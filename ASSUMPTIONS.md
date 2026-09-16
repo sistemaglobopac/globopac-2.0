@@ -82,13 +82,18 @@ secrets do GitHub Actions antes que o pipeline de CI/CD possa fazer deploy real 
 Edge Functions (isso é necessário a partir da Fase 8).
 
 ### 9. Ambiente de execução local sem Docker Desktop
-🟡 **Assumida (pendente de confirmação)** — a máquina usada nesta sessão não tinha Docker
-disponível, então **as migrations não puderam ser validadas localmente** (`supabase db reset`)
-nesta execução. A validação real de "migrations aplicam do zero" (Definition of Done da Fase 0)
-foi delegada ao pipeline de CI (`.github/workflows/ci.yml`), que roda em runner do GitHub Actions
-com Docker disponível. **Antes de confiar na Fase 0 como concluída, rode o CI (ou
-`supabase start && supabase db reset && supabase test db` localmente, com Docker Desktop
-instalado) e confirme que passou.**
+✅ **Resolvida via CI** — a máquina usada para desenvolver a Fase 0 não tinha Docker
+disponível, então as migrations não puderam ser validadas localmente (`supabase db reset`)
+durante a escrita. A validação real de "migrations aplicam do zero" + "testes de RLS por
+perfil passam" (Definition of Done da Fase 0) foi feita via CI
+(`.github/workflows/ci.yml`, runner do GitHub Actions com Docker) —
+[run 35158128902](https://github.com/sistemaglobopac/globopac-2.0/actions/runs/35158128902):
+ambos os jobs verdes, 21/21 testes pgTAP passando. Duas iterações de CI foram necessárias
+para chegar aqui; os bugs reais encontrados (recursão de RLS, teste com expectativa
+desatualizada) foram corrigidos e documentados nos commits subsequentes e no
+[ADR 0007](docs/adr/0007-tem-permissao-security-definer.md). Continua recomendado instalar
+Docker Desktop localmente antes da Fase 1, para poder iterar sem depender de round-trips de
+CI a cada mudança de schema.
 
 ### 10. Ordem/nomenclatura das ações em `permissoes_perfil`
 🟡 **Assumida (pendente de confirmação)** — os nomes de `acao` usados nas policies de RLS

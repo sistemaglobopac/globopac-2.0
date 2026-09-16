@@ -23,10 +23,16 @@ Concluído nesta fase:
 Edge Functions (assinatura, carimbo, liberação SIF, relatórios), frontend, PWA/offline,
 testes E2E Playwright, migração de dados legados. Ver seção "Roteiro" abaixo.
 
-⚠️ **Verificação pendente de confirmação nesta sessão:** as migrations e os testes pgTAP
-foram escritos e revisados, mas **não puderam ser executados localmente** nesta sessão porque
-o ambiente não tinha Docker Desktop instalado (pré-requisito do `supabase start`). Antes de
-considerar a Fase 0 realmente concluída, rode:
+✅ **Validado em CI** ([workflow run](https://github.com/sistemaglobopac/globopac-2.0/actions/runs/35158128902)):
+migrations aplicam do zero em um banco limpo e a suíte pgTAP completa (21/21 testes) passa —
+segregação de funções, imutabilidade pós-liberação ao SIF, append-only de assinaturas, e
+isolamento de RLS por perfil/setor (INSPETOR_PCM não vê outro setor, INSPECAO_FEDERAL só vê
+liberado, ADMIN_MASTER vê tudo, deny-by-default para ação não concedida). Duas rodadas de CI
+foram necessárias para chegar até aqui — os dois bugs reais encontrados (recursão de RLS em
+`tem_permissao()`, e um teste com expectativa desatualizada) estão documentados nos commits
+e em [ADR 0007](docs/adr/0007-tem-permissao-security-definer.md).
+
+Para rodar localmente (requer Docker Desktop):
 
 ```bash
 npm install
@@ -34,10 +40,6 @@ npm run db:start
 npm run db:reset   # aplica todas as migrations do zero + supabase/seed.sql
 npm run db:test    # roda a suíte pgTAP (supabase/tests/database/*.sql)
 ```
-
-Isso também roda automaticamente em CI (`.github/workflows/ci.yml`) a cada push/PR, em um
-runner com Docker disponível — se você não conseguir rodar localmente, abra um PR e confira o
-resultado do job `migrations-e-rls`.
 
 ## Pré-requisitos
 
@@ -83,7 +85,7 @@ staging/produção.
 
 | Fase | Escopo | Status |
 |---|---|---|
-| 0 | Schema base, RLS, autenticação, RBAC | ✅ Implementada nesta sessão — **pendente de validação local/CI** (ver aviso acima) |
+| 0 | Schema base, RLS, autenticação, RBAC | ✅ Concluída e validada em CI |
 | 1 | CRUD de fichas e verificação | Não iniciada |
 | 2 | Assinatura eletrônica + carimbo RFC 3161 | Não iniciada |
 | 3 | Liberação SIF + portal público de verificação | Não iniciada |
