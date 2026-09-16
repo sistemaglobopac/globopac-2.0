@@ -30,10 +30,21 @@ $$;
 comment on function public.meus_setores is
   'Setores de inspeção do usuário autenticado, lidos do claim setores_permitidos do JWT.';
 
+-- SECURITY DEFINER (não o padrão): tem_permissao() lê permissoes_perfil. Se essa leitura
+-- passasse pela RLS de permissoes_perfil, e permissoes_perfil tiver uma policy que também
+-- chama tem_permissao() (para o ADMIN_MASTER gerenciar a matriz — ver migration
+-- 20260916000016), toda chamada a tem_permissao() dispararia outra checagem de RLS em
+-- permissoes_perfil, que chamaria tem_permissao() de novo — recursão infinita
+-- ("stack depth limit exceeded" em produção/CI). SECURITY DEFINER faz a leitura interna
+-- rodar com o privilégio do dono da função (postgres, dono de permissoes_perfil, que já
+-- ignora RLS da própria tabela por ownership), quebrando o ciclo. search_path é travado
+-- explicitamente por segurança padrão de funções SECURITY DEFINER.
 create or replace function public.tem_permissao(p_recurso text, p_acao text)
 returns boolean
 language sql
 stable
+security definer
+set search_path = public, pg_temp
 as $$
   select exists (
     select 1
@@ -49,7 +60,9 @@ comment on function public.tem_permissao is
   'deste projeto. Deny by default: combinação ausente em permissoes_perfil, ou perfil nulo, '
   'retorna false. A coluna condicao de permissoes_perfil NÃO é avaliada aqui — restrições '
   'contextuais (mesmo setor, etc.) são expressas diretamente em cada policy, combinando '
-  'tem_permissao() com meus_setores()/meu_perfil(). Ver ASSUMPTIONS.md item 11.';
+  'tem_permissao() com meus_setores()/meu_perfil(). Ver ASSUMPTIONS.md item 11. '
+  'SECURITY DEFINER é deliberado — ver comentário acima da definição da função sobre '
+  'recursão de RLS.';
 
 revoke execute on function public.meu_perfil from anon;
 revoke execute on function public.meus_setores from anon;

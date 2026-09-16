@@ -27,12 +27,16 @@ values ('b0000000-0000-0000-0000-000000000001', 'TEMP-TESTE', 1, 'Template de Te
 -- ------------------------------------------------------------------------------------------
 -- 1) Segregação de funções: criador não pode verificar o próprio registro.
 -- ------------------------------------------------------------------------------------------
-select throws_ok(
+-- Nota: usamos throws_matching (regex sobre a mensagem) em vez de throws_ok(sql, 'P0001',
+-- description) porque, na forma de 3 argumentos do pgTAP, um segundo argumento de 5
+-- caracteres é tratado como SQLSTATE e o terceiro vira a MENSAGEM DE ERRO ESPERADA (não uma
+-- descrição livre) — e nossas mensagens embutem UUIDs dinâmicos, então nunca bateriam exato.
+select throws_matching(
   $$
     insert into monitoramentos (ficha_template_id, versao_template, user_id, setor, dados_dinamicos, verificado_por)
     values ('b0000000-0000-0000-0000-000000000001', 1, 'a0000000-0000-0000-0000-000000000001', 'LINHA_DIF', '{}'::jsonb, 'a0000000-0000-0000-0000-000000000001')
   $$,
-  'P0001',
+  '^Segregação de funções violada',
   'Segregação de funções: verificado_por = user_id deve ser bloqueado por trigger'
 );
 
@@ -46,13 +50,13 @@ select lives_ok(
 );
 
 -- Tentar "roubar" a verificação para o próprio criador via UPDATE também deve ser bloqueado.
-select throws_ok(
+select throws_matching(
   $$
     update monitoramentos
        set verificado_por = 'a0000000-0000-0000-0000-000000000001'
      where id = 'c0000000-0000-0000-0000-000000000001'
   $$,
-  'P0001',
+  '^Segregação de funções violada',
   'Segregação de funções também se aplica a UPDATE, não só INSERT'
 );
 
@@ -61,15 +65,15 @@ select throws_ok(
 -- ------------------------------------------------------------------------------------------
 update monitoramentos set liberado_sif = true where id = 'c0000000-0000-0000-0000-000000000001';
 
-select throws_ok(
+select throws_matching(
   $$ update monitoramentos set setor = 'RECEPCAO' where id = 'c0000000-0000-0000-0000-000000000001' $$,
-  'P0001',
+  '^Monitoramento .* já foi liberado ao SIF',
   'Monitoramento liberado ao SIF é imutável: UPDATE deve ser bloqueado'
 );
 
-select throws_ok(
+select throws_matching(
   $$ delete from monitoramentos where id = 'c0000000-0000-0000-0000-000000000001' $$,
-  'P0001',
+  '^monitoramentos é append-only',
   'monitoramentos nunca aceita DELETE físico, liberado ou não'
 );
 
@@ -79,24 +83,24 @@ select throws_ok(
 insert into assinaturas_eletronicas (id, monitoramento_id, user_id, tipo, hash_documento)
 values ('d0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000002', 'VERIFICADOR', repeat('a', 64));
 
-select throws_ok(
+select throws_matching(
   $$ update assinaturas_eletronicas set hash_documento = repeat('b', 64) where id = 'd0000000-0000-0000-0000-000000000001' $$,
-  'P0001',
+  '^assinaturas_eletronicas é append-only',
   'assinaturas_eletronicas é append-only: UPDATE deve ser bloqueado por trigger de banco'
 );
 
-select throws_ok(
+select throws_matching(
   $$ delete from assinaturas_eletronicas where id = 'd0000000-0000-0000-0000-000000000001' $$,
-  'P0001',
+  '^assinaturas_eletronicas é append-only',
   'assinaturas_eletronicas é append-only: DELETE deve ser bloqueado por trigger de banco'
 );
 
 -- ------------------------------------------------------------------------------------------
 -- 4) perfis_usuarios nunca é excluído fisicamente.
 -- ------------------------------------------------------------------------------------------
-select throws_ok(
+select throws_matching(
   $$ delete from perfis_usuarios where id = 'a0000000-0000-0000-0000-000000000001' $$,
-  'P0001',
+  '^perfis_usuarios nunca é excluído fisicamente',
   'perfis_usuarios nunca aceita DELETE físico (desativar com ativo=false)'
 );
 
