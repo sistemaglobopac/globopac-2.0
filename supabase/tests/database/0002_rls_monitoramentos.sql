@@ -115,14 +115,18 @@ select is(
 );
 
 -- ------------------------------------------------------------------------------------------
--- Perfil sem a permissão 'ler' concedida (simulado com um perfil qualquer + ação inexistente
--- na matriz) não vê nada, mesmo estando no setor certo — deny by default.
+-- Perfil sem a ação 'monitoramentos.ler' na matriz não vê nada, mesmo com o setor batendo —
+-- deny by default. INSPETOR_PCM não tem essa ação (só ações de manutencao_*, ver migration
+-- 20260916000017); simulamos setores_permitidos = LINHA_DIF para isolar que o bloqueio vem
+-- da PERMISSÃO ausente, não de uma diferença de setor (já coberta no teste do topo do
+-- arquivo). NOTA: GESTOR_SETOR não serve para este teste — a matriz concede a ele
+-- monitoramentos.ler de propósito (para contexto ao tratar RNC do próprio setor).
 -- ------------------------------------------------------------------------------------------
 reset role;
 select set_config('request.jwt.claims', json_build_object(
-  'sub', 'e0000000-0000-0000-0000-000000000001',
+  'sub', 'e0000000-0000-0000-0000-000000000003',
   'role', 'authenticated',
-  'perfil', 'GESTOR_SETOR',
+  'perfil', 'INSPETOR_PCM',
   'setores_permitidos', array['LINHA_DIF']
 )::text, true);
 set local role authenticated;
@@ -130,7 +134,7 @@ set local role authenticated;
 select is(
   (select count(*)::int from monitoramentos),
   0,
-  'GESTOR_SETOR não tem a ação monitoramentos.ler na matriz — deny by default nega tudo'
+  'INSPETOR_PCM não tem a ação monitoramentos.ler na matriz — deny by default nega tudo mesmo com setor batendo'
 );
 
 -- Sanidade: sem NENHUM claim (anon), nada é visível.
