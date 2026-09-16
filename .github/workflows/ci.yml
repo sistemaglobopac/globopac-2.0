@@ -109,14 +109,16 @@ jobs:
       - name: Aplicar migrations + seed (usuários e template de teste)
         run: supabase db reset
 
-      - name: Exportar URL/chaves do stack local para o ambiente
+      - name: Escrever .env.local com URL/chaves do stack local (Vite carrega automaticamente)
+        # Grava direto em .env.local em vez de passar por $GITHUB_ENV: evita qualquer
+        # ambiguidade de aspas/quoting ao reexportar um valor lido de outro comando — Vite lê
+        # .env.local nativamente no build, sem nenhuma variável de ambiente extra necessária.
         run: |
-          supabase status -o env | grep -E '^(API_URL|ANON_KEY)=' >> "$GITHUB_ENV"
-
-      - name: Mapear para as variáveis VITE_* esperadas pelo frontend
-        run: |
-          echo "VITE_SUPABASE_URL=$API_URL" >> "$GITHUB_ENV"
-          echo "VITE_SUPABASE_ANON_KEY=$ANON_KEY" >> "$GITHUB_ENV"
+          supabase status -o env | grep -E '^(API_URL|ANON_KEY)=' | sed \
+            -e 's/^API_URL=/VITE_SUPABASE_URL=/' \
+            -e 's/^ANON_KEY=/VITE_SUPABASE_ANON_KEY=/' > .env.local
+          echo "--- .env.local gerado (chave anon local, não é segredo de produção) ---"
+          cat .env.local
 
       - name: Instalar navegadores do Playwright
         run: npx playwright install --with-deps chromium
@@ -124,12 +126,14 @@ jobs:
       - name: Rodar E2E (build + preview + testes — ver playwright.config.ts)
         run: npm run test:e2e
 
-      - name: Publicar relatório do Playwright em caso de falha
+      - name: Publicar relatório do Playwright em caso de falha (HTML + traces/screenshots)
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: playwright-report/
+          path: |
+            playwright-report/
+            test-results/
           retention-days: 7
 
       - name: Parar stack
