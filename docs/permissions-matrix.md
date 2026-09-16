@@ -25,7 +25,7 @@ que sincronizado entre policies de RLS, esta tabela e a migration de seed):
 | Perfil | Recursos e ações permitidas |
 |---|---|
 | `INSPETOR_QUALIDADE` | `monitoramentos`: ler, criar · `rnc`: ler, criar · `assinaturas_eletronicas`: ler · `turnos_inspetores`: ler |
-| `VERIFICADOR` | `monitoramentos`: ler, verificar, liberar_sif · `rnc`: ler · `assinaturas_eletronicas`: ler · `lote_liberacao_sif`: ler · `fila_carimbo_tempo`: ler |
+| `VERIFICADOR` | `monitoramentos`: ler, verificar, liberar_sif · `rnc`: ler, criar (Fase 1 — abrir RNC automaticamente ao reprovar) · `assinaturas_eletronicas`: ler · `lote_liberacao_sif`: ler · `fila_carimbo_tempo`: ler |
 | `GESTOR_SETOR` | `monitoramentos`: ler · `rnc`: ler, criar, tratar |
 | `ADMIN_MASTER` | Acesso total a todos os recursos listados (ver migration de seed para a lista completa) |
 | `INSPECAO_FEDERAL` | `monitoramentos`: ler (apenas `liberado_sif=true`, reforçado na policy) · `assinaturas_eletronicas`/`assinaturas_os_eletronicas`: ler · `lote_liberacao_sif`: ler · `manutencao_os`/`manutencao_relatorios_sif`: ler |

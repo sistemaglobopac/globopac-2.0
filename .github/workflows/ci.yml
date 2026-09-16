@@ -54,7 +54,89 @@ jobs:
         if: always()
         run: supabase stop
 
-  # Placeholders para as fases seguintes (frontend ainda não existe na Fase 0):
-  # lint, typecheck, testes unitários/componente (Vitest) e build (Vite) entram aqui a partir
-  # da Fase 1, e "deploy de migrations + Edge Functions" a partir da Fase 8 — ver seção 14 do
-  # PROMPT MESTRE e README.md.
+  frontend:
+    name: Lint + typecheck + testes unit/componente + build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm install
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Testes unitários e de componente (Vitest)
+        run: npm run test:unit
+
+      - name: Build (placeholder de env — build real precisa de VITE_SUPABASE_* válidos, ver job e2e)
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: http://127.0.0.1:54321
+          VITE_SUPABASE_ANON_KEY: placeholder-somente-para-o-build-tipar-o-cliente
+
+  e2e:
+    name: E2E (Playwright) — fluxos críticos ponta a ponta
+    runs-on: ubuntu-latest
+    needs: [migrations-e-rls, frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm install
+
+      - name: Instalar Supabase CLI (versão pinada)
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+
+      - name: Subir stack local do Supabase (Postgres + Auth + Edge Functions)
+        run: supabase start
+
+      - name: Aplicar migrations + seed (usuários e template de teste)
+        run: supabase db reset
+
+      - name: Exportar URL/chaves do stack local para o ambiente
+        run: |
+          supabase status -o env | grep -E '^(API_URL|ANON_KEY)=' >> "$GITHUB_ENV"
+
+      - name: Mapear para as variáveis VITE_* esperadas pelo frontend
+        run: |
+          echo "VITE_SUPABASE_URL=$API_URL" >> "$GITHUB_ENV"
+          echo "VITE_SUPABASE_ANON_KEY=$ANON_KEY" >> "$GITHUB_ENV"
+
+      - name: Instalar navegadores do Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Rodar E2E (build + preview + testes — ver playwright.config.ts)
+        run: npm run test:e2e
+
+      - name: Publicar relatório do Playwright em caso de falha
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Parar stack
+        if: always()
+        run: supabase stop
+
+  # Placeholder da Fase 8+: "deploy de migrations + Edge Functions" automatizado contra um
+  # projeto Supabase real — depende de SUPABASE_PROJECT_ID/SUPABASE_ACCESS_TOKEN/
+  # SUPABASE_DB_PASSWORD como secrets do repositório (ainda não configurados — ver
+  # ASSUMPTIONS.md item 8).
