@@ -1,0 +1,52 @@
+project_id = "globopac-2"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:5173"
+additional_redirect_urls = ["http://127.0.0.1:5173"]
+# JWT curto por padrão: revogação de perfil (ativo=false) só é efetiva na próxima renovação
+# de token — ver ASSUMPTIONS.md e seção 4.2 do PROMPT MESTRE. 15 min reduz a janela de risco
+# sem gerar renovação excessiva.
+jwt_expiry = 900
+enable_signup = false
+
+# Auth Hook: embute perfil (RBAC) e setores_permitidos no JWT no momento da emissão.
+# Função definida em supabase/migrations (public.custom_access_token_hook).
+[auth.hook.custom_access_token]
+enabled = true
+uri = "pg-functions://postgres/public/custom_access_token_hook"
+
+[auth.rate_limit]
+# Mitiga força bruta no login — item explícito do checklist de segurança (seção 8).
+sign_in_sign_ups = 30
+token_refresh = 150
+
+[edge_runtime]
+enabled = true
+policy = "oneshot"
+
+[analytics]
+enabled = false

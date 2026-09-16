@@ -1,0 +1,29 @@
+node_modules/
+dist/
+dist-ssr/
+.env
+.env.local
+.env.*.local
+*.local
+
+# Supabase
+supabase/.branches
+supabase/.temp
+.supabase/
+
+# Testes / cobertura
+coverage/
+playwright-report/
+test-results/
+.vitest-cache/
+
+# Editor / SO
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*

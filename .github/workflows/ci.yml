@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Débito técnico da v1 a não repetir: "Deploy de Edge Function manual via dashboard porque a
+# CLI 'crasha'". A causa raiz mais comum desse tipo de sintoma é usar uma versão não pinada
+# da CLI/imagens Docker do stack local. Aqui a versão da Supabase CLI vem do package.json
+# (pinada), e o job roda em um runner com Docker disponível nativamente.
+
+jobs:
+  segredos-e-dependencias:
+    name: Scanner de segredos vazados
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  migrations-e-rls:
+    name: Migrations aplicam do zero + testes de RLS (pgTAP)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar dependências
+        run: npm install
+
+      - name: Instalar Supabase CLI (versão pinada)
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+
+      - name: Subir stack local do Supabase
+        run: supabase start
+
+      - name: Aplicar migrations do zero (supabase db reset)
+        run: supabase db reset
+
+      - name: Rodar testes de banco (pgTAP) — RLS por perfil, segregação de funções, append-only
+        run: supabase test db
+
+      - name: Parar stack
+        if: always()
+        run: supabase stop
+
+  # Placeholders para as fases seguintes (frontend ainda não existe na Fase 0):
+  # lint, typecheck, testes unitários/componente (Vitest) e build (Vite) entram aqui a partir
+  # da Fase 1, e "deploy de migrations + Edge Functions" a partir da Fase 8 — ver seção 14 do
+  # PROMPT MESTRE e README.md.
