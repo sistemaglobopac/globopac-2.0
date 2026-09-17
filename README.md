@@ -5,7 +5,7 @@ Reconstrução da v1 seguindo o PROMPT MESTRE (documentação completa do domín
 roteiro de fases está na conversa que originou este repositório — os pontos operacionais
 relevantes estão replicados em `ASSUMPTIONS.md` e `docs/`).
 
-## Estado atual: Fase 3 — Liberação em lote ao SIF + portal público de verificação
+## Estado atual: Fase 4 — RNC e tratativas
 
 ### Fase 0 (concluída e validada em CI)
 Schema completo versionado (`supabase/migrations/`), RLS deny-by-default em todas as tabelas,
@@ -125,9 +125,32 @@ teste aparece nesta sessão — vale ter isso em mente ao escrever qualquer novo
 use `getByText` sem `exact: true` num app com nomes/rótulos que podem conter substrings uns
 dos outros.
 
-**Ainda não implementado** (fases seguintes do roteiro): portal público para Ordens de
-Serviço (depende da Fase 5 definir como uma OS é liberada), tratativa completa de RNC
-(SLA/notificação), Portal PCM/OS, BI/dashboards, PWA offline, migração de dados legados.
+### Fase 4 (concluída e validada em CI)
+- **Tratativas de RNC** (`/rnc`, GESTOR_SETOR/ADMIN_MASTER): lista as RNCs não fechadas do
+  próprio setor (RLS já restringia isso desde a Fase 0 — nenhuma migration nova foi
+  necessária), com badge de severidade e badge "SLA VENCIDO" quando `prazo_sla` já passou.
+  Ciclo de vida em dois passos explícitos: registrar tratativa (→ `TRATADA`) e depois fechar
+  (→ `FECHADA`) — ver ASSUMPTIONS.md #20 sobre por que `EM_TRATATIVA` foi deixado sem uso.
+- **Reabertura** (ADMIN_MASTER, em RNCs já fechadas): insere uma nova linha referenciando a
+  fechada via `rnc_anterior_id`, recalculando `prazo_sla` a partir de
+  `app_config.sla_rnc_horas_por_severidade` — nunca sobrescreve a tratativa original (ver
+  ASSUMPTIONS.md #21).
+- **Nenhuma Edge Function nova**: ao contrário da assinatura/carimbo, tratar/fechar/reabrir
+  uma RNC não envolve hash nem assinatura eletrônica — as policies de RLS já existentes
+  (`rnc_update`, `rnc_insert`) bastam para gatar essas operações direto do cliente (ver
+  ASSUMPTIONS.md #22).
+- Teste E2E do fluxo nº 3 da seção 10 (`tests/e2e/fluxo-03-rnc-tratativas.spec.ts`):
+  verificador reprova → RNC criada automaticamente → gestor de setor trata → fecha; mais um
+  segundo teste dedicado ao DoD "SLA configurável funcional com alerta" (força um
+  `prazo_sla` vencido via `service_role` e confirma o badge de alerta).
+
+✅ **Validado em CI** — 4/4 jobs, incluindo os 9 testes E2E (fluxos 1, 2, 3, 5, 6a, 6b, 7,
+SLA de RNC, e rate limiting do portal). Link do workflow run será adicionado após o push.
+
+**Ainda não implementado** (fases seguintes do roteiro): notificação ativa de SLA vencido
+(e-mail/push — hoje o alerta é só visual no painel), portal público para Ordens de Serviço
+(depende da Fase 5 definir como uma OS é liberada), Portal PCM/OS, BI/dashboards, PWA
+offline, migração de dados legados.
 
 ## Pré-requisitos
 
@@ -217,7 +240,7 @@ Nunca use esses usuários/senha fora do ambiente local — são recriados do zer
 | 1 | CRUD de fichas e verificação | ✅ Concluída e validada em CI |
 | 2 | Assinatura eletrônica + carimbo RFC 3161 | ✅ Concluída e validada em CI |
 | 3 | Liberação SIF + portal público de verificação | ✅ Concluída e validada em CI |
-| 4 | RNC e tratativas | Parcial (abertura automática ao reprovar existe; SLA/notificação/fechamento não) |
+| 4 | RNC e tratativas | ✅ Concluída e validada em CI |
 | 5 | Portal PCM/OS | Não iniciada — depende de confirmar ADR 0004 (relação com o GLOBO SIGMA) |
 | 6 | BI, dashboards, exportação de relatórios | Não iniciada |
 | 7 | PWA offline e sincronização | Não iniciada |

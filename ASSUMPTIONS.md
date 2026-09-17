@@ -186,3 +186,39 @@ monitoramento por vez, sem hash agregador. Na Fase 3 ela foi reescrita para semp
 lote (`monitoramento_ids: string[]`, mínimo 1) — liberar um único documento agora é só um
 lote de tamanho 1, ganhando de graça a camada extra de tamper-evidence do hash agregador que
 a versão da Fase 2 não tinha. Não existem mais duas implementações de liberação para manter.
+
+## Premissas da Fase 4 (RNC e tratativas)
+
+### 20. Estado `EM_TRATATIVA` do enum `status_rnc` fica disponível no schema, mas não é usado
+🟡 **Assumida (pendente de confirmação)** — o ciclo de vida implementado nesta fase é
+`ABERTA`/`REABERTA` → `TRATADA` (gestor registra a tratativa) → `FECHADA` (gestor fecha), em
+dois passos explícitos e auditáveis. O PROMPT MESTRE não detalha o que distingue
+`EM_TRATATIVA` de `ABERTA` na prática (ex.: precisaria de um terceiro botão "iniciar
+tratativa" sem side-effect nenhum além de marcar "alguém está olhando isso"?) — nenhuma
+suposição foi inventada para preencher essa lacuna. O valor do enum foi mantido (não é
+destrutivo remover depois) para não forçar uma migration se a distinção vier a ser
+especificada.
+
+### 21. Reabertura de RNC restrita a `ADMIN_MASTER`, implementada como novo registro (nunca UPDATE)
+✅ **Confirmada, decisão deliberada** — não existe, em nenhuma fase do PROMPT MESTRE, um
+perfil de "revisor de RNC" distinto de quem a trata. Diante disso, a reabertura foi
+restrita ao único perfil com visão irrestrita (`ADMIN_MASTER`), via RLS existente
+(`rnc_insert`: `tem_permissao('rnc','criar') and aberto_por = auth.uid()` — sem alteração de
+schema/policy nesta fase). A reabertura sempre insere uma **nova linha** com
+`rnc_anterior_id` apontando para a fechada, recalculando `prazo_sla` a partir de
+`app_config.sla_rnc_horas_por_severidade` — a RNC original fechada nunca é sobrescrita,
+preservando a trilha de quem tratou o quê e quando (mesmo princípio de apend-only já usado
+em `assinaturas_eletronicas`, embora aqui seja convenção de aplicação, não trigger de banco,
+já que `rnc` não carrega valor jurídico de assinatura eletrônica — só rastreabilidade
+operacional).
+
+### 22. Nenhuma Edge Function nova para tratar/fechar/reabrir RNC
+✅ **Confirmada, decisão deliberada** — ao contrário de `assinar-documento` ou
+`liberar-sif`, a tratativa de RNC não envolve hash recomputado, assinatura eletrônica ou
+carimbo de tempo (RNC não é, em si, um documento assinado pelo PROMPT MESTRE — é o registro
+de tratamento de uma não conformidade). As policies de RLS já existentes desde a Fase 0
+(`rnc_update`: `tem_permissao('rnc','tratar') and setor = any(meus_setores())`) e a de
+`rnc_insert` já bastam para gatar tanto a tratativa/fechamento quanto a reabertura
+diretamente do cliente Supabase, sem precisar de um `SECURITY DEFINER` server-side. Nenhuma
+migration de `permissoes_perfil` foi necessária: `GESTOR_SETOR` e `ADMIN_MASTER` já tinham
+`rnc: ler/criar/tratar` desde a seed da Fase 0.

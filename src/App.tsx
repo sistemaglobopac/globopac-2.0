@@ -13,12 +13,14 @@ import { CarimbosPendentesPage } from "@/modules/carimbos/CarimbosPendentesPage"
 import { LiberarSifPage } from "@/modules/sif/LiberarSifPage";
 import { AuditoriaFederalPage } from "@/modules/sif/AuditoriaFederalPage";
 import { VerificarPage } from "@/modules/verificacao-publica/VerificarPage";
+import { RncTratativasPage } from "@/modules/rnc/RncTratativasPage";
 
 const ROTA_INICIAL_POR_PERFIL: Record<string, string> = {
   INSPETOR_QUALIDADE: "/fichas/nova",
   VERIFICADOR: "/verificacao",
   ADMIN_MASTER: "/fichas/nova",
   INSPECAO_FEDERAL: "/auditoria",
+  GESTOR_SETOR: "/rnc",
 };
 
 function HomeRedirect() {
@@ -79,6 +81,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute perfisPermitidos={["ADMIN_MASTER"]}>
               <LiberarSifPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/rnc"
+          element={
+            <ProtectedRoute perfisPermitidos={["GESTOR_SETOR", "ADMIN_MASTER"]}>
+              <RncTratativasPage />
             </ProtectedRoute>
           }
         />
