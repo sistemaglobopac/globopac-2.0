@@ -28,7 +28,7 @@ que sincronizado entre policies de RLS, esta tabela e a migration de seed):
 | `VERIFICADOR` | `monitoramentos`: ler, verificar, liberar_sif · `rnc`: ler, criar (Fase 1 — abrir RNC automaticamente ao reprovar) · `assinaturas_eletronicas`: ler · `lote_liberacao_sif`: ler · `fila_carimbo_tempo`: ler |
 | `GESTOR_SETOR` | `monitoramentos`: ler · `rnc`: ler, criar, tratar |
 | `ADMIN_MASTER` | Acesso total a todos os recursos listados (ver migration de seed para a lista completa) |
-| `INSPECAO_FEDERAL` | `monitoramentos`: ler (apenas `liberado_sif=true`, reforçado na policy) · `assinaturas_eletronicas`/`assinaturas_os_eletronicas`: ler · `lote_liberacao_sif`: ler · `manutencao_os`/`manutencao_relatorios_sif`: ler |
+| `INSPECAO_FEDERAL` | `monitoramentos`: ler (apenas `liberado_sif=true`, reforçado na policy) · `assinaturas_eletronicas`/`assinaturas_os_eletronicas`: ler · `lote_liberacao_sif`: ler · `manutencao_os`/`manutencao_relatorios_sif`: ler (mesma restrição `liberado_sif=true`, corrigida na Fase 5 — ver ASSUMPTIONS.md) |
 | `INSPETOR_PCM` | `manutencao_os`: ler, abrir, avancar_etapa · `manutencao_os_historico`: ler · `manutencao_relatorios_sif`: ler, criar, liberar · `assinaturas_os_eletronicas`: ler |
 
 ## Restrições contextuais aplicadas diretamente nas policies (não na coluna `condicao`)

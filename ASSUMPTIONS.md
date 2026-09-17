@@ -27,6 +27,11 @@ forem acessíveis entre si, ou um identificador externo sincronizado via webhook
 **Confirmar antes de iniciar a Fase 5** (Portal PCM/OS) — ver roteiro no README.
 Ver [docs/adr/0004-relacao-globo-sigma.md](docs/adr/0004-relacao-globo-sigma.md).
 
+**Atualização (Fase 5):** a Fase 5 foi autorizada e implementada sem que esta confirmação
+tivesse chegado — mantida a alternativa (b) como estava, `ativo_referencia` continua texto
+livre. Nada na Fase 5 pressupõe uma FK estruturada; se a integração real vier a exigir uma,
+é uma migration isolada (trocar o tipo da coluna), sem impacto no restante do schema.
+
 ### 2. Escopo de unidade única vs. múltiplas unidades
 ✅ **Confirmada pelo próprio prompt mestre** — escopo v2 é a SIF 1606 isoladamente. O modelo
 de dados não usa nenhuma tabela `unidades`/`plantas`, mas também não impede a adição futura
@@ -222,3 +227,54 @@ de tratamento de uma não conformidade). As policies de RLS já existentes desde
 diretamente do cliente Supabase, sem precisar de um `SECURITY DEFINER` server-side. Nenhuma
 migration de `permissoes_perfil` foi necessária: `GESTOR_SETOR` e `ADMIN_MASTER` já tinham
 `rnc: ler/criar/tratar` desde a seed da Fase 0.
+
+## Premissas da Fase 5 (Portal PCM/OS)
+
+### 23. Duas lacunas de RLS de `manutencao_os` corrigidas antes de construir a Fase 5
+✅ **Confirmada, correção necessária** — ao revisar o schema da Fase 0 para implementar a
+Edge Function de transição de etapa, `manutencao_os_update` não tinha escopo de setor
+(qualquer `INSPETOR_PCM` podia avançar a etapa de uma OS de outro setor) e
+`manutencao_os_select` deixava `INSPECAO_FEDERAL` ver OS ainda em andamento, não só as já
+liberadas ao SIF — inconsistente com o que `docs/permissions-matrix.md` já documentava e com
+a mesma regra aplicada em `monitoramentos_select`. As duas foram corrigidas na migration
+20260920000001, com teste pgTAP de regressão (`0004_rls_manutencao_os.sql`).
+
+### 24. Máquina de estados da OS: um único perfil (`INSPETOR_PCM`) conduz todas as 5 etapas
+🔴 **Assumida sob risco — confirmar operacionalmente** — não existe segregação de funções
+entre abrir/autorizar/programar/executar/validar uma OS (ao contrário de `monitoramentos`,
+onde `verificado_por ≠ user_id` é reforçado por trigger). Não há, no vocabulário de
+`nivel_acesso` da Fase 0, um segundo perfil de supervisor de manutenção para sustentar essa
+segregação — ver [ADR 0012](docs/adr/0012-maquina-estados-os-liberacao-manutencao.md).
+Risco: se a operação real exigir que autorização/validação venham de alguém diferente de
+quem executa, será necessário um novo perfil em `nivel_acesso` (migration + RBAC), não uma
+mudança trivial.
+
+### 25. Assinatura `VALIDACAO` conclui a OS diretamente (sem um status `VALIDACAO` intermediário)
+✅ **Confirmada, decisão deliberada** — `tipo_assinatura_os` tem 5 valores mas `status_os` tem
+6; a única leitura consistente do schema da Fase 0 é que validar É concluir, sem uma 6ª
+assinatura para uma transição `VALIDACAO → CONCLUIDA` que o enum não modela. Ver ADR 0012.
+
+### 26. Liberação diária ao SIF de OS é cumulativa por dia, não um evento único
+✅ **Confirmada, decisão deliberada** — `manutencao_relatorios_sif.data_referencia` é
+`unique` desde a Fase 0 (diferente de `lote_liberacao_sif`, que permite múltiplos lotes por
+dia). Uma segunda chamada de `liberar-relatorio-os-sif` no mesmo dia não é rejeitada: ela
+libera as OS recém-concluídas e recalcula o hash agregador sobre TODAS as OS já ligadas ao
+relatório daquele dia (antigas + novas), reenfileirando um novo carimbo de tempo para o hash
+atualizado. Isso também torna a operação segura para retry (uma segunda tentativa após falha
+de rede não trava num 409 permanente).
+
+### 27. Reuso da ação `manutencao_os.avancar_etapa` para autorizar a liberação ao SIF
+✅ **Confirmada, decisão deliberada** — a Fase 0 não previu uma ação dedicada tipo
+`liberar_sif` para `manutencao_os` (só para `manutencao_relatorios_sif`, que tem `liberar`).
+Em vez de uma migration nova só para isso, a Edge Function de liberação reaproveita
+`manutencao_os_update` (gated por `avancar_etapa` + setor) para o UPDATE que marca
+`liberado_sif=true` — semanticamente aceitável (é o último passo administrativo do ciclo da
+OS) e sem abrir nenhum acesso que `INSPETOR_PCM`/`ADMIN_MASTER` já não tivessem.
+
+### 28. Portal público estendido para OS reaproveita a resposta genérica de `verificar-documento`
+✅ **Confirmada, decisão deliberada** — a Fase 3 (ADR 0011) deixou a busca de OS de fora
+deliberadamente, por falta de um mecanismo de liberação definido. Agora que existe
+(`manutencao_os.liberado_sif`), o portal tenta `monitoramentos` e, se não encontrado, tenta
+`manutencao_os` — mesmo formato de resposta (`trilha`/`integridade`), com um campo `descricao`
+opcional só para OS. Nenhuma mudança de contrato para quem já consome o portal para
+monitoramentos.

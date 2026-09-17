@@ -1,11 +1,9 @@
 // Edge Function: verificar-documento (seção 7.6 do PROMPT MESTRE) — portal público
 // /verificar?id=<uuid>. Sem login (verify_jwt = false em supabase/config.toml).
 //
-// Escopo desta fase: só MONITORAMENTOS. Ordens de serviço (OS) ficam para a Fase 5 — a
-// tabela manutencao_os ainda não tem um mecanismo de "liberação" definido (isso é
-// manutencao_relatorios_sif, um relatório diário separado, não um flag por OS), então
-// implementar a busca de OS aqui seria adivinhar um design que a Fase 5 ainda vai definir de
-// verdade — ver ASSUMPTIONS.md.
+// A partir da Fase 5, cobre também Ordens de Serviço (manutencao_os.liberado_sif, ver ADR
+// 0012) — tenta monitoramentos primeiro e, se não encontrado, tenta OS. Mesmas regras de
+// segurança para os dois tipos de documento.
 //
 // Regras de segurança (seção 7.6):
 // - "não encontrado" e "existe mas não liberado" retornam a MESMA resposta ao cliente —
@@ -16,7 +14,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { corsHeaders } from "../_shared/cors.ts";
-import { conteudoAssinavelMonitoramento, sha256Hex } from "../_shared/hash.ts";
+import { conteudoAssinavelMonitoramento, conteudoAssinavelOs, sha256Hex } from "../_shared/hash.ts";
 
 // Tipo explícito (em vez de ReturnType<typeof createClient>): createClient é uma função com
 // overloads genéricos, e ReturnType sozinho resolve para uma variante incompatível com o que
@@ -89,7 +87,9 @@ Deno.serve(async (req) => {
       return respostaNaoEncontrado(correlationId);
     }
 
-    const resultado = await buscarMonitoramentoParaVerificacao(adminClient, parsed.data.id);
+    const resultado =
+      (await buscarMonitoramentoParaVerificacao(adminClient, parsed.data.id)) ??
+      (await buscarOsParaVerificacao(adminClient, parsed.data.id));
 
     if (!resultado || !resultado.liberado) {
       await registrarAcesso(adminClient, parsed.data.id, resultado ? "nao_autorizado" : "nao_encontrado", ipHash);
@@ -100,7 +100,12 @@ Deno.serve(async (req) => {
     log("info", "documento_verificado", { id: parsed.data.id });
 
     return new Response(
-      JSON.stringify({ tipo: resultado.tipo, trilha: resultado.trilha, integridade: resultado.integridade }),
+      JSON.stringify({
+        tipo: resultado.tipo,
+        descricao: "descricao" in resultado ? resultado.descricao : undefined,
+        trilha: resultado.trilha,
+        integridade: resultado.integridade,
+      }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (erro) {
@@ -163,6 +168,79 @@ async function buscarMonitoramentoParaVerificacao(
   }
 
   return { tipo: "monitoramento", liberado: m.liberado_sif as boolean, trilha, integridade };
+}
+
+interface OsParaHash {
+  id: string;
+  descricao: string;
+  setor: string;
+  ativo_referencia: string | null;
+  status: string;
+  aberto_por: string;
+  autorizado_por: string | null;
+  programado_por: string | null;
+  executado_por: string | null;
+  validado_por: string | null;
+  criado_em: string;
+  liberado_sif: boolean;
+}
+
+async function buscarOsParaVerificacao(
+  adminClient: AdminClient,
+  id: string
+): Promise<{
+  tipo: "os";
+  liberado: boolean;
+  descricao: string;
+  trilha: ItemTrilha[];
+  integridade: "IDENTICO" | "VERSAO_ANTERIOR" | null;
+} | null> {
+  const { data: linha } = await adminClient
+    .from("manutencao_os")
+    .select(
+      "id, descricao, setor, ativo_referencia, status, aberto_por, autorizado_por, programado_por, executado_por, validado_por, criado_em, liberado_sif"
+    )
+    .eq("id", id)
+    .maybeSingle();
+  const os = linha as unknown as OsParaHash | null;
+
+  if (!os) return null;
+
+  const { data: assinaturas } = await adminClient
+    .from("assinaturas_os_eletronicas")
+    .select("user_id, tipo, hash_documento, tsr_base64, tsa_emitido_em, tsa_utilizada, criado_em")
+    .eq("os_id", id)
+    .order("criado_em", { ascending: true });
+
+  const idsUsuarios = Array.from(new Set((assinaturas ?? []).map((a) => a.user_id as string)));
+  const { data: perfis } = idsUsuarios.length
+    ? await adminClient.from("perfis_usuarios").select("id, nome_completo").in("id", idsUsuarios)
+    : { data: [] as { id: string; nome_completo: string }[] };
+  const nomePorId = new Map((perfis ?? []).map((p) => [p.id as string, p.nome_completo as string]));
+
+  const trilha: ItemTrilha[] = (assinaturas ?? []).map((a) => ({
+    tipo: a.tipo as string,
+    nome: nomePorId.get(a.user_id as string) ?? "Desconhecido",
+    criado_em: a.criado_em as string,
+    carimbo: a.tsr_base64
+      ? { emitido_em: a.tsa_emitido_em as string | null, tsa: a.tsa_utilizada as string | null }
+      : null,
+  }));
+
+  let integridade: "IDENTICO" | "VERSAO_ANTERIOR" | null = null;
+  if (assinaturas && assinaturas.length > 0) {
+    const ultima = assinaturas[assinaturas.length - 1];
+    const hashRecalculado = await sha256Hex(conteudoAssinavelOs(os));
+    integridade = ultima.hash_documento === hashRecalculado ? "IDENTICO" : "VERSAO_ANTERIOR";
+  }
+
+  return {
+    tipo: "os",
+    liberado: os.liberado_sif as boolean,
+    descricao: os.descricao,
+    trilha,
+    integridade,
+  };
 }
 
 async function registrarAcesso(

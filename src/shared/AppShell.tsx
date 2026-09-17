@@ -14,10 +14,16 @@ const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
   VERIFICADOR: [{ rota: "/verificacao", rotulo: "Verificação" }],
   INSPECAO_FEDERAL: [{ rota: "/auditoria", rotulo: "Auditoria" }],
   GESTOR_SETOR: [{ rota: "/rnc", rotulo: "Tratativas RNC" }],
+  INSPETOR_PCM: [
+    { rota: "/pcm", rotulo: "Ordens de Serviço" },
+    { rota: "/pcm/nova", rotulo: "Nova OS" },
+  ],
   ADMIN_MASTER: [
     { rota: "/fichas/nova", rotulo: "Nova ficha" },
     { rota: "/verificacao", rotulo: "Verificação" },
     { rota: "/rnc", rotulo: "Tratativas RNC" },
+    { rota: "/pcm", rotulo: "Ordens de Serviço" },
+    { rota: "/pcm/nova", rotulo: "Nova OS" },
     { rota: "/templates", rotulo: "Templates" },
     { rota: "/sif/liberar", rotulo: "Liberar ao SIF" },
     { rota: "/auditoria", rotulo: "Auditoria" },

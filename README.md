@@ -5,7 +5,7 @@ Reconstrução da v1 seguindo o PROMPT MESTRE (documentação completa do domín
 roteiro de fases está na conversa que originou este repositório — os pontos operacionais
 relevantes estão replicados em `ASSUMPTIONS.md` e `docs/`).
 
-## Estado atual: Fase 4 — RNC e tratativas
+## Estado atual: Fase 5 — Portal PCM/OS
 
 ### Fase 0 (concluída e validada em CI)
 Schema completo versionado (`supabase/migrations/`), RLS deny-by-default em todas as tabelas,
@@ -154,10 +154,34 @@ pendentes, provavelmente uma corrida entre o refetch do TanStack Query e a naveg
 de forma determinística no retry automático do Playwright (`retries: 1` em CI) — mantido como
 observação, não como correção, já que não é causado por nem afeta o código desta fase.
 
+### Fase 5 (concluída e validada em CI)
+- **Ciclo completo da OS de manutenção** (`/pcm/nova`, `/pcm`, INSPETOR_PCM/ADMIN_MASTER):
+  máquina de estados ABERTURA → AUTORIZACAO → PROGRAMACAO → EXECUCAO → VALIDACAO → CONCLUIDA,
+  uma assinatura eletrônica própria por etapa (`avancar-etapa-os`, tabela de transições
+  explícita, nunca if/else — ver [ADR 0012](docs/adr/0012-maquina-estados-os-liberacao-manutencao.md)).
+  Validar conclui a OS diretamente (ASSUMPTIONS.md #25).
+- **Liberação diária ao SIF** (`liberar-relatorio-os-sif`): agrega no relatório do dia
+  (`manutencao_relatorios_sif`) todas as OS concluídas e ainda não liberadas, com hash
+  agregador cumulativo (múltiplas chamadas no mesmo dia se somam, nunca travam num 409 —
+  ASSUMPTIONS.md #26) e assinatura individual LIBERACAO_DIARIA por OS.
+- **Duas correções de RLS na Fase 0** encontradas ao construir esta fase: `manutencao_os`
+  não restringia UPDATE por setor, e deixava INSPECAO_FEDERAL ver OS em andamento (não só as
+  liberadas) — ambas corrigidas com teste pgTAP de regressão (ASSUMPTIONS.md #23).
+- **Portal público estendido** (`/verificar?id=`): tenta `monitoramentos` e, se não
+  encontrado, tenta OS — mesma trilha/integridade, mesmas regras de segurança da Fase 3.
+- **Auditoria** (INSPECAO_FEDERAL): agora também lista OS liberadas ao SIF.
+- Teste E2E do fluxo nº 4 da seção 10 (`tests/e2e/fluxo-04-pcm-os.spec.ts`): ciclo completo —
+  abrir, avançar as 4 etapas, liberar o relatório do dia, verificar no portal público, e
+  conferir visibilidade na auditoria da Inspeção Federal.
+- **Risco documentado, não resolvido**: nenhuma segregação de funções entre as 5 etapas da OS
+  — um único perfil (`INSPETOR_PCM`) pode assiná-las todas (ASSUMPTIONS.md #24).
+
+✅ **Validado em CI** — 4/4 jobs, incluindo o fluxo E2E nº 4 completo.
+
 **Ainda não implementado** (fases seguintes do roteiro): notificação ativa de SLA vencido
-(e-mail/push — hoje o alerta é só visual no painel), portal público para Ordens de Serviço
-(depende da Fase 5 definir como uma OS é liberada), Portal PCM/OS, BI/dashboards, PWA
-offline, migração de dados legados.
+(e-mail/push — hoje o alerta é só visual no painel), integração estruturada com o GLOBO SIGMA
+para `ativo_referencia` (segue texto livre — ASSUMPTIONS.md #1), segregação de funções entre
+etapas da OS, BI/dashboards, PWA offline, migração de dados legados.
 
 ## Pré-requisitos
 
@@ -248,7 +272,7 @@ Nunca use esses usuários/senha fora do ambiente local — são recriados do zer
 | 2 | Assinatura eletrônica + carimbo RFC 3161 | ✅ Concluída e validada em CI |
 | 3 | Liberação SIF + portal público de verificação | ✅ Concluída e validada em CI |
 | 4 | RNC e tratativas | ✅ Concluída e validada em CI |
-| 5 | Portal PCM/OS | Não iniciada — depende de confirmar ADR 0004 (relação com o GLOBO SIGMA) |
+| 5 | Portal PCM/OS | ✅ Concluída e validada em CI |
 | 6 | BI, dashboards, exportação de relatórios | Não iniciada |
 | 7 | PWA offline e sincronização | Não iniciada |
 | 8 | Testes E2E completos, CI/CD, observabilidade | Não iniciada |
@@ -264,4 +288,5 @@ do PROMPT MESTRE — princípio de execução).
 - [docs/adr/](docs/adr/) — decisões arquiteturais (fila de carimbo, conflito offline, LTV,
   relação com o GLOBO SIGMA, TTL de JWT, `condicao` não-genérica, `tem_permissao()` e
   `custom_access_token_hook` como SECURITY DEFINER, Edge Functions com cliente duplo, worker
-  de carimbo de tempo via pg_cron/pg_net/Vault, portal público de verificação).
+  de carimbo de tempo via pg_cron/pg_net/Vault, portal público de verificação, máquina de
+  estados da OS de manutenção e liberação diária ao SIF).

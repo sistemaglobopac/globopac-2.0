@@ -14,6 +14,8 @@ import { LiberarSifPage } from "@/modules/sif/LiberarSifPage";
 import { AuditoriaFederalPage } from "@/modules/sif/AuditoriaFederalPage";
 import { VerificarPage } from "@/modules/verificacao-publica/VerificarPage";
 import { RncTratativasPage } from "@/modules/rnc/RncTratativasPage";
+import { NovaOsPage } from "@/modules/pcm/NovaOsPage";
+import { PainelOsPage } from "@/modules/pcm/PainelOsPage";
 
 const ROTA_INICIAL_POR_PERFIL: Record<string, string> = {
   INSPETOR_QUALIDADE: "/fichas/nova",
@@ -21,6 +23,7 @@ const ROTA_INICIAL_POR_PERFIL: Record<string, string> = {
   ADMIN_MASTER: "/fichas/nova",
   INSPECAO_FEDERAL: "/auditoria",
   GESTOR_SETOR: "/rnc",
+  INSPETOR_PCM: "/pcm",
 };
 
 function HomeRedirect() {
@@ -89,6 +92,22 @@ function AppRoutes() {
           element={
             <ProtectedRoute perfisPermitidos={["GESTOR_SETOR", "ADMIN_MASTER"]}>
               <RncTratativasPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/pcm"
+          element={
+            <ProtectedRoute perfisPermitidos={["INSPETOR_PCM", "ADMIN_MASTER"]}>
+              <PainelOsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/pcm/nova"
+          element={
+            <ProtectedRoute perfisPermitidos={["INSPETOR_PCM", "ADMIN_MASTER"]}>
+              <NovaOsPage />
             </ProtectedRoute>
           }
         />

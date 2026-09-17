@@ -52,3 +52,34 @@ export function conteudoAssinavelMonitoramento(m: {
     criado_em: m.criado_em,
   });
 }
+
+/** Conteúdo assinável de uma Ordem de Serviço no momento da assinatura (seção 7.4). Cobre o
+ * estado completo do ciclo — cada etapa assina o estado JÁ ATUALIZADO (status e coluna
+ * *_por da própria etapa), nunca o estado anterior. */
+export function conteudoAssinavelOs(os: {
+  id: string;
+  descricao: string;
+  setor: string;
+  ativo_referencia: string | null;
+  status: string;
+  aberto_por: string;
+  autorizado_por: string | null;
+  programado_por: string | null;
+  executado_por: string | null;
+  validado_por: string | null;
+  criado_em: string;
+}): string {
+  return canonicalizar({
+    id: os.id,
+    descricao: os.descricao,
+    setor: os.setor,
+    ativo_referencia: os.ativo_referencia,
+    status: os.status,
+    aberto_por: os.aberto_por,
+    autorizado_por: os.autorizado_por,
+    programado_por: os.programado_por,
+    executado_por: os.executado_por,
+    validado_por: os.validado_por,
+    criado_em: os.criado_em,
+  });
+}

@@ -12,7 +12,8 @@ interface ItemTrilha {
 }
 
 interface RespostaVerificacao {
-  tipo: string;
+  tipo: "monitoramento" | "os";
+  descricao?: string;
   trilha: ItemTrilha[];
   integridade: "IDENTICO" | "VERSAO_ANTERIOR" | null;
 }
@@ -54,6 +55,11 @@ export function VerificarPage() {
 
       {data && (
         <div className="space-y-4">
+          {data.tipo === "os" && (
+            <p className="text-sm text-muted-foreground">
+              Ordem de Serviço de manutenção{data.descricao ? `: ${data.descricao}` : ""}
+            </p>
+          )}
           {data.integridade && (
             <Badge variant={data.integridade === "IDENTICO" ? "success" : "destructive"} className="text-sm">
               {data.integridade === "IDENTICO" ? "✓ IDÊNTICO ao original assinado" : "≠ VERSÃO ANTERIOR (integridade violada)"}

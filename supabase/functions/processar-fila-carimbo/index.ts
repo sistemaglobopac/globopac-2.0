@@ -18,6 +18,7 @@ const TABELA_POR_TIPO: Record<string, { tabela: string; colunaHash: string }> = 
   ficha: { tabela: "assinaturas_eletronicas", colunaHash: "hash_documento" },
   os: { tabela: "assinaturas_os_eletronicas", colunaHash: "hash_documento" },
   lote: { tabela: "lote_liberacao_sif", colunaHash: "hash_agregador" },
+  relatorio_os: { tabela: "manutencao_relatorios_sif", colunaHash: "hash_agregador" },
 };
 
 function bytesParaHexPostgres(bytes: Uint8Array): string {
