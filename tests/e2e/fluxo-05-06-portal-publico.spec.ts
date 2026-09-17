@@ -50,9 +50,11 @@ test("documento liberado aparece com trilha e badge corretos no portal público 
 
   await page.goto(`/verificar?id=${registro!.id}`);
   await expect(page.getByText("Trilha de assinaturas")).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText("INSPETOR")).toBeVisible();
-  await expect(page.getByText("VERIFICADOR")).toBeVisible();
-  await expect(page.getByText("LIBERACAO_DIARIA")).toBeVisible();
+  // exact:true — sem isso, getByText("INSPETOR") também casa com o nome do inspetor de
+  // teste ("Inspetor(a) de Qualidade (dev)"), que contém a mesma substring.
+  await expect(page.getByText("INSPETOR", { exact: true })).toBeVisible();
+  await expect(page.getByText("VERIFICADOR", { exact: true })).toBeVisible();
+  await expect(page.getByText("LIBERACAO_DIARIA", { exact: true })).toBeVisible();
   await expect(page.getByText(/IDÊNTICO ao original assinado/)).toBeVisible();
 });
 
