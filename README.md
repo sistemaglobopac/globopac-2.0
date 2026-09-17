@@ -176,7 +176,17 @@ observação, não como correção, já que não é causado por nem afeta o cód
 - **Risco documentado, não resolvido**: nenhuma segregação de funções entre as 5 etapas da OS
   — um único perfil (`INSPETOR_PCM`) pode assiná-las todas (ASSUMPTIONS.md #24).
 
-✅ **Validado em CI** — 4/4 jobs, incluindo o fluxo E2E nº 4 completo.
+✅ **Validado em CI** ([workflow run](https://github.com/sistemaglobopac/globopac-2.0/actions/runs/35219627374)):
+4/4 jobs, incluindo os 10 testes E2E (fluxos 1, 2, 3, 4, 5, 6a, 6b, 7, SLA de RNC, rate
+limiting do portal). Uma iteração de CI foi necessária: o teste pgTAP novo
+(`0004_rls_manutencao_os.sql`) tinha dois bugs próprios — faltavam linhas em `auth.users`
+para os perfis ADMIN_MASTER/INSPECAO_FEDERAL usados mais adiante no arquivo (violava a FK de
+`perfis_usuarios`), e a verificação do primeiro caso (UPDATE bloqueado) lia o resultado usando
+a MESMA role restrita que a RLS de SELECT também bloqueia, confundindo "não vejo a linha" com
+"a linha não mudou". Nenhum bug de produto — só do próprio teste. Depois disso, 4/4 de
+primeira; único evento residual foi 1 flake pré-existente e não relacionado em
+`fluxo-07-tsas-falham.spec.ts` (uma corrida de timing entre o worker do cron e a asserção do
+teste), resolvido pelo retry automático do Playwright.
 
 **Ainda não implementado** (fases seguintes do roteiro): notificação ativa de SLA vencido
 (e-mail/push — hoje o alerta é só visual no painel), integração estruturada com o GLOBO SIGMA
