@@ -106,8 +106,11 @@ jobs:
       - name: Subir stack local do Supabase (Postgres + Auth + Edge Functions)
         run: supabase start
 
-      - name: Aplicar migrations + seed (usuários e template de teste)
+      - name: Aplicar migrations + seed (templates/dados de teste)
         run: supabase db reset
+
+      - name: Criar usuários de teste via Admin API (não dá para inserir em auth.users via SQL puro)
+        run: npm run db:seed-users
 
       - name: Escrever .env.local com URL/chaves do stack local (Vite carrega automaticamente)
         # Grava direto em .env.local em vez de passar por $GITHUB_ENV: evita qualquer

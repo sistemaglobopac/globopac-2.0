@@ -70,7 +70,7 @@ BI/dashboards, PWA offline, migração de dados legados.
 npm install
 cp .env.example .env.local     # preencha com a saída de `npm run db:start`
 npm run db:start
-npm run db:reset                # aplica migrations + supabase/seed.sql (usuários/templates de teste)
+npm run db:reset                # aplica migrations + supabase/seed.sql + cria usuários de teste (Admin API)
 npm run db:test                 # suíte pgTAP (Fase 0)
 
 npm run dev                     # frontend em http://localhost:5173
@@ -89,7 +89,7 @@ globopac/
 ├── supabase/
 │   ├── config.toml               # config do stack local + Auth Hook de RBAC
 │   ├── migrations/*.sql          # schema versionado
-│   ├── seed.sql                  # dados de DEV LOCAL apenas (usuários de teste, templates)
+│   ├── seed.sql                  # dados de DEV LOCAL apenas (templates de teste, centros de custo)
 │   ├── tests/database/*.sql      # testes pgTAP (RLS, segregação de funções, append-only)
 │   └── functions/
 │       ├── deno.json             # import map (zod, @supabase/supabase-js) para Deno
@@ -109,11 +109,17 @@ globopac/
 │   ├── adr/                      # decisões arquiteturais
 │   ├── permissions-matrix.md
 │   └── runbooks/                 # a partir da Fase 8
+├── scripts/
+│   └── seed-dev-users.mjs        # usuários de teste via Admin API (não dá para inserir via SQL puro)
 ├── ASSUMPTIONS.md
 └── .github/workflows/ci.yml
 ```
 
-## Usuários de teste (ambiente local, `supabase/seed.sql`)
+## Usuários de teste (ambiente local, criados por `scripts/seed-dev-users.mjs` via Admin API)
+
+Rodam automaticamente como parte de `npm run db:reset` (não são criados por `seed.sql` — um
+INSERT direto em `auth.users` não reproduz o que o GoTrue exige para autenticar um login de
+verdade; ver o comentário no topo de `supabase/seed.sql`).
 
 | Email | Perfil | Senha |
 |---|---|---|
@@ -124,8 +130,8 @@ globopac/
 | inspecao.federal@dev.globopac.local | INSPECAO_FEDERAL | globopac-dev-2026 |
 | inspetor.pcm@dev.globopac.local | INSPETOR_PCM | globopac-dev-2026 |
 
-Nunca use esses usuários/senha fora do ambiente local — `seed.sql` não é aplicado em
-staging/produção.
+Nunca use esses usuários/senha fora do ambiente local — são recriados do zero a cada
+`db:reset` e não existem em staging/produção.
 
 ## Roteiro de implementação (seção 14 do PROMPT MESTRE)
 
