@@ -14,7 +14,7 @@ pós-liberação reforçadas por trigger de banco, `ASSUMPTIONS.md`, ADRs inicia
 [Workflow run](https://github.com/sistemaglobopac/globopac-2.0/actions/runs/35158128902):
 migrations aplicam do zero + 21/21 testes pgTAP passam.
 
-### Fase 1 (implementada nesta sessão — validação em CI pendente de confirmação)
+### Fase 1 (concluída e validada em CI)
 - Frontend React 19 + Vite + TypeScript estrito, Tailwind + design system próprio no estilo
   shadcn/ui (`src/shared/ui/`), React Hook Form + Zod, TanStack Query, Zustand.
 - **Fonte única de validação**: `supabase/functions/_shared/schema-campos.ts` gera o schema
@@ -47,11 +47,24 @@ migrations aplicam do zero + 21/21 testes pgTAP passam.
   unit/componente, build — sem depender de Docker) e job `e2e` (sobe o stack local completo e
   roda o Playwright contra ele).
 
-⚠️ **Ainda não confirmado por execução real nesta sessão**: diferente da Fase 0 (onde
-iteramos até o CI ficar verde antes de declarar concluído), o código da Fase 1 foi escrito e
-revisado, mas o CI deste push ainda não rodou/terminou no momento em que este texto foi
-escrito. Trate a Fase 1 como "implementada, validação em andamento" até a confirmação
-explícita do run de CI correspondente.
+✅ **Validado em CI** ([workflow run](https://github.com/sistemaglobopac/globopac-2.0/actions/runs/35168925465)):
+os 4 jobs passam, incluindo o E2E completo do fluxo nº 1 (inspetor cria ficha → assina →
+aparece para o verificador) contra o stack local real. Chegar até aqui levou 8 iterações de
+CI, cada uma revelando um bug real e independente — vale registrar, porque nenhum deles
+apareceria só de revisar o código:
+1. `vite preview` sem `--host 127.0.0.1` — o healthcheck do Playwright nunca conectava.
+2. Usuários de teste inseridos direto em `auth.users` via SQL não autenticam de verdade no
+   GoTrue — precisam ser criados pela Admin API (`scripts/seed-dev-users.mjs`).
+3. `$GITHUB_ENV` do Actions não remove as aspas que `supabase status -o env` coloca nos
+   valores — `SUPABASE_URL` chegava como `"http://..."` (aspas incluídas na string).
+4. `@supabase/supabase-js` sempre inicializa um `RealtimeClient`, que exige `WebSocket`
+   global — inexistente em Node 20 puro (só nativo a partir do Node 22).
+5. `LoginPage` nunca navegava para fora de `/login` após autenticar com sucesso.
+6. **O mais sério**: `custom_access_token_hook` sempre emitia `perfil: null` — RLS bloqueava
+   a própria leitura de `perfis_usuarios` que o hook faz (mesma causa do ADR 0007, agora no
+   hook de emissão do token; ver [ADR 0009](docs/adr/0009-custom-access-token-hook-security-definer.md)).
+   Isso nunca apareceria nos testes pgTAP da Fase 0, que simulam o JWT diretamente sem passar
+   pelo hook real — só um login de verdade em E2E expôs o problema.
 
 **Ainda não implementado** (fases seguintes do roteiro): worker de carimbo RFC 3161,
 liberação SIF + portal público, tratativa completa de RNC (SLA/notificação), Portal PCM/OS,
@@ -138,7 +151,7 @@ Nunca use esses usuários/senha fora do ambiente local — são recriados do zer
 | Fase | Escopo | Status |
 |---|---|---|
 | 0 | Schema base, RLS, autenticação, RBAC | ✅ Concluída e validada em CI |
-| 1 | CRUD de fichas e verificação | 🟡 Implementada — validação em CI em andamento |
+| 1 | CRUD de fichas e verificação | ✅ Concluída e validada em CI |
 | 2 | Assinatura eletrônica + carimbo RFC 3161 | Não iniciada (assinatura em si já existe desde a Fase 1; falta o worker de carimbo) |
 | 3 | Liberação SIF + portal público de verificação | Não iniciada |
 | 4 | RNC e tratativas | Parcial (abertura automática ao reprovar existe; SLA/notificação/fechamento não) |
