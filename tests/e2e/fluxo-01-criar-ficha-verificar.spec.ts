@@ -1,16 +1,9 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "@playwright/test";
+import { login, logout } from "./helpers";
 
 // Fluxo E2E nº 1 (seção 10 do PROMPT MESTRE): "Inspetor cria ficha → assina → aparece para
 // Verificador." Depende do stack local do Supabase rodando com supabase/seed.sql aplicado
 // (usuários e template de teste) — ver README para rodar localmente, ou o job "e2e" do CI.
-
-async function login(page: Page, email: string, senha: string) {
-  await page.goto("/login");
-  await page.getByLabel("E-mail").fill(email);
-  await page.getByLabel("Senha").fill(senha);
-  await page.getByRole("button", { name: "Entrar" }).click();
-  await expect(page).not.toHaveURL(/\/login$/);
-}
 
 test("inspetor cria e assina uma ficha, que aparece para o verificador", async ({ page }) => {
   await login(page, "inspetor.qualidade@dev.globopac.local", "globopac-dev-2026");
@@ -24,8 +17,7 @@ test("inspetor cria e assina uma ficha, que aparece para o verificador", async (
   await page.getByRole("button", { name: "Criar e assinar" }).click();
   await expect(page.getByText("Ficha criada e assinada com sucesso.")).toBeVisible({ timeout: 15_000 });
 
-  await page.getByRole("button", { name: "Sair" }).click();
-  await expect(page).toHaveURL(/\/login$/);
+  await logout(page);
 
   await login(page, "verificador@dev.globopac.local", "globopac-dev-2026");
   await page.goto("/verificacao");

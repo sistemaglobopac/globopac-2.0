@@ -123,3 +123,34 @@ rascunho, essa regra será operacionalmente rígida demais. Se confirmado como p
 a correção é local (trocar o trigger de bloqueio por uma condição `WHERE conformidade IS NULL
 AND verificado_por IS NULL`) e não tem impacto em nenhum dado já gravado, pois nenhum dado
 assinado é afetado por essa mudança.
+
+## Premissas da Fase 2 (carimbo de tempo RFC 3161)
+
+### 13. "Liberar ao SIF" na Fase 2 é uma versão mínima, não a liberação em lote
+🔴 **Assumida sob risco — a liberação em lote é explicitamente Fase 3** — o fluxo E2E nº 2
+(seção 10: "Verificador aprova → assina → Admin libera SIF → aparece para Inspeção Federal")
+exige que ALGUMA forma de liberação ao SIF exista para a Fase 2 fechar ponta a ponta, mas a
+liberação em LOTE com hash agregador (`lote_liberacao_sif`, seção 6.2) e o portal público de
+verificação são escopo declarado da Fase 3 (seção 14 do PROMPT MESTRE). Implementado agora:
+a Edge Function `liberar-sif` libera **um monitoramento por vez**, assina como
+LIBERACAO_DIARIA, e a Inspeção Federal já enxerga o resultado (a RLS de `monitoramentos`
+já existia desde a Fase 0). O que falta para a Fase 3 completar isto: seleção em lote na UI,
+cálculo do hash agregador do lote, e o portal público `/verificar?id=`.
+
+### 14. Lista de 4 TSAs do PROMPT MESTRE mantida sem substituição — todas validadas ao vivo
+✅ **Confirmada por execução real** — diferente do que a pesquisa inicial de conectividade
+sugeria (URLs antigas retornando 404 a um POST vazio), uma requisição RFC 3161 real e bem
+formada foi enviada a FreeTSA, Sectigo (`timestamp.sectigo.com`), Comodo
+(`timestamp.comodoca.com`) e Certum (`time.certum.pl`) a partir deste ambiente de
+desenvolvimento, e as 4 responderam `granted` com corrente de certificados e `genTime`
+extraíveis (`supabase/functions/_shared/rfc3161.test.ts`). Nenhuma substituição foi
+necessária. Isso pode mudar no futuro se algum desses serviços públicos gratuitos for
+descontinuado — o sintoma seria esse TSA específico sempre falhando no painel de pendências.
+
+### 15. Testes automatizados (CI) não dependem da disponibilidade real das 4 TSAs
+✅ **Confirmada, decisão deliberada** — ver
+[ADR 0010](docs/adr/0010-worker-carimbo-tempo.md), Decisão 3. O teste E2E do fluxo nº 7
+(falha de todas as TSAs) sobrescreve `app_config.tsas_carimbo_tempo` com endereços que falham
+de forma determinística, em vez de depender de conseguir fazer 4 serviços públicos externos
+falharem sob demanda (o que não é possível de forma confiável) ou de sua disponibilidade real
+sob demanda no fluxo de sucesso.

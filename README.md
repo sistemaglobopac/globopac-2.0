@@ -5,7 +5,7 @@ Reconstrução da v1 seguindo o PROMPT MESTRE (documentação completa do domín
 roteiro de fases está na conversa que originou este repositório — os pontos operacionais
 relevantes estão replicados em `ASSUMPTIONS.md` e `docs/`).
 
-## Estado atual: Fase 1 — CRUD de fichas, verificação, builder de templates
+## Estado atual: Fase 2 — Assinatura eletrônica + carimbo de tempo RFC 3161
 
 ### Fase 0 (concluída e validada em CI)
 Schema completo versionado (`supabase/migrations/`), RLS deny-by-default em todas as tabelas,
@@ -66,9 +66,33 @@ apareceria só de revisar o código:
    Isso nunca apareceria nos testes pgTAP da Fase 0, que simulam o JWT diretamente sem passar
    pelo hook real — só um login de verdade em E2E expôs o problema.
 
-**Ainda não implementado** (fases seguintes do roteiro): worker de carimbo RFC 3161,
-liberação SIF + portal público, tratativa completa de RNC (SLA/notificação), Portal PCM/OS,
-BI/dashboards, PWA offline, migração de dados legados.
+### Fase 2 (implementada nesta sessão — validação em CI pendente de confirmação)
+- **Cliente RFC 3161 real** (`supabase/functions/_shared/rfc3161.ts`), via
+  `@peculiar/asn1-*` (não ASN.1 manual — ver [ADR 0010](docs/adr/0010-worker-carimbo-tempo.md)).
+  **Validado com uma execução real contra as 4 TSAs do PROMPT MESTRE** (FreeTSA, Sectigo,
+  Comodo, Certum) antes de qualquer código de produção existir — todas responderam
+  `granted` com certificados e `genTime` extraídos corretamente
+  (`supabase/functions/_shared/rfc3161.test.ts`, validação manual, não roda em CI).
+- **Worker** (`processar-fila-carimbo`): processa `fila_carimbo_tempo`, tenta as TSAs em
+  ordem com fallback, grava `tsr_base64`/`tsa_emitido_em`/`tsa_utilizada`/
+  `cadeia_certificados_tsa` no sucesso, ou aplica retry exponencial (até
+  `carimbo_max_tentativas`, depois `falhou_definitivo`) sem nunca bloquear quem assinou o
+  documento — a assinatura em si já aconteceu na Fase 1, o carimbo é sempre assíncrono.
+- **Agendamento**: `pg_cron` + `pg_net` chamam o worker a cada minuto; a `service_role` key
+  fica no Supabase Vault, nunca em uma migration (`scripts/configurar-worker-carimbo.mjs`).
+- **Painel de pendências** (`/carimbos`, ADMIN_MASTER): contagem por status, destaque para
+  pendentes há mais de `carimbo_alerta_horas`, botão "Processar agora".
+- **Liberação ao SIF — versão mínima** (`/sif/liberar`, ADMIN_MASTER): libera um
+  monitoramento verificado por vez, assina como LIBERACAO_DIARIA. A liberação em **lote**
+  com hash agregador e o portal público de verificação são Fase 3 (ver ASSUMPTIONS.md #13).
+- **Auditoria** (`/auditoria`, INSPECAO_FEDERAL/ADMIN_MASTER): lista só o que foi liberado.
+- Testes E2E dos fluxos nº 2 e nº 7 da seção 10 (`tests/e2e/fluxo-02-*`,
+  `tests/e2e/fluxo-07-*` — o nº 7 sobrescreve `app_config.tsas_carimbo_tempo` com endereços
+  que falham de forma determinística, não depende da internet real).
+
+**Ainda não implementado** (fases seguintes do roteiro): liberação em lote + hash agregador +
+portal público de verificação (Fase 3), tratativa completa de RNC (SLA/notificação),
+Portal PCM/OS, BI/dashboards, PWA offline, migração de dados legados.
 
 ## Pré-requisitos
 
@@ -105,12 +129,14 @@ globopac/
 │   ├── seed.sql                  # dados de DEV LOCAL apenas (templates de teste, centros de custo)
 │   ├── tests/database/*.sql      # testes pgTAP (RLS, segregação de funções, append-only)
 │   └── functions/
-│       ├── deno.json             # import map (zod, @supabase/supabase-js) para Deno
-│       ├── _shared/              # hash, cors, schema-campos (fonte única com o frontend)
+│       ├── deno.json             # import map (zod, @supabase/supabase-js, @peculiar/asn1-*) para Deno
+│       ├── _shared/              # hash, cors, schema-campos, rfc3161, tsa-config, jwt (fonte única com o frontend)
 │       ├── assinar-documento/
-│       └── verificar-monitoramento/
+│       ├── verificar-monitoramento/
+│       ├── liberar-sif/          # versão mínima da Fase 2 — lote é Fase 3
+│       └── processar-fila-carimbo/  # worker do carimbo RFC 3161 (pg_cron + pg_net)
 ├── src/
-│   ├── modules/                  # auth, fichas — um diretório por módulo de negócio
+│   ├── modules/                  # auth, fichas, carimbos, sif — um diretório por módulo de negócio
 │   ├── shared/                   # ui/ (design system), schema-campos.ts (reexport)
 │   ├── store/                    # Zustand (sessão/UI)
 │   └── lib/                      # supabase client, database.types, utils
@@ -123,7 +149,8 @@ globopac/
 │   ├── permissions-matrix.md
 │   └── runbooks/                 # a partir da Fase 8
 ├── scripts/
-│   └── seed-dev-users.mjs        # usuários de teste via Admin API (não dá para inserir via SQL puro)
+│   ├── seed-dev-users.mjs        # usuários de teste via Admin API (não dá para inserir via SQL puro)
+│   └── configurar-worker-carimbo.mjs  # agenda pg_cron/pg_net + grava credenciais no Vault
 ├── ASSUMPTIONS.md
 └── .github/workflows/ci.yml
 ```
@@ -152,8 +179,8 @@ Nunca use esses usuários/senha fora do ambiente local — são recriados do zer
 |---|---|---|
 | 0 | Schema base, RLS, autenticação, RBAC | ✅ Concluída e validada em CI |
 | 1 | CRUD de fichas e verificação | ✅ Concluída e validada em CI |
-| 2 | Assinatura eletrônica + carimbo RFC 3161 | Não iniciada (assinatura em si já existe desde a Fase 1; falta o worker de carimbo) |
-| 3 | Liberação SIF + portal público de verificação | Não iniciada |
+| 2 | Assinatura eletrônica + carimbo RFC 3161 | 🟡 Implementada — validação em CI em andamento |
+| 3 | Liberação SIF + portal público de verificação | Parcial (liberação individual existe desde a Fase 2; falta lote/hash agregador/portal público) |
 | 4 | RNC e tratativas | Parcial (abertura automática ao reprovar existe; SLA/notificação/fechamento não) |
 | 5 | Portal PCM/OS | Não iniciada — depende de confirmar ADR 0004 (relação com o GLOBO SIGMA) |
 | 6 | BI, dashboards, exportação de relatórios | Não iniciada |
@@ -169,5 +196,6 @@ do PROMPT MESTRE — princípio de execução).
 - [ASSUMPTIONS.md](ASSUMPTIONS.md) — premissas assumidas, o que está confirmado vs. pendente.
 - [docs/permissions-matrix.md](docs/permissions-matrix.md) — matriz de RBAC completa.
 - [docs/adr/](docs/adr/) — decisões arquiteturais (fila de carimbo, conflito offline, LTV,
-  relação com o GLOBO SIGMA, TTL de JWT, `condicao` não-genérica, `tem_permissao()` como
-  SECURITY DEFINER, Edge Functions com cliente duplo).
+  relação com o GLOBO SIGMA, TTL de JWT, `condicao` não-genérica, `tem_permissao()` e
+  `custom_access_token_hook` como SECURITY DEFINER, Edge Functions com cliente duplo, worker
+  de carimbo de tempo via pg_cron/pg_net/Vault).

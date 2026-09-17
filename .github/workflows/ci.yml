@@ -116,12 +116,16 @@ jobs:
         # literalmente `"http://..."` (com as aspas dentro do valor) e createClient() rejeita
         # como "Invalid supabaseUrl" (foi exatamente o que quebrou o passo seguinte).
         run: |
-          supabase status -o env | grep -E '^(API_URL|SERVICE_ROLE_KEY)=' | tr -d '"' | sed \
+          supabase status -o env | grep -E '^(API_URL|SERVICE_ROLE_KEY|DB_URL)=' | tr -d '"' | sed \
             -e 's/^API_URL=/SUPABASE_URL=/' \
-            -e 's/^SERVICE_ROLE_KEY=/SUPABASE_SERVICE_ROLE_KEY=/' >> "$GITHUB_ENV"
+            -e 's/^SERVICE_ROLE_KEY=/SUPABASE_SERVICE_ROLE_KEY=/' \
+            -e 's/^DB_URL=/SUPABASE_DB_URL=/' >> "$GITHUB_ENV"
 
       - name: Criar usuários de teste via Admin API (não dá para inserir em auth.users via SQL puro)
         run: npm run db:seed-users
+
+      - name: Agendar o worker de carimbo de tempo (pg_cron + pg_net + Vault)
+        run: npm run db:configurar-carimbo
 
       - name: Escrever .env.local com URL/chaves do stack local (Vite carrega automaticamente)
         # Grava direto em .env.local em vez de passar por $GITHUB_ENV: evita qualquer
