@@ -7,10 +7,20 @@
 -- (15 min) em supabase/config.toml exatamente para limitar essa janela — ver seção 4.2 do
 -- PROMPT MESTRE e ASSUMPTIONS.md.
 
+-- SECURITY DEFINER (não o padrão): supabase_auth_admin (o role que o GoTrue usa para chamar
+-- o hook) tem GRANT SELECT em perfis_usuarios, mas GRANT não ignora RLS — e durante a
+-- emissão do hook não existe JWT/GUC 'request.jwt.claims' no contexto (a policy
+-- perfis_usuarios_select exige id = auth.uid() ou tem_permissao(), nenhum dos dois resolve
+-- aqui), então a RLS filtrava a linha e o hook sempre caía no ramo "sem perfil" — bug real,
+-- só visível em login de verdade (JWT sempre saía com perfil:null, setores_permitidos:[]),
+-- nunca nos testes pgTAP da Fase 0 (que simulam o JWT direto, sem passar pelo hook). Mesma
+-- causa raiz do ADR 0007 (tem_permissao), agora no próprio hook de emissão do token.
 create or replace function public.custom_access_token_hook(event jsonb)
 returns jsonb
 language plpgsql
 stable
+security definer
+set search_path = public, pg_temp
 as $$
 declare
   v_perfil record;
