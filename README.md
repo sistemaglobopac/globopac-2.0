@@ -66,7 +66,7 @@ apareceria só de revisar o código:
    Isso nunca apareceria nos testes pgTAP da Fase 0, que simulam o JWT diretamente sem passar
    pelo hook real — só um login de verdade em E2E expôs o problema.
 
-### Fase 2 (implementada nesta sessão — validação em CI pendente de confirmação)
+### Fase 2 (concluída e validada em CI)
 - **Cliente RFC 3161 real** (`supabase/functions/_shared/rfc3161.ts`), via
   `@peculiar/asn1-*` (não ASN.1 manual — ver [ADR 0010](docs/adr/0010-worker-carimbo-tempo.md)).
   **Validado com uma execução real contra as 4 TSAs do PROMPT MESTRE** (FreeTSA, Sectigo,
@@ -89,6 +89,15 @@ apareceria só de revisar o código:
 - Testes E2E dos fluxos nº 2 e nº 7 da seção 10 (`tests/e2e/fluxo-02-*`,
   `tests/e2e/fluxo-07-*` — o nº 7 sobrescreve `app_config.tsas_carimbo_tempo` com endereços
   que falham de forma determinística, não depende da internet real).
+
+✅ **Validado em CI** ([workflow run](https://github.com/sistemaglobopac/globopac-2.0/actions/runs/35174978757)):
+os 4 jobs passam, incluindo os 3 fluxos E2E (1, 2 e 7) e o agendamento real do worker via
+pg_cron/pg_net/Vault. Levou 4 iterações de CI depois do push inicial da fase — três delas
+por um mesmo tipo de bug já visto na Fase 1 (falta do polyfill de `WebSocket` para
+supabase-js em Node puro, desta vez em `tests/e2e/helpers.ts`) e uma por um bug de teste
+genuíno: `getByText("20")` sem `exact: true` colidia com o "20" dentro de "2026" na data
+renderizada no mesmo card — determinístico em qualquer execução no ano de 2026, não
+flakiness. Nenhum bug de produto novo apareceu desta vez (diferente da Fase 1, que revelou 6).
 
 **Ainda não implementado** (fases seguintes do roteiro): liberação em lote + hash agregador +
 portal público de verificação (Fase 3), tratativa completa de RNC (SLA/notificação),
@@ -179,7 +188,7 @@ Nunca use esses usuários/senha fora do ambiente local — são recriados do zer
 |---|---|---|
 | 0 | Schema base, RLS, autenticação, RBAC | ✅ Concluída e validada em CI |
 | 1 | CRUD de fichas e verificação | ✅ Concluída e validada em CI |
-| 2 | Assinatura eletrônica + carimbo RFC 3161 | 🟡 Implementada — validação em CI em andamento |
+| 2 | Assinatura eletrônica + carimbo RFC 3161 | ✅ Concluída e validada em CI |
 | 3 | Liberação SIF + portal público de verificação | Parcial (liberação individual existe desde a Fase 2; falta lote/hash agregador/portal público) |
 | 4 | RNC e tratativas | Parcial (abertura automática ao reprovar existe; SLA/notificação/fechamento não) |
 | 5 | Portal PCM/OS | Não iniciada — depende de confirmar ADR 0004 (relação com o GLOBO SIGMA) |
