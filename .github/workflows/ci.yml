@@ -110,8 +110,13 @@ jobs:
         run: supabase db reset
 
       - name: Exportar credenciais admin do stack local
+        # `supabase status -o env` envolve os valores em aspas duplas (formato .env); ao
+        # contrário do parser do Vite (que descarta aspas ao ler .env.local), o parser do
+        # $GITHUB_ENV do Actions NÃO remove aspas — sem o `tr -d '"'`, SUPABASE_URL vira
+        # literalmente `"http://..."` (com as aspas dentro do valor) e createClient() rejeita
+        # como "Invalid supabaseUrl" (foi exatamente o que quebrou o passo seguinte).
         run: |
-          supabase status -o env | grep -E '^(API_URL|SERVICE_ROLE_KEY)=' | sed \
+          supabase status -o env | grep -E '^(API_URL|SERVICE_ROLE_KEY)=' | tr -d '"' | sed \
             -e 's/^API_URL=/SUPABASE_URL=/' \
             -e 's/^SERVICE_ROLE_KEY=/SUPABASE_SERVICE_ROLE_KEY=/' >> "$GITHUB_ENV"
 

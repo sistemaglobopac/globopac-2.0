@@ -22,8 +22,17 @@ function statusEnv(chave) {
   return linha?.slice(chave.length + 1);
 }
 
-const url = process.env.SUPABASE_URL || statusEnv("API_URL");
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || statusEnv("SERVICE_ROLE_KEY");
+// `supabase status -o env` envolve os valores em aspas duplas (formato .env); se alguma
+// variável chegar via um caminho que não descarta aspas (ex.: $GITHUB_ENV do Actions, que
+// não é um parser de .env), sobra a aspa dentro do valor e createClient() rejeita a URL.
+// Removê-las aqui torna o script robusto independente de como as env vars chegaram.
+function semAspas(valor) {
+  return valor?.trim().replace(/^"|"$/g, "");
+}
+
+const url = semAspas(process.env.SUPABASE_URL) || semAspas(statusEnv("API_URL"));
+const serviceRoleKey =
+  semAspas(process.env.SUPABASE_SERVICE_ROLE_KEY) || semAspas(statusEnv("SERVICE_ROLE_KEY"));
 
 if (!url || !serviceRoleKey) {
   console.error(
