@@ -99,7 +99,7 @@ genuíno: `getByText("20")` sem `exact: true` colidia com o "20" dentro de "2026
 renderizada no mesmo card — determinístico em qualquer execução no ano de 2026, não
 flakiness. Nenhum bug de produto novo apareceu desta vez (diferente da Fase 1, que revelou 6).
 
-### Fase 3 (implementada nesta sessão — validação em CI pendente de confirmação)
+### Fase 3 (concluída e validada em CI)
 - **Liberação em lote** (`liberar-sif`, reescrita — a versão da Fase 2 liberava um por vez,
   sem hash agregador): recebe `monitoramento_ids[]`, calcula o hash agregador do lote
   (seção 6.2, reaproveitando a serialização canônica de `_shared/hash.ts`), grava
@@ -115,6 +115,15 @@ flakiness. Nenhum bug de produto novo apareceu desta vez (diferente da Fase 1, q
 - **Rate limiting** por IP (hash do IP, `log_acessos_verificacao`) via
   `app_config.portal_verificacao_limite_por_minuto`.
 - Testes E2E dos fluxos nº 5 e 6 da seção 10, mais um teste dedicado de rate limiting.
+
+✅ **Validado em CI** ([workflow run](https://github.com/sistemaglobopac/globopac-2.0/actions/runs/35192780590)):
+os 4 jobs passam, incluindo os 7 testes E2E (fluxos 1, 2, 5, 6a, 6b, 7, e rate limiting).
+Precisou de só 1 correção depois do push inicial — de novo, uma colisão de substring em
+`getByText` (desta vez "INSPETOR" batendo em "Inspetor(a) de Qualidade (dev)", o nome do
+usuário de teste), não um bug de produto. É a terceira vez que esse mesmo padrão de bug de
+teste aparece nesta sessão — vale ter isso em mente ao escrever qualquer novo teste E2E que
+use `getByText` sem `exact: true` num app com nomes/rótulos que podem conter substrings uns
+dos outros.
 
 **Ainda não implementado** (fases seguintes do roteiro): portal público para Ordens de
 Serviço (depende da Fase 5 definir como uma OS é liberada), tratativa completa de RNC
@@ -207,7 +216,7 @@ Nunca use esses usuários/senha fora do ambiente local — são recriados do zer
 | 0 | Schema base, RLS, autenticação, RBAC | ✅ Concluída e validada em CI |
 | 1 | CRUD de fichas e verificação | ✅ Concluída e validada em CI |
 | 2 | Assinatura eletrônica + carimbo RFC 3161 | ✅ Concluída e validada em CI |
-| 3 | Liberação SIF + portal público de verificação | 🟡 Implementada — validação em CI em andamento |
+| 3 | Liberação SIF + portal público de verificação | ✅ Concluída e validada em CI |
 | 4 | RNC e tratativas | Parcial (abertura automática ao reprovar existe; SLA/notificação/fechamento não) |
 | 5 | Portal PCM/OS | Não iniciada — depende de confirmar ADR 0004 (relação com o GLOBO SIGMA) |
 | 6 | BI, dashboards, exportação de relatórios | Não iniciada |
