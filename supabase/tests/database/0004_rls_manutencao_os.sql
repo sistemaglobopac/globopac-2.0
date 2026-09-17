@@ -16,7 +16,9 @@ select plan(5);
 insert into auth.users (id, aud, role, email, instance_id, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 values
   ('f0000000-0000-0000-0000-000000000001', 'authenticated', 'authenticated', 'pcm.manutencao@test.local', '00000000-0000-0000-0000-000000000000', '{}', '{}', now(), now()),
-  ('f0000000-0000-0000-0000-000000000002', 'authenticated', 'authenticated', 'pcm.outra.area@test.local', '00000000-0000-0000-0000-000000000000', '{}', '{}', now(), now());
+  ('f0000000-0000-0000-0000-000000000002', 'authenticated', 'authenticated', 'pcm.outra.area@test.local', '00000000-0000-0000-0000-000000000000', '{}', '{}', now(), now()),
+  ('f0000000-0000-0000-0000-000000000003', 'authenticated', 'authenticated', 'admin.fase5@test.local', '00000000-0000-0000-0000-000000000000', '{}', '{}', now(), now()),
+  ('f0000000-0000-0000-0000-000000000004', 'authenticated', 'authenticated', 'sif.fase5@test.local', '00000000-0000-0000-0000-000000000000', '{}', '{}', now(), now());
 
 insert into perfis_usuarios (id, nome_completo, nome_usuario, nivel_acesso, setores_permitidos) values
   ('f0000000-0000-0000-0000-000000000001', 'PCM Manutenção', 'pcm.manutencao.teste', 'INSPETOR_PCM', array['MANUTENCAO']),
@@ -41,6 +43,11 @@ set local role authenticated;
 update manutencao_os set status = 'AUTORIZACAO', autorizado_por = 'f0000000-0000-0000-0000-000000000002'
  where id = '90000000-0000-0000-0000-000000000001';
 
+-- reset role antes de conferir: o próprio ator de teste (setor OUTRA_AREA) não tem
+-- permissão de SELECT sobre uma OS de MANUTENCAO (mesma policy que bloqueou o UPDATE) — a
+-- verificação precisa ler como superusuário, ignorando RLS, não através da mesma visão
+-- restrita que estamos testando.
+reset role;
 select is(
   (select status::text from manutencao_os where id = '90000000-0000-0000-0000-000000000001'),
   'ABERTURA',
