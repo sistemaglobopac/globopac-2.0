@@ -144,8 +144,15 @@ dos outros.
   segundo teste dedicado ao DoD "SLA configurável funcional com alerta" (força um
   `prazo_sla` vencido via `service_role` e confirma o badge de alerta).
 
-✅ **Validado em CI** — 4/4 jobs, incluindo os 9 testes E2E (fluxos 1, 2, 3, 5, 6a, 6b, 7,
-SLA de RNC, e rate limiting do portal). Link do workflow run será adicionado após o push.
+✅ **Validado em CI** ([workflow run](https://github.com/sistemaglobopac/globopac-2.0/actions/runs/35214644851)):
+os 4 jobs passam de primeira, incluindo os 9 testes E2E (fluxos 1, 2, 3, 5, 6a, 6b, 7, SLA de
+RNC, e rate limiting do portal) — nenhuma correção de produto foi necessária nesta fase.
+Único evento digno de nota: `fluxo-05-06-portal-publico.spec.ts` (fluxo 5, não tocado por
+esta fase) apresentou 1 flake — o botão "Liberar selecionados" ficou momentaneamente com
+contagem `(0)` antes do checkbox do documento recém-verificado aparecer na lista de
+pendentes, provavelmente uma corrida entre o refetch do TanStack Query e a navegação. Passou
+de forma determinística no retry automático do Playwright (`retries: 1` em CI) — mantido como
+observação, não como correção, já que não é causado por nem afeta o código desta fase.
 
 **Ainda não implementado** (fases seguintes do roteiro): notificação ativa de SLA vencido
 (e-mail/push — hoje o alerta é só visual no painel), portal público para Ordens de Serviço
