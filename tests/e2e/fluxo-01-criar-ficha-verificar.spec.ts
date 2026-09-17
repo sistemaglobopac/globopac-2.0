@@ -4,8 +4,16 @@ import { login, logout } from "./helpers";
 // Fluxo E2E nº 1 (seção 10 do PROMPT MESTRE): "Inspetor cria ficha → assina → aparece para
 // Verificador." Depende do stack local do Supabase rodando com supabase/seed.sql aplicado
 // (usuários e template de teste) — ver README para rodar localmente, ou o job "e2e" do CI.
+//
+// Usa um marcador único (observacoes) e escopa a asserção ao card que o contém — o banco não
+// é resetado entre arquivos de teste nem entre tentativas de retry na mesma execução de CI,
+// então pode haver mais de um monitoramento pendente de verificação ao mesmo tempo (de outro
+// arquivo, ou de uma tentativa anterior que falhou). Um bug real já apareceu aqui: getByText
+// sem `exact` também colidia com o "20" dentro de "2026" na data renderizada no mesmo card.
 
 test("inspetor cria e assina uma ficha, que aparece para o verificador", async ({ page }) => {
+  const marcador = `E2E-fluxo1-${Date.now()}`;
+
   await login(page, "inspetor.qualidade@dev.globopac.local", "globopac-dev-2026");
 
   await page.goto("/fichas/nova");
@@ -13,6 +21,7 @@ test("inspetor cria e assina uma ficha, que aparece para o verificador", async (
 
   const temperatura = `${20 + Math.floor(Math.random() * 5)}`;
   await page.locator("#temperatura_celsius").fill(temperatura);
+  await page.locator("#observacoes").fill(marcador);
 
   await page.getByRole("button", { name: "Criar e assinar" }).click();
   await expect(page.getByText("Ficha criada e assinada com sucesso.")).toBeVisible({ timeout: 15_000 });
@@ -22,6 +31,8 @@ test("inspetor cria e assina uma ficha, que aparece para o verificador", async (
   await login(page, "verificador@dev.globopac.local", "globopac-dev-2026");
   await page.goto("/verificacao");
 
-  await expect(page.getByText("Monitoramento de Temperatura")).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText(temperatura)).toBeVisible();
+  const cartaoDoRegistro = page.locator(".rounded-lg.border").filter({ hasText: marcador });
+  await expect(cartaoDoRegistro).toBeVisible({ timeout: 15_000 });
+  await expect(cartaoDoRegistro.getByText("Monitoramento de Temperatura")).toBeVisible();
+  await expect(cartaoDoRegistro.getByText(temperatura, { exact: true })).toBeVisible();
 });
