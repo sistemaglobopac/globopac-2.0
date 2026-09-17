@@ -11,6 +11,16 @@
 import { execSync } from "node:child_process";
 import { createClient } from "@supabase/supabase-js";
 
+// supabase-js sempre inicializa um RealtimeClient ao construir o client (mesmo sem usar
+// nenhum recurso de realtime aqui), o que exige um WebSocket global — nativo só a partir do
+// Node 22. Este script roda em CI com Node 20 (e pode rodar localmente também), então
+// preenche o polyfill antes de createClient(), em vez de forçar todo o projeto a Node 22 por
+// causa de um script de seed que nem usa realtime.
+if (typeof globalThis.WebSocket === "undefined") {
+  const { WebSocket } = await import("ws");
+  globalThis.WebSocket = WebSocket;
+}
+
 // Se as variáveis não vierem do ambiente (uso local, fora de CI), busca de `supabase status`
 // — conveniência para `npm run db:seed-users` funcionar sem passos manuais extras. Chama o
 // binário `supabase` direto (sem npx): rodando via `npm run`, node_modules/.bin já está no
