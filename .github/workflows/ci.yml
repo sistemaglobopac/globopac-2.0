@@ -109,6 +109,12 @@ jobs:
       - name: Aplicar migrations + seed (templates/dados de teste)
         run: supabase db reset
 
+      - name: Exportar credenciais admin do stack local
+        run: |
+          supabase status -o env | grep -E '^(API_URL|SERVICE_ROLE_KEY)=' | sed \
+            -e 's/^API_URL=/SUPABASE_URL=/' \
+            -e 's/^SERVICE_ROLE_KEY=/SUPABASE_SERVICE_ROLE_KEY=/' >> "$GITHUB_ENV"
+
       - name: Criar usuários de teste via Admin API (não dá para inserir em auth.users via SQL puro)
         run: npm run db:seed-users
 

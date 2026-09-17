@@ -11,17 +11,19 @@
 import { execSync } from "node:child_process";
 import { createClient } from "@supabase/supabase-js";
 
-// Se as variáveis não vierem do ambiente (uso local, fora de CI), busca direto de
-// `supabase status` — conveniência para `npm run db:seed-users` funcionar sem passos
-// manuais extras.
+// Se as variáveis não vierem do ambiente (uso local, fora de CI), busca de `supabase status`
+// — conveniência para `npm run db:seed-users` funcionar sem passos manuais extras. Chama o
+// binário `supabase` direto (sem npx): rodando via `npm run`, node_modules/.bin já está no
+// PATH, resolvendo a versão pinada do projeto sem ambiguidade de resolução do npx.
+let saidaStatusCache;
 function statusEnv(chave) {
-  const saida = execSync("npx --yes supabase status -o env", { encoding: "utf8" });
-  const linha = saida.split("\n").find((l) => l.startsWith(`${chave}=`));
+  saidaStatusCache ??= execSync("supabase status -o env", { encoding: "utf8" });
+  const linha = saidaStatusCache.split("\n").find((l) => l.startsWith(`${chave}=`));
   return linha?.slice(chave.length + 1);
 }
 
-const url = process.env.SUPABASE_URL ?? statusEnv("API_URL");
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? statusEnv("SERVICE_ROLE_KEY");
+const url = process.env.SUPABASE_URL || statusEnv("API_URL");
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || statusEnv("SERVICE_ROLE_KEY");
 
 if (!url || !serviceRoleKey) {
   console.error(
