@@ -1,6 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { login } from "./helpers";
-import { clienteAdminDeTeste } from "./helpers";
+import { login, clienteAdminDeTeste } from "./helpers";
 
 // Fluxo E2E nº 7 (seção 10 do PROMPT MESTRE): "Falha simulada de todos os TSAs → sistema
 // marca carimbo como pendente e não trava a operação do usuário." Sobrescreve
@@ -17,7 +16,7 @@ const TSAS_QUE_FALHAM = [
 test("falha simultânea de todas as TSAs marca o carimbo como pendente sem travar a criação da ficha", async ({
   page,
 }) => {
-  const admin = clienteAdminDeTeste();
+  const admin = await clienteAdminDeTeste();
 
   const { data: configOriginal } = await admin
     .from("app_config")

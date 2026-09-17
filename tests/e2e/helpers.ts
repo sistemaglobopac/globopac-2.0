@@ -16,12 +16,19 @@ function semAspas(valor: string | undefined): string | undefined {
 
 /** Cliente com service_role — só para setup/asserts de teste (nunca usado pela aplicação em
  * si). Resolve URL/chave do ambiente (CI já exporta) ou de `supabase status` (uso local). */
-export function clienteAdminDeTeste() {
+export async function clienteAdminDeTeste() {
   const url = semAspas(process.env.SUPABASE_URL) || semAspas(statusEnv("API_URL"));
   const serviceRoleKey =
     semAspas(process.env.SUPABASE_SERVICE_ROLE_KEY) || semAspas(statusEnv("SERVICE_ROLE_KEY"));
   if (!url || !serviceRoleKey) {
     throw new Error("SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY indisponíveis para o teste E2E.");
+  }
+  // Playwright roda os testes em Node puro (não no browser) — mesmo problema já visto em
+  // scripts/seed-dev-users.mjs: supabase-js sempre inicializa um RealtimeClient, que exige
+  // WebSocket global, nativo só a partir do Node 22. CI usa Node 20.
+  if (typeof globalThis.WebSocket === "undefined") {
+    const { WebSocket } = await import("ws");
+    globalThis.WebSocket = WebSocket as unknown as typeof globalThis.WebSocket;
   }
   return createClient(url, serviceRoleKey);
 }
