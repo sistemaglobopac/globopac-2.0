@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { supabase } from "@/lib/supabase";
+import { useSessionStore } from "@/store/session";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -16,11 +18,21 @@ type LoginForm = z.infer<typeof loginSchema>;
 
 export function LoginPage() {
   const [erro, setErro] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const perfil = useSessionStore((s) => s.perfil);
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<LoginForm>({ resolver: zodResolver(loginSchema) });
+
+  // O sucesso do login não navega sozinho: useAuthListener só atualiza o session store (o
+  // dado), a navegação em si é responsabilidade da tela. Sem isto, um login bem-sucedido
+  // deixava o usuário parado em /login (bug real, encontrado via E2E: a chamada de rede
+  // retornava 200, mas a página nunca saía da tela de login).
+  useEffect(() => {
+    if (perfil) navigate("/", { replace: true });
+  }, [perfil, navigate]);
 
   async function aoEnviar(dados: LoginForm) {
     setErro(null);
