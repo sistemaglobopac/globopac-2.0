@@ -12,6 +12,7 @@ import { TemplateBuilderPage } from "@/modules/fichas/TemplateBuilderPage";
 import { CarimbosPendentesPage } from "@/modules/carimbos/CarimbosPendentesPage";
 import { LiberarSifPage } from "@/modules/sif/LiberarSifPage";
 import { AuditoriaFederalPage } from "@/modules/sif/AuditoriaFederalPage";
+import { VerificarPage } from "@/modules/verificacao-publica/VerificarPage";
 
 const ROTA_INICIAL_POR_PERFIL: Record<string, string> = {
   INSPETOR_QUALIDADE: "/fichas/nova",
@@ -32,6 +33,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/verificar" element={<VerificarPage />} />
       <Route
         element={
           <ProtectedRoute>

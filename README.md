@@ -5,7 +5,7 @@ Reconstrução da v1 seguindo o PROMPT MESTRE (documentação completa do domín
 roteiro de fases está na conversa que originou este repositório — os pontos operacionais
 relevantes estão replicados em `ASSUMPTIONS.md` e `docs/`).
 
-## Estado atual: Fase 2 — Assinatura eletrônica + carimbo de tempo RFC 3161
+## Estado atual: Fase 3 — Liberação em lote ao SIF + portal público de verificação
 
 ### Fase 0 (concluída e validada em CI)
 Schema completo versionado (`supabase/migrations/`), RLS deny-by-default em todas as tabelas,
@@ -99,9 +99,26 @@ genuíno: `getByText("20")` sem `exact: true` colidia com o "20" dentro de "2026
 renderizada no mesmo card — determinístico em qualquer execução no ano de 2026, não
 flakiness. Nenhum bug de produto novo apareceu desta vez (diferente da Fase 1, que revelou 6).
 
-**Ainda não implementado** (fases seguintes do roteiro): liberação em lote + hash agregador +
-portal público de verificação (Fase 3), tratativa completa de RNC (SLA/notificação),
-Portal PCM/OS, BI/dashboards, PWA offline, migração de dados legados.
+### Fase 3 (implementada nesta sessão — validação em CI pendente de confirmação)
+- **Liberação em lote** (`liberar-sif`, reescrita — a versão da Fase 2 liberava um por vez,
+  sem hash agregador): recebe `monitoramento_ids[]`, calcula o hash agregador do lote
+  (seção 6.2, reaproveitando a serialização canônica de `_shared/hash.ts`), grava
+  `lote_liberacao_sif`, libera todos os documentos numa única UPDATE multi-linha, assina cada
+  um individualmente como LIBERACAO_DIARIA, e enfileira o carimbo do hash agregador do lote.
+- **Portal público** (`/verificar?id=<uuid>`, `verificar-documento`, `verify_jwt=false`):
+  mostra trilha de assinaturas (tipo, nome, timestamp, badge RFC 3161) e badge de integridade
+  (✓ IDÊNTICO / ≠ VERSÃO ANTERIOR, recalculando o hash no servidor). Roda inteiramente com
+  `service_role` internamente — a RLS negaria tudo para um chamador anônimo por design (ver
+  [ADR 0011](docs/adr/0011-portal-publico-verificacao.md)); "não encontrado" e "existe mas
+  não liberado" retornam a mesma resposta, e documento sem nenhuma assinatura nunca fabrica
+  um hash/selo (débito da v1).
+- **Rate limiting** por IP (hash do IP, `log_acessos_verificacao`) via
+  `app_config.portal_verificacao_limite_por_minuto`.
+- Testes E2E dos fluxos nº 5 e 6 da seção 10, mais um teste dedicado de rate limiting.
+
+**Ainda não implementado** (fases seguintes do roteiro): portal público para Ordens de
+Serviço (depende da Fase 5 definir como uma OS é liberada), tratativa completa de RNC
+(SLA/notificação), Portal PCM/OS, BI/dashboards, PWA offline, migração de dados legados.
 
 ## Pré-requisitos
 
@@ -142,10 +159,11 @@ globopac/
 │       ├── _shared/              # hash, cors, schema-campos, rfc3161, tsa-config, jwt (fonte única com o frontend)
 │       ├── assinar-documento/
 │       ├── verificar-monitoramento/
-│       ├── liberar-sif/          # versão mínima da Fase 2 — lote é Fase 3
-│       └── processar-fila-carimbo/  # worker do carimbo RFC 3161 (pg_cron + pg_net)
+│       ├── liberar-sif/          # liberação em LOTE + hash agregador (seção 6.2)
+│       ├── processar-fila-carimbo/  # worker do carimbo RFC 3161 (pg_cron + pg_net)
+│       └── verificar-documento/  # portal público /verificar — verify_jwt=false
 ├── src/
-│   ├── modules/                  # auth, fichas, carimbos, sif — um diretório por módulo de negócio
+│   ├── modules/                  # auth, fichas, carimbos, sif, verificacao-publica
 │   ├── shared/                   # ui/ (design system), schema-campos.ts (reexport)
 │   ├── store/                    # Zustand (sessão/UI)
 │   └── lib/                      # supabase client, database.types, utils
@@ -189,7 +207,7 @@ Nunca use esses usuários/senha fora do ambiente local — são recriados do zer
 | 0 | Schema base, RLS, autenticação, RBAC | ✅ Concluída e validada em CI |
 | 1 | CRUD de fichas e verificação | ✅ Concluída e validada em CI |
 | 2 | Assinatura eletrônica + carimbo RFC 3161 | ✅ Concluída e validada em CI |
-| 3 | Liberação SIF + portal público de verificação | Parcial (liberação individual existe desde a Fase 2; falta lote/hash agregador/portal público) |
+| 3 | Liberação SIF + portal público de verificação | 🟡 Implementada — validação em CI em andamento |
 | 4 | RNC e tratativas | Parcial (abertura automática ao reprovar existe; SLA/notificação/fechamento não) |
 | 5 | Portal PCM/OS | Não iniciada — depende de confirmar ADR 0004 (relação com o GLOBO SIGMA) |
 | 6 | BI, dashboards, exportação de relatórios | Não iniciada |
@@ -207,4 +225,4 @@ do PROMPT MESTRE — princípio de execução).
 - [docs/adr/](docs/adr/) — decisões arquiteturais (fila de carimbo, conflito offline, LTV,
   relação com o GLOBO SIGMA, TTL de JWT, `condicao` não-genérica, `tem_permissao()` e
   `custom_access_token_hook` como SECURITY DEFINER, Edge Functions com cliente duplo, worker
-  de carimbo de tempo via pg_cron/pg_net/Vault).
+  de carimbo de tempo via pg_cron/pg_net/Vault, portal público de verificação).

@@ -48,5 +48,11 @@ token_refresh = 150
 enabled = true
 policy = "oneshot"
 
+# Portal público de verificação (seção 7.6): acessado sem login, de propósito — a própria
+# função decide o que é seguro revelar (só liberado_sif=true), com rate limiting e log de
+# acessos próprios (log_acessos_verificacao), em vez de depender de RLS/JWT para esta decisão.
+[functions.verificar-documento]
+verify_jwt = false
+
 [analytics]
 enabled = false

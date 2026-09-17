@@ -10,8 +10,8 @@ export interface MonitoramentoVerificado {
   criado_em: string;
 }
 
-/** Verificados (aprovados ou reprovados) ainda não liberados — candidatos à liberação
- * individual ao SIF (versão mínima da Fase 2; liberação em lote é Fase 3). */
+/** Verificados (aprovados ou reprovados) ainda não liberados — candidatos à liberação em
+ * lote ao SIF (seção 7.3 e 6.2). */
 export function useMonitoramentosParaLiberar() {
   return useQuery({
     queryKey: ["monitoramentos", "para-liberar"],
@@ -29,15 +29,15 @@ export function useMonitoramentosParaLiberar() {
   });
 }
 
-export function useLiberarSif() {
+export function useLiberarLoteSif() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (monitoramentoId: string) => {
+    mutationFn: async (monitoramentoIds: string[]) => {
       const { data, error } = await supabase.functions.invoke("liberar-sif", {
-        body: { monitoramento_id: monitoramentoId },
+        body: { monitoramento_ids: monitoramentoIds },
       });
       if (error) throw error;
-      return data;
+      return data as { lote_id: string; quantidade_liberada: number; hash_agregador: string };
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["monitoramentos"] });

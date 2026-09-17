@@ -154,3 +154,35 @@ descontinuado — o sintoma seria esse TSA específico sempre falhando no painel
 de forma determinística, em vez de depender de conseguir fazer 4 serviços públicos externos
 falharem sob demanda (o que não é possível de forma confiável) ou de sua disponibilidade real
 sob demanda no fluxo de sucesso.
+
+## Premissas da Fase 3 (liberação em lote + portal público)
+
+### 16. Portal público (`verificar-documento`) cobre só monitoramentos, não OS
+🔴 **Assumida sob risco — depende da Fase 5** — `manutencao_os` não tem um mecanismo de
+"liberação" definido ainda (isso é `manutencao_relatorios_sif`, um relatório diário separado,
+não um flag por OS). Implementar a busca de OS no portal agora seria adivinhar um design que
+a Fase 5 ainda vai desenhar de verdade. Qualquer `id` que não seja um `monitoramentos.id`
+retorna "não encontrado" — ver [ADR 0011](docs/adr/0011-portal-publico-verificacao.md).
+
+### 17. CAPTCHA após N falhas não foi implementado
+🟡 **Assumida (pendente de confirmação)** — a seção 7.6 sugere, como reforço adicional
+opcional ("considerar exigir"), um CAPTCHA depois de várias consultas malsucedidas do mesmo
+IP. Implementado nesta fase: rate limiting simples por IP/minuto
+(`app_config.portal_verificacao_limite_por_minuto`), testado em CI. CAPTCHA fica para uma
+fase posterior, se a operação real mostrar que o rate limiting sozinho não é suficiente.
+
+### 18. Teste do "documento sem assinatura" usa um estado sintético, inserido diretamente
+✅ **Confirmada, decisão deliberada** — no fluxo real (Fase 1 em diante), todo monitoramento
+é assinado como INSPETOR no momento da criação, e `liberar-sif` exige uma assinatura
+registrada antes de incluir um documento no lote — ou seja, "liberado E sem nenhuma
+assinatura" não é um estado que as Edge Functions produzem normalmente. O teste E2E do fluxo
+6b insere esse estado diretamente via `service_role` (fora de qualquer Edge Function),
+só para validar que o código DEFENSIVO do portal (nunca fabricar um hash/selo) funciona,
+mesmo que a situação real que ele previne não aconteça pelo caminho normal do sistema.
+
+### 19. Liberação individual da Fase 2 substituída por liberação em lote (mesmo lote de 1)
+✅ **Confirmada, decisão deliberada** — a Edge Function `liberar-sif` da Fase 2 liberava um
+monitoramento por vez, sem hash agregador. Na Fase 3 ela foi reescrita para sempre operar em
+lote (`monitoramento_ids: string[]`, mínimo 1) — liberar um único documento agora é só um
+lote de tamanho 1, ganhando de graça a camada extra de tamper-evidence do hash agregador que
+a versão da Fase 2 não tinha. Não existem mais duas implementações de liberação para manter.

@@ -2,8 +2,8 @@ import { test, expect } from "@playwright/test";
 import { login, logout } from "./helpers";
 
 // Fluxo E2E nº 2 (seção 10 do PROMPT MESTRE): "Verificador aprova → assina → Admin libera
-// SIF → aparece para Inspeção Federal." A liberação usada aqui é a versão mínima da Fase 2
-// (um monitoramento por vez, sem lote/hash agregador — isso é Fase 3, ver ASSUMPTIONS.md).
+// SIF → aparece para Inspeção Federal." A liberação (Fase 3) é em lote, com hash agregador —
+// aqui o lote tem 1 documento, só para exercitar o mecanismo ponta a ponta.
 //
 // As asserções da etapa de liberação são por CONTAGEM, não por identidade do registro: a
 // tela de liberação/auditoria não expõe um marcador único por ficha (só setor/conformidade),
@@ -35,18 +35,18 @@ test("verificador aprova, admin libera ao SIF, e o registro aparece para a Inspe
 
   await login(page, "admin.master@dev.globopac.local", "globopac-dev-2026");
   await page.goto("/sif/liberar");
-  const botoesLiberar = page.getByRole("button", { name: "Liberar ao SIF" });
-  await expect(botoesLiberar.first()).toBeVisible({ timeout: 15_000 });
-  const totalAntes = await botoesLiberar.count();
+  const cartoesParaLiberar = page.locator(".rounded-lg.border");
+  await expect(cartoesParaLiberar.first()).toBeVisible({ timeout: 15_000 });
+  const totalAntes = await cartoesParaLiberar.count();
 
   await page.goto("/auditoria");
   const totalAuditoriaAntes = await page.locator(".rounded-lg.border").count();
 
   await page.goto("/sif/liberar");
-  await page.getByRole("button", { name: "Liberar ao SIF" }).first().click();
-  await expect(page.getByRole("button", { name: "Liberar ao SIF" })).toHaveCount(totalAntes - 1, {
-    timeout: 15_000,
-  });
+  await page.locator(".rounded-lg.border").first().locator('input[type="checkbox"]').check();
+  await page.getByRole("button", { name: /Liberar selecionados \(1\)/ }).click();
+  await expect(page.getByText(/liberado: 1 documento/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".rounded-lg.border")).toHaveCount(totalAntes - 1, { timeout: 15_000 });
 
   await page.goto("/auditoria");
   await expect(page.locator(".rounded-lg.border")).toHaveCount(totalAuditoriaAntes + 1, { timeout: 15_000 });
