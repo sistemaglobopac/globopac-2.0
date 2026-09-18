@@ -411,3 +411,13 @@ um segundo formato de erro que `estaOffline()` não reconhecia: postgrest-js nun
 `TypeError`/`AbortError` de verdade, sempre devolve um objeto plano
 `{message: "TypeError: Failed to fetch", ...}` — cobrindo isso, a mesma checagem passou a
 reconhecer tanto falha de rede comum quanto abort, no mesmo lugar.
+
+### 42. Retentativa de sincronização também é periódica (10s), não só por evento `online`
+✅ **Confirmada, decisão deliberada** — encontrada ao terminar de validar o item acima: o
+evento `online` do navegador não é garantia de que a rede realmente voltou de forma
+utilizável, e algumas transições de rede reais não o disparam de forma confiável em todo
+navegador/SO. Depender só dele deixaria uma ficha presa na fila indefinidamente em cenários
+legítimos — exatamente o tipo de perda silenciosa que este sistema existe para eliminar.
+`useSincronizacaoOffline` agora também tenta sincronizar a cada 10s, além de on-mount,
+`online` e reautenticação — o evento continua dando resposta rápida quando disponível; o
+temporizador é só a rede de segurança.

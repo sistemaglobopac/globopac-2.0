@@ -50,7 +50,10 @@ test("ficha criada sem rede é enfileirada e sincronizada automaticamente quando
     await page.unroute("**/functions/v1/assinar-documento**");
   }
 
-  await expect(page.getByText(/aguardando sincronização/)).not.toBeVisible({ timeout: 20_000 });
+  // page.unroute() não dispara o evento "online" do navegador (ao contrário de uma
+  // reconexão de rede real) — a sincronização aqui depende do reforço periódico de
+  // useSincronizacaoOffline (a cada 10s), não do evento; margem generosa para isso.
+  await expect(page.getByText(/aguardando sincronização/)).not.toBeVisible({ timeout: 30_000 });
 
   const { data: registro } = await admin
     .from("monitoramentos")
