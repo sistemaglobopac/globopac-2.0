@@ -337,3 +337,43 @@ desta fase (o bundle sempre foi >500KB) e piorou com `recharts`. Dividir o bundl
 (`React.lazy` no `DashboardPage`, ou `manualChunks`) é uma otimização de performance pura, sem
 nenhum impacto funcional — fica para a Fase 8 (PWA offline), que já vai mexer em carregamento/
 cache de qualquer forma.
+
+## Premissas da Fase 8 (PWA offline e sincronização)
+
+### 36. Fila offline cobre só "Nova ficha" — as demais telas continuam exigindo conexão
+✅ **Confirmada, decisão deliberada** — ver [ADR 0014](docs/adr/0014-pwa-offline-fila-sincronizacao.md),
+Decisão 2. Verificação, liberação ao SIF, tratativas de RNC e o ciclo de OS leem estado
+compartilhado em tempo real antes de agir; criar uma ficha tem exatamente um criador e nenhuma
+leitura de estado alheio no momento de preencher — o único caso onde a estratégia
+create-only-sem-merge de ADR 0002 se aplica sem inventar nada novo.
+
+### 37. Service worker cacheia só o app shell — nunca respostas de API/Supabase
+✅ **Confirmada, decisão deliberada** — `vite-plugin-pwa` sem `workbox.runtimeCaching`.
+Mostrar uma lista de pendentes ou uma auditoria desatualizada como se fosse atual seria
+reintroduzir exatamente o tipo de risco que este projeto existe para eliminar. "Offline"
+aqui significa "a interface carrega e aceita entrada", nunca "os dados na tela são garantidos
+atuais".
+
+### 38. `capturado_em` é informativo, nunca faz parte do hash assinável
+✅ **Confirmada, decisão deliberada** — coluna nova em `monitoramentos`, preenchida só para
+registros que passaram pela fila offline, com o relógio do próprio dispositivo do inspetor
+(não confiável para fins de prova, ao contrário de `criado_em`, sempre real e do servidor).
+Exibida no card de verificação como metadado extra ("Capturado offline em... — sincronizado
+em..."), nunca como se fosse `criado_em`. Ver ADR 0014, Decisão 4.
+
+### 39. Reautenticação após sessão expirada preserva a fila — nunca descarta um rascunho
+✅ **Confirmada, decisão deliberada** — se a sincronização falhar por token expirado (offline
+por tempo suficiente para o refresh automático do Supabase não bastar), o item fica marcado
+`falha_autenticacao` (nunca é removido da fila), um banner pede novo login, e a fila retoma
+sozinha assim que `onAuthStateChange` reportar `SIGNED_IN`/`TOKEN_REFRESHED`. A mecânica exata
+de TTL de refresh token do Supabase não foi investigada a fundo — o comportamento observável
+(nunca perder o rascunho, sempre pedir login de novo quando necessário) é o que importa aqui,
+não replicar a lógica interna do GoTrue.
+
+### 40. Ícone único (916×915px) para o manifest do PWA — sem gerar tamanhos otimizados
+🟡 **Assumida (pendente de refinamento)** — `public/favicon.png` (a logo em alta resolução já
+fornecida) é referenciado diretamente no manifest como o único ícone declarado. Funciona para
+instalabilidade (Chrome exige pelo menos um ícone ≥192px em alguma dimensão), mas não é o
+ideal (ícones dedicados 192×192/512×512, inclusive "maskable", dão melhor nitidez em launchers
+Android/iOS). Sem ferramenta de processamento de imagem disponível nesta sessão para gerar
+esses tamanhos — ajuste cosmético, não bloqueante, para uma fase de polimento posterior.

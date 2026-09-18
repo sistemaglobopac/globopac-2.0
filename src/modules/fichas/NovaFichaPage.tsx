@@ -4,11 +4,47 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useSessionStore, type PerfilSessao } from "@/store/session";
 import { zodFromSchemaCampos, valoresIniciaisDe, type CampoTemplate } from "@/shared/schema-campos";
 import { useCriarMonitoramento, useTemplatesAtivos } from "./api";
+import { useSincronizacaoOffline } from "./useSincronizacaoOffline";
 import { DynamicField } from "./DynamicField";
 import { Button } from "@/shared/ui/button";
 import { Select } from "@/shared/ui/select";
 import { Label } from "@/shared/ui/label";
+import { Badge } from "@/shared/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
+
+const ROTULO_STATUS_FILA: Record<string, string> = {
+  pendente: "Pendente de sincronização",
+  sincronizando: "Sincronizando…",
+  falhou: "Falha ao sincronizar — tentando de novo",
+  falha_autenticacao: "Sessão expirada — faça login novamente",
+};
+
+function FilaOfflinePainel() {
+  const { fila } = useSincronizacaoOffline();
+  if (fila.length === 0) return null;
+
+  return (
+    <Card className="border-warning">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm">
+          {fila.length} ficha(s) aguardando sincronização (ADR 0002/0014)
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2 text-sm">
+        {fila.map((item) => (
+          <div key={item.id} className="flex items-center justify-between">
+            <span className="text-muted-foreground">
+              Capturada em {new Date(item.capturadoEm).toLocaleString("pt-BR")}
+            </span>
+            <Badge variant={item.status === "falha_autenticacao" ? "destructive" : "outline"}>
+              {ROTULO_STATUS_FILA[item.status] ?? item.status}
+            </Badge>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
 
 export function NovaFichaPage() {
   const perfil = useSessionStore((s) => s.perfil);
@@ -20,6 +56,8 @@ export function NovaFichaPage() {
   return (
     <div className="mx-auto max-w-xl space-y-6">
       <h1 className="text-2xl font-semibold">Nova ficha de monitoramento</h1>
+
+      <FilaOfflinePainel />
 
       <div className="space-y-2">
         <Label htmlFor="template">Template</Label>
@@ -60,7 +98,7 @@ interface FichaFormProps {
 
 function FichaForm({ templateId, versaoTemplate, campos, perfil }: FichaFormProps) {
   const [setor, setSetor] = useState(perfil.setoresPermitidos[0] ?? "");
-  const [sucesso, setSucesso] = useState(false);
+  const [sucesso, setSucesso] = useState<"online" | "offline" | null>(null);
   const criarMonitoramento = useCriarMonitoramento();
 
   const schema = zodFromSchemaCampos(campos);
@@ -75,9 +113,9 @@ function FichaForm({ templateId, versaoTemplate, campos, perfil }: FichaFormProp
   });
 
   async function aoEnviar(dados: FieldValues) {
-    setSucesso(false);
+    setSucesso(null);
     try {
-      await criarMonitoramento.mutateAsync({
+      const resultado = await criarMonitoramento.mutateAsync({
         fichaTemplateId: templateId,
         versaoTemplate,
         userId: perfil.id,
@@ -85,7 +123,7 @@ function FichaForm({ templateId, versaoTemplate, campos, perfil }: FichaFormProp
         dadosDinamicos: dados,
       });
       reset(valoresIniciaisDe(campos));
-      setSucesso(true);
+      setSucesso(resultado.modo);
     } catch {
       // erro já refletido em criarMonitoramento.isError, renderizado abaixo.
     }
@@ -120,7 +158,13 @@ function FichaForm({ templateId, versaoTemplate, campos, perfil }: FichaFormProp
               Falha ao criar/assinar a ficha. Tente novamente.
             </p>
           )}
-          {sucesso && <p className="text-sm text-success">Ficha criada e assinada com sucesso.</p>}
+          {sucesso === "online" && <p className="text-sm text-success">Ficha criada e assinada com sucesso.</p>}
+          {sucesso === "offline" && (
+            <p className="text-sm text-warning">
+              Sem conexão — ficha salva no dispositivo e será enviada e assinada automaticamente
+              assim que a rede voltar.
+            </p>
+          )}
 
           <Button type="submit" disabled={isSubmitting || criarMonitoramento.isPending}>
             {isSubmitting || criarMonitoramento.isPending ? "Salvando e assinando…" : "Criar e assinar"}

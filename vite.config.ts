@@ -1,6 +1,7 @@
 /// <reference types="vitest/config" />
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
+import { VitePWA } from "vite-plugin-pwa";
 import path from "node:path";
 
 // Identifica cada build para o UpdateNotifier detectar quando um novo deploy foi publicado.
@@ -26,7 +27,33 @@ function buildMetaPlugin(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), buildMetaPlugin()],
+  plugins: [
+    react(),
+    buildMetaPlugin(),
+    // PWA instalável (Fase 8, ADR 0014) — só o app shell é precacheado, NUNCA respostas de
+    // API/Supabase (mostrar um monitoramento desatualizado como se fosse atual seria o tipo
+    // de risco que este projeto existe para eliminar). registerType "autoUpdate": o service
+    // worker se atualiza sozinho em segundo plano — quem avisa o usuário de uma nova versão
+    // já é o UpdateNotifier (build-meta.json); duas UIs de "atualizar" seria confuso.
+    VitePWA({
+      registerType: "autoUpdate",
+      injectRegister: "auto",
+      // Sem workbox.runtimeCaching: nenhuma chamada de rede (Supabase REST/Functions) é
+      // interceptada pelo service worker — só os assets do próprio build (precache automático
+      // do Workbox). navigateFallback (padrão do plugin) serve index.html para qualquer rota
+      // offline, correto para uma SPA independente da tela.
+      manifest: {
+        name: "GloboPac 2.0",
+        short_name: "GloboPac",
+        description: "Controle de qualidade e auditoria — SIF 1606",
+        theme_color: "#002060",
+        background_color: "#ffffff",
+        display: "standalone",
+        start_url: "/",
+        icons: [{ src: "/favicon.png", sizes: "916x915", type: "image/png", purpose: "any" }],
+      },
+    }),
+  ],
   define: {
     __APP_BUILD_ID__: JSON.stringify(buildId),
   },

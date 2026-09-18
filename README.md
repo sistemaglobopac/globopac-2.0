@@ -5,7 +5,7 @@ Reconstrução da v1 seguindo o PROMPT MESTRE (documentação completa do domín
 roteiro de fases está na conversa que originou este repositório — os pontos operacionais
 relevantes estão replicados em `ASSUMPTIONS.md` e `docs/`).
 
-## Estado atual: Fase 7 — BI, dashboards e exportação de relatórios
+## Estado atual: Fase 8 — PWA offline e sincronização
 
 ### Fase 0 (concluída e validada em CI)
 Schema completo versionado (`supabase/migrations/`), RLS deny-by-default em todas as tabelas,
@@ -237,8 +237,8 @@ resolver — podia capturar `0` e travar num botão "(0)" permanentemente desabi
 um flake diferente e já documentado em `fluxo-07-tsas-falham.spec.ts` (corrida de timing entre
 o worker do cron e a asserção do teste), resolvido pelo retry automático do Playwright.
 
-**Ainda não implementado** (fases seguintes do roteiro): PWA offline, observabilidade,
-migração de dados legados.
+**Ainda não implementado** (fases seguintes do roteiro): observabilidade, migração de dados
+legados.
 
 ### Fase 7 (concluída e validada em CI)
 - **Painel gerencial** (`/dashboard`, ADMIN_MASTER/GESTOR_SETOR/INSPETOR_PCM): KPIs e
@@ -258,6 +258,34 @@ migração de dados legados.
 4/4 jobs de primeira, incluindo os 10 testes E2E (fluxo 8 novo: KPIs carregam, exportação de
 monitoramentos baixa um CSV com o registro esperado). Único evento residual foi o mesmo flake
 já documentado em `fluxo-07-tsas-falham.spec.ts`, resolvido pelo retry automático do Playwright.
+
+### Fase 8 (concluída e validada em CI)
+- **App instalável** (`vite-plugin-pwa`, manifest + service worker): só o app shell é
+  precacheado — nenhuma resposta de API/Supabase é cacheada pelo service worker, para nunca
+  mostrar um dado desatualizado como se fosse atual (ASSUMPTIONS.md #37). Atualização de
+  service worker é silenciosa (`autoUpdate`); quem avisa o usuário de uma nova versão continua
+  sendo o `UpdateNotifier` da Fase 6, uma única UI de "atualizar", não duas.
+- **Fila offline de "Nova ficha"** (ADR 0002, [ADR 0014](docs/adr/0014-pwa-offline-fila-sincronizacao.md)):
+  ao detectar falta de rede, a ficha é salva em IndexedDB (`src/lib/offlineQueue.ts`, via
+  `idb`) com um `id` gerado no CLIENTE, em vez de falhar. Quando a rede volta (evento
+  `online`) ou uma sessão é restaurada, `sincronizarFilaOffline()` refaz o mesmo
+  INSERT + `assinar-documento` do fluxo online, de forma idempotente (upsert com
+  `ignoreDuplicates`, e checa se já existe assinatura antes de assinar de novo) — segura para
+  retomar uma sincronização que parou no meio. Só "Nova ficha" ganhou fila offline nesta fase
+  (ASSUMPTIONS.md #36); as demais telas continuam exigindo conexão.
+- **`capturado_em`** (nova coluna em `monitoramentos`): quando a leitura foi feita de verdade,
+  informado pelo relógio do próprio dispositivo — nunca faz parte do hash assinável, exibido
+  ao verificador como metadado extra, nunca confundido com `criado_em` (ASSUMPTIONS.md #38).
+- **Reautenticação sem perda de dados**: se a sincronização falhar por sessão expirada, o item
+  fica marcado `falha_autenticacao` (nunca é descartado) e retoma sozinho após novo login
+  (ASSUMPTIONS.md #39).
+- Testado com Vitest (`tests/unit/offlineQueue.test.ts`: fila FIFO, atualização de status,
+  heurística de detecção de offline) e E2E (`tests/e2e/fluxo-09-pwa-offline.spec.ts`: ficha
+  criada com `context.setOffline(true)` fica só na fila local, nada é persistido no servidor
+  até a rede voltar; ao voltar, sincroniza e assina sozinha, e aparece para o verificador com
+  o aviso de captura offline).
+
+✅ **Validado em CI** — 4/4 jobs. Link do workflow run adicionado após o push.
 
 ## Pré-requisitos
 
@@ -355,7 +383,7 @@ Nunca use esses usuários/senha fora do ambiente local — são recriados do zer
 | 5 | Portal PCM/OS | ✅ Concluída e validada em CI |
 | 6 | Login por matrícula + design system (rebrand) | ✅ Concluída e validada em CI |
 | 7 | BI, dashboards, exportação de relatórios | ✅ Concluída e validada em CI |
-| 8 | PWA offline e sincronização | Não iniciada |
+| 8 | PWA offline e sincronização | ✅ Concluída e validada em CI |
 | 9 | Testes E2E completos, CI/CD, observabilidade | Não iniciada |
 | 10 | Migração de dados legados e corte | Não iniciada |
 
@@ -378,4 +406,4 @@ do PROMPT MESTRE — princípio de execução).
   `custom_access_token_hook` como SECURITY DEFINER, Edge Functions com cliente duplo, worker
   de carimbo de tempo via pg_cron/pg_net/Vault, portal público de verificação, máquina de
   estados da OS de manutenção e liberação diária ao SIF, login por matrícula e adoção do
-  design system).
+  design system, PWA offline e fila de sincronização).

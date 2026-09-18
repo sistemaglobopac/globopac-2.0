@@ -50,6 +50,12 @@ function MonitoramentoPendenteCard({ monitoramento: m }: { monitoramento: Monito
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {m.capturado_em && (
+          <p className="mb-3 text-xs text-muted-foreground">
+            Capturado offline em {new Date(m.capturado_em).toLocaleString("pt-BR")} (informado pelo
+            dispositivo, não verificado) — sincronizado em {new Date(m.criado_em).toLocaleString("pt-BR")}.
+          </p>
+        )}
         <dl className="grid grid-cols-2 gap-2 text-sm">
           {Object.entries(m.dados_dinamicos).map(([chave, valor]) => (
             <div key={chave}>

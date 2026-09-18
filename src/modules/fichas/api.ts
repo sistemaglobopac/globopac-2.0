@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import type { CampoTemplate } from "@/shared/schema-campos";
+import { enfileirarFicha, estaOffline } from "@/lib/offlineQueue";
 
 interface TemplateAtivo {
   id: string;
@@ -58,41 +59,80 @@ export function useCriarTemplate() {
   });
 }
 
+interface CriarMonitoramentoInput {
+  fichaTemplateId: string;
+  versaoTemplate: number;
+  userId: string;
+  setor: string;
+  dadosDinamicos: Record<string, unknown>;
+}
+
+export type ResultadoCriarMonitoramento = { id: string; modo: "online" | "offline" };
+
+/** Cria e assina a ficha (seção 7.5); se estiver sem rede (ou o próprio envio falhar por
+ * falta de rede), enfileira em vez de falhar — ADR 0002/0014: o id é sempre gerado no
+ * CLIENTE (nunca pelo default do banco), para que o mesmo id sirva tanto para o INSERT
+ * imediato quanto para uma sincronização posterior a partir da fila offline. */
 export function useCriarMonitoramento() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: {
-      fichaTemplateId: string;
-      versaoTemplate: number;
-      userId: string;
-      setor: string;
-      dadosDinamicos: Record<string, unknown>;
-    }) => {
-      const { data: monitoramento, error } = await supabase
-        .from("monitoramentos")
-        .insert({
-          ficha_template_id: input.fichaTemplateId,
-          versao_template: input.versaoTemplate,
-          user_id: input.userId,
+    mutationFn: async (input: CriarMonitoramentoInput): Promise<ResultadoCriarMonitoramento> => {
+      const id = crypto.randomUUID();
+      const capturadoEm = new Date().toISOString();
+
+      if (!navigator.onLine) {
+        await enfileirarFicha({
+          fichaTemplateId: input.fichaTemplateId,
+          versaoTemplate: input.versaoTemplate,
+          userId: input.userId,
           setor: input.setor,
-          dados_dinamicos: input.dadosDinamicos,
-        })
-        .select("id")
-        .single()
-        .overrideTypes<{ id: string }, { merge: false }>();
-      if (error) throw error;
+          dadosDinamicos: input.dadosDinamicos,
+          capturadoEm,
+        });
+        return { id, modo: "offline" };
+      }
 
-      // Assina imediatamente como INSPETOR (seção 7.5) — a Edge Function recalcula o hash
-      // no servidor a partir do que acabou de ser persistido, nunca do payload do cliente.
-      const { error: assinarError } = await supabase.functions.invoke("assinar-documento", {
-        body: { monitoramento_id: monitoramento.id, tipo: "INSPETOR" },
-      });
-      if (assinarError) throw assinarError;
+      try {
+        const { data: monitoramento, error } = await supabase
+          .from("monitoramentos")
+          .insert({
+            id,
+            ficha_template_id: input.fichaTemplateId,
+            versao_template: input.versaoTemplate,
+            user_id: input.userId,
+            setor: input.setor,
+            dados_dinamicos: input.dadosDinamicos,
+            capturado_em: capturadoEm,
+          })
+          .select("id")
+          .single()
+          .overrideTypes<{ id: string }, { merge: false }>();
+        if (error) throw error;
 
-      return monitoramento;
+        // Assina imediatamente como INSPETOR (seção 7.5) — a Edge Function recalcula o hash
+        // no servidor a partir do que acabou de ser persistido, nunca do payload do cliente.
+        const { error: assinarError } = await supabase.functions.invoke("assinar-documento", {
+          body: { monitoramento_id: monitoramento.id, tipo: "INSPETOR" },
+        });
+        if (assinarError) throw assinarError;
+
+        return { id: monitoramento.id, modo: "online" };
+      } catch (erro) {
+        if (!estaOffline(erro)) throw erro;
+        await enfileirarFicha({
+          fichaTemplateId: input.fichaTemplateId,
+          versaoTemplate: input.versaoTemplate,
+          userId: input.userId,
+          setor: input.setor,
+          dadosDinamicos: input.dadosDinamicos,
+          capturadoEm,
+        });
+        return { id, modo: "offline" };
+      }
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["monitoramentos"] });
+      void queryClient.invalidateQueries({ queryKey: ["fila-offline"] });
     },
   });
 }
@@ -102,6 +142,7 @@ export interface MonitoramentoPendente {
   setor: string;
   dados_dinamicos: Record<string, unknown>;
   criado_em: string;
+  capturado_em: string | null;
   ficha_template_id: string;
   nomeTemplate: string;
 }
@@ -111,6 +152,7 @@ interface MonitoramentoPendenteBruto {
   setor: string;
   dados_dinamicos: Record<string, unknown>;
   criado_em: string;
+  capturado_em: string | null;
   ficha_template_id: string;
 }
 
@@ -131,7 +173,7 @@ export function useMonitoramentosPendentesVerificacao() {
         await Promise.all([
           supabase
             .from("monitoramentos")
-            .select("id, setor, dados_dinamicos, criado_em, ficha_template_id")
+            .select("id, setor, dados_dinamicos, criado_em, capturado_em, ficha_template_id")
             .is("verificado_por", null)
             .order("criado_em", { ascending: true })
             .overrideTypes<MonitoramentoPendenteBruto[], { merge: false }>(),

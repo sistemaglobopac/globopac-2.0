@@ -61,6 +61,7 @@ interface MonitoramentoRow {
   origem_versao: "v2" | "v1_legado";
   aditivo_de: string | null;
   criado_em: string;
+  capturado_em: string | null;
 }
 
 interface RncRow {
