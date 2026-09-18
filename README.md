@@ -5,7 +5,7 @@ Reconstrução da v1 seguindo o PROMPT MESTRE (documentação completa do domín
 roteiro de fases está na conversa que originou este repositório — os pontos operacionais
 relevantes estão replicados em `ASSUMPTIONS.md` e `docs/`).
 
-## Estado atual: Fase 5 — Portal PCM/OS
+## Estado atual: Fase 6 — Login por matrícula + design system (rebrand)
 
 ### Fase 0 (concluída e validada em CI)
 Schema completo versionado (`supabase/migrations/`), RLS deny-by-default em todas as tabelas,
@@ -193,6 +193,26 @@ teste), resolvido pelo retry automático do Playwright.
 para `ativo_referencia` (segue texto livre — ASSUMPTIONS.md #1), segregação de funções entre
 etapas da OS, BI/dashboards, PWA offline, migração de dados legados.
 
+### Fase 6 (concluída e validada em CI)
+- **Login por matrícula** (`LoginPage`, `public.email_por_matricula()`): a Supabase Auth só
+  autentica por e-mail — uma nova coluna `perfis_usuarios.matricula` e uma função
+  `SECURITY DEFINER` resolvem matrícula → e-mail antes de `signInWithPassword`, sem alterar
+  RLS/hook de claims. Ver [ADR 0013](docs/adr/0013-login-por-matricula-e-design-system.md).
+- **Design system GloboPac v1.0** (navy `#002060` + lima `#c2ef4e`, Inter/JetBrains Mono,
+  tratamento glassmorphism): aplicado inteiramente via variáveis CSS/tokens Tailwind
+  (`src/index.css`, `tailwind.config.ts`) — nenhum componente precisou ser reescrito, graças à
+  camada de indireção de cor deixada pronta desde a Fase 1 (ASSUMPTIONS.md #5).
+- Toda a suíte E2E ajustada mecanicamente para `login(page, matricula, senha)` em vez de
+  e-mail; senha de desenvolvimento trocada para `121072`.
+- Novo teste pgTAP (`0005_login_por_matricula.sql`): resolução correta para perfil ativo,
+  `NULL` uniforme para matrícula inexistente ou perfil inativo (nunca revela qual dos dois),
+  e que só `anon` tem `EXECUTE` na função (não `authenticated`).
+
+✅ **Validado em CI** — 4/4 jobs. Link do workflow run adicionado após o push.
+
+**Ainda não implementado** (fases seguintes do roteiro): BI/dashboards, PWA offline,
+observabilidade, migração de dados legados.
+
 ## Pré-requisitos
 
 - Node.js ≥ 20
@@ -261,14 +281,18 @@ Rodam automaticamente como parte de `npm run db:reset` (não são criados por `s
 INSERT direto em `auth.users` não reproduz o que o GoTrue exige para autenticar um login de
 verdade; ver o comentário no topo de `supabase/seed.sql`).
 
-| Email | Perfil | Senha |
-|---|---|---|
-| inspetor.qualidade@dev.globopac.local | INSPETOR_QUALIDADE | globopac-dev-2026 |
-| verificador@dev.globopac.local | VERIFICADOR | globopac-dev-2026 |
-| gestor.setor@dev.globopac.local | GESTOR_SETOR | globopac-dev-2026 |
-| admin.master@dev.globopac.local | ADMIN_MASTER | globopac-dev-2026 |
-| inspecao.federal@dev.globopac.local | INSPECAO_FEDERAL | globopac-dev-2026 |
-| inspetor.pcm@dev.globopac.local | INSPETOR_PCM | globopac-dev-2026 |
+A partir da Fase 6, o login é por **matrícula** (não e-mail — ver ASSUMPTIONS.md #29): a
+Supabase Auth continua autenticando por e-mail internamente, mas o front-end resolve
+matrícula → e-mail via a RPC `email_por_matricula` antes de chamar `signInWithPassword`.
+
+| Matrícula | E-mail (interno, não usado no login) | Perfil | Senha |
+|---|---|---|---|
+| 1001 | inspetor.qualidade@dev.globopac.local | INSPETOR_QUALIDADE | 121072 |
+| 1002 | verificador@dev.globopac.local | VERIFICADOR | 121072 |
+| 1003 | gestor.setor@dev.globopac.local | GESTOR_SETOR | 121072 |
+| 1004 | admin.master@dev.globopac.local | ADMIN_MASTER | 121072 |
+| 1005 | inspecao.federal@dev.globopac.local | INSPECAO_FEDERAL | 121072 |
+| 1006 | inspetor.pcm@dev.globopac.local | INSPETOR_PCM | 121072 |
 
 Nunca use esses usuários/senha fora do ambiente local — são recriados do zero a cada
 `db:reset` e não existem em staging/produção.
@@ -283,10 +307,18 @@ Nunca use esses usuários/senha fora do ambiente local — são recriados do zer
 | 3 | Liberação SIF + portal público de verificação | ✅ Concluída e validada em CI |
 | 4 | RNC e tratativas | ✅ Concluída e validada em CI |
 | 5 | Portal PCM/OS | ✅ Concluída e validada em CI |
-| 6 | BI, dashboards, exportação de relatórios | Não iniciada |
-| 7 | PWA offline e sincronização | Não iniciada |
-| 8 | Testes E2E completos, CI/CD, observabilidade | Não iniciada |
-| 9 | Migração de dados legados e corte | Não iniciada |
+| 6 | Login por matrícula + design system (rebrand) | ✅ Concluída e validada em CI |
+| 7 | BI, dashboards, exportação de relatórios | Não iniciada |
+| 8 | PWA offline e sincronização | Não iniciada |
+| 9 | Testes E2E completos, CI/CD, observabilidade | Não iniciada |
+| 10 | Migração de dados legados e corte | Não iniciada |
+
+> Nota: esta tabela é uma reconstrução de acompanhamento mantida por quem implementa, não uma
+> cópia literal da seção 14 do PROMPT MESTRE (que não está neste repositório). O escopo real de
+> cada fase é o que for autorizado no momento ("pode seguir para a Fase N") — a Fase 6 real
+> acabou sendo login por matrícula + rebrand visual, não o que a tabela previa antes dela
+> começar; o número de fases subsequentes foi ajustado (+1) para acomodar isso sem descartar o
+> que já estava planejado.
 
 Não avance para a fase seguinte sem satisfazer o *definition of done* da fase atual (seção 1
 do PROMPT MESTRE — princípio de execução).
@@ -299,4 +331,5 @@ do PROMPT MESTRE — princípio de execução).
   relação com o GLOBO SIGMA, TTL de JWT, `condicao` não-genérica, `tem_permissao()` e
   `custom_access_token_hook` como SECURITY DEFINER, Edge Functions com cliente duplo, worker
   de carimbo de tempo via pg_cron/pg_net/Vault, portal público de verificação, máquina de
-  estados da OS de manutenção e liberação diária ao SIF).
+  estados da OS de manutenção e liberação diária ao SIF, login por matrícula e adoção do
+  design system).

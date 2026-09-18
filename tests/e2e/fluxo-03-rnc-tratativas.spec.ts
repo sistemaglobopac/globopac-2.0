@@ -10,7 +10,7 @@ test("verificador reprova, RNC é criada, gestor de setor trata e fecha (fluxo 3
   const marcador = `E2E-fluxo3-${Date.now()}`;
   const admin = await clienteAdminDeTeste();
 
-  await login(page, "inspetor.qualidade@dev.globopac.local", "globopac-dev-2026");
+  await login(page, "1001", "121072");
   await page.goto("/fichas/nova");
   await page.locator("#template").selectOption({ label: "Monitoramento de Temperatura — Linha DIF (v1)" });
   await page.locator("#temperatura_celsius").fill("35");
@@ -19,7 +19,7 @@ test("verificador reprova, RNC é criada, gestor de setor trata e fecha (fluxo 3
   await expect(page.getByText("Ficha criada e assinada com sucesso.")).toBeVisible({ timeout: 15_000 });
   await logout(page);
 
-  await login(page, "verificador@dev.globopac.local", "globopac-dev-2026");
+  await login(page, "1002", "121072");
   await page.goto("/verificacao");
   const cartaoVerificacao = page.locator(".rounded-lg.border").filter({ hasText: marcador });
   await expect(cartaoVerificacao).toBeVisible({ timeout: 15_000 });
@@ -39,7 +39,7 @@ test("verificador reprova, RNC é criada, gestor de setor trata e fecha (fluxo 3
   expect(rncCriada!.status).toBe("ABERTA");
   expect(rncCriada!.severidade).toBe("ALTA");
 
-  await login(page, "gestor.setor@dev.globopac.local", "globopac-dev-2026");
+  await login(page, "1003", "121072");
   await page.goto("/rnc");
   const cartaoRnc = page.locator(".rounded-lg.border").filter({ hasText: marcador });
   await expect(cartaoRnc).toBeVisible({ timeout: 15_000 });
@@ -80,7 +80,7 @@ test("RNC com prazo_sla vencido exibe alerta de SLA (DoD: SLA configurável com 
   });
   expect(error).toBeFalsy();
 
-  await login(page, "gestor.setor@dev.globopac.local", "globopac-dev-2026");
+  await login(page, "1003", "121072");
   await page.goto("/rnc");
   const cartaoRnc = page.locator(".rounded-lg.border").filter({ hasText: marcador });
   await expect(cartaoRnc).toBeVisible({ timeout: 15_000 });

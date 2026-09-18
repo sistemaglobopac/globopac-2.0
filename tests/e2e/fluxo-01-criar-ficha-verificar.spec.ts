@@ -14,7 +14,7 @@ import { login, logout } from "./helpers";
 test("inspetor cria e assina uma ficha, que aparece para o verificador", async ({ page }) => {
   const marcador = `E2E-fluxo1-${Date.now()}`;
 
-  await login(page, "inspetor.qualidade@dev.globopac.local", "globopac-dev-2026");
+  await login(page, "1001", "121072");
 
   await page.goto("/fichas/nova");
   await page.locator("#template").selectOption({ label: "Monitoramento de Temperatura — Linha DIF (v1)" });
@@ -28,7 +28,7 @@ test("inspetor cria e assina uma ficha, que aparece para o verificador", async (
 
   await logout(page);
 
-  await login(page, "verificador@dev.globopac.local", "globopac-dev-2026");
+  await login(page, "1002", "121072");
   await page.goto("/verificacao");
 
   const cartaoDoRegistro = page.locator(".rounded-lg.border").filter({ hasText: marcador });

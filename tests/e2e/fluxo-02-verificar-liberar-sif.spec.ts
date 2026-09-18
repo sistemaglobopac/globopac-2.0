@@ -16,7 +16,7 @@ test("verificador aprova, admin libera ao SIF, e o registro aparece para a Inspe
 }) => {
   const marcador = `E2E-fluxo2-${Date.now()}`;
 
-  await login(page, "inspetor.qualidade@dev.globopac.local", "globopac-dev-2026");
+  await login(page, "1001", "121072");
   await page.goto("/fichas/nova");
   await page.locator("#template").selectOption({ label: "Monitoramento de Temperatura — Linha DIF (v1)" });
   await page.locator("#temperatura_celsius").fill("22");
@@ -25,7 +25,7 @@ test("verificador aprova, admin libera ao SIF, e o registro aparece para a Inspe
   await expect(page.getByText("Ficha criada e assinada com sucesso.")).toBeVisible({ timeout: 15_000 });
   await logout(page);
 
-  await login(page, "verificador@dev.globopac.local", "globopac-dev-2026");
+  await login(page, "1002", "121072");
   await page.goto("/verificacao");
   const cartaoDoRegistro = page.locator(".rounded-lg.border").filter({ hasText: marcador });
   await expect(cartaoDoRegistro).toBeVisible({ timeout: 15_000 });
@@ -33,7 +33,7 @@ test("verificador aprova, admin libera ao SIF, e o registro aparece para a Inspe
   await expect(cartaoDoRegistro).not.toBeVisible({ timeout: 15_000 });
   await logout(page);
 
-  await login(page, "admin.master@dev.globopac.local", "globopac-dev-2026");
+  await login(page, "1004", "121072");
   await page.goto("/sif/liberar");
   const cartoesParaLiberar = page.locator(".rounded-lg.border");
   await expect(cartoesParaLiberar.first()).toBeVisible({ timeout: 15_000 });

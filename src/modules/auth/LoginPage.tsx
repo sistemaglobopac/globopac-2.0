@@ -8,13 +8,15 @@ import { useSessionStore } from "@/store/session";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/shared/ui/card";
 
 const loginSchema = z.object({
-  email: z.string().email("Informe um e-mail válido"),
+  matricula: z.string().min(1, "Informe a matrícula"),
   senha: z.string().min(1, "Informe a senha"),
 });
 type LoginForm = z.infer<typeof loginSchema>;
+
+const ERRO_CREDENCIAIS = "Matrícula ou senha inválidos.";
 
 export function LoginPage() {
   const [erro, setErro] = useState<string | null>(null);
@@ -36,26 +38,47 @@ export function LoginPage() {
 
   async function aoEnviar(dados: LoginForm) {
     setErro(null);
+
+    // Supabase Auth só autentica por e-mail/telefone — resolve matrícula -> e-mail via RPC
+    // antes de chamar signInWithPassword. Mesma mensagem genérica para matrícula inexistente
+    // e senha errada, para não revelar qual das duas está incorreta.
+    const { data: email, error: erroLookup } = await supabase.rpc("email_por_matricula", {
+      p_matricula: dados.matricula,
+    });
+
+    if (erroLookup || !email) {
+      setErro(ERRO_CREDENCIAIS);
+      return;
+    }
+
     const { error } = await supabase.auth.signInWithPassword({
-      email: dados.email,
+      email,
       password: dados.senha,
     });
-    if (error) setErro("E-mail ou senha inválidos.");
+    if (error) setErro(ERRO_CREDENCIAIS);
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted p-4">
-      <Card className="w-full max-w-sm">
+    <div className="page-wash flex min-h-screen items-center justify-center p-4">
+      <Card className="w-full max-w-sm rounded-xl border-white/70 bg-white/85 shadow-lg backdrop-blur-xl">
         <CardHeader>
-          <CardTitle>GloboPac 2.0</CardTitle>
+          <img src="/logo-globopac.png" alt="GloboPac" className="h-10 w-auto self-start" />
           <CardDescription>Controle de qualidade e auditoria — SIF 1606</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(aoEnviar)} className="space-y-4" noValidate>
             <div className="space-y-2">
-              <Label htmlFor="email">E-mail</Label>
-              <Input id="email" type="email" autoComplete="username" {...register("email")} />
-              {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+              <Label htmlFor="matricula">Matrícula</Label>
+              <Input
+                id="matricula"
+                type="text"
+                inputMode="numeric"
+                autoComplete="username"
+                {...register("matricula")}
+              />
+              {errors.matricula && (
+                <p className="text-sm text-destructive">{errors.matricula.message}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="senha">Senha</Label>

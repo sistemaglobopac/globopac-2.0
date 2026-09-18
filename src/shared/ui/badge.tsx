@@ -9,7 +9,10 @@ const badgeVariants = cva(
       variant: {
         default: "border-transparent bg-primary text-primary-foreground",
         secondary: "border-transparent bg-secondary text-secondary-foreground",
-        destructive: "border-transparent bg-destructive text-destructive-foreground",
+        // Selo negativo é preenchimento suave (não sólido) — ver design system,
+        // badge-negative: bg down-soft / texto down. Botão "destructive" continua sólido
+        // (bg-destructive), papel diferente (ação vs. status).
+        destructive: "border-transparent bg-down-soft text-down",
         success: "border-transparent bg-success text-success-foreground",
         warning: "border-transparent bg-warning text-warning-foreground",
         outline: "text-foreground",

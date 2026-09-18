@@ -13,7 +13,7 @@ test("documento liberado aparece com trilha e badge corretos no portal público 
   const marcador = `E2E-fluxo5-${Date.now()}`;
   const admin = await clienteAdminDeTeste();
 
-  await login(page, "inspetor.qualidade@dev.globopac.local", "globopac-dev-2026");
+  await login(page, "1001", "121072");
   await page.goto("/fichas/nova");
   await page.locator("#template").selectOption({ label: "Monitoramento de Temperatura — Linha DIF (v1)" });
   await page.locator("#temperatura_celsius").fill("21");
@@ -22,7 +22,7 @@ test("documento liberado aparece com trilha e badge corretos no portal público 
   await expect(page.getByText("Ficha criada e assinada com sucesso.")).toBeVisible({ timeout: 15_000 });
   await logout(page);
 
-  await login(page, "verificador@dev.globopac.local", "globopac-dev-2026");
+  await login(page, "1002", "121072");
   await page.goto("/verificacao");
   const cartaoVerificacao = page.locator(".rounded-lg.border").filter({ hasText: marcador });
   await expect(cartaoVerificacao).toBeVisible({ timeout: 15_000 });
@@ -32,7 +32,7 @@ test("documento liberado aparece com trilha e badge corretos no portal público 
 
   // Libera TODOS os pendentes (não só o nosso) — mais simples e robusto do que garantir que
   // o nosso seja o único checkbox marcável; o teste só precisa que o NOSSO acabe liberado.
-  await login(page, "admin.master@dev.globopac.local", "globopac-dev-2026");
+  await login(page, "1004", "121072");
   await page.goto("/sif/liberar");
   const checkboxes = page.locator('input[type="checkbox"]');
   const total = await checkboxes.count();
@@ -62,7 +62,7 @@ test("documento ainda não liberado não é encontrado no portal público (fluxo
   const marcador = `E2E-fluxo6a-${Date.now()}`;
   const admin = await clienteAdminDeTeste();
 
-  await login(page, "inspetor.qualidade@dev.globopac.local", "globopac-dev-2026");
+  await login(page, "1001", "121072");
   await page.goto("/fichas/nova");
   await page.locator("#template").selectOption({ label: "Monitoramento de Temperatura — Linha DIF (v1)" });
   await page.locator("#temperatura_celsius").fill("22");

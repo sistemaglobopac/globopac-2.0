@@ -12,7 +12,7 @@ test("ciclo completo de OS: abrir, avançar todas as etapas, liberar ao SIF, ver
   const admin = await clienteAdminDeTeste();
   const hoje = new Date().toISOString().slice(0, 10);
 
-  await login(page, "inspetor.pcm@dev.globopac.local", "globopac-dev-2026");
+  await login(page, "1006", "121072");
 
   await page.goto("/pcm/nova");
   await page.locator("#descricao").fill(marcador);
@@ -70,7 +70,7 @@ test("ciclo completo de OS: abrir, avançar todas as etapas, liberar ao SIF, ver
   await expect(page.getByText("LIBERACAO_DIARIA", { exact: true })).toBeVisible();
   await expect(page.getByText(/IDÊNTICO ao original assinado/)).toBeVisible();
 
-  await login(page, "inspecao.federal@dev.globopac.local", "globopac-dev-2026");
+  await login(page, "1005", "121072");
   await page.goto("/auditoria");
   await expect(page.getByText(marcador)).toBeVisible({ timeout: 15_000 });
 });

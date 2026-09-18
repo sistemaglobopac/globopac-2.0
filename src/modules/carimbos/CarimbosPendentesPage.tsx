@@ -52,11 +52,13 @@ export function CarimbosPendentesPage() {
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {Object.entries(ROTULO_STATUS).map(([chave, rotulo]) => (
-          <Card key={chave}>
+          <Card key={chave} className="glass-kpi rounded-xl border-white/65 shadow-md">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{rotulo}</CardTitle>
+              <CardTitle className="text-[13px] font-normal text-muted-foreground">{rotulo}</CardTitle>
             </CardHeader>
-            <CardContent className="text-2xl font-semibold">{porStatus[chave] ?? 0}</CardContent>
+            <CardContent className="font-mono text-[26px] font-medium leading-tight text-ink">
+              {porStatus[chave] ?? 0}
+            </CardContent>
           </Card>
         ))}
       </div>
@@ -71,7 +73,7 @@ export function CarimbosPendentesPage() {
         </Card>
       )}
 
-      <Card>
+      <Card className="glass-panel rounded-xl border-white/70">
         <CardHeader>
           <CardTitle className="text-base">Itens recentes</CardTitle>
         </CardHeader>
@@ -79,7 +81,7 @@ export function CarimbosPendentesPage() {
           {isLoading && <p className="text-muted-foreground">Carregando…</p>}
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-muted-foreground">
+              <tr className="text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 <th className="py-1">Tipo</th>
                 <th>Status</th>
                 <th>Tentativas</th>

@@ -59,6 +59,12 @@ frontend ainda). Quando a Fase 1 iniciar, o design system (tokens shadcn/ui + Ta
 inicialmente neutro, com uma camada de tokens de cor isolada em CSS variables para permitir
 substituição pela paleta Avenorte sem refatoração, assim que confirmado.
 
+**Atualização (Fase 6):** ✅ **Confirmada** — o usuário forneceu o design system GloboPac v1.0
+(navy/lima, tipografia Inter/JetBrains Mono, tratamento glassmorphism). Aplicado inteiramente
+via variáveis CSS/tokens Tailwind (`src/index.css`, `tailwind.config.ts`), exatamente pela
+camada de indireção isolada que foi deixada pronta desde a Fase 1 para este momento — nenhum
+componente precisou ser reescrito. Ver [ADR 0013](docs/adr/0013-login-por-matricula-e-design-system.md).
+
 ### 6. Canal de alerta operacional
 🟡 **Assumida (pendente de confirmação)** — e-mail como canal mínimo padrão, conforme sugerido
 no PROMPT MESTRE. Nenhuma integração foi implementada na Fase 0 (é escopo da Fase 8 —
@@ -278,3 +284,24 @@ deliberadamente, por falta de um mecanismo de liberação definido. Agora que ex
 `manutencao_os` — mesmo formato de resposta (`trilha`/`integridade`), com um campo `descricao`
 opcional só para OS. Nenhuma mudança de contrato para quem já consome o portal para
 monitoramentos.
+
+## Premissas da Fase 6 (login por matrícula + design system)
+
+### 29. Login por matrícula é uma camada de resolução sobre o e-mail, não um mecanismo de auth novo
+✅ **Confirmada, decisão deliberada** — a Supabase Auth só autentica por e-mail/telefone.
+`perfis_usuarios.matricula` (nova coluna, distinta de `nome_usuario`) mais a função
+`public.email_por_matricula()` (SECURITY DEFINER, chamada antes de existir sessão) resolvem
+matrícula → e-mail no `LoginPage`, que então chama `signInWithPassword` normalmente — nenhuma
+mudança em RLS, no hook de claims, ou em qualquer policy existente. Ver
+[ADR 0013](docs/adr/0013-login-por-matricula-e-design-system.md).
+
+### 30. Senha de desenvolvimento trocada para `121072`
+✅ **Confirmada, decisão deliberada** — escolha arbitrária do usuário ao atualizar
+`scripts/seed-dev-users.mjs`; todos os testes E2E e a tabela de usuários de teste do README
+foram atualizados para o novo valor. Nunca usado fora do ambiente local.
+
+### 31. `matricula` não entra nas claims do JWT
+✅ **Confirmada, decisão deliberada** — `custom_access_token_hook` continua embutindo só
+`perfil`/`setores_permitidos` (o vocabulário de autorização). `matricula` é usada uma única
+vez, no momento do login, antes de qualquer sessão existir — depois disso não tem nenhum papel
+em RLS/RBAC, então não precisa viajar no token.

@@ -55,9 +55,9 @@ export async function chamarFuncaoCrua(nomeFuncao: string, corpo: unknown) {
   });
 }
 
-export async function login(page: Page, email: string, senha: string) {
+export async function login(page: Page, matricula: string, senha: string) {
   await page.goto("/login");
-  await page.getByLabel("E-mail").fill(email);
+  await page.getByLabel("Matrícula").fill(matricula);
   await page.getByLabel("Senha").fill(senha);
   await page.getByRole("button", { name: "Entrar" }).click();
   await expect(page).not.toHaveURL(/\/login$/);

@@ -27,7 +27,7 @@ test("falha simultânea de todas as TSAs marca o carimbo como pendente sem trava
   await admin.from("app_config").update({ valor: TSAS_QUE_FALHAM }).eq("chave", "tsas_carimbo_tempo");
 
   try {
-    await login(page, "inspetor.qualidade@dev.globopac.local", "globopac-dev-2026");
+    await login(page, "1001", "121072");
     await page.goto("/fichas/nova");
     await page.locator("#template").selectOption({ label: "Monitoramento de Temperatura — Linha DIF (v1)" });
     await page.locator("#temperatura_celsius").fill("25");

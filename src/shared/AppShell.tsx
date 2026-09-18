@@ -9,6 +9,15 @@ interface ItemMenu {
   rotulo: string;
 }
 
+const NIVEL_ACESSO_ROTULO: Record<string, string> = {
+  INSPETOR_QUALIDADE: "Inspetor de Qualidade",
+  VERIFICADOR: "Verificador",
+  GESTOR_SETOR: "Gestor de Setor",
+  ADMIN_MASTER: "Administrador",
+  INSPECAO_FEDERAL: "Inspeção Federal",
+  INSPETOR_PCM: "Inspetor PCM",
+};
+
 const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
   INSPETOR_QUALIDADE: [{ rota: "/fichas/nova", rotulo: "Nova ficha" }],
   VERIFICADOR: [{ rota: "/verificacao", rotulo: "Verificação" }],
@@ -36,18 +45,20 @@ export function AppShell() {
   const itens = perfil ? (MENU_POR_PERFIL[perfil.nivelAcesso] ?? []) : [];
 
   return (
-    <div className="flex min-h-screen">
-      <aside className="w-60 shrink-0 border-r bg-card">
-        <div className="p-4 text-lg font-semibold">GloboPac 2.0</div>
-        <nav className="flex flex-col gap-1 px-2">
+    <div className="page-wash flex min-h-screen">
+      <aside className="glass-sidebar w-60 shrink-0 border-r border-white/10">
+        <div className="p-4">
+          <img src="/logo-globopac-white.png" alt="GloboPac" className="h-16 w-auto" />
+        </div>
+        <nav className="flex flex-col gap-1 px-3">
           {itens.map((item) => (
             <NavLink
               key={item.rota}
               to={item.rota}
               className={({ isActive }) =>
                 cn(
-                  "rounded-md px-3 py-2 text-sm font-medium hover:bg-accent",
-                  isActive && "bg-accent text-accent-foreground"
+                  "rounded-md border-l-[3px] border-transparent px-3 py-2 text-sm font-medium text-ondark-soft transition-colors hover:bg-white/5 hover:text-ondark",
+                  isActive && "border-lime bg-white/10 font-semibold text-ondark"
                 )
               }
             >
@@ -57,9 +68,9 @@ export function AppShell() {
         </nav>
       </aside>
       <div className="flex flex-1 flex-col">
-        <header className="flex items-center justify-between border-b p-4">
+        <header className="glass-topbar sticky top-0 z-10 flex items-center justify-between border-b border-white/60 p-4">
           <div className="text-sm text-muted-foreground">
-            {perfil?.nomeCompleto} · {perfil?.nivelAcesso}
+            {perfil?.nomeCompleto} · {perfil ? NIVEL_ACESSO_ROTULO[perfil.nivelAcesso] : ""}
           </div>
           <Button variant="outline" size="sm" onClick={() => supabase.auth.signOut()}>
             Sair

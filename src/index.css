@@ -2,32 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Tokens de cor neutros (ver ASSUMPTIONS.md item 5 — paleta Avenorte ainda não confirmada).
-   Trocar só estas variáveis substitui a paleta em todo o app, sem tocar componentes. */
+/* Tokens de cor — paleta GloboPac (design system v1.0, ver
+   C:\Users\wande\Downloads\globopac-design-system.md). Navy (#002060) e lima (#c2ef4e)
+   extraídos da marca. Trocar só estas variáveis substitui a paleta em todo o app, sem tocar
+   componentes. */
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
+    --foreground: 221 41% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --primary: 222 47% 25%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 210 40% 92%;
-    --accent-foreground: 222 47% 11%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 210 40% 98%;
-    --success: 142 71% 33%;
-    --success-foreground: 210 40% 98%;
+    --card-foreground: 221 41% 11%;
+    --primary: 220 100% 19%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 216 22% 96%;
+    --secondary-foreground: 221 41% 11%;
+    --muted: 216 22% 96%;
+    --muted-foreground: 219 8% 51%;
+    --accent: 216 22% 92%;
+    --accent-foreground: 221 41% 11%;
+    --destructive: 355 73% 47%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 77 83% 62%;
+    --success-foreground: 220 100% 19%;
     --warning: 38 92% 45%;
     --warning-foreground: 210 40% 98%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 222 47% 25%;
-    --radius: 0.5rem;
+    --border: 219 14% 89%;
+    --input: 219 14% 89%;
+    --ring: 220 100% 19%;
+    --radius: 1rem;
   }
 
   .dark {
@@ -59,6 +61,48 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
+  }
+}
+
+/* Chrome estrutural em glassmorphism — ver seção "Tratamento de superfície" do design
+   system. A opacidade escala com a densidade de texto de cada superfície: sidebar (só ícone
+   + rótulo) pode ir mais transparente que um painel de tabela densa. */
+@layer utilities {
+  .page-wash {
+    background-color: theme("colors.surface.soft");
+    background-image:
+      radial-gradient(1000px circle at 6% 10%, rgba(0, 32, 96, 0.18), transparent 55%),
+      radial-gradient(900px circle at 95% 90%, rgba(194, 239, 78, 0.16), transparent 50%),
+      radial-gradient(700px circle at 55% 40%, rgba(18, 48, 110, 0.1), transparent 55%);
+    background-attachment: fixed;
+  }
+
+  .glass-sidebar {
+    /* O design system pede 72% de opacidade (ver globopac-design-system.md), calibrado para
+       um fundo mais escuro atrás da sidebar. Nosso page-wash é predominantemente claro
+       (surface-soft), então 72% lavava o navy até um cinza-azulado — subimos para 94% para
+       manter a leitura como navy sólido, com só um resquício de vidro/blur. */
+    background: rgba(2, 15, 42, 0.94);
+    backdrop-filter: blur(22px) saturate(150%);
+    -webkit-backdrop-filter: blur(22px) saturate(150%);
+  }
+
+  .glass-topbar {
+    background: rgba(255, 255, 255, 0.62);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+  }
+
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.84);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+  }
+
+  .glass-kpi {
+    background: rgba(255, 255, 255, 0.58);
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
   }
 }

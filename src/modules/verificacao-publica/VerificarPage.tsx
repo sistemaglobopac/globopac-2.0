@@ -37,7 +37,10 @@ export function VerificarPage() {
 
   return (
     <div className="mx-auto min-h-screen max-w-xl space-y-4 p-6">
-      <h1 className="text-2xl font-semibold">Verificação de documento — GloboPac 2.0</h1>
+      <div className="space-y-2">
+        <img src="/logo-globopac.png" alt="GloboPac" className="h-9 w-auto" />
+        <h1 className="text-2xl font-semibold">Verificação de documento</h1>
+      </div>
 
       {!id && (
         <p className="text-muted-foreground">

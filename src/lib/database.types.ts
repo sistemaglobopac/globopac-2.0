@@ -24,6 +24,7 @@ interface PerfilUsuarioRow {
   id: string;
   nome_completo: string;
   nome_usuario: string;
+  matricula: string;
   nivel_acesso: NivelAcesso;
   setores_permitidos: string[];
   ativo: boolean;
@@ -103,7 +104,7 @@ export interface Database {
       perfis_usuarios: {
         Row: PerfilUsuarioRow;
         Insert: Partial<PerfilUsuarioRow> &
-          Pick<PerfilUsuarioRow, "id" | "nome_completo" | "nome_usuario" | "nivel_acesso">;
+          Pick<PerfilUsuarioRow, "id" | "nome_completo" | "nome_usuario" | "matricula" | "nivel_acesso">;
         Update: Partial<PerfilUsuarioRow>;
         Relationships: [];
       };
@@ -148,7 +149,12 @@ export interface Database {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      email_por_matricula: {
+        Args: { p_matricula: string };
+        Returns: string | null;
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

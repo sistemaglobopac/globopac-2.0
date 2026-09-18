@@ -55,13 +55,14 @@ const admin = createClient(url, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
-const SENHA_DEV = "globopac-dev-2026";
+const SENHA_DEV = "121072";
 
 const USUARIOS = [
   {
     email: "inspetor.qualidade@dev.globopac.local",
     nomeCompleto: "Inspetor(a) de Qualidade (dev)",
     nomeUsuario: "inspetor.qualidade",
+    matricula: "1001",
     nivelAcesso: "INSPETOR_QUALIDADE",
     setoresPermitidos: ["LINHA_DIF", "PRE_INSPECAO"],
   },
@@ -69,6 +70,7 @@ const USUARIOS = [
     email: "verificador@dev.globopac.local",
     nomeCompleto: "Verificador(a) (dev)",
     nomeUsuario: "verificador",
+    matricula: "1002",
     nivelAcesso: "VERIFICADOR",
     setoresPermitidos: ["LINHA_DIF", "PRE_INSPECAO"],
   },
@@ -76,13 +78,15 @@ const USUARIOS = [
     email: "gestor.setor@dev.globopac.local",
     nomeCompleto: "Gestor(a) de Setor (dev)",
     nomeUsuario: "gestor.setor",
+    matricula: "1003",
     nivelAcesso: "GESTOR_SETOR",
     setoresPermitidos: ["LINHA_DIF"],
   },
   {
     email: "admin.master@dev.globopac.local",
-    nomeCompleto: "Administrador(a) Master (dev)",
+    nomeCompleto: "Administrador(a) (dev)",
     nomeUsuario: "admin.master",
+    matricula: "1004",
     nivelAcesso: "ADMIN_MASTER",
     setoresPermitidos: ["LINHA_DIF", "PRE_INSPECAO", "RECEPCAO", "EXPEDICAO", "MANUTENCAO"],
   },
@@ -90,6 +94,7 @@ const USUARIOS = [
     email: "inspecao.federal@dev.globopac.local",
     nomeCompleto: "Inspeção Federal (dev)",
     nomeUsuario: "inspecao.federal",
+    matricula: "1005",
     nivelAcesso: "INSPECAO_FEDERAL",
     setoresPermitidos: [],
   },
@@ -97,6 +102,7 @@ const USUARIOS = [
     email: "inspetor.pcm@dev.globopac.local",
     nomeCompleto: "Inspetor(a) PCM (dev)",
     nomeUsuario: "inspetor.pcm",
+    matricula: "1006",
     nivelAcesso: "INSPETOR_PCM",
     setoresPermitidos: ["MANUTENCAO"],
   },
@@ -118,6 +124,7 @@ for (const usuario of USUARIOS) {
     id: data.user.id,
     nome_completo: usuario.nomeCompleto,
     nome_usuario: usuario.nomeUsuario,
+    matricula: usuario.matricula,
     nivel_acesso: usuario.nivelAcesso,
     setores_permitidos: usuario.setoresPermitidos,
   });
