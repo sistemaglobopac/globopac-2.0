@@ -17,9 +17,9 @@ values
   ('a0000000-0000-0000-0000-000000000001', 'authenticated', 'authenticated', 'criador@test.local', '00000000-0000-0000-0000-000000000000', '{}', '{}', now(), now()),
   ('a0000000-0000-0000-0000-000000000002', 'authenticated', 'authenticated', 'verificador@test.local', '00000000-0000-0000-0000-000000000000', '{}', '{}', now(), now());
 
-insert into perfis_usuarios (id, nome_completo, nome_usuario, nivel_acesso, setores_permitidos) values
-  ('a0000000-0000-0000-0000-000000000001', 'Criador Teste', 'criador.teste', 'INSPETOR_QUALIDADE', array['LINHA_DIF']),
-  ('a0000000-0000-0000-0000-000000000002', 'Verificador Teste', 'verificador.teste', 'VERIFICADOR', array['LINHA_DIF']);
+insert into perfis_usuarios (id, nome_completo, nome_usuario, matricula, nivel_acesso, setores_permitidos) values
+  ('a0000000-0000-0000-0000-000000000001', 'Criador Teste', 'criador.teste', 'T0001', 'INSPETOR_QUALIDADE', array['LINHA_DIF']),
+  ('a0000000-0000-0000-0000-000000000002', 'Verificador Teste', 'verificador.teste', 'T0002', 'VERIFICADOR', array['LINHA_DIF']);
 
 insert into fichas_templates (id, codigo, versao, nome, pac_correspondente, schema_campos)
 values ('b0000000-0000-0000-0000-000000000001', 'TEMP-TESTE', 1, 'Template de Teste', 'PAC-000', '[]'::jsonb);

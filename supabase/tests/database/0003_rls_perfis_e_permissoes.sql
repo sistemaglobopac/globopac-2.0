@@ -12,9 +12,9 @@ values
   ('90000000-0000-0000-0000-000000000001', 'authenticated', 'authenticated', 'user1@test.local', '00000000-0000-0000-0000-000000000000', '{}', '{}', now(), now()),
   ('90000000-0000-0000-0000-000000000002', 'authenticated', 'authenticated', 'user2@test.local', '00000000-0000-0000-0000-000000000000', '{}', '{}', now(), now());
 
-insert into perfis_usuarios (id, nome_completo, nome_usuario, nivel_acesso, setores_permitidos) values
-  ('90000000-0000-0000-0000-000000000001', 'Usuário Um', 'usuario.um', 'INSPETOR_QUALIDADE', array['LINHA_DIF']),
-  ('90000000-0000-0000-0000-000000000002', 'Usuário Dois', 'usuario.dois', 'GESTOR_SETOR', array['LINHA_DIF']);
+insert into perfis_usuarios (id, nome_completo, nome_usuario, matricula, nivel_acesso, setores_permitidos) values
+  ('90000000-0000-0000-0000-000000000001', 'Usuário Um', 'usuario.um', 'T0008', 'INSPETOR_QUALIDADE', array['LINHA_DIF']),
+  ('90000000-0000-0000-0000-000000000002', 'Usuário Dois', 'usuario.dois', 'T0009', 'GESTOR_SETOR', array['LINHA_DIF']);
 
 -- ------------------------------------------------------------------------------------------
 -- 1) Um usuário sempre enxerga a própria linha em perfis_usuarios, mesmo sem permissão 'ler'.

@@ -22,12 +22,12 @@ values
   ('e0000000-0000-0000-0000-000000000004', 'authenticated', 'authenticated', 'admin@test.local', '00000000-0000-0000-0000-000000000000', '{}', '{}', now(), now()),
   ('e0000000-0000-0000-0000-000000000005', 'authenticated', 'authenticated', 'sif@test.local', '00000000-0000-0000-0000-000000000000', '{}', '{}', now(), now());
 
-insert into perfis_usuarios (id, nome_completo, nome_usuario, nivel_acesso, setores_permitidos) values
-  ('e0000000-0000-0000-0000-000000000001', 'Inspetor DIF', 'inspetor.dif', 'INSPETOR_QUALIDADE', array['LINHA_DIF']),
-  ('e0000000-0000-0000-0000-000000000002', 'Verificador DIF', 'verificador.dif', 'VERIFICADOR', array['LINHA_DIF']),
-  ('e0000000-0000-0000-0000-000000000003', 'Inspetor PCM', 'inspetor.pcm.teste', 'INSPETOR_PCM', array['MANUTENCAO']),
-  ('e0000000-0000-0000-0000-000000000004', 'Admin', 'admin.teste', 'ADMIN_MASTER', array['LINHA_DIF', 'MANUTENCAO']),
-  ('e0000000-0000-0000-0000-000000000005', 'SIF', 'sif.teste', 'INSPECAO_FEDERAL', array[]::text[]);
+insert into perfis_usuarios (id, nome_completo, nome_usuario, matricula, nivel_acesso, setores_permitidos) values
+  ('e0000000-0000-0000-0000-000000000001', 'Inspetor DIF', 'inspetor.dif', 'T0003', 'INSPETOR_QUALIDADE', array['LINHA_DIF']),
+  ('e0000000-0000-0000-0000-000000000002', 'Verificador DIF', 'verificador.dif', 'T0004', 'VERIFICADOR', array['LINHA_DIF']),
+  ('e0000000-0000-0000-0000-000000000003', 'Inspetor PCM', 'inspetor.pcm.teste', 'T0005', 'INSPETOR_PCM', array['MANUTENCAO']),
+  ('e0000000-0000-0000-0000-000000000004', 'Admin', 'admin.teste', 'T0006', 'ADMIN_MASTER', array['LINHA_DIF', 'MANUTENCAO']),
+  ('e0000000-0000-0000-0000-000000000005', 'SIF', 'sif.teste', 'T0007', 'INSPECAO_FEDERAL', array[]::text[]);
 
 insert into fichas_templates (id, codigo, versao, nome, pac_correspondente, schema_campos)
 values ('f0000000-0000-0000-0000-000000000001', 'TEMP-RLS-TESTE', 1, 'Template RLS', 'PAC-000', '[]'::jsonb);

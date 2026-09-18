@@ -20,9 +20,9 @@ values
   ('f0000000-0000-0000-0000-000000000003', 'authenticated', 'authenticated', 'admin.fase5@test.local', '00000000-0000-0000-0000-000000000000', '{}', '{}', now(), now()),
   ('f0000000-0000-0000-0000-000000000004', 'authenticated', 'authenticated', 'sif.fase5@test.local', '00000000-0000-0000-0000-000000000000', '{}', '{}', now(), now());
 
-insert into perfis_usuarios (id, nome_completo, nome_usuario, nivel_acesso, setores_permitidos) values
-  ('f0000000-0000-0000-0000-000000000001', 'PCM Manutenção', 'pcm.manutencao.teste', 'INSPETOR_PCM', array['MANUTENCAO']),
-  ('f0000000-0000-0000-0000-000000000002', 'PCM Outra Área', 'pcm.outra.teste', 'INSPETOR_PCM', array['OUTRA_AREA']);
+insert into perfis_usuarios (id, nome_completo, nome_usuario, matricula, nivel_acesso, setores_permitidos) values
+  ('f0000000-0000-0000-0000-000000000001', 'PCM Manutenção', 'pcm.manutencao.teste', 'T0010', 'INSPETOR_PCM', array['MANUTENCAO']),
+  ('f0000000-0000-0000-0000-000000000002', 'PCM Outra Área', 'pcm.outra.teste', 'T0011', 'INSPETOR_PCM', array['OUTRA_AREA']);
 
 insert into manutencao_os (id, descricao, setor, aberto_por, status)
 values ('90000000-0000-0000-0000-000000000001', 'Troca de rolamento', 'MANUTENCAO', 'f0000000-0000-0000-0000-000000000001', 'ABERTURA');
@@ -91,8 +91,8 @@ select throws_matching(
 -- ------------------------------------------------------------------------------------------
 -- 4) ADMIN_MASTER sempre pode avançar etapa, independente de setor.
 -- ------------------------------------------------------------------------------------------
-insert into perfis_usuarios (id, nome_completo, nome_usuario, nivel_acesso, setores_permitidos) values
-  ('f0000000-0000-0000-0000-000000000003', 'Admin', 'admin.fase5.teste', 'ADMIN_MASTER', array[]::text[]);
+insert into perfis_usuarios (id, nome_completo, nome_usuario, matricula, nivel_acesso, setores_permitidos) values
+  ('f0000000-0000-0000-0000-000000000003', 'Admin', 'admin.fase5.teste', 'T0012', 'ADMIN_MASTER', array[]::text[]);
 insert into manutencao_os (id, descricao, setor, aberto_por, status)
 values ('90000000-0000-0000-0000-000000000002', 'Lubrificação preventiva', 'MANUTENCAO', 'f0000000-0000-0000-0000-000000000001', 'ABERTURA');
 
@@ -118,8 +118,8 @@ select is(
 -- andamento (mesma regra já aplicada a monitoramentos_select).
 -- ------------------------------------------------------------------------------------------
 reset role;
-insert into perfis_usuarios (id, nome_completo, nome_usuario, nivel_acesso, setores_permitidos) values
-  ('f0000000-0000-0000-0000-000000000004', 'SIF', 'sif.fase5.teste', 'INSPECAO_FEDERAL', array[]::text[]);
+insert into perfis_usuarios (id, nome_completo, nome_usuario, matricula, nivel_acesso, setores_permitidos) values
+  ('f0000000-0000-0000-0000-000000000004', 'SIF', 'sif.fase5.teste', 'T0013', 'INSPECAO_FEDERAL', array[]::text[]);
 
 select set_config('request.jwt.claims', json_build_object(
   'sub', 'f0000000-0000-0000-0000-000000000004',

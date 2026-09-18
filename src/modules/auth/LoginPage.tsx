@@ -59,11 +59,11 @@ export function LoginPage() {
   }
 
   return (
-    <div className="page-wash flex min-h-screen items-center justify-center p-4">
+    <div className="page-wash flex min-h-screen flex-col items-center justify-center gap-4 p-4">
       <Card className="w-full max-w-sm rounded-xl border-white/70 bg-white/85 shadow-lg backdrop-blur-xl">
-        <CardHeader>
-          <img src="/logo-globopac.png" alt="GloboPac" className="h-10 w-auto self-start" />
-          <CardDescription>Controle de qualidade e auditoria — SIF 1606</CardDescription>
+        <CardHeader className="items-center text-center">
+          <img src="/logo-globopac.png" alt="GloboPac" className="h-12 w-auto" />
+          <CardDescription>Gestão do Autocontrole</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(aoEnviar)} className="space-y-4" noValidate>
@@ -92,6 +92,9 @@ export function LoginPage() {
           </form>
         </CardContent>
       </Card>
+      <p className="text-center text-xs text-muted-foreground">
+        Desenvolvido por Wanderson Alves de Moura · PMPPA Universidade Brasil · 2026
+      </p>
     </div>
   );
 }
