@@ -457,3 +457,45 @@ portal, BI/CSV (Fase 7) e PWA offline (Fase 8) já cobriam ponta a ponta o camin
 cada fase antes desta auditoria. O único item novo desta fase (`healthcheck`) ganhou seu
 próprio teste (`fluxo-10-healthcheck.spec.ts`). "Testes E2E completos" nesta fase significou
 confirmar isso e fechar a lacuna do healthcheck, não construir uma suíte nova do zero.
+
+## Premissas da Fase 10 (migração de dados legados e corte)
+
+### 47. Contrato de import da migração de dados legados foi desenhado, não recebido do v1
+🔴 **Assumida sob risco — nenhum export real do sistema v1 foi fornecido neste projeto** — o
+formato JSON que `scripts/migrar-dados-legados.mjs` espera (ver
+[docs/migracao-dados-legados.md](docs/migracao-dados-legados.md)) foi desenhado a partir do
+schema da v2 e do que a seção 11 do PROMPT MESTRE exige preservar, não a partir de um export
+real do v1. Isso é uma limitação de acesso a dados, não uma decisão técnica evitável — o
+script foi estruturado (uma função `migrar*` por tipo de registro, tudo sobre o mesmo padrão
+de resolução de usuário/template) para ser fácil de adaptar quando o formato real existir,
+não para ser a implementação final e definitiva.
+
+### 48. Migração cobre só registros já concluídos/fechados do v1 — não OS em andamento
+🟡 **Assumida (pendente de necessidade real)** — uma OS que estivesse no meio do ciclo
+(`AUTORIZACAO`/`PROGRAMACAO`/`EXECUCAO`) no momento do corte teria uma cadeia de assinaturas
+parcial (só ABERTURA + o que já foi assinado) e precisaria continuar seu ciclo de vida na v2
+exatamente de onde parou no v1 — algo que o contrato atual não cobre (só migra o estado final
+de um registro já fechado). Se o corte real precisar disso, o script precisará de um modo
+adicional para "continuar" uma OS em andamento, não coberto aqui por falta de um caso de uso
+real para desenhar contra.
+
+### 49. `id_legado` é rastreabilidade/idempotência, não um dado exposto na UI
+✅ **Confirmada, decisão deliberada** — a nova coluna existe só para o script de migração
+conseguir ser idempotente (buscar por `id_legado` antes de inserir) e para permitir responder
+"qual registro do v1 corresponde a este" numa auditoria futura. Nenhuma tela (incluindo o
+portal público) expõe esse valor — é metadado interno de migração, não um fato do domínio.
+
+### 50. Hash e timestamps de registros migrados são copiados literalmente, nunca recalculados
+✅ **Confirmada, decisão deliberada** — o script nunca chama a lógica de hash da v2
+(`_shared/hash.ts`) para um registro com `id_legado` preenchido; `hash_documento` de cada
+assinatura migrada vem literalmente do valor informado no export. Ver
+`docs/migracao-dados-legados.md`, seção "Por que o hash nunca é recalculado", para o
+raciocínio completo (dois motivos: serialização pode ter sido diferente no v1; e o valor
+probatório está em corresponder ao que foi assinado na época, não em ser recomputável hoje).
+
+### 51. Runbook de corte nunca foi executado de verdade
+🔴 **Assumida sob risco — depende de um projeto Supabase hospedado que não existe (item 8) e
+de um export real do v1 que não existe (item 47)** —
+[docs/runbooks/corte-migracao-legado.md](docs/runbooks/corte-migracao-legado.md) é um
+checklist preparado com antecedência, testado só na forma de "o script roda e é idempotente
+contra o stack local" (`fluxo-11-migracao-legado.spec.ts`), não como um corte real.

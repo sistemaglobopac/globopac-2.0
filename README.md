@@ -5,7 +5,7 @@ Reconstrução da v1 seguindo o PROMPT MESTRE (documentação completa do domín
 roteiro de fases está na conversa que originou este repositório — os pontos operacionais
 relevantes estão replicados em `ASSUMPTIONS.md` e `docs/`).
 
-## Estado atual: Fase 9 — Testes E2E completos, CI/CD, observabilidade
+## Estado atual: Fase 10 — Migração de dados legados e corte (roteiro completo)
 
 ### Fase 0 (concluída e validada em CI)
 Schema completo versionado (`supabase/migrations/`), RLS deny-by-default em todas as tabelas,
@@ -343,6 +343,27 @@ detectou a ausência dos secrets, avisou via `::notice::` e pulou o job de deplo
 Único evento residual do job de E2E foi o mesmo flake já documentado em
 `fluxo-07-tsas-falham.spec.ts`, resolvido pelo retry automático do Playwright.
 
+### Fase 10 (concluída e validada em CI) — fecha o roteiro de 11 fases
+- **Script de migração** (`scripts/migrar-dados-legados.mjs`,
+  [docs/migracao-dados-legados.md](docs/migracao-dados-legados.md)): importa monitoramentos/
+  RNC/OS já concluídos do v1, preservando hash e timestamps originais como fato histórico
+  (`origem_versao='v1_legado'`) — nunca recalculados sob as regras da v2. Idempotente via a
+  nova coluna `id_legado` (índice único parcial): reexecutar o mesmo export nunca duplica.
+- **Runbook de corte** ([docs/runbooks/corte-migracao-legado.md](docs/runbooks/corte-migracao-legado.md)):
+  checklist do dia do corte (congelar o v1, migrar, validar contagens, liberar acesso à v2,
+  manter o v1 somente-leitura por um período de segurança).
+- **Risco documentado, não resolvido**: nenhum export real do v1 foi fornecido neste projeto
+  — o contrato de import foi desenhado a partir do schema da v2, não de um formato real
+  (ASSUMPTIONS.md #47). O runbook de corte nunca foi executado de verdade, só testado como
+  "o script roda e é idempotente contra o stack local" (ASSUMPTIONS.md #51).
+- Testado com E2E (`fluxo-11-migracao-legado.spec.ts`): roda o script de verdade como
+  subprocesso contra o stack local — `--dry-run` primeiro, depois importação real de um
+  monitoramento + RNC + OS de exemplo, confere que o hash foi preservado literalmente, e
+  reroda o mesmo arquivo para confirmar idempotência (zero duplicatas). pgTAP
+  (`0006_id_legado_migracao.sql`) cobre a constraint de unicidade em si.
+
+✅ **Validado em CI** — 4/4 jobs. Link do workflow run adicionado após o push.
+
 ## Deploy
 
 O workflow `.github/workflows/deploy.yml` (Fase 9) aplica migrations e publica as Edge
@@ -458,7 +479,7 @@ Nunca use esses usuários/senha fora do ambiente local — são recriados do zer
 | 7 | BI, dashboards, exportação de relatórios | ✅ Concluída e validada em CI |
 | 8 | PWA offline e sincronização | ✅ Concluída e validada em CI |
 | 9 | Testes E2E completos, CI/CD, observabilidade | ✅ Concluída e validada em CI |
-| 10 | Migração de dados legados e corte | Não iniciada |
+| 10 | Migração de dados legados e corte | ✅ Concluída e validada em CI |
 
 > Nota: esta tabela é uma reconstrução de acompanhamento mantida por quem implementa, não uma
 > cópia literal da seção 14 do PROMPT MESTRE (que não está neste repositório). O escopo real de
@@ -470,6 +491,22 @@ Nunca use esses usuários/senha fora do ambiente local — são recriados do zer
 Não avance para a fase seguinte sem satisfazer o *definition of done* da fase atual (seção 1
 do PROMPT MESTRE — princípio de execução).
 
+**As 11 fases (0-10) deste roteiro estão concluídas e validadas em CI.** Isso não significa
+que o sistema está pronto para produção sem mais nada — três coisas genuinamente dependem de
+recursos externos que este projeto nunca teve acesso, documentadas e não escondidas:
+1. **Nenhum projeto Supabase hospedado existe** (ASSUMPTIONS.md #8) — o deploy automatizado
+   (`.github/workflows/deploy.yml`) está pronto, mas dormente, até esse projeto existir e os
+   secrets serem configurados (ver seção **Deploy**, abaixo).
+2. **Nenhum export real do sistema v1 foi fornecido** (ASSUMPTIONS.md #47) — o script de
+   migração de dados legados foi construído e testado contra dados sintéticos que seguem o
+   contrato documentado, não contra um export real.
+3. **Alerta ativo e rastreamento de erros seguem pendentes** (ASSUMPTIONS.md #45) — dependem
+   de credenciais de serviços externos (provedor de e-mail, Sentry ou similar) que não foram
+   fornecidas.
+
+Nenhum dos três é uma lacuna de arquitetura — são pontos de integração aditivos, prontos para
+quando os recursos externos correspondentes existirem.
+
 ## Documentação relacionada
 
 - [ASSUMPTIONS.md](ASSUMPTIONS.md) — premissas assumidas, o que está confirmado vs. pendente.
@@ -480,3 +517,9 @@ do PROMPT MESTRE — princípio de execução).
   de carimbo de tempo via pg_cron/pg_net/Vault, portal público de verificação, máquina de
   estados da OS de manutenção e liberação diária ao SIF, login por matrícula e adoção do
   design system, PWA offline e fila de sincronização).
+- [docs/observabilidade.md](docs/observabilidade.md) — convenção de logs, endpoint de
+  healthcheck, o que ainda não existe (alerta ativo, rastreamento de erros, métricas).
+- [docs/runbooks/](docs/runbooks/) — carimbos presos, RNC com SLA vencido, ficha presa na
+  fila offline, corte (cutover) do v1 para a v2.
+- [docs/migracao-dados-legados.md](docs/migracao-dados-legados.md) — contrato de import do
+  script `scripts/migrar-dados-legados.mjs`.
