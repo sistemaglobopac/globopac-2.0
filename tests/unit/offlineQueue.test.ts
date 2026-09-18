@@ -8,6 +8,7 @@ import {
 } from "@/lib/offlineQueue";
 
 const RASCUNHO_BASE = {
+  id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
   fichaTemplateId: "11111111-1111-1111-1111-111111111111",
   versaoTemplate: 1,
   userId: "22222222-2222-2222-2222-222222222222",
@@ -26,9 +27,9 @@ describe("offlineQueue", () => {
     await limparFila();
   });
 
-  it("enfileira uma ficha com id gerado no cliente e status inicial 'pendente'", async () => {
+  it("enfileira uma ficha com o id informado e status inicial 'pendente'", async () => {
     const item = await enfileirarFicha(RASCUNHO_BASE);
-    expect(item.id).toBeTruthy();
+    expect(item.id).toBe(RASCUNHO_BASE.id);
     expect(item.status).toBe("pendente");
 
     const fila = await listarFichasEnfileiradas();
@@ -38,9 +39,17 @@ describe("offlineQueue", () => {
   });
 
   it("lista em ordem de enfileiramento (mais antiga primeiro)", async () => {
-    const primeira = await enfileirarFicha({ ...RASCUNHO_BASE, capturadoEm: "2026-01-01T09:00:00.000Z" });
+    const primeira = await enfileirarFicha({
+      ...RASCUNHO_BASE,
+      id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      capturadoEm: "2026-01-01T09:00:00.000Z",
+    });
     await new Promise((r) => setTimeout(r, 2));
-    const segunda = await enfileirarFicha({ ...RASCUNHO_BASE, capturadoEm: "2026-01-01T10:00:00.000Z" });
+    const segunda = await enfileirarFicha({
+      ...RASCUNHO_BASE,
+      id: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+      capturadoEm: "2026-01-01T10:00:00.000Z",
+    });
 
     const fila = await listarFichasEnfileiradas();
     expect(fila.map((f) => f.id)).toEqual([primeira.id, segunda.id]);
@@ -70,5 +79,24 @@ describe("estaOffline", () => {
 
   it("não trata um erro comum (ex.: validação/permissão) como offline", () => {
     expect(estaOffline(new Error("permissão negada"))).toBe(false);
+  });
+
+  it("reconhece o erro estruturado do postgrest-js quando o AbortSignal aborta a requisição", () => {
+    expect(
+      estaOffline({
+        message: "AbortError: This operation was aborted",
+        hint: "Request was aborted (timeout or manual cancellation)",
+      })
+    ).toBe(true);
+  });
+
+  it("reconhece FunctionsFetchError (functions.invoke abortado por timeout)", () => {
+    expect(estaOffline({ name: "FunctionsFetchError", message: "Failed to send a request to the Edge Function" })).toBe(
+      true
+    );
+  });
+
+  it("não trata um erro estruturado comum (sem hint/name de abort) como offline", () => {
+    expect(estaOffline({ message: "duplicate key value violates unique constraint" })).toBe(false);
   });
 });

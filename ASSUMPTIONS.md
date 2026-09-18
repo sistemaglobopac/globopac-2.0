@@ -378,14 +378,21 @@ ideal (ícones dedicados 192×192/512×512, inclusive "maskable", dão melhor ni
 Android/iOS). Sem ferramenta de processamento de imagem disponível nesta sessão para gerar
 esses tamanhos — ajuste cosmético, não bloqueante, para uma fase de polimento posterior.
 
-### 41. Tentativa online tem prazo curto (8s) antes de cair para a fila offline
+### 41. Tentativa online tem prazo curto (8s, via AbortSignal nativo) antes de cair para a fila offline
 ✅ **Confirmada, decisão deliberada** — encontrada ao validar esta fase em CI: com
-`context.setOffline(true)` (Playwright), o fetch não rejeita rápido com um erro de rede
-reconhecível — ele fica pendurado, e o botão "Salvando e assinando…" nunca resolvia dentro do
-timeout do teste. Investigando, isso expôs uma lacuna real de produto, não só do teste: uma
-conexão degradada (lenta ou instável, não necessariamente "desligada") deixaria o inspetor
-esperando indefinidamente antes de qualquer fallback. `comTimeoutOffline()` (novo,
-`src/lib/offlineQueue.ts`) corre a tentativa online contra um prazo de 8s — se estourar, cai
-para a fila offline exatamente como cairia por falta de rede. Escolhido 8s como equilíbrio
-entre "não confundir uma rede só um pouco lenta com offline" e "não deixar o usuário esperando
-por muito tempo"; não veio de nenhuma medição real de latência de rede da planta.
+`context.setOffline(true)` (Playwright), a requisição a `assinar-documento` ficava pendurada
+indefinidamente (confirmado inspecionando o trace de rede do CI: a chamada nunca recebia
+resposta, nem erro). Investigando o código-fonte de `postgrest-js`/`functions-js`, nenhum dos
+dois clientes impõe um limite de tempo por conta própria — sem um `AbortSignal`/`timeout`
+explícito, uma conexão travada trava a Promise para sempre; o cliente só resolve com
+`{data:null, error}` quando o **próprio `AbortController` interno** de fato aborta. A primeira
+tentativa de correção (uma corrida manual em cima da Promise, sem tocar o fetch de verdade) não
+resolveu — a requisição de rede seguia pendurada e nada garantia que o timer da corrida
+disparasse de forma confiável no ambiente de CI. A correção real usa os mecanismos nativos:
+`.abortSignal(AbortSignal.timeout(8000))` no lado do postgrest-js, e a própria opção
+`{ timeout: 8000 }` do `functions.invoke()` (já suportada pelo cliente, só não estava sendo
+usada). `estaOffline()` foi ampliada para reconhecer os formatos de erro estruturado que os
+dois clientes devolvem quando o abort dispara (nunca um `AbortError` puro — cada um envolve
+numa mensagem própria). Escolhidos 8s como equilíbrio entre "não confundir uma rede só um
+pouco lenta com offline" e "não deixar o usuário esperando por muito tempo"; não veio de
+nenhuma medição real de latência de rede da planta.

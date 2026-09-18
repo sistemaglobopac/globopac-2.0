@@ -38,13 +38,18 @@ function abrirDb() {
   return dbPromise;
 }
 
+/** `id` é responsabilidade de quem chama (gerado uma única vez no início do fluxo de
+ * criação, ADR 0002) — nunca gerado aqui dentro. Isso importa porque uma tentativa online
+ * pode ter inserido o registro no servidor ANTES de falhar (ex.: o INSERT foi bem-sucedido,
+ * só a assinatura que travou/abortou) — enfileirar com um id novo, diferente do que já foi
+ * persistido, deixaria aquela linha órfã (sem assinatura, e sem nenhuma fila apontando para
+ * ela) em vez de retomá-la na próxima sincronização. */
 export async function enfileirarFicha(
-  rascunho: Omit<FichaEnfileirada, "id" | "enfileiradoEm" | "status">
+  rascunho: Omit<FichaEnfileirada, "enfileiradoEm" | "status">
 ): Promise<FichaEnfileirada> {
   const db = await abrirDb();
   const item: FichaEnfileirada = {
     ...rascunho,
-    id: crypto.randomUUID(),
     enfileiradoEm: new Date().toISOString(),
     status: "pendente",
   };
@@ -70,35 +75,28 @@ export async function removerFichaEnfileirada(id: string) {
   await db.delete("fichas_pendentes", id);
 }
 
-export const ERRO_TEMPO_ESGOTADO = "tempo-esgotado-offline";
+/** Prazo para a tentativa online antes de cair para a fila offline (ver PRAZO_ONLINE_MS nos
+ * call sites, via AbortSignal.timeout — mecanismo nativo do fetch, não um race manual em
+ * cima da Promise: encontramos em CI que uma conexão "offline" emulada (Playwright
+ * context.setOffline) podia deixar o fetch pendurado sem nunca rejeitar por conta própria —
+ * supabase-js/postgrest-js e functions-js só resolvem com {data:null, error} quando o AbortController
+ * embutido de fato aborta a requisição; sem um signal/timeout explícito, não há limite algum). */
+export const PRAZO_ONLINE_MS = 8_000;
 
-/** Heurística de "isto falhou por falta de rede, não por outro motivo" — combina o sinal do
- * navegador (`navigator.onLine`), o formato típico de erro de fetch sem rede (`TypeError` no
- * browser) e um timeout explícito (ver `comTimeoutOffline`) para conexões degradadas que nem
- * chegam a rejeitar rápido (uma rede ruim, não necessariamente "desligada", pode deixar o
- * fetch pendurado por dezenas de segundos antes de qualquer erro nativo). Um erro de
- * validação/permissão real (400/403) nunca cai aqui. */
+/** Heurística de "isto falhou por falta de rede (ou por ter estourado o prazo acima), não por
+ * outro motivo" — um erro de validação/permissão real (400/403) nunca cai aqui. Cobre os três
+ * formatos observados: sinal do navegador, fetch cru sem handler (TypeError), e os erros
+ * estruturados que postgrest-js/functions-js devolvem quando o AbortSignal aborta a
+ * requisição (nunca lançam um AbortError puro — sempre envolvem numa mensagem própria). */
 export function estaOffline(erro?: unknown): boolean {
   if (typeof navigator !== "undefined" && navigator.onLine === false) return true;
   if (erro instanceof TypeError) return true;
-  return erro instanceof Error && erro.message === ERRO_TEMPO_ESGOTADO;
-}
-
-/** Corrida entre a promessa real e um timeout — sem isso, uma conexão degradada (não
- * totalmente offline, só lenta/pendurada) deixaria o usuário esperando indefinidamente em vez
- * de cair na fila offline dentro de um tempo previsível. */
-export function comTimeoutOffline<T>(promessa: PromiseLike<T>, ms = 8_000): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const temporizador = setTimeout(() => reject(new Error(ERRO_TEMPO_ESGOTADO)), ms);
-    promessa.then(
-      (valor) => {
-        clearTimeout(temporizador);
-        resolve(valor);
-      },
-      (erro) => {
-        clearTimeout(temporizador);
-        reject(erro);
-      }
-    );
-  });
+  if (erro instanceof Error && /^AbortError/.test(erro.message)) return true;
+  if (erro && typeof erro === "object") {
+    const objeto = erro as { name?: string; message?: string; hint?: string };
+    if (objeto.name === "FunctionsFetchError") return true;
+    if (typeof objeto.message === "string" && /^AbortError/.test(objeto.message)) return true;
+    if (typeof objeto.hint === "string" && objeto.hint.includes("aborted")) return true;
+  }
+  return false;
 }

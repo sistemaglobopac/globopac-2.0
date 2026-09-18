@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import type { CampoTemplate } from "@/shared/schema-campos";
-import { comTimeoutOffline, enfileirarFicha, estaOffline } from "@/lib/offlineQueue";
+import { PRAZO_ONLINE_MS, enfileirarFicha, estaOffline } from "@/lib/offlineQueue";
 
 interface TemplateAtivo {
   id: string;
@@ -82,6 +82,7 @@ export function useCriarMonitoramento() {
 
       if (!navigator.onLine) {
         await enfileirarFicha({
+          id,
           fichaTemplateId: input.fichaTemplateId,
           versaoTemplate: input.versaoTemplate,
           userId: input.userId,
@@ -93,40 +94,42 @@ export function useCriarMonitoramento() {
       }
 
       try {
-        // Prazo curto (não o timeout indefinido do navegador): uma conexão degradada — não
-        // totalmente offline, só lenta ou pendurada — não pode deixar o inspetor esperando
-        // por dezenas de segundos antes de cair na fila offline (ver comTimeoutOffline).
-        const { data: monitoramento, error } = await comTimeoutOffline(
-          supabase
-            .from("monitoramentos")
-            .insert({
-              id,
-              ficha_template_id: input.fichaTemplateId,
-              versao_template: input.versaoTemplate,
-              user_id: input.userId,
-              setor: input.setor,
-              dados_dinamicos: input.dadosDinamicos,
-              capturado_em: capturadoEm,
-            })
-            .select("id")
-            .single()
-            .overrideTypes<{ id: string }, { merge: false }>()
-        );
+        // Prazo curto via AbortSignal.timeout (mecanismo nativo do fetch, não um race manual
+        // em cima da Promise) — uma conexão degradada não pode deixar o inspetor esperando
+        // indefinidamente antes de cair na fila offline (ver PRAZO_ONLINE_MS).
+        const { data: monitoramento, error } = await supabase
+          .from("monitoramentos")
+          .insert({
+            id,
+            ficha_template_id: input.fichaTemplateId,
+            versao_template: input.versaoTemplate,
+            user_id: input.userId,
+            setor: input.setor,
+            dados_dinamicos: input.dadosDinamicos,
+            capturado_em: capturadoEm,
+          })
+          .select("id")
+          .abortSignal(AbortSignal.timeout(PRAZO_ONLINE_MS))
+          .single()
+          .overrideTypes<{ id: string }, { merge: false }>();
         if (error) throw error;
 
         // Assina imediatamente como INSPETOR (seção 7.5) — a Edge Function recalcula o hash
         // no servidor a partir do que acabou de ser persistido, nunca do payload do cliente.
-        const { error: assinarError } = await comTimeoutOffline(
-          supabase.functions.invoke("assinar-documento", {
-            body: { monitoramento_id: monitoramento.id, tipo: "INSPETOR" },
-          })
-        );
+        const { error: assinarError } = await supabase.functions.invoke("assinar-documento", {
+          body: { monitoramento_id: monitoramento.id, tipo: "INSPETOR" },
+          timeout: PRAZO_ONLINE_MS,
+        });
         if (assinarError) throw assinarError;
 
         return { id: monitoramento.id, modo: "online" };
       } catch (erro) {
         if (!estaOffline(erro)) throw erro;
+        // Mesmo id da tentativa que acabou de falhar — se o INSERT já tinha sido bem-sucedido
+        // e só a assinatura abortou, a sincronização posterior (mesmo id) encontra a linha já
+        // existente (upsert com ignoreDuplicates) e só falta assinar, em vez de deixá-la órfã.
         await enfileirarFicha({
+          id,
           fichaTemplateId: input.fichaTemplateId,
           versaoTemplate: input.versaoTemplate,
           userId: input.userId,
