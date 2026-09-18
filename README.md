@@ -215,7 +215,7 @@ etapas da OS, BI/dashboards, PWA offline, migração de dados legados.
   o usuário pedir. Testado com Vitest (`tests/component/UpdateNotifier.test.tsx`: sem aviso
   quando as versões batem, aviso quando divergem, falha de rede ignorada silenciosamente).
 
-✅ **Validado em CI** ([workflow run](https://github.com/sistemaglobopac/globopac-2.0/actions/runs/35294246230)):
+✅ **Validado em CI** (Login por matrícula, [workflow run](https://github.com/sistemaglobopac/globopac-2.0/actions/runs/35294246230)):
 4/4 jobs, incluindo os 10 testes E2E, todos já usando login por matrícula. Duas correções
 foram necessárias depois do push inicial: (1) a migration nova tornou
 `perfis_usuarios.matricula` `NOT NULL`, mas os 4 arquivos de pgTAP pré-existentes
@@ -223,9 +223,19 @@ foram necessárias depois do push inicial: (1) a migration nova tornou
 inteiro em CI; e (2) a senha de desenvolvimento tinha sido trocada para `121072` no seed, mas
 todos os `login()` dos testes E2E ainda passavam a senha antiga. Nenhuma das duas é um bug de
 produto — ambas eram descompassos entre partes do próprio código que precisam ficar em
-sincronia manualmente (seed vs. testes; schema vs. fixtures). Único evento residual foi o
-mesmo flake pré-existente e não relacionado em `fluxo-07-tsas-falham.spec.ts`, resolvido pelo
-retry automático do Playwright.
+sincronia manualmente (seed vs. testes; schema vs. fixtures).
+
+✅ **Validado em CI** (UpdateNotifier, [workflow run](https://github.com/sistemaglobopac/globopac-2.0/actions/runs/35297785640)):
+4/4 jobs. Nesta rodada, `fluxo-05-06-portal-publico.spec.ts` (fluxo 5) falhou até no retry
+automático do Playwright — a mesma corrida que já vinha sendo "resolvida" por sorte no retry
+desde a Fase 3 (documentada em toda validação de Fase desde então). Desta vez foi corrigida de
+verdade: `checkboxes.count()` era um snapshot único (não uma asserção com auto-retry),
+chamado logo após `page.goto("/sif/liberar")`, antes de `useMonitoramentosParaLiberar()`
+resolver — podia capturar `0` e travar num botão "(0)" permanentemente desabilitado.
+`fluxo-02` já usava o padrão certo (esperar o primeiro elemento aparecer antes de contar);
+`fluxo-05` só não tinha essa espera. Depois do fix, 4/4 de primeira; único evento residual foi
+um flake diferente e já documentado em `fluxo-07-tsas-falham.spec.ts` (corrida de timing entre
+o worker do cron e a asserção do teste), resolvido pelo retry automático do Playwright.
 
 **Ainda não implementado** (fases seguintes do roteiro): BI/dashboards, PWA offline,
 observabilidade, migração de dados legados.
