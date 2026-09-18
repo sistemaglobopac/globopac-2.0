@@ -208,7 +208,17 @@ etapas da OS, BI/dashboards, PWA offline, migração de dados legados.
   `NULL` uniforme para matrícula inexistente ou perfil inativo (nunca revela qual dos dois),
   e que só `anon` tem `EXECUTE` na função (não `authenticated`).
 
-✅ **Validado em CI** — 4/4 jobs. Link do workflow run adicionado após o push.
+✅ **Validado em CI** ([workflow run](https://github.com/sistemaglobopac/globopac-2.0/actions/runs/35294246230)):
+4/4 jobs, incluindo os 10 testes E2E, todos já usando login por matrícula. Duas correções
+foram necessárias depois do push inicial: (1) a migration nova tornou
+`perfis_usuarios.matricula` `NOT NULL`, mas os 4 arquivos de pgTAP pré-existentes
+(`0001`-`0004`) inseriam `perfis_usuarios` sem essa coluna — quebrava o `supabase db reset`
+inteiro em CI; e (2) a senha de desenvolvimento tinha sido trocada para `121072` no seed, mas
+todos os `login()` dos testes E2E ainda passavam a senha antiga. Nenhuma das duas é um bug de
+produto — ambas eram descompassos entre partes do próprio código que precisam ficar em
+sincronia manualmente (seed vs. testes; schema vs. fixtures). Único evento residual foi o
+mesmo flake pré-existente e não relacionado em `fluxo-07-tsas-falham.spec.ts`, resolvido pelo
+retry automático do Playwright.
 
 **Ainda não implementado** (fases seguintes do roteiro): BI/dashboards, PWA offline,
 observabilidade, migração de dados legados.
