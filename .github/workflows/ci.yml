@@ -158,7 +158,6 @@ jobs:
         if: always()
         run: supabase stop
 
-  # Placeholder da Fase 8+: "deploy de migrations + Edge Functions" automatizado contra um
-  # projeto Supabase real — depende de SUPABASE_PROJECT_ID/SUPABASE_ACCESS_TOKEN/
-  # SUPABASE_DB_PASSWORD como secrets do repositório (ainda não configurados — ver
-  # ASSUMPTIONS.md item 8).
+  # Deploy de migrations + Edge Functions contra um projeto Supabase hospedado: ver
+  # .github/workflows/deploy.yml (Fase 9) — dispara depois que este workflow conclui com
+  # sucesso na main, e fica dormente até os secrets existirem (ASSUMPTIONS.md item 8).

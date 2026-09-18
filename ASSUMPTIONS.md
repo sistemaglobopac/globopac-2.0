@@ -421,3 +421,39 @@ legítimos — exatamente o tipo de perda silenciosa que este sistema existe par
 `useSincronizacaoOffline` agora também tenta sincronizar a cada 10s, além de on-mount,
 `online` e reautenticação — o evento continua dando resposta rápida quando disponível; o
 temporizador é só a rede de segurança.
+
+## Premissas da Fase 9 (testes E2E completos, CI/CD, observabilidade)
+
+### 43. `/healthcheck` sinaliza "degradado" só para dois sinais operacionais já existentes
+✅ **Confirmada, decisão deliberada** — carimbo pendente há mais de
+`app_config.carimbo_alerta_horas` e RNC com `prazo_sla` vencido são os dois sinais que já
+existiam em painéis internos (`/carimbos`, `/rnc`) desde as Fases 2 e 4; o healthcheck só os
+expõe de forma agregada e pública para um monitor de uptime externo, sem inventar um novo
+critério de "saúde do sistema". Não inclui, por exemplo, latência ou taxa de erro por
+endpoint — isso exigiria um agregador de métricas que não existe ainda (ver
+`docs/observabilidade.md`).
+
+### 44. Deploy automatizado (CI/CD) fica dormente — nenhum projeto Supabase hospedado existe
+🔴 **Assumida sob risco — depende de infraestrutura externa que não foi provisionada** — ver
+ASSUMPTIONS.md item 8, ainda válido. `.github/workflows/deploy.yml` foi construído e está
+pronto (job `verificar-secrets` + job `deploy` condicionado a ele), mas nunca rodou de fato:
+sem `SUPABASE_PROJECT_ID`/`SUPABASE_ACCESS_TOKEN`/`SUPABASE_DB_PASSWORD` configurados como
+secrets do repositório, o primeiro job conclui "nada a fazer" e o segundo é pulado — nunca
+falha, só fica inerte. Validar de verdade (deploy real) exige que o responsável pelo projeto
+crie o projeto Supabase hospedado e configure os três secrets (passo a passo no README, seção
+Deploy).
+
+### 45. Alerta ativo, rastreamento de erros e métricas de infraestrutura seguem pendentes
+🟡 **Assumida (pendente de decisão/credencial)** — ASSUMPTIONS.md item 6 já registrava "canal
+de alerta operacional" como pendente desde a Fase 0; esta fase não resolve isso, só cria a
+base para resolver (logs estruturados + healthcheck agregando os sinais certos). Implementar
+alerta ativo por e-mail exigiria um provedor (Resend, SendGrid, SMTP) e uma decisão de para
+quem alertar; rastreamento de erros exigiria uma conta Sentry (ou similar); nenhum dos dois
+tinha credencial disponível nesta fase — cada um é aditivo quando existir.
+
+### 46. Auditoria de cobertura E2E não encontrou lacuna funcional nova
+✅ **Confirmada** — os 7 fluxos numerados da seção 10 do PROMPT MESTRE mais rate limiting do
+portal, BI/CSV (Fase 7) e PWA offline (Fase 8) já cobriam ponta a ponta o caminho principal de
+cada fase antes desta auditoria. O único item novo desta fase (`healthcheck`) ganhou seu
+próprio teste (`fluxo-10-healthcheck.spec.ts`). "Testes E2E completos" nesta fase significou
+confirmar isso e fechar a lacuna do healthcheck, não construir uma suíte nova do zero.

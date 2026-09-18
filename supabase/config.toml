@@ -54,5 +54,10 @@ policy = "oneshot"
 [functions.verificar-documento]
 verify_jwt = false
 
+# Health-check (Fase 9, observabilidade) — sem login, para um monitor de uptime externo
+# poder pingar. Só devolve contagens agregadas (nunca dados individuais).
+[functions.healthcheck]
+verify_jwt = false
+
 [analytics]
 enabled = false

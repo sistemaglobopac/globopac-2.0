@@ -1,0 +1,66 @@
+name: Deploy
+
+# Fase 9 (CI/CD) — só roda depois que o CI da main passa, e só faz algo se os secrets do
+# projeto Supabase hospedado existirem (SUPABASE_PROJECT_ID/SUPABASE_ACCESS_TOKEN/
+# SUPABASE_DB_PASSWORD). Sem eles (estado atual — ver ASSUMPTIONS.md item 8: nenhum projeto
+# hospedado foi criado ainda), o job "verificar-secrets" roda e conclui "nada a fazer", sem
+# falhar — este workflow fica dormente até o projeto real existir e os secrets serem
+# configurados em Settings > Secrets and variables > Actions do repositório (ver README,
+# seção "Deploy").
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  verificar-secrets:
+    name: Verificar se os secrets de deploy existem
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    outputs:
+      tem-secrets: ${{ steps.checar.outputs.tem_secrets }}
+    steps:
+      - name: Checar SUPABASE_PROJECT_ID/SUPABASE_ACCESS_TOKEN/SUPABASE_DB_PASSWORD
+        id: checar
+        env:
+          PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+          ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          if [ -n "$PROJECT_ID" ] && [ -n "$ACCESS_TOKEN" ] && [ -n "$DB_PASSWORD" ]; then
+            echo "tem_secrets=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "tem_secrets=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Secrets de deploy ainda não configurados — este workflow fica dormente. Ver README, seção Deploy."
+          fi
+
+  deploy:
+    name: Aplicar migrations + publicar Edge Functions
+    runs-on: ubuntu-latest
+    needs: verificar-secrets
+    if: ${{ needs.verificar-secrets.outputs.tem-secrets == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Supabase CLI (versão pinada — mesma do resto do projeto)
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+
+      - name: Vincular ao projeto Supabase hospedado
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+
+      - name: Aplicar migrations pendentes (supabase db push)
+        run: supabase db push
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: Publicar todas as Edge Functions
+        run: supabase functions deploy
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

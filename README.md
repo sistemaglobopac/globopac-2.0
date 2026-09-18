@@ -5,7 +5,7 @@ Reconstrução da v1 seguindo o PROMPT MESTRE (documentação completa do domín
 roteiro de fases está na conversa que originou este repositório — os pontos operacionais
 relevantes estão replicados em `ASSUMPTIONS.md` e `docs/`).
 
-## Estado atual: Fase 8 — PWA offline e sincronização
+## Estado atual: Fase 9 — Testes E2E completos, CI/CD, observabilidade
 
 ### Fase 0 (concluída e validada em CI)
 Schema completo versionado (`supabase/migrations/`), RLS deny-by-default em todas as tabelas,
@@ -307,6 +307,53 @@ reais expostas por elas:
 Único evento residual foi o mesmo flake já documentado em `fluxo-07-tsas-falham.spec.ts`,
 resolvido pelo retry automático do Playwright.
 
+### Fase 9 (concluída e validada em CI)
+- **Health-check público** (`healthcheck`, [docs/observabilidade.md](docs/observabilidade.md)):
+  endpoint sem login para um monitor de uptime externo pingar — contagens agregadas (nunca
+  dados individuais), `503` quando degradado (carimbo preso há mais de
+  `app_config.carimbo_alerta_horas`, ou RNC com SLA vencido), `200` caso contrário. Também
+  serve como teste de conectividade real ao Postgres.
+- **Runbooks operacionais** ([docs/runbooks/](docs/runbooks/)): carimbos presos na fila, RNC
+  com SLA vencido, ficha presa na fila de sincronização offline — cada um com sintoma,
+  diagnóstico, ações e quando escalar.
+- **Deploy automatizado** ([.github/workflows/deploy.yml](.github/workflows/deploy.yml)): roda
+  depois que o CI da `main` passa, aplica migrations (`supabase db push`) e publica as Edge
+  Functions (`supabase functions deploy`) contra um projeto Supabase hospedado — fica
+  **dormente** (não falha, só não faz nada) até os secrets existirem, ver seção **Deploy**
+  abaixo. Nenhum projeto hospedado foi criado nesta fase (ASSUMPTIONS.md item 8).
+- **Convenção de logs estruturados** documentada (já seguida desde a Fase 0, formalizada agora
+  em `docs/observabilidade.md`): todo log de Edge Function é uma linha JSON com
+  `correlationId`/`funcao`/`nivel`/`evento` sempre presentes.
+- **Auditoria de cobertura E2E**: os 7 fluxos numerados da seção 10 do PROMPT MESTRE (criar+
+  verificar, verificar+liberar+auditoria, RNC, OS/PCM, portal público liberado, portal público
+  não liberado/sem assinatura, falha de todas as TSAs) mais rate limiting do portal, BI/CSV, e
+  PWA offline — 11 testes E2E no total — já cobriam ponta a ponta cada fase; nenhuma lacuna
+  nova foi encontrada nesta auditoria além do healthcheck, que ganhou seu próprio teste
+  (`fluxo-10-healthcheck.spec.ts`).
+- **Ainda não implementado** (fora do escopo desta fase, sem credencial de serviço externo
+  disponível): alerta ativo (e-mail/push quando degradado — hoje é preciso consultar
+  `/healthcheck` ativamente), rastreamento de erros (Sentry ou similar), métricas/dashboards
+  de infraestrutura.
+
+✅ **Validado em CI** — 4/4 jobs. Link do workflow run adicionado após o push.
+
+## Deploy
+
+O workflow `.github/workflows/deploy.yml` (Fase 9) aplica migrations e publica as Edge
+Functions contra um projeto Supabase **hospedado** automaticamente após todo push que passa no
+CI da `main`. Para ativá-lo, configure em **Settings → Secrets and variables → Actions** do
+repositório:
+
+| Secret | Onde encontrar |
+|---|---|
+| `SUPABASE_PROJECT_ID` | URL do projeto no [Supabase Dashboard](https://supabase.com/dashboard) (`app.supabase.com/project/<este-id>`) |
+| `SUPABASE_ACCESS_TOKEN` | [Account → Access Tokens](https://supabase.com/dashboard/account/tokens) — gerar um token novo |
+| `SUPABASE_DB_PASSWORD` | Senha do Postgres definida na criação do projeto (Settings → Database) |
+
+Sem esses três secrets, o job `verificar-secrets` roda, conclui "nada a fazer" e não falha —
+o workflow fica dormente. Nenhum projeto hospedado existe ainda (ASSUMPTIONS.md item 8), então
+isto nunca rodou de verdade — só a estrutura está pronta para quando o projeto real existir.
+
 ## Pré-requisitos
 
 - Node.js ≥ 20
@@ -404,7 +451,7 @@ Nunca use esses usuários/senha fora do ambiente local — são recriados do zer
 | 6 | Login por matrícula + design system (rebrand) | ✅ Concluída e validada em CI |
 | 7 | BI, dashboards, exportação de relatórios | ✅ Concluída e validada em CI |
 | 8 | PWA offline e sincronização | ✅ Concluída e validada em CI |
-| 9 | Testes E2E completos, CI/CD, observabilidade | Não iniciada |
+| 9 | Testes E2E completos, CI/CD, observabilidade | ✅ Concluída e validada em CI |
 | 10 | Migração de dados legados e corte | Não iniciada |
 
 > Nota: esta tabela é uma reconstrução de acompanhamento mantida por quem implementa, não uma
