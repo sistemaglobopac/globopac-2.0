@@ -96,6 +96,13 @@ describe("estaOffline", () => {
     );
   });
 
+  it("reconhece o objeto plano do postgrest-js para uma falha de rede comum (não só abort)", () => {
+    // Formato real devolvido por postgrest-js em qualquer rejeição de fetch (rede
+    // indisponível ou requisição abortada por route.abort()/CDP) — nunca uma instância de
+    // Error de verdade, sempre um objeto plano com essa mensagem.
+    expect(estaOffline({ message: "TypeError: Failed to fetch", details: "", hint: "", code: "" })).toBe(true);
+  });
+
   it("não trata um erro estruturado comum (sem hint/name de abort) como offline", () => {
     expect(estaOffline({ message: "duplicate key value violates unique constraint" })).toBe(false);
   });

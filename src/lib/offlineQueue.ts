@@ -84,18 +84,22 @@ export async function removerFichaEnfileirada(id: string) {
 export const PRAZO_ONLINE_MS = 8_000;
 
 /** Heurística de "isto falhou por falta de rede (ou por ter estourado o prazo acima), não por
- * outro motivo" — um erro de validação/permissão real (400/403) nunca cai aqui. Cobre os três
- * formatos observados: sinal do navegador, fetch cru sem handler (TypeError), e os erros
- * estruturados que postgrest-js/functions-js devolvem quando o AbortSignal aborta a
- * requisição (nunca lançam um AbortError puro — sempre envolvem numa mensagem própria). */
+ * outro motivo" — um erro de validação/permissão real (400/403) nunca cai aqui. postgrest-js
+ * nunca lança um TypeError/AbortError puro: qualquer falha de fetch (rede indisponível,
+ * requisição abortada por nós via AbortSignal.timeout, ou abortada pelo navegador/CDP) chega
+ * como um objeto plano `{message: "<NomeDoErro>: <mensagem original>", hint, ...}` — nunca uma
+ * instância de Error de verdade. Cobre os formatos observados: sinal do navegador, fetch cru
+ * sem handler (TypeError), FunctionsFetchError (functions.invoke) e o objeto plano acima. */
+const PADRAO_ERRO_DE_REDE = /^(TypeError|AbortError|FetchError)/;
+
 export function estaOffline(erro?: unknown): boolean {
   if (typeof navigator !== "undefined" && navigator.onLine === false) return true;
   if (erro instanceof TypeError) return true;
-  if (erro instanceof Error && /^AbortError/.test(erro.message)) return true;
+  if (erro instanceof Error && PADRAO_ERRO_DE_REDE.test(erro.message)) return true;
   if (erro && typeof erro === "object") {
     const objeto = erro as { name?: string; message?: string; hint?: string };
     if (objeto.name === "FunctionsFetchError") return true;
-    if (typeof objeto.message === "string" && /^AbortError/.test(objeto.message)) return true;
+    if (typeof objeto.message === "string" && PADRAO_ERRO_DE_REDE.test(objeto.message)) return true;
     if (typeof objeto.hint === "string" && objeto.hint.includes("aborted")) return true;
   }
   return false;

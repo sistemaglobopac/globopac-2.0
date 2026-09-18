@@ -5,10 +5,18 @@ import { login, logout, clienteAdminDeTeste } from "./helpers";
 // (feature adicionada além do roteiro original, ver ASSUMPTIONS.md). Cobre o caminho
 // completo: sem rede → ficha enfileirada localmente → rede volta → sincroniza e assina
 // automaticamente, sem nenhuma ação adicional do usuário.
+//
+// Simula "sem rede" com page.route(...).abort() nas chamadas de escrita (monitoramentos e
+// Edge Functions), em vez de context.setOffline(true): confirmado em CI (3 tentativas, dois
+// mecanismos de timeout diferentes no app) que setOffline deixa requisições já em voo
+// penduradas indefinidamente neste ambiente, sem nunca entregar erro/abort ao JS da página —
+// nem um AbortSignal.timeout(...) genuíno consegue resgatar isso, então nenhuma correção no
+// app teria efeito num teste que dependesse disso. route.abort() rejeita a requisição de
+// forma real e imediata, exercitando o fallback de "falha de rede" do app sem depender desse
+// comportamento específico do CDP.
 
 test("ficha criada sem rede é enfileirada e sincronizada automaticamente quando a rede volta (Fase 8)", async ({
   page,
-  context,
 }) => {
   const marcador = `E2E-fluxo9-${Date.now()}`;
   const admin = await clienteAdminDeTeste();
@@ -17,7 +25,8 @@ test("ficha criada sem rede é enfileirada e sincronizada automaticamente quando
   await page.goto("/fichas/nova");
   await page.locator("#template").selectOption({ label: "Monitoramento de Temperatura — Linha DIF (v1)" });
 
-  await context.setOffline(true);
+  await page.route("**/rest/v1/monitoramentos**", (route) => route.abort("internetdisconnected"));
+  await page.route("**/functions/v1/assinar-documento**", (route) => route.abort("internetdisconnected"));
   try {
     await page.locator("#temperatura_celsius").fill("19");
     await page.locator("#observacoes").fill(marcador);
@@ -29,12 +38,16 @@ test("ficha criada sem rede é enfileirada e sincronizada automaticamente quando
     await expect(page.getByText(/1 ficha\(s\) aguardando sincronização/)).toBeVisible();
     await expect(page.getByText("Pendente de sincronização")).toBeVisible();
 
-    // Não afirma que nada foi persistido no servidor neste ponto: dependendo de reuso de
-    // conexão do ambiente, o próprio INSERT pode escapar da emulação de offline do Playwright
-    // mesmo com a assinatura abortando por timeout — o que importa (verificado depois) é que
-    // o resultado final está correto de qualquer forma, nunca uma linha órfã sem assinatura.
+    // Nada foi persistido no servidor: o INSERT em si foi abortado (não só a assinatura).
+    const { data: aindaNaoExiste } = await admin
+      .from("monitoramentos")
+      .select("id")
+      .eq("dados_dinamicos->>observacoes", marcador)
+      .maybeSingle();
+    expect(aindaNaoExiste).toBeNull();
   } finally {
-    await context.setOffline(false);
+    await page.unroute("**/rest/v1/monitoramentos**");
+    await page.unroute("**/functions/v1/assinar-documento**");
   }
 
   await expect(page.getByText(/aguardando sincronização/)).not.toBeVisible({ timeout: 20_000 });

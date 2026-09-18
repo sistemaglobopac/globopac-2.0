@@ -396,3 +396,18 @@ dois clientes devolvem quando o abort dispara (nunca um `AbortError` puro — ca
 numa mensagem própria). Escolhidos 8s como equilíbrio entre "não confundir uma rede só um
 pouco lenta com offline" e "não deixar o usuário esperando por muito tempo"; não veio de
 nenhuma medição real de latência de rede da planta.
+
+**Atualização:** mesmo com o `AbortSignal` nativo, o teste E2E (`context.setOffline(true)`)
+continuou reproduzindo o mesmo travamento — a requisição em voo simplesmente nunca recebia
+resposta/erro no ambiente de CI, e nem um abort de verdade (não só um race manual) conseguia
+resgatar isso. Concluído que é uma limitação do próprio Playwright/CDP com
+`context.setOffline` sobre requisições já em curso neste ambiente, não um bug do app — o teste
+foi reescrito para usar `page.route(...).abort("internetdisconnected")` (interceptação
+determinística, o padrão recomendado do Playwright para simular falha de rede), que rejeita a
+requisição de forma real e imediata. O prazo de 8s via `AbortSignal`/`timeout` continua no
+código do app — vale para uma conexão genuinamente degradada (lenta, não travada pelo CDP),
+só não é o que o teste E2E exercita diretamente. Ao investigar essa correção também apareceu
+um segundo formato de erro que `estaOffline()` não reconhecia: postgrest-js nunca lança um
+`TypeError`/`AbortError` de verdade, sempre devolve um objeto plano
+`{message: "TypeError: Failed to fetch", ...}` — cobrindo isso, a mesma checagem passou a
+reconhecer tanto falha de rede comum quanto abort, no mesmo lugar.
