@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import type { CampoTemplate } from "@/shared/schema-campos";
-import { enfileirarFicha, estaOffline } from "@/lib/offlineQueue";
+import { comTimeoutOffline, enfileirarFicha, estaOffline } from "@/lib/offlineQueue";
 
 interface TemplateAtivo {
   id: string;
@@ -93,27 +93,34 @@ export function useCriarMonitoramento() {
       }
 
       try {
-        const { data: monitoramento, error } = await supabase
-          .from("monitoramentos")
-          .insert({
-            id,
-            ficha_template_id: input.fichaTemplateId,
-            versao_template: input.versaoTemplate,
-            user_id: input.userId,
-            setor: input.setor,
-            dados_dinamicos: input.dadosDinamicos,
-            capturado_em: capturadoEm,
-          })
-          .select("id")
-          .single()
-          .overrideTypes<{ id: string }, { merge: false }>();
+        // Prazo curto (não o timeout indefinido do navegador): uma conexão degradada — não
+        // totalmente offline, só lenta ou pendurada — não pode deixar o inspetor esperando
+        // por dezenas de segundos antes de cair na fila offline (ver comTimeoutOffline).
+        const { data: monitoramento, error } = await comTimeoutOffline(
+          supabase
+            .from("monitoramentos")
+            .insert({
+              id,
+              ficha_template_id: input.fichaTemplateId,
+              versao_template: input.versaoTemplate,
+              user_id: input.userId,
+              setor: input.setor,
+              dados_dinamicos: input.dadosDinamicos,
+              capturado_em: capturadoEm,
+            })
+            .select("id")
+            .single()
+            .overrideTypes<{ id: string }, { merge: false }>()
+        );
         if (error) throw error;
 
         // Assina imediatamente como INSPETOR (seção 7.5) — a Edge Function recalcula o hash
         // no servidor a partir do que acabou de ser persistido, nunca do payload do cliente.
-        const { error: assinarError } = await supabase.functions.invoke("assinar-documento", {
-          body: { monitoramento_id: monitoramento.id, tipo: "INSPETOR" },
-        });
+        const { error: assinarError } = await comTimeoutOffline(
+          supabase.functions.invoke("assinar-documento", {
+            body: { monitoramento_id: monitoramento.id, tipo: "INSPETOR" },
+          })
+        );
         if (assinarError) throw assinarError;
 
         return { id: monitoramento.id, modo: "online" };

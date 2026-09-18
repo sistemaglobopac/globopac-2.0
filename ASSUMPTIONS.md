@@ -377,3 +377,15 @@ instalabilidade (Chrome exige pelo menos um ícone ≥192px em alguma dimensão)
 ideal (ícones dedicados 192×192/512×512, inclusive "maskable", dão melhor nitidez em launchers
 Android/iOS). Sem ferramenta de processamento de imagem disponível nesta sessão para gerar
 esses tamanhos — ajuste cosmético, não bloqueante, para uma fase de polimento posterior.
+
+### 41. Tentativa online tem prazo curto (8s) antes de cair para a fila offline
+✅ **Confirmada, decisão deliberada** — encontrada ao validar esta fase em CI: com
+`context.setOffline(true)` (Playwright), o fetch não rejeita rápido com um erro de rede
+reconhecível — ele fica pendurado, e o botão "Salvando e assinando…" nunca resolvia dentro do
+timeout do teste. Investigando, isso expôs uma lacuna real de produto, não só do teste: uma
+conexão degradada (lenta ou instável, não necessariamente "desligada") deixaria o inspetor
+esperando indefinidamente antes de qualquer fallback. `comTimeoutOffline()` (novo,
+`src/lib/offlineQueue.ts`) corre a tentativa online contra um prazo de 8s — se estourar, cai
+para a fila offline exatamente como cairia por falta de rede. Escolhido 8s como equilíbrio
+entre "não confundir uma rede só um pouco lenta com offline" e "não deixar o usuário esperando
+por muito tempo"; não veio de nenhuma medição real de latência de rede da planta.
