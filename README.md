@@ -335,7 +335,13 @@ resolvido pelo retry automático do Playwright.
   `/healthcheck` ativamente), rastreamento de erros (Sentry ou similar), métricas/dashboards
   de infraestrutura.
 
-✅ **Validado em CI** — 4/4 jobs. Link do workflow run adicionado após o push.
+✅ **Validado em CI** ([workflow run](https://github.com/sistemaglobopac/globopac-2.0/actions/runs/35323401523)):
+4/4 jobs de primeira, incluindo os 12 testes E2E (fluxo novo: `healthcheck` responde 503 e
+"degradado" quando há RNC com SLA vencido). O workflow `deploy.yml` também já disparou uma
+vez de verdade após este push (`workflow_run`) e se comportou exatamente como projetado:
+detectou a ausência dos secrets, avisou via `::notice::` e pulou o job de deploy sem falhar.
+Único evento residual do job de E2E foi o mesmo flake já documentado em
+`fluxo-07-tsas-falham.spec.ts`, resolvido pelo retry automático do Playwright.
 
 ## Deploy
 
