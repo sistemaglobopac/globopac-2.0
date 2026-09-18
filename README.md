@@ -285,7 +285,27 @@ já documentado em `fluxo-07-tsas-falham.spec.ts`, resolvido pelo retry automát
   até a rede voltar; ao voltar, sincroniza e assina sozinha, e aparece para o verificador com
   o aviso de captura offline).
 
-✅ **Validado em CI** — 4/4 jobs. Link do workflow run adicionado após o push.
+✅ **Validado em CI** ([workflow run](https://github.com/sistemaglobopac/globopac-2.0/actions/runs/35321583759)):
+4/4 jobs, incluindo os 11 testes E2E (fluxo novo: ficha criada sem rede fica só na fila local,
+sincroniza e assina sozinha quando a rede volta, aparece para o verificador com o aviso de
+captura offline). Quatro iterações de CI foram necessárias — todas em uma única simulação de
+rede no teste (`fluxo-09-pwa-offline.spec.ts`), nenhuma no código de produto além de correções
+reais expostas por elas:
+1. `context.setOffline(true)` (Playwright) deixava a chamada a `assinar-documento` pendurada
+   indefinidamente — nem um race manual em cima da Promise nem um `AbortSignal.timeout(...)`
+   nativo (a correção correta, ainda no código) conseguiam resgatar isso; concluído ser uma
+   limitação do próprio Playwright/CDP com requisições já em curso sob `setOffline` neste
+   ambiente, não um bug do app.
+2. O teste foi reescrito para `page.route(...).abort("internetdisconnected")` (padrão
+   recomendado do Playwright para simular falha de rede) — determinístico e imediato.
+3. Isso expôs que `estaOffline()` não reconhecia o formato de erro que `postgrest-js` devolve
+   para uma falha de rede comum (só reconhecia o formato de abort) — corrigido.
+4. E que a sincronização de volta dependia só do evento `online` do navegador, que
+   `page.unroute()` não dispara (nem toda transição de rede real dispara de forma confiável)
+   — `useSincronizacaoOffline` ganhou um reforço de retentativa periódica (10s).
+
+Único evento residual foi o mesmo flake já documentado em `fluxo-07-tsas-falham.spec.ts`,
+resolvido pelo retry automático do Playwright.
 
 ## Pré-requisitos
 
