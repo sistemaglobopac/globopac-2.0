@@ -305,3 +305,11 @@ foram atualizados para o novo valor. Nunca usado fora do ambiente local.
 `perfil`/`setores_permitidos` (o vocabulário de autorização). `matricula` é usada uma única
 vez, no momento do login, antes de qualquer sessão existir — depois disso não tem nenhum papel
 em RLS/RBAC, então não precisa viajar no token.
+
+### 32. Aviso de nova versão (`UpdateNotifier`) nunca recarrega sozinho
+✅ **Confirmada, decisão deliberada** — o polling de `build-meta.json` só troca um `boolean`
+de estado para mostrar um aviso; o `window.location.reload()` só acontece no clique explícito
+do botão "Atualizar". Isso é deliberado dado o domínio: um recarregamento automático em
+qualquer momento poderia descartar dados de um formulário em andamento (ex.: uma OS ou ficha
+sendo preenchida) — o mesmo princípio de nunca perder trabalho do usuário silenciosamente que
+já rege o resto do sistema (ex.: nunca sobrescrever uma RNC/OS já fechada, sempre aditivo).

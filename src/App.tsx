@@ -6,6 +6,7 @@ import { useSessionStore } from "@/store/session";
 import { LoginPage } from "@/modules/auth/LoginPage";
 import { ProtectedRoute } from "@/modules/auth/ProtectedRoute";
 import { AppShell } from "@/shared/AppShell";
+import { UpdateNotifier } from "@/shared/UpdateNotifier";
 import { NovaFichaPage } from "@/modules/fichas/NovaFichaPage";
 import { VerificacaoPage } from "@/modules/fichas/VerificacaoPage";
 import { TemplateBuilderPage } from "@/modules/fichas/TemplateBuilderPage";
@@ -129,6 +130,7 @@ export function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AppRoutes />
+        <UpdateNotifier />
       </BrowserRouter>
     </QueryClientProvider>
   );

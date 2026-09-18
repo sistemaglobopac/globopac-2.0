@@ -207,6 +207,13 @@ etapas da OS, BI/dashboards, PWA offline, migração de dados legados.
 - Novo teste pgTAP (`0005_login_por_matricula.sql`): resolução correta para perfil ativo,
   `NULL` uniforme para matrícula inexistente ou perfil inativo (nunca revela qual dos dois),
   e que só `anon` tem `EXECUTE` na função (não `authenticated`).
+- **Aviso de nova versão disponível** (`UpdateNotifier`, seção 8/observabilidade adiantada):
+  o build embute um `__APP_BUILD_ID__` e emite `dist/build-meta.json` com o mesmo valor
+  (plugin Vite `build-meta`); o cliente já carregado consulta esse arquivo a cada 60s e, se o
+  `buildId` do servidor mudar (novo deploy publicado), mostra um aviso discreto com um botão
+  "Atualizar" — nunca recarrega sozinho, então nunca descarta um formulário em andamento sem
+  o usuário pedir. Testado com Vitest (`tests/component/UpdateNotifier.test.tsx`: sem aviso
+  quando as versões batem, aviso quando divergem, falha de rede ignorada silenciosamente).
 
 ✅ **Validado em CI** ([workflow run](https://github.com/sistemaglobopac/globopac-2.0/actions/runs/35294246230)):
 4/4 jobs, incluindo os 10 testes E2E, todos já usando login por matrícula. Duas correções
