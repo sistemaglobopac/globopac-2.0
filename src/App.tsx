@@ -17,6 +17,7 @@ import { VerificarPage } from "@/modules/verificacao-publica/VerificarPage";
 import { RncTratativasPage } from "@/modules/rnc/RncTratativasPage";
 import { NovaOsPage } from "@/modules/pcm/NovaOsPage";
 import { PainelOsPage } from "@/modules/pcm/PainelOsPage";
+import { DashboardPage } from "@/modules/bi/DashboardPage";
 
 const ROTA_INICIAL_POR_PERFIL: Record<string, string> = {
   INSPETOR_QUALIDADE: "/fichas/nova",
@@ -117,6 +118,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute perfisPermitidos={["INSPECAO_FEDERAL", "ADMIN_MASTER"]}>
               <AuditoriaFederalPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute perfisPermitidos={["ADMIN_MASTER", "GESTOR_SETOR", "INSPETOR_PCM"]}>
+              <DashboardPage />
             </ProtectedRoute>
           }
         />

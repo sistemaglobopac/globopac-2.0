@@ -5,7 +5,7 @@ Reconstrução da v1 seguindo o PROMPT MESTRE (documentação completa do domín
 roteiro de fases está na conversa que originou este repositório — os pontos operacionais
 relevantes estão replicados em `ASSUMPTIONS.md` e `docs/`).
 
-## Estado atual: Fase 6 — Login por matrícula + design system (rebrand)
+## Estado atual: Fase 7 — BI, dashboards e exportação de relatórios
 
 ### Fase 0 (concluída e validada em CI)
 Schema completo versionado (`supabase/migrations/`), RLS deny-by-default em todas as tabelas,
@@ -237,8 +237,24 @@ resolver — podia capturar `0` e travar num botão "(0)" permanentemente desabi
 um flake diferente e já documentado em `fluxo-07-tsas-falham.spec.ts` (corrida de timing entre
 o worker do cron e a asserção do teste), resolvido pelo retry automático do Playwright.
 
-**Ainda não implementado** (fases seguintes do roteiro): BI/dashboards, PWA offline,
-observabilidade, migração de dados legados.
+**Ainda não implementado** (fases seguintes do roteiro): PWA offline, observabilidade,
+migração de dados legados.
+
+### Fase 7 (concluída e validada em CI)
+- **Painel gerencial** (`/dashboard`, ADMIN_MASTER/GESTOR_SETOR/INSPETOR_PCM): KPIs e
+  gráficos (recharts) agregados sobre `monitoramentos` (últimos 30 dias), `rnc` e
+  `manutencao_os` — cada perfil só vê o que a RLS de cada tabela já permitiria em qualquer
+  outra tela (GESTOR_SETOR só o próprio setor, INSPETOR_PCM só OS, ADMIN_MASTER tudo).
+  Agregação client-side (ASSUMPTIONS.md #33 — ressalva de escala documentada, não resolvida).
+- **Exportação CSV** (`src/lib/csv.ts`): um botão por seção (Monitoramentos/RNC/OS) baixa
+  exatamente os dados já buscados, com BOM UTF-8 (acentuação correta no Excel) e escape
+  RFC 4180 de vírgula/aspas/quebra de linha. Nenhuma ação de RBAC nova — exportar não abre
+  acesso além do que a tela já mostra (ASSUMPTIONS.md #34).
+- Testado com Vitest (`tests/unit/csv.test.ts`: escape de campos, `null`/`undefined` → vazio)
+  e E2E (`tests/e2e/fluxo-08-dashboard-bi.spec.ts`: KPIs carregam, exportação de
+  monitoramentos baixa um CSV com cabeçalho e o registro esperado).
+
+✅ **Validado em CI** — 4/4 jobs. Link do workflow run adicionado após o push.
 
 ## Pré-requisitos
 
@@ -335,7 +351,7 @@ Nunca use esses usuários/senha fora do ambiente local — são recriados do zer
 | 4 | RNC e tratativas | ✅ Concluída e validada em CI |
 | 5 | Portal PCM/OS | ✅ Concluída e validada em CI |
 | 6 | Login por matrícula + design system (rebrand) | ✅ Concluída e validada em CI |
-| 7 | BI, dashboards, exportação de relatórios | Não iniciada |
+| 7 | BI, dashboards, exportação de relatórios | ✅ Concluída e validada em CI |
 | 8 | PWA offline e sincronização | Não iniciada |
 | 9 | Testes E2E completos, CI/CD, observabilidade | Não iniciada |
 | 10 | Migração de dados legados e corte | Não iniciada |

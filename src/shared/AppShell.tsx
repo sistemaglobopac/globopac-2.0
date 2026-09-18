@@ -22,10 +22,14 @@ const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
   INSPETOR_QUALIDADE: [{ rota: "/fichas/nova", rotulo: "Nova ficha" }],
   VERIFICADOR: [{ rota: "/verificacao", rotulo: "Verificação" }],
   INSPECAO_FEDERAL: [{ rota: "/auditoria", rotulo: "Auditoria" }],
-  GESTOR_SETOR: [{ rota: "/rnc", rotulo: "Tratativas RNC" }],
+  GESTOR_SETOR: [
+    { rota: "/rnc", rotulo: "Tratativas RNC" },
+    { rota: "/dashboard", rotulo: "Painel gerencial" },
+  ],
   INSPETOR_PCM: [
     { rota: "/pcm", rotulo: "Ordens de Serviço" },
     { rota: "/pcm/nova", rotulo: "Nova OS" },
+    { rota: "/dashboard", rotulo: "Painel gerencial" },
   ],
   ADMIN_MASTER: [
     { rota: "/fichas/nova", rotulo: "Nova ficha" },
@@ -37,6 +41,7 @@ const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
     { rota: "/sif/liberar", rotulo: "Liberar ao SIF" },
     { rota: "/auditoria", rotulo: "Auditoria" },
     { rota: "/carimbos", rotulo: "Carimbos de tempo" },
+    { rota: "/dashboard", rotulo: "Painel gerencial" },
   ],
 };
 

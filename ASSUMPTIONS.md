@@ -313,3 +313,27 @@ do botão "Atualizar". Isso é deliberado dado o domínio: um recarregamento aut
 qualquer momento poderia descartar dados de um formulário em andamento (ex.: uma OS ou ficha
 sendo preenchida) — o mesmo princípio de nunca perder trabalho do usuário silenciosamente que
 já rege o resto do sistema (ex.: nunca sobrescrever uma RNC/OS já fechada, sempre aditivo).
+
+## Premissas da Fase 7 (BI, dashboards, exportação de relatórios)
+
+### 33. Agregação do painel gerencial é client-side, não uma view/RPC no banco
+🟡 **Assumida (pendente de confirmação de volumetria)** — `useMonitoramentosResumo()`/
+`useRncResumo()`/`useOsResumo()` buscam as linhas já filtradas por RLS (monitoramentos dos
+últimos 30 dias; RNC/OS sem corte de data) e agregam (contagens por severidade/status) no
+próprio navegador. Simples de construir e testar, e adequado ao volume esperado de um único
+frigorífico sob inspeção permanente — mas não escala indefinidamente. Se o volume real tornar
+isso lento, a correção é uma view ou função agregadora no Postgres (ver ASSUMPTIONS.md item 3,
+"Volumetria real", que já registrava essa mesma incerteza desde a Fase 0).
+
+### 34. Exportar CSV não é uma ação de RBAC nova — segue a mesma visibilidade da tela
+✅ **Confirmada, decisão deliberada** — não existe (nem foi criada) uma ação `exportar` em
+`permissoes_perfil`. O botão "Exportar CSV" só transforma em arquivo os mesmos dados que a
+consulta já trouxe (RLS já decidiu o que aparece) — não abre nenhum acesso que a tela do
+painel gerencial já não desse, então não há necessidade de uma permissão dedicada.
+
+### 35. `recharts` cresce o bundle principal para ~1MB (de ~680KB) — code-splitting adiado
+🟡 **Assumida (pendente de priorização)** — o aviso de "chunk maior que 500KB" já existia antes
+desta fase (o bundle sempre foi >500KB) e piorou com `recharts`. Dividir o bundle
+(`React.lazy` no `DashboardPage`, ou `manualChunks`) é uma otimização de performance pura, sem
+nenhum impacto funcional — fica para a Fase 8 (PWA offline), que já vai mexer em carregamento/
+cache de qualquer forma.
