@@ -8,19 +8,22 @@ import { ProtectedRoute } from "@/modules/auth/ProtectedRoute";
 import { AppShell } from "@/shared/AppShell";
 import { UpdateNotifier } from "@/shared/UpdateNotifier";
 import { NovaFichaPage } from "@/modules/fichas/NovaFichaPage";
-import { VerificacaoPage } from "@/modules/fichas/VerificacaoPage";
-import { TemplateBuilderPage } from "@/modules/fichas/TemplateBuilderPage";
+import { PainelVerificacao } from "@/modules/fichas/PainelVerificacao";
+import { ConstrutorFichasPage } from "@/modules/fichas/ConstrutorFichasPage";
+import { SetoresPage } from "@/modules/admin/SetoresPage";
 import { CarimbosPendentesPage } from "@/modules/carimbos/CarimbosPendentesPage";
 import { LiberarSifPage } from "@/modules/sif/LiberarSifPage";
 import { AuditoriaFederalPage } from "@/modules/sif/AuditoriaFederalPage";
 import { VerificarPage } from "@/modules/verificacao-publica/VerificarPage";
 import { RncTratativasPage } from "@/modules/rnc/RncTratativasPage";
+import { NovaRncPage } from "@/modules/rnc/NovaRncPage";
 import { NovaOsPage } from "@/modules/pcm/NovaOsPage";
 import { PainelOsPage } from "@/modules/pcm/PainelOsPage";
 import { DashboardPage } from "@/modules/bi/DashboardPage";
+import { PainelBordo } from "@/modules/bordo/PainelBordo";
 
 const ROTA_INICIAL_POR_PERFIL: Record<string, string> = {
-  INSPETOR_QUALIDADE: "/fichas/nova",
+  INSPETOR_QUALIDADE: "/painel",
   VERIFICADOR: "/verificacao",
   ADMIN_MASTER: "/fichas/nova",
   INSPECAO_FEDERAL: "/auditoria",
@@ -50,6 +53,14 @@ function AppRoutes() {
       >
         <Route path="/" element={<HomeRedirect />} />
         <Route
+          path="/painel"
+          element={
+            <ProtectedRoute perfisPermitidos={["INSPETOR_QUALIDADE", "ADMIN_MASTER"]}>
+              <PainelBordo />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/fichas/nova"
           element={
             <ProtectedRoute perfisPermitidos={["INSPETOR_QUALIDADE", "ADMIN_MASTER"]}>
@@ -58,10 +69,18 @@ function AppRoutes() {
           }
         />
         <Route
+          path="/nova-rnc"
+          element={
+            <ProtectedRoute perfisPermitidos={["INSPETOR_QUALIDADE", "ADMIN_MASTER"]}>
+              <NovaRncPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/verificacao"
           element={
             <ProtectedRoute perfisPermitidos={["VERIFICADOR", "ADMIN_MASTER"]}>
-              <VerificacaoPage />
+              <PainelVerificacao />
             </ProtectedRoute>
           }
         />
@@ -69,7 +88,15 @@ function AppRoutes() {
           path="/templates"
           element={
             <ProtectedRoute perfisPermitidos={["ADMIN_MASTER"]}>
-              <TemplateBuilderPage />
+              <ConstrutorFichasPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/setores"
+          element={
+            <ProtectedRoute perfisPermitidos={["ADMIN_MASTER"]}>
+              <SetoresPage />
             </ProtectedRoute>
           }
         />
@@ -100,7 +127,7 @@ function AppRoutes() {
         <Route
           path="/pcm"
           element={
-            <ProtectedRoute perfisPermitidos={["INSPETOR_PCM", "ADMIN_MASTER"]}>
+            <ProtectedRoute perfisPermitidos={["INSPETOR_PCM", "ADMIN_MASTER", "INSPETOR_QUALIDADE"]}>
               <PainelOsPage />
             </ProtectedRoute>
           }
@@ -108,7 +135,7 @@ function AppRoutes() {
         <Route
           path="/pcm/nova"
           element={
-            <ProtectedRoute perfisPermitidos={["INSPETOR_PCM", "ADMIN_MASTER"]}>
+            <ProtectedRoute perfisPermitidos={["INSPETOR_PCM", "ADMIN_MASTER", "INSPETOR_QUALIDADE"]}>
               <NovaOsPage />
             </ProtectedRoute>
           }

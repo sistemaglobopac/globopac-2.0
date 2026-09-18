@@ -58,6 +58,50 @@ export function useRncsFechadasRecentes() {
   });
 }
 
+/** Abertura de RNC pelo próprio autor do desvio (Painel de Bordo, seção 7/10) — mesma regra de
+ * SLA por severidade usada em useReabrirRnc. `monitoramentoId` é opcional: a matriz de
+ * permissões já previa INSPETOR_QUALIDADE abrindo RNC "em campo", vinculada a um monitoramento
+ * ou avulsa. */
+export function useAbrirRnc() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      monitoramentoId: string | null;
+      descricao: string;
+      setor: string;
+      severidade: SeveridadeRnc;
+      abertoPor: string;
+    }) => {
+      const { data: config, error: erroConfig } = await supabase
+        .from("app_config")
+        .select("valor")
+        .eq("chave", "sla_rnc_horas_por_severidade")
+        .single()
+        .overrideTypes<{ valor: Record<string, number> }, { merge: false }>();
+      if (erroConfig) throw erroConfig;
+      const horas = config.valor[input.severidade] ?? 168;
+      const prazoSla = new Date(Date.now() + horas * 60 * 60 * 1000).toISOString();
+
+      const { data, error } = await supabase
+        .from("rnc")
+        .insert({
+          monitoramento_id: input.monitoramentoId,
+          descricao: input.descricao,
+          setor: input.setor,
+          severidade: input.severidade,
+          aberto_por: input.abertoPor,
+          prazo_sla: prazoSla,
+        })
+        .select("id")
+        .single()
+        .overrideTypes<{ id: string }, { merge: false }>();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["rnc"] }),
+  });
+}
+
 /** Registra a tratativa (ABERTA/REABERTA → TRATADA). Ação e fechamento são passos
  * separados — reflete literalmente o fluxo E2E nº 3 ("Gestor de Setor trata → fecha"),
  * dois verbos, duas ações. */

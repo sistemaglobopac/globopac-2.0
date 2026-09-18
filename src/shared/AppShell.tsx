@@ -19,8 +19,12 @@ const NIVEL_ACESSO_ROTULO: Record<string, string> = {
 };
 
 const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
-  INSPETOR_QUALIDADE: [{ rota: "/fichas/nova", rotulo: "Nova ficha" }],
-  VERIFICADOR: [{ rota: "/verificacao", rotulo: "Verificação" }],
+  INSPETOR_QUALIDADE: [
+    { rota: "/painel", rotulo: "Painel de Bordo" },
+    { rota: "/fichas/nova", rotulo: "Nova ficha" },
+    { rota: "/nova-rnc", rotulo: "Abrir RNC" },
+  ],
+  VERIFICADOR: [{ rota: "/verificacao", rotulo: "Painel de Verificação" }],
   INSPECAO_FEDERAL: [{ rota: "/auditoria", rotulo: "Auditoria" }],
   GESTOR_SETOR: [
     { rota: "/rnc", rotulo: "Tratativas RNC" },
@@ -32,12 +36,14 @@ const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
     { rota: "/dashboard", rotulo: "Painel gerencial" },
   ],
   ADMIN_MASTER: [
+    { rota: "/painel", rotulo: "Painel de Bordo" },
     { rota: "/fichas/nova", rotulo: "Nova ficha" },
-    { rota: "/verificacao", rotulo: "Verificação" },
+    { rota: "/verificacao", rotulo: "Painel de Verificação" },
     { rota: "/rnc", rotulo: "Tratativas RNC" },
     { rota: "/pcm", rotulo: "Ordens de Serviço" },
     { rota: "/pcm/nova", rotulo: "Nova OS" },
-    { rota: "/templates", rotulo: "Templates" },
+    { rota: "/templates", rotulo: "Construtor de Fichas" },
+    { rota: "/admin/setores", rotulo: "Gestão de Setores" },
     { rota: "/sif/liberar", rotulo: "Liberar ao SIF" },
     { rota: "/auditoria", rotulo: "Auditoria" },
     { rota: "/carimbos", rotulo: "Carimbos de tempo" },

@@ -43,6 +43,14 @@ interface FichaTemplateRow {
   ativo: boolean;
   criado_por: string | null;
   criado_em: string;
+  // Metadados do Construtor de Fichas (painel administrativo) — ver migração
+  // 20260924000001_construtor_fichas_metadados.sql.
+  tipo_apontamento: "Recorrente" | "Demanda";
+  frequencia: "Diário" | "Por Turno" | null;
+  tempo_entre_apontamentos_min: number | null;
+  tempo_edicao_min: number | null;
+  locais_aplicacao: string[];
+  atualizado_em: string;
 }
 
 interface MonitoramentoRow {
@@ -99,6 +107,37 @@ interface AppConfigRow {
   atualizado_em: string;
 }
 
+interface TurnoInspetorRow {
+  id: string;
+  user_id: string;
+  setor: string | null;
+  inicio: string;
+  fim: string | null;
+  criado_em: string;
+}
+
+interface PausaInspetorRow {
+  id: string;
+  user_id: string;
+  tipo_pausa: "CURTA_20M" | "ALMOCO_72M" | "JANTAR_72M";
+  status: "EM_ANDAMENTO" | "CONCLUIDA";
+  hora_inicio: string;
+  hora_fim: string | null;
+  criado_em: string;
+}
+
+interface ParadaProcessoRow {
+  id: string;
+  inspetor_id: string;
+  setor: string;
+  equipamento: string | null;
+  motivo: string;
+  detalhes: string | null;
+  hora_inicio: string;
+  hora_fim: string | null;
+  criado_em: string;
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -146,6 +185,25 @@ export interface Database {
         Row: AppConfigRow;
         Insert: Partial<AppConfigRow> & Pick<AppConfigRow, "chave" | "valor">;
         Update: Partial<AppConfigRow>;
+        Relationships: [];
+      };
+      turnos_inspetores: {
+        Row: TurnoInspetorRow;
+        Insert: Partial<TurnoInspetorRow> & Pick<TurnoInspetorRow, "user_id" | "inicio">;
+        Update: Partial<TurnoInspetorRow>;
+        Relationships: [];
+      };
+      pausas_inspetores: {
+        Row: PausaInspetorRow;
+        Insert: Partial<PausaInspetorRow> & Pick<PausaInspetorRow, "user_id" | "tipo_pausa">;
+        Update: Partial<PausaInspetorRow>;
+        Relationships: [];
+      };
+      paradas_processo: {
+        Row: ParadaProcessoRow;
+        Insert: Partial<ParadaProcessoRow> &
+          Pick<ParadaProcessoRow, "inspetor_id" | "setor" | "motivo" | "hora_inicio">;
+        Update: Partial<ParadaProcessoRow>;
         Relationships: [];
       };
     };
