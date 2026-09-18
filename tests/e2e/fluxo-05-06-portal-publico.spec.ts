@@ -35,6 +35,12 @@ test("documento liberado aparece com trilha e badge corretos no portal público 
   await login(page, "1004", "121072");
   await page.goto("/sif/liberar");
   const checkboxes = page.locator('input[type="checkbox"]');
+  // checkboxes.count() é um snapshot único, não uma asserção com auto-retry do Playwright —
+  // chamado logo após a navegação, antes de useMonitoramentosParaLiberar() resolver (a sessão
+  // ainda está sendo restaurada do localStorage pelo useAuthListener, e só depois disso a
+  // query dispara), ele podia capturar 0 e travar o teste com um botão "(0)" permanentemente
+  // desabilitado. Espera o primeiro checkbox realmente aparecer antes de contar.
+  await expect(checkboxes.first()).toBeVisible({ timeout: 15_000 });
   const total = await checkboxes.count();
   for (let i = 0; i < total; i++) await checkboxes.nth(i).check();
   await page.getByRole("button", { name: new RegExp(`Liberar selecionados \\(${total}\\)`) }).click();
