@@ -254,7 +254,10 @@ migração de dados legados.
   e E2E (`tests/e2e/fluxo-08-dashboard-bi.spec.ts`: KPIs carregam, exportação de
   monitoramentos baixa um CSV com cabeçalho e o registro esperado).
 
-✅ **Validado em CI** — 4/4 jobs. Link do workflow run adicionado após o push.
+✅ **Validado em CI** ([workflow run](https://github.com/sistemaglobopac/globopac-2.0/actions/runs/35299592872)):
+4/4 jobs de primeira, incluindo os 10 testes E2E (fluxo 8 novo: KPIs carregam, exportação de
+monitoramentos baixa um CSV com o registro esperado). Único evento residual foi o mesmo flake
+já documentado em `fluxo-07-tsas-falham.spec.ts`, resolvido pelo retry automático do Playwright.
 
 ## Pré-requisitos
 
