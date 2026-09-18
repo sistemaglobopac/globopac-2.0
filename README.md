@@ -362,7 +362,11 @@ detectou a ausência dos secrets, avisou via `::notice::` e pulou o job de deplo
   reroda o mesmo arquivo para confirmar idempotência (zero duplicatas). pgTAP
   (`0006_id_legado_migracao.sql`) cobre a constraint de unicidade em si.
 
-✅ **Validado em CI** — 4/4 jobs. Link do workflow run adicionado após o push.
+✅ **Validado em CI** ([workflow run](https://github.com/sistemaglobopac/globopac-2.0/actions/runs/35325204443)):
+4/4 jobs de primeira, incluindo os 13 testes E2E (fluxo-11 de migração/idempotência
+entre eles) e o novo teste pgTAP `0006_id_legado_migracao.sql`. Único evento residual
+foi o mesmo flake já documentado em `fluxo-07-tsas-falham.spec.ts`, resolvido pelo
+retry automático do Playwright.
 
 ## Deploy
 
