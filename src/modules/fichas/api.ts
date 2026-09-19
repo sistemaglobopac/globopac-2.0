@@ -365,7 +365,7 @@ export interface FiltrosVerificacao {
 }
 
 const CAMPOS_MONITORAMENTO_VERIFICACAO =
-  "id, ficha_template_id, user_id, setor, dados_dinamicos, conformidade, verificado_por, verificado_em, criado_em";
+  "id, ficha_template_id, user_id, setor, dados_dinamicos, conformidade, verificado_por, verificado_em, criado_em, capturado_em";
 
 /** Fila de verificação: pendências (verificado_por IS NULL — fila crônica, qualquer dia) +
  * verificados recentes (últimos 500, qualquer dia — a filtragem por dia local/intervalo

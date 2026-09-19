@@ -23,10 +23,12 @@ test("verificador reprova, RNC é criada, gestor de setor trata e fecha (fluxo 3
   await page.goto("/verificacao");
   const cartaoVerificacao = page.locator(".rounded-lg.border").filter({ hasText: marcador });
   await expect(cartaoVerificacao).toBeVisible({ timeout: 15_000 });
-  await cartaoVerificacao.getByRole("button", { name: "Reprovar" }).click();
-  await cartaoVerificacao.locator("select").selectOption("ALTA");
-  await cartaoVerificacao.locator("textarea").fill(marcador);
-  await cartaoVerificacao.getByRole("button", { name: "Confirmar reprovação (abre RNC)" }).click();
+  await cartaoVerificacao.getByRole("button", { name: "Ver" }).click();
+  const dialogReprovacao = page.getByRole("dialog");
+  await dialogReprovacao.getByRole("button", { name: "Reprovar" }).click();
+  await dialogReprovacao.locator("select").selectOption("ALTA");
+  await dialogReprovacao.locator("textarea").fill(marcador);
+  await dialogReprovacao.getByRole("button", { name: "Confirmar reprovação (abre RNC)" }).click();
   await expect(cartaoVerificacao).not.toBeVisible({ timeout: 15_000 });
   await logout(page);
 

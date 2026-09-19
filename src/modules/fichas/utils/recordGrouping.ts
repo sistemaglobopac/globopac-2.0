@@ -13,6 +13,7 @@ export interface MonitoramentoVerificacao {
   verificado_por: string | null;
   verificado_em: string | null;
   criado_em: string;
+  capturado_em: string | null;
 }
 
 export interface AppointmentDisplay {

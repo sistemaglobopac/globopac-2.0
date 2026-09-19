@@ -54,6 +54,7 @@ export function AuditRecordCard({
   const nomeFicha = nomePorTemplateId.get(appt.ficha_template_id) ?? "Ficha";
   const pac = pacPorTemplateId.get(appt.ficha_template_id) ?? "—";
   const inspetorNome = usersMap.get(appt.user_id) ?? "Inspetor";
+  const campos = Object.entries(appt.dados_dinamicos).filter(([chave]) => chave !== "adendos");
 
   return (
     <div className={`space-y-2 rounded-lg border bg-card p-4 shadow-sm ${bloqueado ? "opacity-70" : ""}`}>
@@ -101,6 +102,24 @@ export function AuditRecordCard({
           </Button>
         </div>
       </div>
+
+      {appt.capturado_em && (
+        <p className="text-xs text-muted-foreground">
+          Capturado offline em {new Date(appt.capturado_em).toLocaleString("pt-BR")} (informado pelo dispositivo,
+          não verificado) — sincronizado em {new Date(appt.criado_em).toLocaleString("pt-BR")}.
+        </p>
+      )}
+
+      {campos.length > 0 && (
+        <dl className="grid grid-cols-2 gap-2 border-t pt-2 text-sm">
+          {campos.map(([chave, valor]) => (
+            <div key={chave}>
+              <dt className="text-muted-foreground">{chave}</dt>
+              <dd>{String(valor)}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
 
       {appt.conformidade === false && (
         <p className="flex items-center gap-1.5 text-xs font-medium text-destructive">

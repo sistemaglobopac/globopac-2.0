@@ -564,7 +564,7 @@ export function PainelVerificacao() {
 function ModalBase({ titulo, onFechar, children }: { titulo: string; onFechar: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-lg rounded-xl border bg-background shadow-2xl">
+      <div role="dialog" aria-modal="true" aria-label={titulo} className="w-full max-w-lg rounded-xl border bg-background shadow-2xl">
         <div className="flex items-center justify-between rounded-t-xl bg-primary px-4 py-3 text-primary-foreground">
           <span className="font-semibold">{titulo}</span>
           <button type="button" onClick={onFechar} aria-label="Fechar">

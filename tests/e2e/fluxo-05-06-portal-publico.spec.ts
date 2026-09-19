@@ -26,7 +26,8 @@ test("documento liberado aparece com trilha e badge corretos no portal público 
   await page.goto("/verificacao");
   const cartaoVerificacao = page.locator(".rounded-lg.border").filter({ hasText: marcador });
   await expect(cartaoVerificacao).toBeVisible({ timeout: 15_000 });
-  await cartaoVerificacao.getByRole("button", { name: "Aprovar e assinar" }).click();
+  await cartaoVerificacao.getByRole("button", { name: "Ver" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Aprovar e assinar" }).click();
   await expect(cartaoVerificacao).not.toBeVisible({ timeout: 15_000 });
   await logout(page);
 
