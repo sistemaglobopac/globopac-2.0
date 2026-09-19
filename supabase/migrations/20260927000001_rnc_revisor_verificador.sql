@@ -5,7 +5,9 @@
 -- própria RNC sozinho — o fechamento (aprovação) ou a devolução para nova tratativa é do
 -- VERIFICADOR/ADMIN_MASTER, nunca da mesma pessoa que tratou.
 
-alter type status_rnc add value if not exists 'DEVOLVIDA';
+-- 'DEVOLVIDA' já existe no enum status_rnc a esta altura — ver
+-- 20260926000002_status_rnc_add_devolvida.sql (precisa ser uma migração separada e anterior:
+-- Postgres proíbe usar um valor de enum recém-adicionado na mesma transação em que foi criado).
 
 alter table rnc
   add column revisado_por uuid references perfis_usuarios (id),
