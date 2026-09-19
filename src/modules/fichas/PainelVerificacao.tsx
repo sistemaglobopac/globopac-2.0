@@ -351,10 +351,18 @@ export function PainelVerificacao() {
             key={dossie.chave}
             dossie={dossie}
             selectedIds={selectedIds}
+            toggleSelection={toggleSelection}
             toggleGroupSelection={toggleGroupSelection}
+            onPreview={setPreviewItem}
+            pacPorTemplateId={pacPorTemplateId}
+            nomePorTemplateId={nomePorTemplateId}
+            usersMap={usuarios}
             isAdmin={Boolean(isAdmin)}
             onEncerrarTurno={(d) =>
               setEncerrarAlvo({ userId: d.userId, dia: diaTurno(d.items[0]!.appt.criado_em), nome: d.inspetorNome })
+            }
+            onEncerrarTurnoItem={(i) =>
+              setEncerrarAlvo({ userId: i.appt.user_id, dia: diaTurno(i.appt.criado_em), nome: usuarios.get(i.appt.user_id) ?? "inspetor" })
             }
           />
         ))}

@@ -1,19 +1,41 @@
 import { Layers, Lock, Unlock } from "lucide-react";
 import { Button } from "@/shared/ui/button";
-import type { DossieVerificacao } from "../utils/recordGrouping";
+import type { AppointmentDisplay, DossieVerificacao } from "../utils/recordGrouping";
 import { ensureLocalTime } from "../utils/tempo";
+import { AuditRecordCard } from "./AuditRecordCard";
 
 interface DossieVerificacaoCardProps {
   dossie: DossieVerificacao;
   selectedIds: Set<string>;
+  toggleSelection: (id: string) => void;
   toggleGroupSelection: (ids: string[]) => void;
+  onPreview: (item: AppointmentDisplay) => void;
+  pacPorTemplateId: Map<string, string>;
+  nomePorTemplateId: Map<string, string>;
+  usersMap: Map<string, string>;
   isAdmin: boolean;
   onEncerrarTurno: (dossie: DossieVerificacao) => void;
+  onEncerrarTurnoItem: (item: AppointmentDisplay) => void;
 }
 
 /** Card agregado de um "dossiê" — N apontamentos horários da mesma ficha/inspetor/turno,
- * selecionáveis em bloco para a assinatura em lote. */
-export function DossieVerificacaoCard({ dossie, selectedIds, toggleGroupSelection, isAdmin, onEncerrarTurno }: DossieVerificacaoCardProps) {
+ * selecionáveis em bloco para a assinatura em lote (checkbox do cabeçalho) e também
+ * individualmente inspecionáveis/reprováveis (cada apontamento continua sendo o mesmo
+ * AuditRecordCard usado fora de um dossiê, com seu próprio "Ver"/checkbox) — agrupar N
+ * apontamentos não pode significar perder a capacidade de tratar UM deles isoladamente. */
+export function DossieVerificacaoCard({
+  dossie,
+  selectedIds,
+  toggleSelection,
+  toggleGroupSelection,
+  onPreview,
+  pacPorTemplateId,
+  nomePorTemplateId,
+  usersMap,
+  isAdmin,
+  onEncerrarTurno,
+  onEncerrarTurnoItem,
+}: DossieVerificacaoCardProps) {
   const todasSelecionadas = dossie.ids.every((id) => selectedIds.has(id));
   const primeiroItem = dossie.items.at(0);
   const ultimoItem = dossie.items.at(-1);
@@ -21,7 +43,7 @@ export function DossieVerificacaoCard({ dossie, selectedIds, toggleGroupSelectio
   const ultimaHora = ultimoItem ? ensureLocalTime(ultimoItem.appt.criado_em).time : "—";
 
   return (
-    <div className={`space-y-2 rounded-lg border-2 border-dashed bg-card p-4 shadow-sm ${dossie.bloqueado ? "opacity-70" : ""}`}>
+    <div className={`space-y-3 rounded-lg border-2 border-dashed bg-muted/20 p-4 shadow-sm ${dossie.bloqueado ? "opacity-70" : ""}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
           {!dossie.bloqueado && (
@@ -65,6 +87,25 @@ export function DossieVerificacaoCard({ dossie, selectedIds, toggleGroupSelectio
             )}
           </div>
         )}
+      </div>
+
+      <div className="space-y-2 border-t pt-3">
+        {dossie.items.map((item) => (
+          <AuditRecordCard
+            key={item.id}
+            item={item}
+            mode="verificacao"
+            selectedIds={selectedIds}
+            toggleSelection={toggleSelection}
+            onPreview={onPreview}
+            pacPorTemplateId={pacPorTemplateId}
+            nomePorTemplateId={nomePorTemplateId}
+            usersMap={usersMap}
+            blockedIds={dossie.bloqueado ? new Set(dossie.ids) : new Set()}
+            isAdmin={isAdmin}
+            onEncerrarTurno={onEncerrarTurnoItem}
+          />
+        ))}
       </div>
     </div>
   );
