@@ -33,6 +33,11 @@ test("verificador reprova, RNC é criada, gestor de setor trata e verificador re
   await dialogReprovacao.locator("select").selectOption("ALTA");
   await dialogReprovacao.locator("textarea").fill(marcador);
   await dialogReprovacao.getByRole("button", { name: "Confirmar reprovação (abre RNC)" }).click();
+  // Reprovar também exige reautenticação por senha (mesmo mecanismo de "Aprovar e assinar",
+  // já existente desde be0f61c) — nunca coberto aqui porque o CI nunca tinha chegado até este
+  // teste antes (bloqueado por outras falhas anteriores no pipeline).
+  await dialogReprovacao.getByLabel("Sua senha").fill("121072");
+  await dialogReprovacao.getByRole("button", { name: "Confirmar e Assinar" }).click();
   await expect(cartaoVerificacao).not.toBeVisible({ timeout: 15_000 });
   await logout(page);
 

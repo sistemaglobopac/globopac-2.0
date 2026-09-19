@@ -40,7 +40,12 @@ test("ficha criada sem rede é enfileirada e sincronizada automaticamente quando
       page.getByText("Sem conexão — ficha salva no dispositivo e será enviada e assinada automaticamente")
     ).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText(/1 ficha\(s\) aguardando sincronização/)).toBeVisible();
-    await expect(page.getByText("Pendente de sincronização")).toBeVisible();
+    // "Pendente" ou "Falha ao sincronizar": salvar() volta pra lista de fichas (onVoltar),
+    // remontando FilaOfflinePainel — o efeito de montagem tenta sincronizar na hora, e como a
+    // rede simulada ainda está cortada aqui, o item pode já ter passado de pendente pra
+    // falhou antes desta asserção rodar. Os dois estados confirmam igualmente que o item
+    // continua enfileirado (não sincronizou de verdade ainda).
+    await expect(page.getByText(/Pendente de sincronização|Falha ao sincronizar/)).toBeVisible();
 
     // Nada foi persistido no servidor: o INSERT em si foi abortado (não só a assinatura).
     const { data: aindaNaoExiste } = await admin
