@@ -179,7 +179,7 @@ export function FormUsuarioModal({ usuario, onClose }: FormUsuarioModalProps) {
           <div className="rounded-md border border-hairline p-3">
             <label className="mb-2 flex items-center gap-2 text-sm font-bold text-ink">
               <input type="checkbox" checked={livreGeral} onChange={(e) => setLivreGeral(e.target.checked)} />
-              Supervisor/Livre (Acesso Geral)
+              Acesso Geral
             </label>
             <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
               {(setoresDisponiveis ?? []).map((setor) => (
