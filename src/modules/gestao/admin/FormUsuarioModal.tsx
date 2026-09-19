@@ -49,6 +49,7 @@ export function FormUsuarioModal({ usuario, onClose }: FormUsuarioModalProps) {
   const [setoresSelecionados, setSetoresSelecionados] = useState<string[]>(
     usuario ? usuario.setores_permitidos.filter((s) => s !== SETOR_LIVRE) : []
   );
+  const isVerificador = nivelAcesso === "VERIFICADOR";
   const [turnoFixo, setTurnoFixo] = useState<"Turno 1" | "Turno 2" | "Ambos">(configInicial.turnoFixo ?? "Ambos");
   const [coberturaAtiva, setCoberturaAtiva] = useState(!!configInicial.coberturaTemporaria);
   const [coberturaSetor, setCoberturaSetor] = useState(configInicial.coberturaTemporaria?.setor ?? "");
@@ -75,7 +76,11 @@ export function FormUsuarioModal({ usuario, onClose }: FormUsuarioModalProps) {
         ? { setor: coberturaSetor, inicio: coberturaInicio, fim: coberturaFim }
         : null,
     };
-    const setoresPermitidos = livreGeral ? [SETOR_LIVRE] : setoresSelecionados;
+    // VERIFICADOR não tem setor — verifica monitoramentos de todos os Inspetores de
+    // Qualidade, de qualquer setor (bypass inerente ao perfil na RLS, não configurável por
+    // usuário como o "Acesso Geral" dos demais perfis). Grava vazio para não deixar um valor
+    // de setor sem efeito nenhum sobre o acesso real.
+    const setoresPermitidos = isVerificador ? [] : livreGeral ? [SETOR_LIVRE] : setoresSelecionados;
 
     try {
       if (usuario) {
@@ -174,28 +179,37 @@ export function FormUsuarioModal({ usuario, onClose }: FormUsuarioModalProps) {
           </Select>
         </div>
 
-        <div className="space-y-2 sm:col-span-2">
-          <Label>Setores Vinculados</Label>
-          <div className="rounded-md border border-hairline p-3">
-            <label className="mb-2 flex items-center gap-2 text-sm font-bold text-ink">
-              <input type="checkbox" checked={livreGeral} onChange={(e) => setLivreGeral(e.target.checked)} />
-              Acesso Geral
-            </label>
-            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-              {(setoresDisponiveis ?? []).map((setor) => (
-                <label key={setor} className={`flex items-center gap-1.5 text-sm ${livreGeral ? "opacity-40" : ""}`}>
-                  <input
-                    type="checkbox"
-                    disabled={livreGeral}
-                    checked={setoresSelecionados.includes(setor)}
-                    onChange={() => alternarSetor(setor)}
-                  />
-                  {setor}
-                </label>
-              ))}
+        {isVerificador ? (
+          <div className="space-y-2 sm:col-span-2">
+            <Label>Setores Vinculados</Label>
+            <p className="rounded-md border border-hairline bg-muted/40 p-3 text-sm text-muted-foreground">
+              Verificador não tem setor — verifica os monitoramentos de todos os Inspetores de Qualidade, de qualquer setor, automaticamente.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2 sm:col-span-2">
+            <Label>Setores Vinculados</Label>
+            <div className="rounded-md border border-hairline p-3">
+              <label className="mb-2 flex items-center gap-2 text-sm font-bold text-ink">
+                <input type="checkbox" checked={livreGeral} onChange={(e) => setLivreGeral(e.target.checked)} />
+                Acesso Geral
+              </label>
+              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                {(setoresDisponiveis ?? []).map((setor) => (
+                  <label key={setor} className={`flex items-center gap-1.5 text-sm ${livreGeral ? "opacity-40" : ""}`}>
+                    <input
+                      type="checkbox"
+                      disabled={livreGeral}
+                      checked={setoresSelecionados.includes(setor)}
+                      onChange={() => alternarSetor(setor)}
+                    />
+                    {setor}
+                  </label>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         <div className="space-y-2 sm:col-span-2">
           <Label htmlFor="turno-fixo">Turno Fixo Vinculado</Label>
