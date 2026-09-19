@@ -55,7 +55,9 @@ export function DossieVerificacaoCard({
   const nomeFicha = primeiroItem ? nomePorTemplateId.get(primeiroItem.appt.ficha_template_id) ?? dossie.codigo : dossie.codigo;
 
   return (
-    <div className={`rounded-xl border bg-card p-4 shadow-sm transition-shadow hover:shadow-md ${dossie.bloqueado ? "opacity-80" : ""}`}>
+    <div
+      className={`glass-panel rounded-xl border border-white/70 p-4 shadow-sm transition-shadow hover:shadow-md ${dossie.bloqueado ? "opacity-80" : ""}`}
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           {!dossie.bloqueado && (

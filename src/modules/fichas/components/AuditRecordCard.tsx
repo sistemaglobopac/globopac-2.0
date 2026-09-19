@@ -68,7 +68,7 @@ export function AuditRecordCard({
 
   return (
     <div
-      className={`space-y-2 rounded-lg border border-l-4 bg-card p-4 shadow-sm ${STATUS_BORDA[item.status]} ${bloqueado ? "opacity-70" : ""}`}
+      className={`glass-panel space-y-2 rounded-lg border border-white/70 border-l-4 p-4 shadow-sm ${STATUS_BORDA[item.status]} ${bloqueado ? "opacity-70" : ""}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
