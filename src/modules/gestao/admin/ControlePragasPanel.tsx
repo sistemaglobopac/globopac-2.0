@@ -79,28 +79,26 @@ export function ControlePragasPanel() {
   const ordenados = [...(registros ?? [])].sort((a, b) => b.data.localeCompare(a.data));
 
   return (
-    <div className="rounded-2xl bg-white p-5 shadow-sm" style={{ border: "1px solid #dfe2e7" }}>
+    <div className="rounded-2xl border border-hairline bg-card p-5 shadow-sm">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <Bug className="h-7 w-7 shrink-0" style={{ color: "#6a5fc1" }} />
+          <Bug className="h-7 w-7 shrink-0 text-primary" />
           <div>
-            <h2 className="text-lg font-bold" style={{ color: "#1f1633" }}>
-              Controle de Pragas
-            </h2>
-            <p className="text-sm" style={{ color: "#79628c" }}>Registro de ocorrências e ações de controle integrado de pragas.</p>
+            <h2 className="text-lg font-bold text-ink">Controle de Pragas</h2>
+            <p className="text-sm text-muted-foreground">Registro de ocorrências e ações de controle integrado de pragas.</p>
           </div>
         </div>
-        <Button type="button" style={{ background: "#6a5fc1", color: "#fff" }} onClick={() => abrirModal()}>
+        <Button type="button" onClick={() => abrirModal()}>
           <Plus className="h-4 w-4" /> Novo Registro
         </Button>
       </div>
 
-      {isLoading && <p className="text-sm" style={{ color: "#79628c" }}>Carregando…</p>}
+      {isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
 
-      <div className="overflow-x-auto rounded-lg" style={{ border: "1px solid #dfe2e7" }}>
+      <div className="overflow-x-auto rounded-lg border border-hairline">
         <table className="w-full text-sm">
-          <thead style={{ background: "#f7f8fa" }}>
-            <tr className="text-left text-xs font-bold uppercase tracking-wide" style={{ color: "#79628c" }}>
+          <thead className="bg-surface-soft">
+            <tr className="text-left text-xs font-bold uppercase tracking-wide text-muted-foreground">
               <th className="px-4 py-2">Data</th>
               <th className="px-4 py-2">Setor</th>
               <th className="px-4 py-2">Tipo de Praga</th>
@@ -111,12 +109,12 @@ export function ControlePragasPanel() {
           </thead>
           <tbody>
             {ordenados.map((item) => (
-              <tr key={item.id} className="border-t" style={{ borderColor: "#dfe2e7" }}>
-                <td className="px-4 py-2" style={{ color: "#1f1633" }}>{new Date(`${item.data}T00:00:00`).toLocaleDateString("pt-BR")}</td>
-                <td className="px-4 py-2" style={{ color: "#1f1633" }}>{item.setor}</td>
-                <td className="px-4 py-2" style={{ color: "#1f1633" }}>{item.tipoPraga}</td>
-                <td className="px-4 py-2" style={{ color: "#1f1633" }}>{item.acaoTomada}</td>
-                <td className="px-4 py-2" style={{ color: "#1f1633" }}>{item.responsavel || "—"}</td>
+              <tr key={item.id} className="border-t border-hairline">
+                <td className="px-4 py-2 text-ink">{new Date(`${item.data}T00:00:00`).toLocaleDateString("pt-BR")}</td>
+                <td className="px-4 py-2 text-ink">{item.setor}</td>
+                <td className="px-4 py-2 text-ink">{item.tipoPraga}</td>
+                <td className="px-4 py-2 text-ink">{item.acaoTomada}</td>
+                <td className="px-4 py-2 text-ink">{item.responsavel || "—"}</td>
                 <td className="px-4 py-2">
                   <div className="flex justify-end gap-1.5">
                     <Button type="button" variant="outline" size="sm" aria-label="Editar registro" onClick={() => abrirModal(item)}>
@@ -138,7 +136,7 @@ export function ControlePragasPanel() {
             ))}
             {!isLoading && ordenados.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center" style={{ color: "#79628c" }}>
+                <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
                   Nenhum registro cadastrado.
                 </td>
               </tr>
@@ -156,7 +154,7 @@ export function ControlePragasPanel() {
               <Button type="button" variant="outline" onClick={() => setModalAberto(false)}>
                 Cancelar
               </Button>
-              <Button type="button" style={{ background: "#6a5fc1", color: "#fff" }} disabled={salvar.isPending} onClick={salvarItem}>
+              <Button type="button" disabled={salvar.isPending} onClick={salvarItem}>
                 {salvar.isPending ? "Salvando…" : "Salvar"}
               </Button>
             </>

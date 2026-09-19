@@ -17,16 +17,14 @@ function ColunaPausas({ titulo, pausas, agoraMs }: { titulo: string; pausas: Pau
   const totalMin = pausas.reduce((soma, p) => soma + duracaoMin(p.hora_inicio, p.hora_fim, agoraMs), 0);
 
   return (
-    <div className="flex-1 rounded-xl p-3" style={{ background: "#f7f8fa", border: "1px solid #dfe2e7" }}>
+    <div className="flex-1 rounded-xl border border-hairline bg-surface-soft p-3">
       <div className="mb-2 flex items-center justify-between">
-        <h4 className="text-xs font-bold uppercase tracking-wide" style={{ color: "#79628c" }}>
-          {titulo}
-        </h4>
-        <span className="text-xs font-bold" style={{ color: "#1f1633" }}>
+        <h4 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{titulo}</h4>
+        <span className="text-xs font-bold text-ink">
           {pausas.length} · {totalMin} min
         </span>
       </div>
-      {pausas.length === 0 && <p className="text-xs" style={{ color: "#79628c" }}>Nenhuma pausa registrada.</p>}
+      {pausas.length === 0 && <p className="text-xs text-muted-foreground">Nenhuma pausa registrada.</p>}
       <ul className="space-y-1.5">
         {pausas.map((p) => {
           const duracao = duracaoMin(p.hora_inicio, p.hora_fim, agoraMs);
@@ -36,25 +34,20 @@ function ColunaPausas({ titulo, pausas, agoraMs }: { titulo: string; pausas: Pau
           return (
             <li
               key={p.id}
-              className="flex items-center justify-between rounded-md px-2 py-1.5 text-xs"
-              style={{ background: excedeu ? "#dc26261a" : "#fff", border: "1px solid #dfe2e7" }}
+              className={`flex items-center justify-between rounded-md border px-2 py-1.5 text-xs ${
+                excedeu ? "border-hairline bg-destructive/10" : "border-hairline bg-canvas"
+              }`}
             >
-              <span style={{ color: "#1f1633" }}>
+              <span className="text-ink">
                 {inicioFmt} → {fimFmt}
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="font-bold" style={{ color: excedeu ? "#dc2626" : "#1f1633" }}>
-                  {duracao} min
-                </span>
+                <span className={`font-bold ${excedeu ? "text-destructive" : "text-ink"}`}>{duracao} min</span>
                 {p.status === "EM_ANDAMENTO" && (
-                  <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ background: "#c2ef4e", color: "#1f1633" }}>
-                    em andamento
-                  </span>
+                  <span className="rounded-full bg-lime px-1.5 py-0.5 text-[10px] font-bold text-primary">em andamento</span>
                 )}
                 {excedeu && (
-                  <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ background: "#dc2626", color: "#fff" }}>
-                    excedeu
-                  </span>
+                  <span className="rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-bold text-destructive-foreground">excedeu</span>
                 )}
               </span>
             </li>
@@ -97,16 +90,12 @@ export function ModalPausasInspetores({ onClose }: { onClose: () => void }) {
 
   return (
     <ModalShell titulo="Pausa dos Inspetores" onClose={onClose} largura="max-w-3xl">
-      {isLoading && <p className="text-sm" style={{ color: "#79628c" }}>Carregando…</p>}
-      {!isLoading && linhas.length === 0 && (
-        <p className="text-sm" style={{ color: "#79628c" }}>Nenhum inspetor ativo hoje.</p>
-      )}
+      {isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
+      {!isLoading && linhas.length === 0 && <p className="text-sm text-muted-foreground">Nenhum inspetor ativo hoje.</p>}
       <div className="space-y-4">
         {linhas.map((linha) => (
-          <div key={linha.id} className="rounded-xl p-3" style={{ border: "1px solid #dfe2e7" }}>
-            <p className="mb-2 text-sm font-bold" style={{ color: "#1f1633" }}>
-              {linha.nome}
-            </p>
+          <div key={linha.id} className="rounded-xl border border-hairline p-3">
+            <p className="mb-2 text-sm font-bold text-ink">{linha.nome}</p>
             <div className="flex flex-col gap-3 sm:flex-row">
               <ColunaPausas titulo={ROTULO_TIPO.CURTA_20M} pausas={linha.curtas} agoraMs={agoraMs} />
               <ColunaPausas titulo={ROTULO_TIPO.ALMOCO_72M} pausas={linha.refeicoes} agoraMs={agoraMs} />

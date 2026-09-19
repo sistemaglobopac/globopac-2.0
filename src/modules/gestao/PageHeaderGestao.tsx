@@ -54,31 +54,26 @@ export function PageHeaderGestao() {
   const badge = perfil ? NIVEL_ACESSO_BADGE[perfil.nivelAcesso] : null;
 
   return (
-    <header className="rounded-2xl p-5 shadow-lg" style={{ background: "linear-gradient(135deg, #1f1633, #150f23)" }}>
+    <header className="rounded-2xl bg-surface-dark p-5 shadow-lg">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-base font-black text-white"
-            style={{ background: "#6a5fc1" }}
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary text-base font-black text-ondark"
             aria-hidden
           >
             {perfil ? iniciaisDoNome(perfil.nomeCompleto) : "?"}
           </div>
           <div>
-            <p className="text-lg font-black text-white">
+            <p className="text-lg font-black text-ondark">
               {saudacaoPorHora(horaManaus)}, {primeiroNome}!
             </p>
-            <p className="text-sm" style={{ color: "#a99bd6" }}>
-              {dataExtenso}
-            </p>
+            <p className="text-sm text-ondark-soft">{dataExtenso}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <span className="font-mono text-xl font-bold tabular-nums" style={{ color: "#c2ef4e" }}>
-            {relogio}
-          </span>
+          <span className="font-mono text-xl font-bold tabular-nums text-lime">{relogio}</span>
           {badge && perfil && (
-            <span className="rounded-full px-3 py-1 text-xs font-bold" style={{ background: badge.bg, color: badge.color }}>
+            <span className={`rounded-full px-3 py-1 text-xs font-bold ${badge.className}`}>
               {NIVEL_ACESSO_ROTULO[perfil.nivelAcesso]}
             </span>
           )}

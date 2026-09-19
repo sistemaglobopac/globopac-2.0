@@ -4,28 +4,26 @@ import { DossieDetalhe } from "../DossieDetalhe";
 import { type Rnc } from "@/modules/rnc/api";
 import { type FichaSemRnc, useRncsPendentesDetalhado } from "../api";
 
-const VARIANTE_STATUS: Record<Rnc["status"], { bg: string; cor: string }> = {
-  ABERTA: { bg: "#dc26261a", cor: "#dc2626" },
-  EM_TRATATIVA: { bg: "#dc26261a", cor: "#dc2626" },
-  REABERTA: { bg: "#c58a1f1a", cor: "#c58a1f" },
-  TRATADA: { bg: "#6a5fc11a", cor: "#6a5fc1" },
-  FECHADA: { bg: "#e5e7eb", cor: "#374151" },
+// Mesmo mapeamento de status de RNC usado no Painel de Bordo (ver STATUS_RNC em
+// src/modules/bordo/PainelBordo.tsx) — cores semânticas do design system, não hex por status.
+const VARIANTE_STATUS: Record<Rnc["status"], string> = {
+  ABERTA: "bg-warning/10 text-warning",
+  EM_TRATATIVA: "bg-warning/10 text-warning",
+  REABERTA: "bg-destructive/10 text-destructive",
+  TRATADA: "bg-primary/10 text-primary",
+  FECHADA: "bg-secondary text-secondary-foreground",
 };
 
 function CartaoRnc({ rnc, onAbrirDossie }: { rnc: Rnc; onAbrirDossie: (monitoramentoId: string) => void }) {
-  const cor = VARIANTE_STATUS[rnc.status];
+  const variante = VARIANTE_STATUS[rnc.status];
   const conteudo = (
-    <div className="rounded-md p-3 text-left text-xs" style={{ background: "#f7f8fa", border: "1px solid #dfe2e7" }}>
+    <div className="rounded-md border border-hairline bg-surface-soft p-3 text-left text-xs">
       <div className="mb-1 flex flex-wrap items-center gap-1.5">
-        <span className="rounded-full px-2 py-0.5 font-bold" style={{ background: cor.bg, color: cor.cor }}>
-          {rnc.status}
-        </span>
-        <span className="rounded-full px-2 py-0.5 font-bold" style={{ background: "#e5e7eb", color: "#374151" }}>
-          {rnc.setor}
-        </span>
-        <span style={{ color: "#79628c" }}>{new Date(rnc.criado_em).toLocaleDateString("pt-BR")}</span>
+        <span className={`rounded-full px-2 py-0.5 font-bold ${variante}`}>{rnc.status}</span>
+        <span className="rounded-full bg-secondary px-2 py-0.5 font-bold text-secondary-foreground">{rnc.setor}</span>
+        <span className="text-muted-foreground">{new Date(rnc.criado_em).toLocaleDateString("pt-BR")}</span>
       </div>
-      <p style={{ color: "#1f1633" }}>{rnc.descricao}</p>
+      <p className="text-ink">{rnc.descricao}</p>
     </div>
   );
 
@@ -42,14 +40,11 @@ function CartaoFichaSemRnc({ ficha, onAbrirDossie }: { ficha: FichaSemRnc; onAbr
     <button
       type="button"
       onClick={() => onAbrirDossie(ficha.id)}
-      className="w-full rounded-md p-3 text-left text-xs hover:opacity-80"
-      style={{ background: "#f7f8fa", border: "1px solid #dfe2e7" }}
+      className="w-full rounded-md border border-hairline bg-surface-soft p-3 text-left text-xs hover:opacity-80"
     >
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="rounded-full px-2 py-0.5 font-bold" style={{ background: "#e5e7eb", color: "#374151" }}>
-          {ficha.setor}
-        </span>
-        <span style={{ color: "#79628c" }}>{new Date(ficha.criado_em).toLocaleString("pt-BR")}</span>
+        <span className="rounded-full bg-secondary px-2 py-0.5 font-bold text-secondary-foreground">{ficha.setor}</span>
+        <span className="text-muted-foreground">{new Date(ficha.criado_em).toLocaleString("pt-BR")}</span>
       </div>
     </button>
   );
@@ -67,41 +62,41 @@ export function ModalRncsPendentes({ onClose }: { onClose: () => void }) {
         <DossieDetalhe monitoramentoId={dossieId} onVoltar={() => setDossieId(null)} />
       ) : (
         <div className="space-y-5">
-          {isLoading && <p className="text-sm" style={{ color: "#79628c" }}>Carregando…</p>}
+          {isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
 
           <section>
-            <h4 className="mb-2 text-xs font-bold uppercase tracking-wide" style={{ color: "#79628c" }}>
+            <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
               Em Tratativa com Encarregados de Setor ({data?.emTratativa.length ?? 0})
             </h4>
             <div className="space-y-2">
               {(data?.emTratativa ?? []).map((rnc) => (
                 <CartaoRnc key={rnc.id} rnc={rnc} onAbrirDossie={setDossieId} />
               ))}
-              {data && data.emTratativa.length === 0 && <p className="text-xs" style={{ color: "#79628c" }}>Nenhuma.</p>}
+              {data && data.emTratativa.length === 0 && <p className="text-xs text-muted-foreground">Nenhuma.</p>}
             </div>
           </section>
 
           <section>
-            <h4 className="mb-2 text-xs font-bold uppercase tracking-wide" style={{ color: "#79628c" }}>
+            <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
               Pendente de Verificação ({data?.pendenteVerificacao.length ?? 0})
             </h4>
             <div className="space-y-2">
               {(data?.pendenteVerificacao ?? []).map((rnc) => (
                 <CartaoRnc key={rnc.id} rnc={rnc} onAbrirDossie={setDossieId} />
               ))}
-              {data && data.pendenteVerificacao.length === 0 && <p className="text-xs" style={{ color: "#79628c" }}>Nenhuma.</p>}
+              {data && data.pendenteVerificacao.length === 0 && <p className="text-xs text-muted-foreground">Nenhuma.</p>}
             </div>
           </section>
 
           <section>
-            <h4 className="mb-2 text-xs font-bold uppercase tracking-wide" style={{ color: "#79628c" }}>
+            <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
               Histórico de Fichas com Desvios — Pendentes de Encerramento ({data?.fichasSemRnc.length ?? 0})
             </h4>
             <div className="space-y-2">
               {(data?.fichasSemRnc ?? []).map((ficha) => (
                 <CartaoFichaSemRnc key={ficha.id} ficha={ficha} onAbrirDossie={setDossieId} />
               ))}
-              {data && data.fichasSemRnc.length === 0 && <p className="text-xs" style={{ color: "#79628c" }}>Nenhuma.</p>}
+              {data && data.fichasSemRnc.length === 0 && <p className="text-xs text-muted-foreground">Nenhuma.</p>}
             </div>
           </section>
         </div>

@@ -5,9 +5,10 @@ import type { NivelAcesso } from "@/lib/database.types";
 import { type Rnc } from "@/modules/rnc/api";
 
 // ---------------------------------------------------------------------------------------
-// Perfil / nível de acesso — rótulos e cores do badge (seção "Aba admin" do Painel de
-// Gestão). Cinza padrão para Monitor de Qualidade porque é o perfil mais numeroso — reservar
-// cor de destaque só pros perfis administrativos/especiais.
+// Perfil / nível de acesso — rótulos e classes do badge (seção "Aba admin" do Painel de
+// Gestão), nas mesmas cores do design system GloboPac (navy/lima) usado no resto do app.
+// Secondary (cinza) padrão para Monitor de Qualidade porque é o perfil mais numeroso —
+// reservar cor de destaque só pros perfis administrativos/especiais.
 // ---------------------------------------------------------------------------------------
 export const NIVEL_ACESSO_ROTULO: Record<NivelAcesso, string> = {
   INSPETOR_QUALIDADE: "Monitor de Qualidade",
@@ -18,13 +19,13 @@ export const NIVEL_ACESSO_ROTULO: Record<NivelAcesso, string> = {
   INSPECAO_FEDERAL: "Auditoria Oficial SIF",
 };
 
-export const NIVEL_ACESSO_BADGE: Record<NivelAcesso, { bg: string; color: string }> = {
-  ADMIN_MASTER: { bg: "#6a5fc1", color: "#ffffff" },
-  VERIFICADOR: { bg: "#e4defa", color: "#422082" },
-  GESTOR_SETOR: { bg: "#c2ef4e", color: "#1f1633" },
-  INSPECAO_FEDERAL: { bg: "#1f1633", color: "#c2ef4e" },
-  INSPETOR_PCM: { bg: "#79628c", color: "#ffffff" },
-  INSPETOR_QUALIDADE: { bg: "#e5e7eb", color: "#374151" },
+export const NIVEL_ACESSO_BADGE: Record<NivelAcesso, { className: string }> = {
+  ADMIN_MASTER: { className: "bg-primary text-primary-foreground" },
+  VERIFICADOR: { className: "bg-primary-soft text-primary" },
+  GESTOR_SETOR: { className: "bg-lime text-primary" },
+  INSPECAO_FEDERAL: { className: "bg-surface-dark text-lime" },
+  INSPETOR_PCM: { className: "bg-primary-active text-primary-foreground" },
+  INSPETOR_QUALIDADE: { className: "bg-secondary text-secondary-foreground" },
 };
 
 // ---------------------------------------------------------------------------------------
@@ -643,23 +644,25 @@ export const GRUPOS_DESVIO = [
 ] as const;
 export type GrupoDesvio = (typeof GRUPOS_DESVIO)[number];
 
+// Classes (não hex) — badge sólido por grupo de desvio, restrito à paleta do design system
+// GloboPac (navy/lima/warning/destructive + os neutros de superfície escura/cinza).
 export const COR_GRUPO_DESVIO: Record<GrupoDesvio, string> = {
-  "Manutenção Mecânica": "#79628c",
-  "Manutenção Elétrica": "#6a5fc1",
-  "Mecânica com Risco BPF": "#c58a1f",
-  "Elétrica com Risco BPF": "#c58a1f",
-  "Qualidade/Contaminação/BPF": "#dc2626",
-  "Processo Operacional (Gargalos)": "#0f766e",
-  "Infraestrutura Externa": "#374151",
-  "Auditoria/Inspeção (SIF/DAE/VOEC)": "#1f1633",
-  "Negligência com a Qualidade": "#dc2626",
-  "Negligência com as BPF": "#dc2626",
-  "Violação de PCC1B": "#991b1b",
-  "Violação de PCC2B": "#991b1b",
-  "Pane Mecânica/Elétrica": "#79628c",
-  "Contaminação Cruzada - Produto": "#b91c1c",
-  "Contaminação Cruzada - Fômites": "#b91c1c",
-  Outros: "#6b7280",
+  "Manutenção Mecânica": "bg-primary text-ondark",
+  "Manutenção Elétrica": "bg-primary-active text-ondark",
+  "Mecânica com Risco BPF": "bg-warning text-warning-foreground",
+  "Elétrica com Risco BPF": "bg-warning text-warning-foreground",
+  "Qualidade/Contaminação/BPF": "bg-destructive text-destructive-foreground",
+  "Processo Operacional (Gargalos)": "bg-primary-active text-ondark",
+  "Infraestrutura Externa": "bg-muted-foreground text-ondark",
+  "Auditoria/Inspeção (SIF/DAE/VOEC)": "bg-surface-dark text-lime",
+  "Negligência com a Qualidade": "bg-destructive text-destructive-foreground",
+  "Negligência com as BPF": "bg-destructive text-destructive-foreground",
+  "Violação de PCC1B": "bg-destructive text-destructive-foreground",
+  "Violação de PCC2B": "bg-destructive text-destructive-foreground",
+  "Pane Mecânica/Elétrica": "bg-primary text-ondark",
+  "Contaminação Cruzada - Produto": "bg-destructive text-destructive-foreground",
+  "Contaminação Cruzada - Fômites": "bg-destructive text-destructive-foreground",
+  Outros: "bg-muted-foreground text-ondark",
 };
 
 export interface DesvioCadastrado {

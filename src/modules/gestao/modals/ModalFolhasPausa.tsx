@@ -43,7 +43,7 @@ export function ModalFolhasPausa({ onClose }: { onClose: () => void }) {
           <Button type="button" variant="outline" onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="button" style={{ background: "#6a5fc1", color: "#fff" }} disabled={!inspetorId} onClick={gerar}>
+          <Button type="button" disabled={!inspetorId} onClick={gerar}>
             Gerar relatório
           </Button>
         </>
@@ -66,7 +66,7 @@ export function ModalFolhasPausa({ onClose }: { onClose: () => void }) {
           <Label htmlFor="mes-folha">Mês de referência</Label>
           <Input id="mes-folha" type="month" value={mes} onChange={(e) => setMes(e.target.value)} />
         </div>
-        <p className="text-xs" style={{ color: "#79628c" }}>
+        <p className="text-xs text-muted-foreground">
           O relatório consolida os horários de início/fim de turno e todas as pausas (múltiplas por dia) em formato A4
           para impressão e assinatura.
         </p>

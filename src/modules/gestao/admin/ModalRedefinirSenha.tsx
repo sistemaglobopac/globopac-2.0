@@ -39,7 +39,7 @@ export function ModalRedefinirSenha({ userId, nomeCompleto, onClose }: { userId:
           <Button type="button" variant="outline" onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="button" style={{ background: "#6a5fc1", color: "#fff" }} disabled={redefinir.isPending} onClick={salvar}>
+          <Button type="button" disabled={redefinir.isPending} onClick={salvar}>
             {redefinir.isPending ? "Salvando…" : "Redefinir"}
           </Button>
         </>

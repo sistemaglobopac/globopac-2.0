@@ -61,28 +61,26 @@ export function DesviosAdminPanel() {
   }
 
   return (
-    <div className="rounded-2xl bg-white p-5 shadow-sm" style={{ border: "1px solid #dfe2e7" }}>
+    <div className="rounded-2xl border border-hairline bg-card p-5 shadow-sm">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <AlertTriangle className="h-7 w-7 shrink-0" style={{ color: "#6a5fc1" }} />
+          <AlertTriangle className="h-7 w-7 shrink-0 text-primary" />
           <div>
-            <h2 className="text-lg font-bold" style={{ color: "#1f1633" }}>
-              Gestão de Motivos de Desvio
-            </h2>
-            <p className="text-sm" style={{ color: "#79628c" }}>Classificação de paradas e não conformidades usada em todo o sistema.</p>
+            <h2 className="text-lg font-bold text-ink">Gestão de Motivos de Desvio</h2>
+            <p className="text-sm text-muted-foreground">Classificação de paradas e não conformidades usada em todo o sistema.</p>
           </div>
         </div>
-        <Button type="button" style={{ background: "#6a5fc1", color: "#fff" }} onClick={() => abrirModal()}>
+        <Button type="button" onClick={() => abrirModal()}>
           <Plus className="h-4 w-4" /> Novo Motivo
         </Button>
       </div>
 
-      {isLoading && <p className="text-sm" style={{ color: "#79628c" }}>Carregando…</p>}
+      {isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
 
-      <div className="overflow-x-auto rounded-lg" style={{ border: "1px solid #dfe2e7" }}>
+      <div className="overflow-x-auto rounded-lg border border-hairline">
         <table className="w-full text-sm">
-          <thead style={{ background: "#f7f8fa" }}>
-            <tr className="text-left text-xs font-bold uppercase tracking-wide" style={{ color: "#79628c" }}>
+          <thead className="bg-surface-soft">
+            <tr className="text-left text-xs font-bold uppercase tracking-wide text-muted-foreground">
               <th className="px-4 py-2">Motivo/Categoria</th>
               <th className="px-4 py-2">Grupo/Classificação</th>
               <th className="px-4 py-2 text-right">Ações</th>
@@ -90,10 +88,10 @@ export function DesviosAdminPanel() {
           </thead>
           <tbody>
             {(desvios ?? []).map((item) => (
-              <tr key={item.id} className="border-t" style={{ borderColor: "#dfe2e7" }}>
-                <td className="px-4 py-2 font-bold" style={{ color: "#1f1633" }}>{item.nome}</td>
+              <tr key={item.id} className="border-t border-hairline">
+                <td className="px-4 py-2 font-bold text-ink">{item.nome}</td>
                 <td className="px-4 py-2">
-                  <span className="inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold text-white" style={{ background: COR_GRUPO_DESVIO[item.grupo] }}>
+                  <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${COR_GRUPO_DESVIO[item.grupo]}`}>
                     {item.grupo}
                   </span>
                 </td>
@@ -118,7 +116,7 @@ export function DesviosAdminPanel() {
             ))}
             {!isLoading && (desvios ?? []).length === 0 && (
               <tr>
-                <td colSpan={3} className="px-4 py-6 text-center" style={{ color: "#79628c" }}>
+                <td colSpan={3} className="px-4 py-6 text-center text-muted-foreground">
                   Nenhum motivo cadastrado.
                 </td>
               </tr>
@@ -136,7 +134,7 @@ export function DesviosAdminPanel() {
               <Button type="button" variant="outline" onClick={() => setModalAberto(false)}>
                 Cancelar
               </Button>
-              <Button type="button" style={{ background: "#6a5fc1", color: "#fff" }} disabled={salvar.isPending} onClick={salvarItem}>
+              <Button type="button" disabled={salvar.isPending} onClick={salvarItem}>
                 {salvar.isPending ? "Salvando…" : "Salvar"}
               </Button>
             </>

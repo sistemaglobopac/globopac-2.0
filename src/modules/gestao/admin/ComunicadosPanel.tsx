@@ -72,32 +72,28 @@ export function ComunicadosPanel() {
   const ordenados = [...(comunicados ?? [])].sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime());
 
   return (
-    <div className="rounded-2xl bg-white p-5 shadow-sm" style={{ border: "1px solid #dfe2e7" }}>
+    <div className="rounded-2xl border border-hairline bg-card p-5 shadow-sm">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <Megaphone className="h-7 w-7 shrink-0" style={{ color: "#6a5fc1" }} />
+          <Megaphone className="h-7 w-7 shrink-0 text-primary" />
           <div>
-            <h2 className="text-lg font-bold" style={{ color: "#1f1633" }}>
-              Comunicados
-            </h2>
-            <p className="text-sm" style={{ color: "#79628c" }}>Avisos internos publicados para toda a equipe.</p>
+            <h2 className="text-lg font-bold text-ink">Comunicados</h2>
+            <p className="text-sm text-muted-foreground">Avisos internos publicados para toda a equipe.</p>
           </div>
         </div>
-        <Button type="button" style={{ background: "#6a5fc1", color: "#fff" }} onClick={() => abrirModal()}>
+        <Button type="button" onClick={() => abrirModal()}>
           <Plus className="h-4 w-4" /> Novo Comunicado
         </Button>
       </div>
 
-      {isLoading && <p className="text-sm" style={{ color: "#79628c" }}>Carregando…</p>}
-      {!isLoading && ordenados.length === 0 && <p className="text-sm" style={{ color: "#79628c" }}>Nenhum comunicado publicado.</p>}
+      {isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
+      {!isLoading && ordenados.length === 0 && <p className="text-sm text-muted-foreground">Nenhum comunicado publicado.</p>}
 
       <div className="space-y-3">
         {ordenados.map((item) => (
-          <article key={item.id} className="rounded-xl p-4" style={{ border: "1px solid #dfe2e7" }}>
+          <article key={item.id} className="rounded-xl border border-hairline p-4">
             <div className="mb-1 flex items-start justify-between gap-3">
-              <h3 className="text-sm font-bold" style={{ color: "#1f1633" }}>
-                {item.titulo}
-              </h3>
+              <h3 className="text-sm font-bold text-ink">{item.titulo}</h3>
               <div className="flex shrink-0 gap-1.5">
                 <Button type="button" variant="outline" size="sm" aria-label={`Editar ${item.titulo}`} onClick={() => abrirModal(item)}>
                   <Edit className="h-3.5 w-3.5" />
@@ -114,10 +110,8 @@ export function ComunicadosPanel() {
                 </Button>
               </div>
             </div>
-            <p className="whitespace-pre-wrap text-sm" style={{ color: "#1f1633" }}>
-              {item.mensagem}
-            </p>
-            <p className="mt-2 text-xs" style={{ color: "#79628c" }}>
+            <p className="whitespace-pre-wrap text-sm text-ink">{item.mensagem}</p>
+            <p className="mt-2 text-xs text-muted-foreground">
               {item.autor} · {new Date(item.criadoEm).toLocaleString("pt-BR")}
             </p>
           </article>
@@ -133,7 +127,7 @@ export function ComunicadosPanel() {
               <Button type="button" variant="outline" onClick={() => setModalAberto(false)}>
                 Cancelar
               </Button>
-              <Button type="button" style={{ background: "#6a5fc1", color: "#fff" }} disabled={salvar.isPending} onClick={salvarItem}>
+              <Button type="button" disabled={salvar.isPending} onClick={salvarItem}>
                 {salvar.isPending ? "Salvando…" : "Publicar"}
               </Button>
             </>

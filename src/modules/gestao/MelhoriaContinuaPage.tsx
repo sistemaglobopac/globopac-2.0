@@ -9,11 +9,9 @@ import { Button } from "@/shared/ui/button";
 export function MelhoriaContinuaPage() {
   return (
     <div className="mx-auto max-w-lg space-y-4 py-16 text-center">
-      <TrendingUp className="mx-auto h-10 w-10" style={{ color: "#6a5fc1" }} />
-      <h1 className="text-xl font-bold" style={{ color: "#1f1633" }}>
-        Melhoria Contínua
-      </h1>
-      <p className="text-sm" style={{ color: "#79628c" }}>
+      <TrendingUp className="mx-auto h-10 w-10 text-primary" />
+      <h1 className="text-xl font-bold text-ink">Melhoria Contínua</h1>
+      <p className="text-sm text-muted-foreground">
         Este módulo (planos de ação/CAPA) ainda não foi implementado neste sistema. O campo
         "E-mail Real para Alertas" já existe no cadastro de colaboradores, pronto para quando o
         módulo de notificações de Melhoria Contínua for construído.
