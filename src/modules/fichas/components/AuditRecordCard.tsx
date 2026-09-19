@@ -10,10 +10,16 @@ const STATUS_ROTULO: Record<AppointmentDisplay["status"], string> = {
   verificado: "Verificado",
 };
 
-const STATUS_VARIANT: Record<AppointmentDisplay["status"], "outline" | "warning" | "success"> = {
-  aguardando: "outline",
+const STATUS_VARIANT: Record<AppointmentDisplay["status"], "info" | "warning" | "success"> = {
+  aguardando: "info",
   adendo_pendente: "warning",
   verificado: "success",
+};
+
+const STATUS_BORDA: Record<AppointmentDisplay["status"], string> = {
+  aguardando: "border-l-primary",
+  adendo_pendente: "border-l-warning",
+  verificado: "border-l-success",
 };
 
 /** Card individual de monitoramento — reutilizável entre o modo "verificacao" (fila de QA) e,
@@ -58,7 +64,9 @@ export function AuditRecordCard({
   const inspetorNome = usersMap.get(appt.user_id) ?? "Inspetor";
 
   return (
-    <div className={`space-y-2 rounded-lg border bg-card p-4 shadow-sm ${bloqueado ? "opacity-70" : ""}`}>
+    <div
+      className={`space-y-2 rounded-lg border border-l-4 bg-card p-4 shadow-sm ${STATUS_BORDA[item.status]} ${bloqueado ? "opacity-70" : ""}`}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
           {selecionavel && (
@@ -72,7 +80,9 @@ export function AuditRecordCard({
           )}
           <div>
             <p className="text-xs uppercase text-muted-foreground">
-              {pac} · Monitoramento nº {item.ordemDia}
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 font-semibold text-primary">{pac}</span>
+              {" · Monitoramento nº "}
+              {item.ordemDia}
             </p>
             <p className="font-medium">{nomeFicha}</p>
           </div>

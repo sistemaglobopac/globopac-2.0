@@ -16,6 +16,9 @@ const badgeVariants = cva(
         success: "border-transparent bg-success text-success-foreground",
         warning: "border-transparent bg-warning text-warning-foreground",
         outline: "text-foreground",
+        // Selo neutro-informativo (ex.: "aguardando verificação") — mais colorido que
+        // "outline" (cinza puro), mas sem o peso visual de warning/destructive.
+        info: "border-transparent bg-primary/10 text-primary",
       },
     },
     defaultVariants: { variant: "default" },
