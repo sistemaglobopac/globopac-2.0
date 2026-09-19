@@ -369,6 +369,7 @@ export function PainelVerificacao() {
             onVerDossie={(d: DossieVerificacao) => setRelatorioIds(d.ids)}
             pacPorTemplateId={pacPorTemplateId}
             nomePorTemplateId={nomePorTemplateId}
+            codigoPorTemplateId={codigoPorTemplateId}
             usersMap={usuarios}
             isAdmin={Boolean(isAdmin)}
             onEncerrarTurno={(d) =>
@@ -390,6 +391,7 @@ export function PainelVerificacao() {
             onImprimir={(i) => setRelatorioIds([i.id])}
             pacPorTemplateId={pacPorTemplateId}
             nomePorTemplateId={nomePorTemplateId}
+            codigoPorTemplateId={codigoPorTemplateId}
             usersMap={usuarios}
             blockedIds={blockedIds}
             isAdmin={Boolean(isAdmin)}
@@ -413,6 +415,7 @@ export function PainelVerificacao() {
                 onImprimir={(i) => setRelatorioIds([i.id])}
                 pacPorTemplateId={pacPorTemplateId}
                 nomePorTemplateId={nomePorTemplateId}
+                codigoPorTemplateId={codigoPorTemplateId}
                 usersMap={usuarios}
                 blockedIds={blockedIds}
                 isAdmin={Boolean(isAdmin)}

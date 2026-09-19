@@ -34,6 +34,7 @@ export interface AuditRecordCardProps {
   onImprimir: (item: AppointmentDisplay) => void;
   pacPorTemplateId: Map<string, string>;
   nomePorTemplateId: Map<string, string>;
+  codigoPorTemplateId: Map<string, string>;
   usersMap: Map<string, string>;
   blockedIds: Set<string>;
   isAdmin: boolean;
@@ -50,6 +51,7 @@ export function AuditRecordCard({
   onImprimir,
   pacPorTemplateId,
   nomePorTemplateId,
+  codigoPorTemplateId,
   usersMap,
   blockedIds,
   isAdmin,
@@ -61,6 +63,7 @@ export function AuditRecordCard({
   const { datePt, time } = ensureLocalTime(appt.criado_em);
   const nomeFicha = nomePorTemplateId.get(appt.ficha_template_id) ?? "Ficha";
   const pac = pacPorTemplateId.get(appt.ficha_template_id) ?? "—";
+  const codigo = codigoPorTemplateId.get(appt.ficha_template_id);
   const inspetorNome = usersMap.get(appt.user_id) ?? "Inspetor";
 
   return (
@@ -84,7 +87,10 @@ export function AuditRecordCard({
               {" · Monitoramento nº "}
               {item.ordemDia}
             </p>
-            <p className="font-medium">{nomeFicha}</p>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <p className="font-medium">{nomeFicha}</p>
+              {codigo && <Badge variant="outline">{codigo}</Badge>}
+            </div>
           </div>
         </div>
         <Badge variant={STATUS_VARIANT[item.status]}>{STATUS_ROTULO[item.status]}</Badge>

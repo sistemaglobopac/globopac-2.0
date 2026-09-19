@@ -16,6 +16,7 @@ interface DossieVerificacaoCardProps {
   onVerDossie: (dossie: DossieVerificacao) => void;
   pacPorTemplateId: Map<string, string>;
   nomePorTemplateId: Map<string, string>;
+  codigoPorTemplateId: Map<string, string>;
   usersMap: Map<string, string>;
   isAdmin: boolean;
   onEncerrarTurno: (dossie: DossieVerificacao) => void;
@@ -39,6 +40,7 @@ export function DossieVerificacaoCard({
   onVerDossie,
   pacPorTemplateId,
   nomePorTemplateId,
+  codigoPorTemplateId,
   usersMap,
   isAdmin,
   onEncerrarTurno,
@@ -69,7 +71,10 @@ export function DossieVerificacaoCard({
             <FolderClosed className="h-4 w-4" />
           </div>
           <div className="space-y-1.5">
-            <p className="font-semibold leading-tight text-ink">{nomeFicha}</p>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <p className="font-semibold leading-tight text-ink">{nomeFicha}</p>
+              {dossie.codigo && <Badge variant="outline">{dossie.codigo}</Badge>}
+            </div>
             <div className="flex flex-wrap items-center gap-1.5">
               <Badge variant="secondary">{dossie.items.length} Monitoramentos</Badge>
               <Badge variant={dossie.bloqueado ? "warning" : "success"}>
@@ -116,6 +121,7 @@ export function DossieVerificacaoCard({
               onImprimir={onImprimir}
               pacPorTemplateId={pacPorTemplateId}
               nomePorTemplateId={nomePorTemplateId}
+              codigoPorTemplateId={codigoPorTemplateId}
               usersMap={usersMap}
               blockedIds={dossie.bloqueado ? new Set(dossie.ids) : new Set()}
               isAdmin={isAdmin}
