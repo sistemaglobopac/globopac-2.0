@@ -13,14 +13,20 @@ insert into centros_custo (codigo, nome) values
   ('CC-200', 'Manutenção — custo contábil')
 on conflict (codigo) do nothing;
 
-insert into fichas_templates (codigo, versao, nome, pac_correspondente, schema_campos, criterios_classificacao) values
+-- locais_aplicacao precisa ser setado explicitamente: a coluna (20260924000001, Construtor de
+-- Fichas) tem default '[]' ("ficha sem setor definido") — sem isso, NovaFichaPage nunca mostra
+-- esta ficha pra nenhum setor (fichasDoSetor filtra por locais_aplicacao.includes(setor)), bug
+-- real que só apareceu quando o E2E finalmente rodou até essa tela (antes travava antes, em
+-- outra falha de CI).
+insert into fichas_templates (codigo, versao, nome, pac_correspondente, schema_campos, criterios_classificacao, locais_aplicacao) values
   (
     'TEMP-LINHA-DIF',
     1,
-    'Monitoramento de Temperatura — Linha DIF',
+    'Monitoramento de Temperatura — Linha DIF (v1)',
     'PAC-002',
     '[{"chave":"temperatura_celsius","tipo":"numero","min":0,"max":45,"unidade":"celsius","obrigatorio":true},
       {"chave":"observacoes","tipo":"texto","obrigatorio":false}]'::jsonb,
-    '["ARTRITE", "AEROSSACULITE", "LESAO_DE_PELE", "ASPECTO_REPUGNANTE"]'::jsonb
+    '["ARTRITE", "AEROSSACULITE", "LESAO_DE_PELE", "ASPECTO_REPUGNANTE"]'::jsonb,
+    '["LINHA_DIF"]'::jsonb
   )
 on conflict (codigo, versao) do nothing;
