@@ -175,7 +175,8 @@ function RegistroUnico({ record, ordem, template, dados, hashesAoVivo }: Registr
     <div className="rounded-lg border border-primary/15 bg-primary/[0.02] p-4 print:break-inside-avoid print:p-2">
       <div className="mb-3 flex items-center justify-between border-b border-dashed border-primary/25 pb-2">
         <span className="text-xs font-black uppercase tracking-wider text-primary print:text-[9px]">
-          {ordem ? `Monitoramento ${ordem}` : "Apuração"} — {time}
+          {template?.nome ?? "Ficha de Monitoramento"}
+          {ordem ? ` · Apuração ${ordem}` : ""} — {time}
         </span>
         <span className={`text-[10px] font-black uppercase tracking-wider print:text-[8px] ${record.conformidade ? "text-success" : "text-down"}`}>
           {record.conformidade ? "Conforme" : "Não Conforme"}
