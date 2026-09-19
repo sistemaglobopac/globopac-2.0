@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { login, logout } from "./helpers";
+import { login, logout, selecionarTemplate } from "./helpers";
 
 // Fluxo E2E nº 2 (seção 10 do PROMPT MESTRE): "Verificador aprova → assina → Admin libera
 // SIF → aparece para Inspeção Federal." A liberação (Fase 3) é em lote, com hash agregador —
@@ -18,7 +18,7 @@ test("verificador aprova, admin libera ao SIF, e o registro aparece para a Inspe
 
   await login(page, "1001", "121072");
   await page.goto("/fichas/nova");
-  await page.locator("#template").selectOption({ label: "Monitoramento de Temperatura — Linha DIF (v1)" });
+  await selecionarTemplate(page, "Monitoramento de Temperatura — Linha DIF (v1)");
   await page.locator("#temperatura_celsius").fill("22");
   await page.locator("#observacoes").fill(marcador);
   await page.getByRole("button", { name: "Criar e assinar" }).click();

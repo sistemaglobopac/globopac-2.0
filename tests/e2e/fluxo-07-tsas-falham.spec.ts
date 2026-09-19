@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { login, clienteAdminDeTeste } from "./helpers";
+import { login, clienteAdminDeTeste, selecionarTemplate } from "./helpers";
 
 // Fluxo E2E nº 7 (seção 10 do PROMPT MESTRE): "Falha simulada de todos os TSAs → sistema
 // marca carimbo como pendente e não trava a operação do usuário." Sobrescreve
@@ -29,7 +29,7 @@ test("falha simultânea de todas as TSAs marca o carimbo como pendente sem trava
   try {
     await login(page, "1001", "121072");
     await page.goto("/fichas/nova");
-    await page.locator("#template").selectOption({ label: "Monitoramento de Temperatura — Linha DIF (v1)" });
+    await selecionarTemplate(page, "Monitoramento de Temperatura — Linha DIF (v1)");
     await page.locator("#temperatura_celsius").fill("25");
 
     const antesDaCriacao = new Date().toISOString();

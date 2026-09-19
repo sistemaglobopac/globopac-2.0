@@ -15,8 +15,8 @@ administrador pode liberar aquele IP de volta.
    delegar a autenticação de verdade para a Supabase Auth (a Edge Function nunca reimplementa
    verificação de senha). Um gate client-side seria inútil: o cliente é exatamente quem se
    quer conter.
-2. **Limiares: 5 → CAPTCHA, 10 → bloqueio total.** Implementado com Cloudflare Turnstile
-   (`TURNSTILE_SECRET_KEY` verificado server-side via `siteverify`, fail-closed se a secret não
+2. **Limiares: 5 → CAPTCHA, 10 → bloqueio total.** Implementado com hCaptcha
+   (`HCAPTCHA_SECRET_KEY` verificado server-side via `siteverify`, fail-closed se a secret não
    estiver configurada). Uma tentativa bem-sucedida a qualquer momento zera o contador do IP.
 3. **Desbloqueio exclusivo de ADMIN_MASTER**, via Edge Function `desbloquear-ip-login` (mesmo
    padrão de autorização de `criar-usuario`/`redefinir-senha`: revalida o chamador e o
@@ -30,10 +30,27 @@ administrador pode liberar aquele IP de volta.
    se libera — um hash irreversível tornaria essa tela inutilizável para esse julgamento
    operacional. Este é um controle interno de acesso de colaboradores (não de público
    anônimo), o que muda o cálculo de privacidade.
-5. **Chaves de teste públicas da Cloudflare em dev/CI.** `1x00000000000000000000AA` (site key)
-   e `1x0000000000000000000000000000AA` (secret) são documentadas pela própria Cloudflare como
-   sempre-aprovam — usadas como default em `.env.example` para nunca travar um ambiente local
-   ou o pipeline de CI por falta de conta Cloudflare. Produção exige as chaves reais.
+5. **Chaves de teste públicas do hCaptcha em dev/CI.** `10000000-ffff-ffff-ffff-000000000001`
+   (site key) e `0x0000000000000000000000000000000000000000` (secret) são documentadas pelo
+   próprio hCaptcha como sempre-aprovam — usadas como default em `.env.example` para nunca
+   travar um ambiente local ou o pipeline de CI por falta de conta. Produção exige as chaves
+   reais.
+
+## Atualização — Cloudflare Turnstile trocado por hCaptcha
+A decisão original (item 2/5 acima) usava Cloudflare Turnstile. Ao validar em produção
+(`novoglobopac.netlify.app`), toda sitekey real criada na conta Cloudflare do responsável do
+projeto retornava `TurnstileError: 400020` ("invalid sitekey") — inclusive após recriar o
+widget do zero com domínios corretos (`127.0.0.1`, `localhost`,
+`novoglobopac.netlify.app`) e confirmar que o bundle publicado carregava a sitekey certa.
+Isolado com um teste direto no navegador: a sitekey de TESTE do Turnstile
+(`1x00000000000000000000AA`) funcionou perfeitamente na mesma página, provando que o problema
+não era o site/domínio/código deste projeto — é um bug de conta do lado da Cloudflare
+("toda sitekey real falha, só a de teste funciona"), relatado por múltiplos outros usuários no
+fórum da comunidade Cloudflare, sem correção disponível por configuração. Trocado por hCaptcha
+(mesma arquitetura: sitekey pública no widget, secret verificado server-side via `siteverify`)
+— `HCaptchaWidget.tsx` substitui `TurnstileWidget.tsx`, `HCAPTCHA_SECRET_KEY` substitui
+`TURNSTILE_SECRET_KEY`. Nenhuma mudança na lógica de limiares/bloqueio por IP, só o provedor
+de CAPTCHA.
 
 ## Alternativas consideradas
 - **Bloqueio por usuário/matrícula, não por IP (rejeitada):** o pedido foi explicitamente por

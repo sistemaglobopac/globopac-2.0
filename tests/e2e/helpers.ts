@@ -63,6 +63,18 @@ export async function login(page: Page, matricula: string, senha: string) {
   await expect(page).not.toHaveURL(/\/login$/);
 }
 
+/** NovaFichaPage não usa mais um <select id="template"> (trocado por um grid de cards com
+ * cronômetro de liberado/bloqueado/atrasado em be0f61c) — localiza o card pelo nome do
+ * template e clica no botão dele (único por card, texto varia com o status: "Preencher
+ * monitoramento"/"Preencher urgente"/"Aguarde o tempo"). */
+export async function selecionarTemplate(page: Page, nomeTemplate: string) {
+  await page
+    .getByTestId("ficha-card")
+    .filter({ hasText: nomeTemplate })
+    .getByRole("button")
+    .click();
+}
+
 export async function logout(page: Page) {
   await page.getByRole("button", { name: "Sair" }).click();
   await expect(page).toHaveURL(/\/login$/);

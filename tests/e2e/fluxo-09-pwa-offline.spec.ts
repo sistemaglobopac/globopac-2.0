@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { login, logout, clienteAdminDeTeste } from "./helpers";
+import { login, logout, clienteAdminDeTeste, selecionarTemplate } from "./helpers";
 
 // Fase 8 (PWA offline e sincronização, ADR 0002/0014) — sem número de fluxo na seção 10
 // (feature adicionada além do roteiro original, ver ASSUMPTIONS.md). Cobre o caminho
@@ -23,7 +23,7 @@ test("ficha criada sem rede é enfileirada e sincronizada automaticamente quando
 
   await login(page, "1001", "121072");
   await page.goto("/fichas/nova");
-  await page.locator("#template").selectOption({ label: "Monitoramento de Temperatura — Linha DIF (v1)" });
+  await selecionarTemplate(page, "Monitoramento de Temperatura — Linha DIF (v1)");
 
   await page.route("**/rest/v1/monitoramentos**", (route) => route.abort("internetdisconnected"));
   await page.route("**/functions/v1/assinar-documento**", (route) => route.abort("internetdisconnected"));

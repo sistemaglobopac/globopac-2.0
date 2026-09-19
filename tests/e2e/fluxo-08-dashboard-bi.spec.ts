@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { login, logout, clienteAdminDeTeste } from "./helpers";
+import { login, logout, clienteAdminDeTeste, selecionarTemplate } from "./helpers";
 
 // Fase 7 (BI/dashboards/exportação de relatórios, seção 7.7) — painel gerencial com KPIs,
 // gráficos agregados e exportação CSV, sobre os mesmos dados que RLS já permite ao usuário ver
@@ -12,7 +12,7 @@ test("painel gerencial mostra KPIs e permite exportar CSV de monitoramentos (Fas
 
   await login(page, "1001", "121072");
   await page.goto("/fichas/nova");
-  await page.locator("#template").selectOption({ label: "Monitoramento de Temperatura — Linha DIF (v1)" });
+  await selecionarTemplate(page, "Monitoramento de Temperatura — Linha DIF (v1)");
   await page.locator("#temperatura_celsius").fill("23");
   await page.locator("#observacoes").fill(marcador);
   await page.getByRole("button", { name: "Criar e assinar" }).click();

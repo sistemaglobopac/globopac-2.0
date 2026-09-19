@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { login, logout, clienteAdminDeTeste } from "./helpers";
+import { login, logout, clienteAdminDeTeste, selecionarTemplate } from "./helpers";
 
 // Fluxos E2E nº 5 e 6 (seção 10 do PROMPT MESTRE):
 // 5) "Acesso ao portal público /verificar com UUID de documento assinado → mostra trilha e
@@ -15,7 +15,7 @@ test("documento liberado aparece com trilha e badge corretos no portal público 
 
   await login(page, "1001", "121072");
   await page.goto("/fichas/nova");
-  await page.locator("#template").selectOption({ label: "Monitoramento de Temperatura — Linha DIF (v1)" });
+  await selecionarTemplate(page, "Monitoramento de Temperatura — Linha DIF (v1)");
   await page.locator("#temperatura_celsius").fill("21");
   await page.locator("#observacoes").fill(marcador);
   await page.getByRole("button", { name: "Criar e assinar" }).click();
@@ -73,7 +73,7 @@ test("documento ainda não liberado não é encontrado no portal público (fluxo
 
   await login(page, "1001", "121072");
   await page.goto("/fichas/nova");
-  await page.locator("#template").selectOption({ label: "Monitoramento de Temperatura — Linha DIF (v1)" });
+  await selecionarTemplate(page, "Monitoramento de Temperatura — Linha DIF (v1)");
   await page.locator("#temperatura_celsius").fill("22");
   await page.locator("#observacoes").fill(marcador);
   await page.getByRole("button", { name: "Criar e assinar" }).click();

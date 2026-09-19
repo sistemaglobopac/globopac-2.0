@@ -9,7 +9,7 @@ import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Card, CardContent, CardDescription, CardHeader } from "@/shared/ui/card";
-import { TurnstileWidget } from "./TurnstileWidget";
+import { HCaptchaWidget } from "./HCaptchaWidget";
 
 const loginSchema = z.object({
   matricula: z.string().min(1, "Informe a matrícula"),
@@ -41,7 +41,7 @@ export function LoginPage() {
   const [erro, setErro] = useState<string | null>(null);
   const [exigeCaptcha, setExigeCaptcha] = useState(false);
   const [bloqueado, setBloqueado] = useState(false);
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [captchaNonce, setCaptchaNonce] = useState(0);
   const navigate = useNavigate();
   const perfil = useSessionStore((s) => s.perfil);
@@ -61,10 +61,10 @@ export function LoginPage() {
 
   async function aoEnviar(dados: LoginForm) {
     setErro(null);
-    const tokenParaEnviar = turnstileToken;
-    // Um token do Turnstile só serve para UMA verificação — descarta e força o widget a gerar
+    const tokenParaEnviar = captchaToken;
+    // Um token de captcha só serve para UMA verificação — descarta e força o widget a gerar
     // um novo a cada tentativa (o key={captchaNonce} abaixo remonta o componente).
-    setTurnstileToken(null);
+    setCaptchaToken(null);
     setCaptchaNonce((n) => n + 1);
 
     // O gate de tentativas por IP (5 falhas -> CAPTCHA, 10 -> bloqueio só desbloqueável por
@@ -72,7 +72,7 @@ export function LoginPage() {
     // Function "login" em vez de chamar supabase.auth.signInWithPassword diretamente daqui.
     // Ver ADR 0015.
     const { data, error } = await supabase.functions.invoke<RespostaLogin>("login", {
-      body: { matricula: dados.matricula, senha: dados.senha, turnstile_token: tokenParaEnviar },
+      body: { matricula: dados.matricula, senha: dados.senha, captcha_token: tokenParaEnviar },
     });
 
     const corpo = data ?? (await lerCorpoErro(error));
@@ -128,12 +128,12 @@ export function LoginPage() {
               <Input id="senha" type="password" autoComplete="current-password" {...register("senha")} />
               {errors.senha && <p className="text-sm text-destructive">{errors.senha.message}</p>}
             </div>
-            {exigeCaptcha && !bloqueado && <TurnstileWidget key={captchaNonce} onToken={setTurnstileToken} />}
+            {exigeCaptcha && !bloqueado && <HCaptchaWidget key={captchaNonce} onToken={setCaptchaToken} />}
             {erro && <p className="text-sm text-destructive">{erro}</p>}
             <Button
               type="submit"
               className="w-full"
-              disabled={isSubmitting || bloqueado || (exigeCaptcha && !turnstileToken)}
+              disabled={isSubmitting || bloqueado || (exigeCaptcha && !captchaToken)}
             >
               {isSubmitting ? "Entrando…" : "Entrar"}
             </Button>

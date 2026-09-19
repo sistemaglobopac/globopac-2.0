@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { login, logout, clienteAdminDeTeste } from "./helpers";
+import { login, logout, clienteAdminDeTeste, selecionarTemplate } from "./helpers";
 
 // Fluxo E2E nº 3 (seção 10 do PROMPT MESTRE), atualizado na Fase 11 (decisão do cliente: o
 // VERIFICADOR atua como revisor de RNC — ver ASSUMPTIONS.md item 22):
@@ -15,7 +15,7 @@ test("verificador reprova, RNC é criada, gestor de setor trata e verificador re
 
   await login(page, "1001", "121072");
   await page.goto("/fichas/nova");
-  await page.locator("#template").selectOption({ label: "Monitoramento de Temperatura — Linha DIF (v1)" });
+  await selecionarTemplate(page, "Monitoramento de Temperatura — Linha DIF (v1)");
   await page.locator("#temperatura_celsius").fill("35");
   await page.locator("#observacoes").fill(marcador);
   await page.getByRole("button", { name: "Criar e assinar" }).click();

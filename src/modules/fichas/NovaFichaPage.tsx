@@ -169,6 +169,7 @@ export function NovaFichaPage() {
             return (
               <Card
                 key={ficha.id}
+                data-testid="ficha-card"
                 className={
                   status === "ATRASADO"
                     ? "animate-pulse border-2 border-destructive shadow-lg"

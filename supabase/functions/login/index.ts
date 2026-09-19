@@ -25,7 +25,7 @@ type Flag = "captcha_necessario" | "ip_bloqueado";
 const requestSchema = z.object({
   matricula: z.string().min(1),
   senha: z.string().min(1),
-  turnstile_token: z.string().nullish(),
+  captcha_token: z.string().nullish(),
 });
 
 Deno.serve(async (req) => {
@@ -66,8 +66,8 @@ Deno.serve(async (req) => {
     }
 
     if (bloqueio?.status === "aguardando_captcha") {
-      const captchaOk = parsed.data.turnstile_token
-        ? await verificarTurnstile(parsed.data.turnstile_token, ip)
+      const captchaOk = parsed.data.captcha_token
+        ? await verificarHCaptcha(parsed.data.captcha_token, ip)
         : false;
       if (!captchaOk) {
         return jsonError(
@@ -167,13 +167,17 @@ async function registrarFalha(adminClient: AdminClient, ip: string): Promise<Fla
   return undefined;
 }
 
-async function verificarTurnstile(token: string, ip: string): Promise<boolean> {
-  const secret = Deno.env.get("TURNSTILE_SECRET_KEY");
+/** hCaptcha, não Cloudflare Turnstile: a conta Turnstile usada apresentou erro persistente
+ * "400020 invalid sitekey" em toda sitekey real (só a sitekey de teste funcionava) — problema
+ * de conta do lado da Cloudflare, confirmado isolando com a sitekey de teste, não corrigível
+ * por configuração deste projeto. Ver ADR 0015. */
+async function verificarHCaptcha(token: string, ip: string): Promise<boolean> {
+  const secret = Deno.env.get("HCAPTCHA_SECRET_KEY");
   // Fail-closed: sem secret configurado, nunca aceita o desafio como válido (nunca abre uma
   // brecha silenciosa por falta de configuração de ambiente).
   if (!secret) return false;
 
-  const resposta = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+  const resposta = await fetch("https://api.hcaptcha.com/siteverify", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ secret, response: token, remoteip: ip }),
