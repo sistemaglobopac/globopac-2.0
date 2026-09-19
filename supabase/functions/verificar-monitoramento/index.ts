@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return jsonError(401, "não autenticado", correlationId);
+    if (!authHeader) return jsonError(401, "não autenticado", correlationId, cors);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -53,12 +53,12 @@ Deno.serve(async (req) => {
       data: { user },
       error: authError,
     } = await callerClient.auth.getUser();
-    if (authError || !user) return jsonError(401, "não autenticado", correlationId);
+    if (authError || !user) return jsonError(401, "não autenticado", correlationId, cors);
 
     const body = await req.json().catch(() => null);
     const parsed = requestSchema.safeParse(body);
     if (!parsed.success) {
-      return jsonError(400, "payload inválido", correlationId, parsed.error.flatten());
+      return jsonError(400, "payload inválido", correlationId, cors, parsed.error.flatten());
     }
     const dados = parsed.data;
 
@@ -81,7 +81,8 @@ Deno.serve(async (req) => {
       return jsonError(
         409,
         "monitoramento não encontrado, já verificado, ou sem permissão para verificar",
-        correlationId
+        correlationId,
+        cors
       );
     }
 
@@ -115,7 +116,7 @@ Deno.serve(async (req) => {
 
       if (rncError || !rncCriada) {
         log("error", "criar_rnc_falhou", { erro: rncError?.message });
-        return jsonError(500, "reprovação registrada, mas falhou ao abrir RNC", correlationId);
+        return jsonError(500, "reprovação registrada, mas falhou ao abrir RNC", correlationId, cors);
       }
       rnc = rncCriada;
     }
@@ -131,7 +132,8 @@ Deno.serve(async (req) => {
       return jsonError(
         assinatura.status,
         `verificação registrada, mas falhou ao assinar: ${assinatura.mensagem}`,
-        correlationId
+        correlationId,
+        cors
       );
     }
 
@@ -148,13 +150,13 @@ Deno.serve(async (req) => {
     );
   } catch (erro) {
     log("error", "excecao_nao_tratada", { erro: erro instanceof Error ? erro.message : String(erro) });
-    return jsonError(500, "erro interno", correlationId);
+    return jsonError(500, "erro interno", correlationId, cors);
   }
 });
 
-function jsonError(status: number, mensagem: string, correlationId: string, detalhes?: unknown) {
+function jsonError(status: number, mensagem: string, correlationId: string, cors: HeadersInit, detalhes?: unknown) {
   return new Response(JSON.stringify({ erro: mensagem, correlationId, detalhes }), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { ...cors, "Content-Type": "application/json" },
   });
 }

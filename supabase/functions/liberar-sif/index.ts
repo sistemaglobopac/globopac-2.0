@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return jsonError(401, "não autenticado", correlationId);
+    if (!authHeader) return jsonError(401, "não autenticado", correlationId, cors);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -37,12 +37,12 @@ Deno.serve(async (req) => {
       data: { user },
       error: authError,
     } = await callerClient.auth.getUser();
-    if (authError || !user) return jsonError(401, "não autenticado", correlationId);
+    if (authError || !user) return jsonError(401, "não autenticado", correlationId, cors);
 
     const body = await req.json().catch(() => null);
     const parsed = requestSchema.safeParse(body);
     if (!parsed.success) {
-      return jsonError(400, "payload inválido", correlationId, parsed.error.flatten());
+      return jsonError(400, "payload inválido", correlationId, cors, parsed.error.flatten());
     }
 
     const { data: perfil } = await callerClient
@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
       .eq("id", user.id)
       .single();
     if (perfil?.nivel_acesso !== "ADMIN_MASTER") {
-      return jsonError(403, "só ADMIN_MASTER libera ao SIF", correlationId);
+      return jsonError(403, "só ADMIN_MASTER libera ao SIF", correlationId, cors);
     }
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
@@ -68,10 +68,10 @@ Deno.serve(async (req) => {
 
     if (erroElegiveis) {
       log("error", "listar_elegiveis_falhou", { erro: erroElegiveis.message });
-      return jsonError(500, "falha ao verificar elegibilidade", correlationId);
+      return jsonError(500, "falha ao verificar elegibilidade", correlationId, cors);
     }
     if (!elegiveis || elegiveis.length === 0) {
-      return jsonError(409, "nenhum dos monitoramentos informados está elegível para liberação", correlationId);
+      return jsonError(409, "nenhum dos monitoramentos informados está elegível para liberação", correlationId, cors);
     }
 
     const idsElegiveis = elegiveis.map((m) => m.id as string).sort();
@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
 
     if (erroAssinaturas) {
       log("error", "listar_assinaturas_falhou", { erro: erroAssinaturas.message });
-      return jsonError(500, "falha ao ler assinaturas", correlationId);
+      return jsonError(500, "falha ao ler assinaturas", correlationId, cors);
     }
 
     const hashPorMonitoramento = new Map<string, string>();
@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
       return jsonError(
         409,
         "nenhum dos monitoramentos elegíveis tem assinatura registrada — não é possível calcular o hash agregador",
-        correlationId
+        correlationId, cors
       );
     }
 
@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
 
     if (erroLote || !lote) {
       log("error", "criar_lote_falhou", { erro: erroLote?.message });
-      return jsonError(500, "falha ao criar lote de liberação", correlationId);
+      return jsonError(500, "falha ao criar lote de liberação", correlationId, cors);
     }
 
     // 4) Uma única UPDATE multi-linha (liberado_sif, liberado_em, lote_liberacao_id juntos —
@@ -144,7 +144,7 @@ Deno.serve(async (req) => {
 
     if (erroUpdate) {
       log("error", "liberar_falhou", { erro: erroUpdate.message, loteId: lote.id });
-      return jsonError(500, "lote criado, mas falhou ao liberar os monitoramentos", correlationId);
+      return jsonError(500, "lote criado, mas falhou ao liberar os monitoramentos", correlationId, cors);
     }
 
     // 5) Assinatura individual LIBERACAO_DIARIA por documento liberado.
@@ -183,13 +183,13 @@ Deno.serve(async (req) => {
     );
   } catch (erro) {
     log("error", "excecao_nao_tratada", { erro: erro instanceof Error ? erro.message : String(erro) });
-    return jsonError(500, "erro interno", correlationId);
+    return jsonError(500, "erro interno", correlationId, cors);
   }
 });
 
-function jsonError(status: number, mensagem: string, correlationId: string, detalhes?: unknown) {
+function jsonError(status: number, mensagem: string, correlationId: string, cors: HeadersInit, detalhes?: unknown) {
   return new Response(JSON.stringify({ erro: mensagem, correlationId, detalhes }), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { ...cors, "Content-Type": "application/json" },
   });
 }

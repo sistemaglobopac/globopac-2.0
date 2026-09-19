@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return jsonError(401, "não autenticado", correlationId);
+    if (!authHeader) return jsonError(401, "não autenticado", correlationId, cors);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -40,16 +40,16 @@ Deno.serve(async (req) => {
       data: { user },
       error: authError,
     } = await callerClient.auth.getUser();
-    if (authError || !user) return jsonError(401, "não autenticado", correlationId);
+    if (authError || !user) return jsonError(401, "não autenticado", correlationId, cors);
 
     const body = await req.json().catch(() => null);
     const parsed = requestSchema.safeParse(body);
     if (!parsed.success) {
-      return jsonError(400, "payload inválido", correlationId, parsed.error.flatten());
+      return jsonError(400, "payload inválido", correlationId, cors, parsed.error.flatten());
     }
 
     if (!TRANSICOES_OS[parsed.data.tipo]) {
-      return jsonError(400, `tipo de etapa desconhecido: ${parsed.data.tipo}`, correlationId);
+      return jsonError(400, `tipo de etapa desconhecido: ${parsed.data.tipo}`, correlationId, cors);
     }
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
 
     if (!resultado.ok) {
       log("error", "transicao_falhou", { motivo: resultado.mensagem, tipo: parsed.data.tipo });
-      return jsonError(resultado.status, resultado.mensagem, correlationId);
+      return jsonError(resultado.status, resultado.mensagem, correlationId, cors);
     }
 
     log("info", "etapa_avancada", { osId: parsed.data.os_id, tipo: parsed.data.tipo, assinaturaId: resultado.id });
@@ -76,13 +76,13 @@ Deno.serve(async (req) => {
     );
   } catch (erro) {
     log("error", "excecao_nao_tratada", { erro: erro instanceof Error ? erro.message : String(erro) });
-    return jsonError(500, "erro interno", correlationId);
+    return jsonError(500, "erro interno", correlationId, cors);
   }
 });
 
-function jsonError(status: number, mensagem: string, correlationId: string, detalhes?: unknown) {
+function jsonError(status: number, mensagem: string, correlationId: string, cors: HeadersInit, detalhes?: unknown) {
   return new Response(JSON.stringify({ erro: mensagem, correlationId, detalhes }), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { ...cors, "Content-Type": "application/json" },
   });
 }

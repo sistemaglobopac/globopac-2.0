@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return jsonError(401, "não autenticado", correlationId);
+    if (!authHeader) return jsonError(401, "não autenticado", correlationId, cors);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -38,12 +38,12 @@ Deno.serve(async (req) => {
       data: { user },
       error: authError,
     } = await callerClient.auth.getUser();
-    if (authError || !user) return jsonError(401, "não autenticado", correlationId);
+    if (authError || !user) return jsonError(401, "não autenticado", correlationId, cors);
 
     const body = await req.json().catch(() => null);
     const parsed = requestSchema.safeParse(body);
     if (!parsed.success) {
-      return jsonError(400, "payload inválido", correlationId, parsed.error.flatten());
+      return jsonError(400, "payload inválido", correlationId, cors, parsed.error.flatten());
     }
 
     const { data: perfil } = await callerClient
@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
       .eq("id", user.id)
       .single();
     if (perfil?.nivel_acesso !== "ADMIN_MASTER" && perfil?.nivel_acesso !== "INSPETOR_PCM") {
-      return jsonError(403, "só INSPETOR_PCM ou ADMIN_MASTER liberam o relatório ao SIF", correlationId);
+      return jsonError(403, "só INSPETOR_PCM ou ADMIN_MASTER liberam o relatório ao SIF", correlationId, cors);
     }
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
@@ -71,10 +71,10 @@ Deno.serve(async (req) => {
 
     if (erroElegiveis) {
       log("error", "listar_elegiveis_falhou", { erro: erroElegiveis.message });
-      return jsonError(500, "falha ao verificar elegibilidade", correlationId);
+      return jsonError(500, "falha ao verificar elegibilidade", correlationId, cors);
     }
     if (!elegiveis || elegiveis.length === 0) {
-      return jsonError(409, "nenhuma OS concluída e não liberada nessa data", correlationId);
+      return jsonError(409, "nenhuma OS concluída e não liberada nessa data", correlationId, cors);
     }
 
     const idsElegiveis = elegiveis.map((os) => os.id as string).sort();
@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
 
     if (erroAssinaturas) {
       log("error", "listar_assinaturas_falhou", { erro: erroAssinaturas.message });
-      return jsonError(500, "falha ao ler assinaturas", correlationId);
+      return jsonError(500, "falha ao ler assinaturas", correlationId, cors);
     }
 
     const hashPorOs = new Map<string, string>();
@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
       return jsonError(
         409,
         "nenhuma OS elegível tem assinatura VALIDACAO registrada — não é possível calcular o hash agregador",
-        correlationId
+        correlationId, cors
       );
     }
 
@@ -125,7 +125,7 @@ Deno.serve(async (req) => {
     }
     if (!relatorioId) {
       log("error", "criar_relatorio_falhou", { erro: erroUpsert?.message });
-      return jsonError(500, "falha ao criar/localizar o relatório do dia", correlationId);
+      return jsonError(500, "falha ao criar/localizar o relatório do dia", correlationId, cors);
     }
 
     // 4) Libera as OS recém-elegíveis (uma única UPDATE multi-linha) — depois disso o trigger
@@ -141,7 +141,7 @@ Deno.serve(async (req) => {
 
     if (erroLiberar) {
       log("error", "liberar_os_falhou", { erro: erroLiberar.message, relatorioId });
-      return jsonError(500, "relatório criado, mas falhou ao liberar as OS", correlationId);
+      return jsonError(500, "relatório criado, mas falhou ao liberar as OS", correlationId, cors);
     }
 
     // 4b) Hash agregador CUMULATIVO: recalcula sobre TODAS as OS já ligadas a este relatório
@@ -153,7 +153,7 @@ Deno.serve(async (req) => {
       .eq("relatorio_sif_id", relatorioId);
     if (erroTodasDoRelatorio || !todasDoRelatorio) {
       log("error", "listar_todas_relatorio_falhou", { erro: erroTodasDoRelatorio?.message, relatorioId });
-      return jsonError(500, "OS liberadas, mas falhou ao recalcular o hash agregador", correlationId);
+      return jsonError(500, "OS liberadas, mas falhou ao recalcular o hash agregador", correlationId, cors);
     }
 
     const idsCumulativos = todasDoRelatorio.map((os) => os.id as string).sort();
@@ -181,7 +181,7 @@ Deno.serve(async (req) => {
       .eq("id", relatorioId);
     if (erroRelatorioUpdate) {
       log("error", "atualizar_relatorio_falhou", { erro: erroRelatorioUpdate.message });
-      return jsonError(500, "falha ao gravar o hash agregador do relatório", correlationId);
+      return jsonError(500, "falha ao gravar o hash agregador do relatório", correlationId, cors);
     }
 
     // 5) Assinatura individual LIBERACAO_DIARIA só para as OS recém-liberadas nesta chamada —
@@ -221,13 +221,13 @@ Deno.serve(async (req) => {
     );
   } catch (erro) {
     log("error", "excecao_nao_tratada", { erro: erro instanceof Error ? erro.message : String(erro) });
-    return jsonError(500, "erro interno", correlationId);
+    return jsonError(500, "erro interno", correlationId, cors);
   }
 });
 
-function jsonError(status: number, mensagem: string, correlationId: string, detalhes?: unknown) {
+function jsonError(status: number, mensagem: string, correlationId: string, cors: HeadersInit, detalhes?: unknown) {
   return new Response(JSON.stringify({ erro: mensagem, correlationId, detalhes }), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { ...cors, "Content-Type": "application/json" },
   });
 }

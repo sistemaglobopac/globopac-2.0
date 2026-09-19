@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return jsonError(401, "não autenticado", correlationId);
+    if (!authHeader) return jsonError(401, "não autenticado", correlationId, cors);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -46,13 +46,13 @@ Deno.serve(async (req) => {
     } = await callerClient.auth.getUser();
     if (authError || !user) {
       log("error", "auth_falhou", { erro: authError?.message });
-      return jsonError(401, "não autenticado", correlationId);
+      return jsonError(401, "não autenticado", correlationId, cors);
     }
 
     const body = await req.json().catch(() => null);
     const parsed = requestSchema.safeParse(body);
     if (!parsed.success) {
-      return jsonError(400, "payload inválido", correlationId, parsed.error.flatten());
+      return jsonError(400, "payload inválido", correlationId, cors, parsed.error.flatten());
     }
     const { monitoramento_id, tipo } = parsed.data;
 
@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
       .eq("id", user.id)
       .single();
     if (perfilError || !perfil) {
-      return jsonError(403, "perfil não encontrado ou inativo", correlationId);
+      return jsonError(403, "perfil não encontrado ou inativo", correlationId, cors);
     }
 
     const tiposPermitidos = TIPO_PERMITIDO_POR_PERFIL[perfil.nivel_acesso] ?? [];
@@ -71,7 +71,8 @@ Deno.serve(async (req) => {
       return jsonError(
         403,
         `perfil ${perfil.nivel_acesso} não pode assinar como ${tipo}`,
-        correlationId
+        correlationId,
+        cors
       );
     }
 
@@ -84,7 +85,7 @@ Deno.serve(async (req) => {
 
     if (!resultado.ok) {
       log("error", "assinatura_falhou", { motivo: resultado.mensagem });
-      return jsonError(resultado.status, resultado.mensagem, correlationId);
+      return jsonError(resultado.status, resultado.mensagem, correlationId, cors);
     }
 
     log("info", "assinatura_criada", { assinaturaId: resultado.id, monitoramento_id, tipo });
@@ -99,13 +100,13 @@ Deno.serve(async (req) => {
     );
   } catch (erro) {
     log("error", "excecao_nao_tratada", { erro: erro instanceof Error ? erro.message : String(erro) });
-    return jsonError(500, "erro interno", correlationId);
+    return jsonError(500, "erro interno", correlationId, cors);
   }
 });
 
-function jsonError(status: number, mensagem: string, correlationId: string, detalhes?: unknown) {
+function jsonError(status: number, mensagem: string, correlationId: string, cors: HeadersInit, detalhes?: unknown) {
   return new Response(JSON.stringify({ erro: mensagem, correlationId, detalhes }), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { ...cors, "Content-Type": "application/json" },
   });
 }
