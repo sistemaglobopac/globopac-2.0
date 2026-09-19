@@ -3,6 +3,7 @@ import { useForm, useWatch, type FieldValues } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertTriangle, ArrowLeft, BellRing, CheckCircle2, Clock, Lock } from "lucide-react";
 import { useSessionStore, type PerfilSessao } from "@/store/session";
+import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/api";
 import { zodFromSchemaCampos, valoresIniciaisDe, type CampoTemplate } from "@/shared/schema-campos";
 import { useCriarMonitoramento, useTemplatesAtivos, useUltimoRegistroFicha, useUltimosApontamentosHoje, type TemplateAtivo } from "./api";
 import { useSincronizacaoOffline } from "./useSincronizacaoOffline";
@@ -82,14 +83,17 @@ function calcularStatus(
 export function NovaFichaPage() {
   const perfil = useSessionStore((s) => s.perfil);
   const { data: templates, isLoading } = useTemplatesAtivos();
-  const [setor, setSetor] = useState(perfil?.setoresPermitidos[0] ?? "");
+  const { data: masterSetores } = useSetoresCadastrados();
+  const setoresDoUsuario = resolverSetoresEfetivos(perfil?.setoresPermitidos ?? [], masterSetores);
+  const [setor, setSetor] = useState(setoresDoUsuario[0] ?? "");
   const [templateId, setTemplateId] = useState("");
   const [agora, setAgora] = useState(() => new Date());
 
   useEffect(() => {
     if (!perfil) return;
-    setSetor((atual) => (atual && perfil.setoresPermitidos.includes(atual) ? atual : (perfil.setoresPermitidos[0] ?? "")));
-  }, [perfil]);
+    setSetor((atual) => (atual && setoresDoUsuario.includes(atual) ? atual : (setoresDoUsuario[0] ?? "")));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [perfil, masterSetores]);
 
   useEffect(() => {
     const intervalo = setInterval(() => setAgora(new Date()), 1000);
@@ -123,16 +127,16 @@ export function NovaFichaPage() {
       <div className="mx-auto max-w-5xl space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-semibold">Nova ficha de monitoramento</h1>
-          {perfil.setoresPermitidos.length > 1 && (
+          {setoresDoUsuario.length > 1 && (
             <Select className="w-auto" value={setor} onChange={(e) => setSetor(e.target.value)}>
-              {perfil.setoresPermitidos.map((s) => (
+              {setoresDoUsuario.map((s) => (
                 <option key={s} value={s}>
                   {s}
                 </option>
               ))}
             </Select>
           )}
-          {perfil.setoresPermitidos.length === 1 && <Badge variant="outline">{setor}</Badge>}
+          {setoresDoUsuario.length === 1 && <Badge variant="outline">{setor}</Badge>}
         </div>
 
         <FilaOfflinePainel />

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, BellRing, Clock } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSessionStore } from "@/store/session";
+import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/api";
 import { supabase } from "@/lib/supabase";
 import { useAudioAlarm } from "@/modules/fichas/useAudioAlarm";
 import { Button } from "@/shared/ui/button";
@@ -30,9 +31,10 @@ interface RncCritica {
 export function GlobalInspectorAlerts() {
   const perfil = useSessionStore((s) => s.perfil);
   const queryClient = useQueryClient();
+  const { data: masterSetores } = useSetoresCadastrados();
   const isInspetor = perfil?.nivelAcesso === "INSPETOR_QUALIDADE";
   const userId = isInspetor ? perfil?.id : undefined;
-  const userSetores = perfil?.setoresPermitidos ?? [];
+  const userSetores = resolverSetoresEfetivos(perfil?.setoresPermitidos ?? [], masterSetores);
 
   const { data: turnoHoje } = useTurnoHoje(userId);
   const { data: pausaAtiva } = usePausaAtiva(userId);

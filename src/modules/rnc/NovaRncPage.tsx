@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import { useSessionStore } from "@/store/session";
+import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/api";
 import { supabase } from "@/lib/supabase";
 import { useAbrirRnc, type SeveridadeRnc } from "./api";
 import { Button } from "@/shared/ui/button";
@@ -54,8 +55,10 @@ export function NovaRncPage() {
 
   const monitoramentoVinculo = searchParams.get("vinculo");
   const { data: vinculo } = useFichaDoMonitoramento(monitoramentoVinculo);
+  const { data: masterSetores } = useSetoresCadastrados();
+  const setoresDoUsuario = resolverSetoresEfetivos(perfil?.setoresPermitidos ?? [], masterSetores);
 
-  const [setor, setSetor] = useState(perfil?.setoresPermitidos[0] ?? "");
+  const [setor, setSetor] = useState(setoresDoUsuario[0] ?? "");
   const [severidade, setSeveridade] = useState<SeveridadeRnc>("MEDIA");
   const [descricao, setDescricao] = useState("");
   const [mensagem, setMensagem] = useState<{ tipo: "success" | "error"; texto: string } | null>(null);
@@ -63,6 +66,12 @@ export function NovaRncPage() {
   useEffect(() => {
     if (vinculo) setSetor(vinculo.setor);
   }, [vinculo]);
+
+  useEffect(() => {
+    if (vinculo) return;
+    setSetor((atual) => (atual && setoresDoUsuario.includes(atual) ? atual : (setoresDoUsuario[0] ?? "")));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [perfil, masterSetores]);
 
   async function handleAbrirRnc(e: FormEvent) {
     e.preventDefault();
@@ -118,8 +127,8 @@ export function NovaRncPage() {
           <form onSubmit={handleAbrirRnc} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="setorRnc">Setor</Label>
-              <Select id="setorRnc" value={setor} onChange={(e) => setSetor(e.target.value)} disabled={perfil.setoresPermitidos.length <= 1}>
-                {perfil.setoresPermitidos.map((s) => (
+              <Select id="setorRnc" value={setor} onChange={(e) => setSetor(e.target.value)} disabled={setoresDoUsuario.length <= 1}>
+                {setoresDoUsuario.map((s) => (
                   <option key={s} value={s}>
                     {s}
                   </option>

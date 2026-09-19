@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSessionStore } from "@/store/session";
+import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/api";
 import { useCriarOs } from "./api";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
@@ -10,7 +11,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 
 export function NovaOsPage() {
   const perfil = useSessionStore((s) => s.perfil);
-  const [setor, setSetor] = useState(perfil?.setoresPermitidos[0] ?? "");
+  const { data: masterSetores } = useSetoresCadastrados();
+  const setoresDoUsuario = resolverSetoresEfetivos(perfil?.setoresPermitidos ?? [], masterSetores);
+  const [setor, setSetor] = useState(setoresDoUsuario[0] ?? "");
+  useEffect(() => {
+    setSetor((atual) => (atual && setoresDoUsuario.includes(atual) ? atual : (setoresDoUsuario[0] ?? "")));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [perfil, masterSetores]);
   const [descricao, setDescricao] = useState("");
   const [ativoReferencia, setAtivoReferencia] = useState("");
   const [slaEsperadoHoras, setSlaEsperadoHoras] = useState("");
@@ -48,11 +55,11 @@ export function NovaOsPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={aoEnviar} className="space-y-4" noValidate>
-            {perfil && perfil.setoresPermitidos.length > 1 && (
+            {setoresDoUsuario.length > 1 && (
               <div className="space-y-2">
                 <Label htmlFor="setor">Setor</Label>
                 <Select id="setor" value={setor} onChange={(e) => setSetor(e.target.value)}>
-                  {perfil.setoresPermitidos.map((s) => (
+                  {setoresDoUsuario.map((s) => (
                     <option key={s} value={s}>
                       {s}
                     </option>

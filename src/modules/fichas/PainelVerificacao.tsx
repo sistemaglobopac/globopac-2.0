@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, ClipboardCheck, Filter, Layers, Loader2, Sparkles, X } from "lucide-react";
 import { useSessionStore } from "@/store/session";
-import { useSetoresCadastrados } from "@/modules/admin/api";
+import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/api";
 import { useRncsAbertas } from "@/modules/rnc/api";
 import { supabase } from "@/lib/supabase";
 import {
@@ -78,7 +78,7 @@ export function PainelVerificacao() {
 
   const usuarios = useMemo(() => usersMap ?? new Map<string, string>(), [usersMap]);
   const isAdmin = perfil?.nivelAcesso === "ADMIN_MASTER";
-  const userSetores = perfil && perfil.setoresPermitidos.length > 0 ? perfil.setoresPermitidos : masterSetores ?? [];
+  const userSetores = resolverSetoresEfetivos(perfil?.setoresPermitidos ?? [], masterSetores);
   const setoresDisponiveis = isAdmin ? masterSetores ?? [] : userSetores;
 
   const templateIdsDoPac = useMemo(() => {

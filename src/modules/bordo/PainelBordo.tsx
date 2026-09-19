@@ -19,7 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { useSessionStore } from "@/store/session";
-import { useSetoresCadastrados } from "@/modules/admin/api";
+import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/api";
 import { useEquipamentosCadastrados, useDesviosCadastrados } from "@/modules/gestao/api";
 import { supabase } from "@/lib/supabase";
 import {
@@ -85,7 +85,7 @@ export function PainelBordo() {
   const { data: equipamentosCadastrados } = useEquipamentosCadastrados();
   const { data: desviosCadastrados } = useDesviosCadastrados();
 
-  const userSetores = perfil && perfil.setoresPermitidos.length > 0 ? perfil.setoresPermitidos : masterSetores ?? [];
+  const userSetores = resolverSetoresEfetivos(perfil?.setoresPermitidos ?? [], masterSetores);
   const activeSetorLabel = userSetores.length === 1 ? userSetores[0] : userSetores.length > 1 ? `${userSetores.length} Setores (Múltiplos)` : "—";
   const isManutencaoInspector = userSetores.includes("Manutenções Diversas");
 
