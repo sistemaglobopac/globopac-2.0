@@ -21,7 +21,7 @@ test("verificador reprova, RNC é criada, gestor de setor trata e fecha (fluxo 3
 
   await login(page, "1002", "121072");
   await page.goto("/verificacao");
-  const cartaoVerificacao = page.locator(".rounded-lg.border").filter({ hasText: marcador });
+  const cartaoVerificacao = page.locator('[data-testid="fila-pendente"] .rounded-lg.border').filter({ hasText: marcador });
   await expect(cartaoVerificacao).toBeVisible({ timeout: 15_000 });
   await cartaoVerificacao.getByRole("button", { name: "Ver" }).click();
   const dialogReprovacao = page.getByRole("dialog");

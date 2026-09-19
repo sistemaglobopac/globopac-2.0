@@ -341,7 +341,7 @@ export function PainelVerificacao() {
         </Button>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-3" data-testid="fila-pendente">
         {fila.isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
         {!fila.isLoading && dossies.length === 0 && avulsos.length === 0 && (
           <div className="rounded-lg border bg-muted/40 p-8 text-center text-sm text-muted-foreground">Nenhuma ficha aguardando verificação.</div>
