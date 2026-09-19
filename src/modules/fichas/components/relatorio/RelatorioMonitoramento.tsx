@@ -170,6 +170,11 @@ function RegistroUnico({ record, ordem, template, dados, hashesAoVivo }: Registr
   const rnc = dados.rncs.find((r) => r.monitoramento_id === record.id);
   const adendos = (record.dados_dinamicos.adendos as AdendoBruto[] | undefined) ?? [];
   const { time } = ensureLocalTime(record.criado_em);
+  // Campos "hora" (ex.: "Hora do Monitoramento") já aparecem no cabeçalho deste bloco
+  // ("Monitoramento N — HH:MM") — listá-los de novo em Dados Coletados é redundante e pode
+  // divergir do horário real de criação do registro (o campo é digitado/editável pelo
+  // inspetor; o cabeçalho usa `criado_em`, o horário de fato gravado no servidor).
+  const camposSemHora = (template?.schema_campos ?? []).filter((campo) => campo.tipo !== "hora");
 
   return (
     <div className="rounded-lg border border-primary/15 bg-primary/[0.02] p-4 print:break-inside-avoid print:p-2">
@@ -183,7 +188,7 @@ function RegistroUnico({ record, ordem, template, dados, hashesAoVivo }: Registr
         </span>
       </div>
 
-      <DadosColetados dadosDinamicos={record.dados_dinamicos} campos={template?.schema_campos ?? []} />
+      <DadosColetados dadosDinamicos={record.dados_dinamicos} campos={camposSemHora} />
 
       {record.conformidade === false && rnc && <BlocoRnc rnc={rnc} nomesPorId={dados.nomesPorId} />}
       {adendos.length > 0 && <BlocoAdendos adendos={adendos} />}
