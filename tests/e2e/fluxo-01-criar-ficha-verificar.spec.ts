@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { login, logout, selecionarTemplate } from "./helpers";
+import { login, logout, selecionarTemplate, assinarComSenha } from "./helpers";
 
 // Fluxo E2E nº 1 (seção 10 do PROMPT MESTRE): "Inspetor cria ficha → assina → aparece para
 // Verificador." Depende do stack local do Supabase rodando com supabase/seed.sql aplicado
@@ -24,6 +24,7 @@ test("inspetor cria e assina uma ficha, que aparece para o verificador", async (
   await page.locator("#observacoes").fill(marcador);
 
   await page.getByRole("button", { name: "Criar e assinar" }).click();
+  await assinarComSenha(page, "121072");
   await expect(page.getByText("Ficha criada e assinada com sucesso.")).toBeVisible({ timeout: 15_000 });
 
   await logout(page);

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { login, logout, clienteAdminDeTeste, selecionarTemplate } from "./helpers";
+import { login, logout, clienteAdminDeTeste, selecionarTemplate, assinarComSenha } from "./helpers";
 
 // Fase 7 (BI/dashboards/exportação de relatórios, seção 7.7) — painel gerencial com KPIs,
 // gráficos agregados e exportação CSV, sobre os mesmos dados que RLS já permite ao usuário ver
@@ -16,6 +16,7 @@ test("painel gerencial mostra KPIs e permite exportar CSV de monitoramentos (Fas
   await page.locator("#temperatura_celsius").fill("23");
   await page.locator("#observacoes").fill(marcador);
   await page.getByRole("button", { name: "Criar e assinar" }).click();
+  await assinarComSenha(page, "121072");
   await expect(page.getByText("Ficha criada e assinada com sucesso.")).toBeVisible({ timeout: 15_000 });
   await logout(page);
 

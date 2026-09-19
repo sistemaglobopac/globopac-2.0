@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { login, logout, clienteAdminDeTeste, selecionarTemplate } from "./helpers";
+import { login, logout, clienteAdminDeTeste, selecionarTemplate, assinarComSenha } from "./helpers";
 
 // Fase 8 (PWA offline e sincronização, ADR 0002/0014) — sem número de fluxo na seção 10
 // (feature adicionada além do roteiro original, ver ASSUMPTIONS.md). Cobre o caminho
@@ -31,6 +31,10 @@ test("ficha criada sem rede é enfileirada e sincronizada automaticamente quando
     await page.locator("#temperatura_celsius").fill("19");
     await page.locator("#observacoes").fill(marcador);
     await page.getByRole("button", { name: "Criar e assinar" }).click();
+    // signInWithPassword (reautenticação da assinatura) bate em /auth/v1/token, rota diferente
+    // das interceptadas acima (rest/v1/monitoramentos, functions/v1/assinar-documento) —
+    // continua alcançável, então o passo de senha roda normalmente antes da falha simulada.
+    await assinarComSenha(page, "121072");
 
     await expect(
       page.getByText("Sem conexão — ficha salva no dispositivo e será enviada e assinada automaticamente")

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { login, logout, clienteAdminDeTeste, selecionarTemplate } from "./helpers";
+import { login, logout, clienteAdminDeTeste, selecionarTemplate, assinarComSenha } from "./helpers";
 
 // Fluxos E2E nº 5 e 6 (seção 10 do PROMPT MESTRE):
 // 5) "Acesso ao portal público /verificar com UUID de documento assinado → mostra trilha e
@@ -19,6 +19,7 @@ test("documento liberado aparece com trilha e badge corretos no portal público 
   await page.locator("#temperatura_celsius").fill("21");
   await page.locator("#observacoes").fill(marcador);
   await page.getByRole("button", { name: "Criar e assinar" }).click();
+  await assinarComSenha(page, "121072");
   await expect(page.getByText("Ficha criada e assinada com sucesso.")).toBeVisible({ timeout: 15_000 });
   await logout(page);
 
@@ -77,6 +78,7 @@ test("documento ainda não liberado não é encontrado no portal público (fluxo
   await page.locator("#temperatura_celsius").fill("22");
   await page.locator("#observacoes").fill(marcador);
   await page.getByRole("button", { name: "Criar e assinar" }).click();
+  await assinarComSenha(page, "121072");
   await expect(page.getByText("Ficha criada e assinada com sucesso.")).toBeVisible({ timeout: 15_000 });
   await logout(page);
 

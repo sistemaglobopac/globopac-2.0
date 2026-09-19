@@ -75,6 +75,15 @@ export async function selecionarTemplate(page: Page, nomeTemplate: string) {
     .click();
 }
 
+/** NovaFichaPage passou a exigir reautenticação por senha antes de gravar/assinar (Lei
+ * 14.063/2020, Art. 4º §2º) — "Criar e assinar" não submete mais direto, troca o card pelo
+ * passo de confirmação (inline, não é um dialog: ao contrário do fluxo do VERIFICADOR em
+ * PainelVerificacao). Só roda quando online — offline pula esse passo e vai direto pra fila. */
+export async function assinarComSenha(page: Page, senha: string) {
+  await page.getByLabel("Sua senha").fill(senha);
+  await page.getByRole("button", { name: "Confirmar e Assinar" }).click();
+}
+
 export async function logout(page: Page) {
   await page.getByRole("button", { name: "Sair" }).click();
   await expect(page).toHaveURL(/\/login$/);
