@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useForm, useWatch, type FieldValues } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertTriangle, ArrowLeft, BellRing, CheckCircle2, Clock, Lock } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BellRing, CheckCircle2, Clock, Lock, ShieldCheck, X } from "lucide-react";
 import { useSessionStore, type PerfilSessao } from "@/store/session";
 import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/api";
 import { zodFromSchemaCampos, valoresIniciaisDe, type CampoTemplate } from "@/shared/schema-campos";
@@ -375,74 +375,98 @@ function FichaForm({ templateId, versaoTemplate, campos, nome, setor, perfil, on
 
       <Card>
         <CardContent className="pt-6">
-          {dadosPendentes ? (
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Confirme sua senha (a mesma do login) para assinar eletronicamente este monitoramento.
+          <form onSubmit={handleSubmit(aoEnviar)} className="space-y-4" noValidate>
+            {camposVisiveis.map((campo) => (
+              <DynamicField
+                key={campo.chave}
+                campo={campo}
+                register={register}
+                errors={errors}
+                control={control}
+                prevAppointment={ultimoRegistro?.dados_dinamicos}
+                carcacasAtual={carcacasAtual}
+              />
+            ))}
+
+            {criarMonitoramento.isError && (
+              <p className="text-sm text-destructive">Falha ao criar/assinar a ficha. Tente novamente.</p>
+            )}
+            {sucesso === "online" && <p className="text-sm text-success">Ficha criada e assinada com sucesso.</p>}
+            {sucesso === "offline" && (
+              <p className="text-sm text-warning">
+                Sem conexão — ficha salva no dispositivo e será enviada e assinada automaticamente assim que a rede voltar.
               </p>
-              <div className="space-y-2">
-                <Label htmlFor="senha-assinatura-ficha">Sua senha</Label>
-                <Input
-                  id="senha-assinatura-ficha"
-                  type="password"
-                  value={senha}
-                  onChange={(e) => setSenha(e.target.value)}
-                  disabled={autenticando}
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && senha && !autenticando) void confirmarComSenha();
-                  }}
-                />
-              </div>
-              {erroSenha && <p className="text-sm text-destructive">{erroSenha}</p>}
-              {criarMonitoramento.isError && (
-                <p className="text-sm text-destructive">Falha ao criar/assinar a ficha. Tente novamente.</p>
-              )}
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" className="flex-1" disabled={autenticando} onClick={cancelarAssinatura}>
-                  Cancelar
-                </Button>
-                <Button
-                  type="button"
-                  className="flex-1"
-                  disabled={autenticando || !senha || criarMonitoramento.isPending}
-                  onClick={confirmarComSenha}
-                >
-                  {autenticando || criarMonitoramento.isPending ? "Assinando…" : "Confirmar e Assinar"}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit(aoEnviar)} className="space-y-4" noValidate>
-              {camposVisiveis.map((campo) => (
-                <DynamicField
-                  key={campo.chave}
-                  campo={campo}
-                  register={register}
-                  errors={errors}
-                  control={control}
-                  prevAppointment={ultimoRegistro?.dados_dinamicos}
-                  carcacasAtual={carcacasAtual}
-                />
-              ))}
+            )}
 
-              {criarMonitoramento.isError && (
-                <p className="text-sm text-destructive">Falha ao criar/assinar a ficha. Tente novamente.</p>
-              )}
-              {sucesso === "online" && <p className="text-sm text-success">Ficha criada e assinada com sucesso.</p>}
-              {sucesso === "offline" && (
-                <p className="text-sm text-warning">
-                  Sem conexão — ficha salva no dispositivo e será enviada e assinada automaticamente assim que a rede voltar.
-                </p>
-              )}
-
-              <Button type="submit" disabled={isSubmitting || criarMonitoramento.isPending}>
-                {isSubmitting || criarMonitoramento.isPending ? "Salvando e assinando…" : "Criar e assinar"}
-              </Button>
-            </form>
-          )}
+            <Button type="submit" disabled={isSubmitting || criarMonitoramento.isPending}>
+              {isSubmitting || criarMonitoramento.isPending ? "Salvando e assinando…" : "Criar e assinar"}
+            </Button>
+          </form>
         </CardContent>
       </Card>
+
+      {dadosPendentes && (
+        <ModalAssinatura titulo="Assinatura Eletrônica do Inspetor" onFechar={autenticando ? () => undefined : cancelarAssinatura}>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Confirme sua senha (a mesma do login) para assinar eletronicamente este monitoramento.
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="senha-assinatura-ficha">Sua senha</Label>
+              <Input
+                id="senha-assinatura-ficha"
+                type="password"
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                disabled={autenticando}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && senha && !autenticando) void confirmarComSenha();
+                }}
+              />
+            </div>
+            {erroSenha && <p className="text-sm text-destructive">{erroSenha}</p>}
+            {criarMonitoramento.isError && (
+              <p className="text-sm text-destructive">Falha ao criar/assinar a ficha. Tente novamente.</p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" className="flex-1" disabled={autenticando} onClick={cancelarAssinatura}>
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                className="flex-1"
+                disabled={autenticando || !senha || criarMonitoramento.isPending}
+                onClick={confirmarComSenha}
+              >
+                {autenticando || criarMonitoramento.isPending ? "Assinando…" : "Confirmar e Assinar"}
+              </Button>
+            </div>
+          </div>
+        </ModalAssinatura>
+      )}
+    </div>
+  );
+}
+
+/** Ambiente de assinatura do Inspetor de Qualidade — sempre um modal por cima do formulário
+ * preenchido (nunca substitui a tela), mesmo padrão visual do modal de "Assinatura de Adendo"
+ * de Painel de Bordo (ModalBase local ali). */
+function ModalAssinatura({ titulo, onFechar, children }: { titulo: string; onFechar: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div role="dialog" aria-modal="true" aria-label={titulo} className="w-full max-w-md rounded-xl border bg-background shadow-2xl">
+        <div className="flex items-center justify-between rounded-t-xl bg-primary px-4 py-3 text-primary-foreground">
+          <span className="flex items-center gap-2 font-semibold">
+            <ShieldCheck className="h-5 w-5" />
+            {titulo}
+          </span>
+          <button type="button" onClick={onFechar} aria-label="Fechar">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="p-4">{children}</div>
+      </div>
     </div>
   );
 }
