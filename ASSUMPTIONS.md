@@ -656,3 +656,31 @@ allowlist `ALLOWED_ORIGINS`. **Ação necessária do responsável do projeto:** 
 frontend antes do go-live (sem isso, as chamadas autenticadas do frontend em produção falham
 por CORS) — mesma lacuna operacional já registrada no item 8/44 (projeto hospedado ainda não
 provisionado).
+
+### 66. Cloudflare Turnstile trocado por hCaptcha (bug de conta, não de código)
+✅ **Confirmada por execução real** — ver a atualização no ADR 0015: toda sitekey real criada
+na conta Cloudflare do responsável do projeto retornava `400020 (invalid sitekey)`, mesmo após
+recriar o widget do zero. Isolado com um teste direto no navegador (a sitekey de TESTE do
+Turnstile funcionou normalmente na mesma página) — confirmando que não era domínio, código ou
+cache deste projeto. Trocado por hCaptcha, mesma arquitetura.
+
+### 67. Bug real encontrado em produção: secret de Edge Function "salvo" no lugar errado nunca chega à função
+🔴 **Confirmada por execução real — mesmo padrão do item 61 (Auth Hook nunca sincronizado)** —
+depois de trocar para hCaptcha, o CAPTCHA continuava recusando mesmo com o desafio resolvido
+corretamente pelo usuário. Investigado com `query_logs` (Supabase MCP): a Edge Function `login`
+nunca sequer tentava chamar a API do hCaptcha — `Deno.env.get("HCAPTCHA_SECRET_KEY")` retornava
+`undefined`, apesar do responsável do projeto ter configurado essa secret no Dashboard.
+Causa raiz: precisa ser em **Project Settings → Edge Functions → Secrets** especificamente —
+não a seção de variáveis de ambiente do banco, nem uma env var do Netlify (que é do frontend,
+nunca chega ao backend). Não há nenhuma validação visual óbvia no Dashboard que avise "essa
+secret não está acessível às funções" — o primeiro sintoma é sempre um comportamento silencioso
+de uma Edge Function agindo como se a secret estivesse vazia (aqui, sempre fail-closed
+recusando o captcha; em outro caso poderia ser qualquer outra checagem baseada em secret).
+Diagnosticado adicionando um log temporário de `!!Deno.env.get(...)` direto no handler
+principal — uma tentativa inicial de logar de dentro de uma função auxiliar aninhada
+(`verificarHCaptcha`) não aparecia em `query_logs` de forma alguma (mesmo sem lançar exceção e
+a resposta HTTP voltando normalmente); mover o log para a função `log()` do handler principal
+(já comprovadamente capturada) resolveu — não investigado a fundo *por que* o `console.log`
+aninhado sumia, mas o padrão "logar sempre pela função `log()` do topo, nunca com
+`console.log` solto em uma função auxiliar" evita o problema e é o que as demais Edge Functions
+deste projeto já faziam.

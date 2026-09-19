@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
 
     if (bloqueio?.status === "aguardando_captcha") {
       const captchaOk = parsed.data.captcha_token
-        ? await verificarHCaptcha(parsed.data.captcha_token, ip)
+        ? await verificarHCaptcha(parsed.data.captcha_token, ip, log)
         : false;
       if (!captchaOk) {
         return jsonError(
@@ -171,19 +171,36 @@ async function registrarFalha(adminClient: AdminClient, ip: string): Promise<Fla
  * "400020 invalid sitekey" em toda sitekey real (só a sitekey de teste funcionava) — problema
  * de conta do lado da Cloudflare, confirmado isolando com a sitekey de teste, não corrigível
  * por configuração deste projeto. Ver ADR 0015. */
-async function verificarHCaptcha(token: string, ip: string): Promise<boolean> {
+type LogFn = (nivel: "info" | "error", evento: string, extra?: Record<string, unknown>) => void;
+
+async function verificarHCaptcha(token: string, ip: string, log: LogFn): Promise<boolean> {
   const secret = Deno.env.get("HCAPTCHA_SECRET_KEY");
   // Fail-closed: sem secret configurado, nunca aceita o desafio como válido (nunca abre uma
   // brecha silenciosa por falta de configuração de ambiente).
-  if (!secret) return false;
+  if (!secret) {
+    log("error", "hcaptcha_secret_ausente");
+    return false;
+  }
 
-  const resposta = await fetch("https://api.hcaptcha.com/siteverify", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ secret, response: token, remoteip: ip }),
-  });
-  const resultado = await resposta.json().catch(() => ({ success: false }));
-  return resultado?.success === true;
+  try {
+    // Timeout explícito (mesmo princípio de _shared/rfc3161.ts): sem isso, uma rede degradada
+    // ou travada entre a Edge Function e a API do hCaptcha prende a Promise indefinidamente,
+    // sem lançar erro nem retornar.
+    const resposta = await fetch("https://api.hcaptcha.com/siteverify", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ secret, response: token, remoteip: ip }),
+      signal: AbortSignal.timeout(8000),
+    });
+    const resultado = await resposta.json();
+    if (resultado?.success !== true) {
+      log("error", "hcaptcha_siteverify_falhou", { resultado });
+    }
+    return resultado?.success === true;
+  } catch (erro) {
+    log("error", "hcaptcha_fetch_falhou", { erro: erro instanceof Error ? erro.message : String(erro) });
+    return false;
+  }
 }
 
 function jsonError(
