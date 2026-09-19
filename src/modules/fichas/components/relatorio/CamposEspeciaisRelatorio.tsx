@@ -76,13 +76,6 @@ export function ChillerCarcacasRelatorio({ valor }: { valor: ChillerCarcacasValo
   return (
     <div className="col-span-full space-y-2 rounded-lg border border-hairline bg-gray-50 p-3 print:p-2">
       <Cabecalho titulo="Renovação da Água — SPR Carcaças" conforme={valor.conformidade} />
-      <TabelaTanques
-        tanques={{
-          preChiller: { ...valor.tanques.preChiller, rotulo: "Pré-chiller" },
-          chiller1: { ...valor.tanques.chiller1, rotulo: "Chiller 01" },
-          chiller2: { ...valor.tanques.chiller2, rotulo: "Chiller 02" },
-        }}
-      />
       <div className="grid grid-cols-2 gap-2 text-[10px] print:text-[8px] sm:grid-cols-4">
         <div><span className="text-muted-foreground">Aves no período</span><br /><strong>{valor.totalAves.toLocaleString("pt-BR")}</strong></div>
         <div><span className="text-muted-foreground">Aves bruto</span><br /><strong>{valor.totalAvesBruto.toLocaleString("pt-BR")}</strong></div>
@@ -109,6 +102,13 @@ export function ChillerCarcacasRelatorio({ valor }: { valor: ChillerCarcacasValo
           </tbody>
         </table>
       )}
+      <TabelaTanques
+        tanques={{
+          preChiller: { ...valor.tanques.preChiller, rotulo: "Pré-chiller" },
+          chiller1: { ...valor.tanques.chiller1, rotulo: "Chiller 01" },
+          chiller2: { ...valor.tanques.chiller2, rotulo: "Chiller 02" },
+        }}
+      />
       <NotaDesvio detalhes={valor.detalhesRNC} />
     </div>
   );
