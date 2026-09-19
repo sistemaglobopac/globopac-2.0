@@ -99,14 +99,15 @@ select set_config('request.jwt.claims', json_build_object(
 )::text, true);
 set local role authenticated;
 
-insert into turnos_inspetores (user_id, inicio, fim) values ('e0000000-0000-0000-0000-000000000003', now(), now());
-
-reset role;
-select is(
-  (select count(*)::int from turnos_inspetores where user_id = 'e0000000-0000-0000-0000-000000000003'),
-  1,
+-- Diferente de UPDATE (onde a policy USING só filtra a linha silenciosamente, 0 linhas
+-- afetadas, sem erro), um INSERT cujo WITH CHECK falha lança exceção direto — throws_ok, não
+-- is()/count(*), senão a exceção não capturada aborta o script antes do finish() rodar.
+select throws_ok(
+  $$insert into turnos_inspetores (user_id, inicio, fim) values ('e0000000-0000-0000-0000-000000000003', now(), now())$$,
   'INSPETOR_QUALIDADE não consegue inserir turno em nome de outro inspetor via RLS'
 );
+
+reset role;
 
 select * from finish();
 rollback;
