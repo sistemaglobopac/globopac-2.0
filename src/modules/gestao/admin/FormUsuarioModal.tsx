@@ -119,7 +119,7 @@ export function FormUsuarioModal({ usuario, onClose }: FormUsuarioModalProps) {
           <Button type="button" variant="outline" onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="button" style={{ background: "#6a5fc1", color: "#fff" }} disabled={salvando} onClick={salvar}>
+          <Button type="button" disabled={salvando} onClick={salvar}>
             {salvando ? "Salvando…" : "Salvar"}
           </Button>
         </>
@@ -176,8 +176,8 @@ export function FormUsuarioModal({ usuario, onClose }: FormUsuarioModalProps) {
 
         <div className="space-y-2 sm:col-span-2">
           <Label>Setores Vinculados</Label>
-          <div className="rounded-md border p-3" style={{ borderColor: "#dfe2e7" }}>
-            <label className="mb-2 flex items-center gap-2 text-sm font-bold" style={{ color: "#1f1633" }}>
+          <div className="rounded-md border border-hairline p-3">
+            <label className="mb-2 flex items-center gap-2 text-sm font-bold text-ink">
               <input type="checkbox" checked={livreGeral} onChange={(e) => setLivreGeral(e.target.checked)} />
               Supervisor/Livre (Acesso Geral)
             </label>
@@ -206,8 +206,8 @@ export function FormUsuarioModal({ usuario, onClose }: FormUsuarioModalProps) {
           </Select>
         </div>
 
-        <div className="space-y-2 rounded-md border border-dashed p-3 sm:col-span-2" style={{ borderColor: "#79628c" }}>
-          <label className="flex items-center gap-2 text-sm font-bold" style={{ color: "#1f1633" }}>
+        <div className="space-y-2 rounded-md border border-dashed border-warning/50 p-3 sm:col-span-2">
+          <label className="flex items-center gap-2 text-sm font-bold text-ink">
             <input type="checkbox" checked={coberturaAtiva} onChange={(e) => setCoberturaAtiva(e.target.checked)} />
             Este monitor cobrirá horário de almoço/ausência noutro setor temporariamente?
           </label>

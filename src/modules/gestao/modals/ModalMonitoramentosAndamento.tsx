@@ -14,16 +14,16 @@ export function ModalMonitoramentosAndamento({ onClose }: { onClose: () => void 
         <DossieDetalhe monitoramentoId={dossieId} onVoltar={() => setDossieId(null)} />
       ) : (
         <div className="space-y-4">
-          {isLoading && <p className="text-sm" style={{ color: "#79628c" }}>Carregando…</p>}
+          {isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
 
           {data && data.atrasados.length > 0 && (
-            <div className="rounded-xl p-3" style={{ background: "#dc26261a", border: "1px solid #dc262666" }}>
-              <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide" style={{ color: "#dc2626" }}>
+            <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-destructive">
                 <AlertTriangle className="h-4 w-4" /> Monitoramentos em atraso ({data.atrasados.length})
               </p>
               <ul className="space-y-1">
                 {data.atrasados.map((a, i) => (
-                  <li key={i} className="text-xs" style={{ color: "#7f1d1d" }}>
+                  <li key={i} className="text-xs text-destructive">
                     <span className="font-bold">
                       {a.codigo} · {a.setor}
                     </span>{" "}
@@ -35,18 +35,14 @@ export function ModalMonitoramentosAndamento({ onClose }: { onClose: () => void 
           )}
 
           {data && data.porSetor.length === 0 && !isLoading && (
-            <p className="text-sm" style={{ color: "#79628c" }}>Nenhum monitoramento criado hoje ainda.</p>
+            <p className="text-sm text-muted-foreground">Nenhum monitoramento criado hoje ainda.</p>
           )}
 
           {data?.porSetor.map((grupo) => (
             <div key={grupo.setor}>
               <div className="mb-1.5 flex items-center justify-between">
-                <h4 className="text-xs font-bold uppercase tracking-wide" style={{ color: "#79628c" }}>
-                  {grupo.setor}
-                </h4>
-                <span className="text-xs font-bold" style={{ color: "#1f1633" }}>
-                  {grupo.quantidade}
-                </span>
+                <h4 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{grupo.setor}</h4>
+                <span className="text-xs font-bold text-ink">{grupo.quantidade}</span>
               </div>
               <ul className="space-y-1">
                 {grupo.itens.map((item) => (
@@ -54,8 +50,7 @@ export function ModalMonitoramentosAndamento({ onClose }: { onClose: () => void 
                     <button
                       type="button"
                       onClick={() => setDossieId(item.id)}
-                      className="w-full rounded-md px-2 py-1.5 text-left text-xs hover:opacity-80"
-                      style={{ background: "#f7f8fa", border: "1px solid #dfe2e7", color: "#1f1633" }}
+                      className="w-full rounded-md border border-hairline bg-surface-soft px-2 py-1.5 text-left text-xs text-ink hover:opacity-80"
                     >
                       {new Date(item.criado_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} ·{" "}
                       {item.conformidade === false ? "Não conforme" : item.conformidade === true ? "Conforme" : "Aguardando verificação"}

@@ -67,28 +67,26 @@ export function EquipamentosAdminPanel() {
   }
 
   return (
-    <div className="rounded-2xl bg-white p-5 shadow-sm" style={{ border: "1px solid #dfe2e7" }}>
+    <div className="rounded-2xl border border-hairline bg-card p-5 shadow-sm">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <Cog className="h-7 w-7 shrink-0" style={{ color: "#6a5fc1" }} />
+          <Cog className="h-7 w-7 shrink-0 text-primary" />
           <div>
-            <h2 className="text-lg font-bold" style={{ color: "#1f1633" }}>
-              Gestão de Equipamentos
-            </h2>
-            <p className="text-sm" style={{ color: "#79628c" }}>Catálogo de equipamentos por setor, usado nos apontamentos e no PCM.</p>
+            <h2 className="text-lg font-bold text-ink">Gestão de Equipamentos</h2>
+            <p className="text-sm text-muted-foreground">Catálogo de equipamentos por setor, usado nos apontamentos e no PCM.</p>
           </div>
         </div>
-        <Button type="button" style={{ background: "#6a5fc1", color: "#fff" }} onClick={() => abrirModal()}>
+        <Button type="button" onClick={() => abrirModal()}>
           <Plus className="h-4 w-4" /> Novo Equipamento
         </Button>
       </div>
 
-      {isLoading && <p className="text-sm" style={{ color: "#79628c" }}>Carregando…</p>}
+      {isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
 
-      <div className="overflow-x-auto rounded-lg" style={{ border: "1px solid #dfe2e7" }}>
+      <div className="overflow-x-auto rounded-lg border border-hairline">
         <table className="w-full text-sm">
-          <thead style={{ background: "#f7f8fa" }}>
-            <tr className="text-left text-xs font-bold uppercase tracking-wide" style={{ color: "#79628c" }}>
+          <thead className="bg-surface-soft">
+            <tr className="text-left text-xs font-bold uppercase tracking-wide text-muted-foreground">
               <th className="px-4 py-2">Código</th>
               <th className="px-4 py-2">TAG</th>
               <th className="px-4 py-2">Nome</th>
@@ -98,11 +96,11 @@ export function EquipamentosAdminPanel() {
           </thead>
           <tbody>
             {(equipamentos ?? []).map((item) => (
-              <tr key={item.id} className="border-t" style={{ borderColor: "#dfe2e7" }}>
-                <td className="px-4 py-2" style={{ color: "#1f1633" }}>{item.codigo || "—"}</td>
-                <td className="px-4 py-2 font-mono" style={{ color: "#1f1633" }}>{item.tag || "—"}</td>
-                <td className="px-4 py-2 font-bold" style={{ color: "#1f1633" }}>{item.nome}</td>
-                <td className="px-4 py-2" style={{ color: "#1f1633" }}>{item.setor}</td>
+              <tr key={item.id} className="border-t border-hairline">
+                <td className="px-4 py-2 text-ink">{item.codigo || "—"}</td>
+                <td className="px-4 py-2 font-mono text-ink">{item.tag || "—"}</td>
+                <td className="px-4 py-2 font-bold text-ink">{item.nome}</td>
+                <td className="px-4 py-2 text-ink">{item.setor}</td>
                 <td className="px-4 py-2">
                   <div className="flex justify-end gap-1.5">
                     <Button type="button" variant="outline" size="sm" aria-label={`Editar ${item.nome}`} onClick={() => abrirModal(item)}>
@@ -124,7 +122,7 @@ export function EquipamentosAdminPanel() {
             ))}
             {!isLoading && (equipamentos ?? []).length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center" style={{ color: "#79628c" }}>
+                <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
                   Nenhum equipamento cadastrado.
                 </td>
               </tr>
@@ -142,7 +140,7 @@ export function EquipamentosAdminPanel() {
               <Button type="button" variant="outline" onClick={() => setModalAberto(false)}>
                 Cancelar
               </Button>
-              <Button type="button" style={{ background: "#6a5fc1", color: "#fff" }} disabled={salvar.isPending} onClick={salvarItem}>
+              <Button type="button" disabled={salvar.isPending} onClick={salvarItem}>
                 {salvar.isPending ? "Salvando…" : "Salvar"}
               </Button>
             </>

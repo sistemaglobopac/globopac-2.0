@@ -19,6 +19,7 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { PainelBordo } from "@/modules/bordo/PainelBordo";
 import { PainelVerificacao } from "@/modules/fichas/PainelVerificacao";
 import { RncTratativasPage } from "@/modules/rnc/RncTratativasPage";
@@ -81,9 +82,8 @@ function useAbaAtiva(): [AbaGestao, (aba: AbaGestao) => void] {
   return [aba, irPara];
 }
 
-/** Injeta os keyframes/classes específicos do design system do Painel de Gestão (roxo/lima) —
- * o painel é um componente único e autocontido (não altera tailwind.config.ts/index.css
- * globais), então o CSS custom mora aqui, escopado por `.gs-scope`. */
+/** Injeta só a animação de entrada dos cartões/botões do Painel de Gestão — cor e superfícies
+ * agora vêm inteiramente das classes utilitárias Tailwind/design system, não deste bloco. */
 function EstilosGestao() {
   return (
     <style>{`
@@ -95,24 +95,19 @@ function EstilosGestao() {
       .gs-scope .gs-d4 { animation-delay: .16s; }
       .gs-scope .gs-d5 { animation-delay: .2s; }
       .gs-scope .gs-d6 { animation-delay: .24s; }
-      .gs-scope .gs-btn-ferramenta:hover { background: #422082 !important; }
-      .gs-scope .gs-btn-sistema:hover { background: #2a2050 !important; }
     `}</style>
   );
 }
 
 function TituloPainelGestao() {
   return (
-    <div
-      className="flex items-center gap-3 rounded-2xl p-4 text-white shadow-md"
-      style={{ background: "linear-gradient(135deg, #6a5fc1, #422082)" }}
-    >
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl" style={{ background: "rgba(255,255,255,0.18)" }}>
+    <div className="flex items-center gap-3 rounded-2xl bg-gradient-to-br from-primary to-primary-active p-4 text-ondark shadow-md">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/15">
         <Settings className="h-6 w-6" />
       </div>
       <div>
         <h1 className="text-lg font-black">Painel de Gestão</h1>
-        <p className="text-xs" style={{ color: "#e4defa" }}>Console administrativo master</p>
+        <p className="text-xs text-ondark-soft">Console administrativo master</p>
       </div>
     </div>
   );
@@ -120,20 +115,26 @@ function TituloPainelGestao() {
 
 function AvisoOperacaoAdmin({ aba }: { aba: AbaGestao }) {
   return (
-    <div
-      className="rounded-xl p-3 text-center text-sm font-bold"
-      style={{ background: "#fff7e6", border: "1px solid #f0c96b", color: "#8a5a00" }}
-    >
+    <div className="rounded-xl border border-warning bg-warning/10 p-3 text-center text-sm font-bold text-warning">
       {AVISO_POR_ABA[aba]} — qualquer ação executada aqui terá validade oficial e será registrada com o seu
       nome de administrador nos relatórios e na trilha de auditoria.
     </div>
   );
 }
 
+/** Paleta fechada de variantes semânticas para os KPIs do Painel de Gestão — só os tokens do
+ * design system (primary/lime/warning/destructive/success), nunca hex arbitrário por card. */
+const KPI_VARIANTES = {
+  primary: { soft: "bg-primary/10 border-primary/40", solid: "bg-primary", solidText: "text-primary-foreground", tint: "text-primary" },
+  lime: { soft: "bg-lime/10 border-lime/50", solid: "bg-lime", solidText: "text-primary", tint: "text-lime" },
+  warning: { soft: "bg-warning/10 border-warning/40", solid: "bg-warning", solidText: "text-warning-foreground", tint: "text-warning" },
+  destructive: { soft: "bg-destructive/10 border-destructive/40", solid: "bg-destructive", solidText: "text-destructive-foreground", tint: "text-destructive" },
+  success: { soft: "bg-success/10 border-success/40", solid: "bg-success", solidText: "text-success-foreground", tint: "text-success" },
+} as const;
+
 interface KpiCardGestaoProps {
   icon: LucideIcon;
-  cor: string;
-  textoEscuro?: boolean;
+  variante: keyof typeof KPI_VARIANTES;
   rotulo: string;
   valor: number | string;
   subtitulo: string;
@@ -141,31 +142,34 @@ interface KpiCardGestaoProps {
   onClick: () => void;
 }
 
-function KpiCardGestao({ icon: Icon, cor, textoEscuro, rotulo, valor, subtitulo, indice, onClick }: KpiCardGestaoProps) {
+function KpiCardGestao({ icon: Icon, variante, rotulo, valor, subtitulo, indice, onClick }: KpiCardGestaoProps) {
+  const v = KPI_VARIANTES[variante];
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`gs-fade-up gs-d${indice} relative overflow-hidden rounded-2xl p-5 text-left shadow-md transition-transform hover:-translate-y-0.5`}
-      style={{ background: `linear-gradient(145deg, ${cor}30, ${cor}10)`, border: `2px solid ${cor}B3` }}
+      className={cn(
+        "gs-fade-up relative overflow-hidden rounded-2xl border-2 p-5 text-left shadow-md transition-transform hover:-translate-y-0.5",
+        v.soft,
+        `gs-d${indice}`
+      )}
     >
-      <span className="absolute inset-x-0 top-0 h-1" style={{ background: cor }} />
-      <Icon className="pointer-events-none absolute -right-3 -top-2 h-24 w-24" style={{ color: cor, opacity: 0.16 }} />
-      <div className="relative flex h-10 w-10 items-center justify-center rounded-[11px]" style={{ background: cor }}>
-        <Icon className="h-5 w-5" style={{ color: textoEscuro ? "#1f1633" : "#ffffff" }} />
+      <span className={cn("absolute inset-x-0 top-0 h-1", v.solid)} />
+      <Icon className={cn("pointer-events-none absolute -right-3 -top-2 h-24 w-24 opacity-15", v.tint)} />
+      <div className={cn("relative flex h-10 w-10 items-center justify-center rounded-[11px]", v.solid)}>
+        <Icon className={cn("h-5 w-5", v.solidText)} />
       </div>
       <span
-        className="relative mt-3 inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide"
-        style={{ background: cor, color: textoEscuro ? "#1f1633" : "#ffffff" }}
+        className={cn(
+          "relative mt-3 inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide",
+          v.solid,
+          v.solidText
+        )}
       >
         {rotulo}
       </span>
-      <p className="relative mt-3 font-mono text-[2.5rem] font-black leading-none" style={{ color: "#1f1633" }}>
-        {valor}
-      </p>
-      <p className="relative mt-1 text-sm" style={{ color: "#79628c" }}>
-        {subtitulo}
-      </p>
+      <p className="relative mt-3 font-mono text-[2.5rem] font-black leading-none text-ink">{valor}</p>
+      <p className="relative mt-1 text-sm text-muted-foreground">{subtitulo}</p>
     </button>
   );
 }
@@ -187,14 +191,11 @@ function BotaoFerramenta({
     <button
       type="button"
       onClick={onClick}
-      className={`gs-fade-up gs-d${indice} gs-btn-ferramenta flex items-center gap-3 rounded-xl p-4 text-left text-white shadow-sm transition-colors`}
-      style={{ background: "#6a5fc1" }}
+      className={`gs-fade-up gs-d${indice} flex items-center gap-3 rounded-xl bg-primary p-4 text-left text-ondark shadow-sm transition-colors hover:bg-primary-active`}
     >
-      <Icon className="h-6 w-6 shrink-0" style={{ color: "#c2ef4e" }} />
+      <Icon className="h-6 w-6 shrink-0 text-lime" />
       <div>
-        <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "#e4defa" }}>
-          {categoria}
-        </p>
+        <p className="text-[11px] font-bold uppercase tracking-wide text-ondark-soft">{categoria}</p>
         <p className="text-sm font-bold">{titulo}</p>
       </div>
     </button>
@@ -218,14 +219,11 @@ function BotaoGestaoSistema({
     <button
       type="button"
       onClick={onClick}
-      className={`gs-fade-up gs-d${indice} gs-btn-sistema flex items-center gap-3 rounded-xl p-4 text-left text-white shadow-sm transition-colors`}
-      style={{ background: "#1f1633", border: "1px solid #362d59" }}
+      className={`gs-fade-up gs-d${indice} flex items-center gap-3 rounded-xl border border-white/10 bg-surface-dark p-4 text-left text-ondark shadow-sm transition-colors hover:bg-primary-active`}
     >
-      <Icon className="h-6 w-6 shrink-0" style={{ color: "#c2ef4e" }} />
+      <Icon className="h-6 w-6 shrink-0 text-lime" />
       <div>
-        <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "#a99bd6" }}>
-          {categoria}
-        </p>
+        <p className="text-[11px] font-bold uppercase tracking-wide text-ondark-soft">{categoria}</p>
         <p className="text-sm font-bold">{titulo}</p>
       </div>
     </button>
@@ -250,7 +248,7 @@ function AbaHome({ irPara }: { irPara: (aba: AbaGestao) => void }) {
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <KpiCardGestao
           icon={Users}
-          cor="#6a5fc1"
+          variante="primary"
           rotulo="Usuários Ativos"
           valor={onlineIds.size}
           subtitulo="Conectados agora"
@@ -259,7 +257,7 @@ function AbaHome({ irPara }: { irPara: (aba: AbaGestao) => void }) {
         />
         <KpiCardGestao
           icon={Clock}
-          cor="#79628c"
+          variante="warning"
           rotulo="Pausa dos Inspetores"
           valor={pausas?.length ?? 0}
           subtitulo="Em andamento agora"
@@ -268,8 +266,7 @@ function AbaHome({ irPara }: { irPara: (aba: AbaGestao) => void }) {
         />
         <KpiCardGestao
           icon={FileText}
-          cor="#c2ef4e"
-          textoEscuro
+          variante="lime"
           rotulo="Monitoramentos em Andamento"
           valor={monitoramentosHoje?.length ?? 0}
           subtitulo="Fichas criadas hoje"
@@ -278,7 +275,7 @@ function AbaHome({ irPara }: { irPara: (aba: AbaGestao) => void }) {
         />
         <KpiCardGestao
           icon={AlertOctagon}
-          cor="#dc2626"
+          variante="destructive"
           rotulo="RNCs Pendentes"
           valor={rncPendentesTotal}
           subtitulo="Aguardando tratativa/verificação"
@@ -288,9 +285,7 @@ function AbaHome({ irPara }: { irPara: (aba: AbaGestao) => void }) {
       </section>
 
       <section>
-        <h2 className="mb-3 text-sm font-bold uppercase tracking-wide" style={{ color: "#79628c" }}>
-          Ferramentas
-        </h2>
+        <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">Ferramentas</h2>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
           <BotaoFerramenta icon={ClipboardPlus} categoria="Ferramenta" titulo="Criar Fichas" indice={1} onClick={() => irPara("fichas_builder")} />
           <BotaoFerramenta icon={Megaphone} categoria="Comunicação" titulo="Comunicados" indice={2} onClick={() => irPara("comunicados")} />
@@ -301,12 +296,10 @@ function AbaHome({ irPara }: { irPara: (aba: AbaGestao) => void }) {
         </div>
       </section>
 
-      <div className="h-px" style={{ background: "#dfe2e7" }} />
+      <div className="h-px bg-hairline" />
 
       <section>
-        <h2 className="mb-3 text-sm font-bold uppercase tracking-wide" style={{ color: "#79628c" }}>
-          Gestão do Sistema
-        </h2>
+        <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">Gestão do Sistema</h2>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
           <BotaoGestaoSistema icon={Users} categoria="Configurações" titulo="Acessos de Usuários" indice={1} onClick={() => irPara("admin")} />
           <BotaoGestaoSistema icon={MapPin} categoria="Configurações" titulo="Setores Globais" indice={2} onClick={() => irPara("admin_setores")} />
@@ -343,10 +336,10 @@ const PAINEL_POR_ABA: Partial<Record<AbaGestao, ComponentType>> = {
 };
 
 /** Painel de Gestão — console administrativo master do ADMIN_MASTER. Componente único e
- * autocontido: navegação por query string (`?tab=`, deep-linkável), design system próprio
- * (roxo/lima) aplicado via estilos inline + o pouco de CSS injetado por EstilosGestao, e
- * reaproveita os painéis operacionais/administrativos que já existem no resto do sistema para
- * as abas que só embutem um módulo existente. */
+ * autocontido: navegação por query string (`?tab=`, deep-linkável), usa o mesmo design system
+ * GloboPac (navy/lima) do resto do app via classes Tailwind + a animação de entrada injetada
+ * por EstilosGestao, e reaproveita os painéis operacionais/administrativos que já existem no
+ * resto do sistema para as abas que só embutem um módulo existente. */
 export function PainelGestao() {
   const [aba, irPara] = useAbaAtiva();
   const Painel = PAINEL_POR_ABA[aba];

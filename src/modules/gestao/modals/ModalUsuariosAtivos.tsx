@@ -18,13 +18,11 @@ export function ModalUsuariosAtivos({ onClose }: { onClose: () => void }) {
 
   return (
     <ModalShell titulo={`Usuários Ativos (${online.length})`} onClose={onClose} largura="max-w-2xl">
-      {isLoading && <p className="text-sm" style={{ color: "#79628c" }}>Carregando…</p>}
+      {isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
       {!isLoading && online.length === 0 && (
-        <p className="text-sm" style={{ color: "#79628c" }}>
-          Nenhum usuário com o painel aberto no momento.
-        </p>
+        <p className="text-sm text-muted-foreground">Nenhum usuário com o painel aberto no momento.</p>
       )}
-      <ul className="divide-y" style={{ borderColor: "#dfe2e7" }}>
+      <ul className="divide-y divide-hairline">
         {online.map((p) => {
           const badge = NIVEL_ACESSO_BADGE[p.nivel_acesso];
           const config = parseConfigExtras(p.configuracoes_extras);
@@ -33,15 +31,13 @@ export function ModalUsuariosAtivos({ onClose }: { onClose: () => void }) {
           return (
             <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
               <div className="min-w-0">
-                <p className="text-sm font-bold" style={{ color: "#1f1633" }}>
-                  {p.nome_completo}
-                </p>
+                <p className="text-sm font-bold text-ink">{p.nome_completo}</p>
                 <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                  <span className="inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ background: badge.bg, color: badge.color }}>
+                  <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${badge.className}`}>
                     {NIVEL_ACESSO_ROTULO[p.nivel_acesso]}
                   </span>
                   {config.coberturaTemporaria && (
-                    <span className="inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ background: "#79628c1a", color: "#79628c" }}>
+                    <span className="inline-flex rounded-full bg-warning/10 px-2 py-0.5 text-[11px] font-bold text-warning">
                       Cobrindo {config.coberturaTemporaria.setor} ({config.coberturaTemporaria.inicio}–{config.coberturaTemporaria.fim})
                     </span>
                   )}
@@ -71,8 +67,7 @@ export function ModalUsuariosAtivos({ onClose }: { onClose: () => void }) {
                   <button
                     type="button"
                     onClick={() => setEditandoId(p.id)}
-                    className="shrink-0 rounded-full px-3 py-1 text-xs font-bold"
-                    style={{ background: "#6a5fc11a", color: "#6a5fc1" }}
+                    className="shrink-0 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary"
                   >
                     {config.setorDia ?? "Definir setor do dia"}
                   </button>
