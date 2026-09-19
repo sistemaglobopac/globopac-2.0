@@ -76,5 +76,5 @@ export function HCaptchaWidget({ onToken }: { onToken: (token: string) => void }
     );
   }
 
-  return <div ref={containerRef} />;
+  return <div ref={containerRef} className="flex justify-center" />;
 }
