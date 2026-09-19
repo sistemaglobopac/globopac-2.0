@@ -100,3 +100,69 @@
     -webkit-backdrop-filter: blur(18px) saturate(160%);
   }
 }
+
+/* Impressão do relatório de monitoramento (RelatorioModal.tsx) — imprime a PRÓPRIA página em
+   vez de clonar HTML/CSS para uma janela separada (ver printHelper.ts: a versão anterior saía
+   sem nenhum estilo, porque o Tailwind da janela nova nunca tinha garantia de carregar antes
+   do print). Técnica padrão "imprimir só este elemento": esconde tudo, mostra só
+   #relatorio-impressao, e neutraliza overflow/position dos wrappers do modal (sem isso, o
+   overflow-hidden/max-h-full do diálogo corta o relatório mesmo com o conteúdo "visível"). */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  #relatorio-impressao,
+  #relatorio-impressao * {
+    visibility: visible;
+  }
+
+  /* Todo o conteúdo ANTES de #relatorio-impressao no documento (o app inteiro por trás do
+     modal) continua invisível mas ocupando espaço em layout — visibility:hidden não remove do
+     fluxo normal. position:absolute + top/left:0 tira o relatório desse fluxo e o ancora no
+     topo da página impressa, em vez de aparecer em branco lá embaixo, depois de toda a altura
+     acumulada do app escondido. Só funciona porque os wrappers do modal logo abaixo (regra
+     seguinte) são forçados a position:static — sem um ancestral posicionado entre eles, o
+     bloco de contenção deste absolute vira a própria página, não o modal. */
+  #relatorio-impressao {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+  }
+
+  .relatorio-modal-overlay,
+  .relatorio-modal-dialog,
+  .relatorio-modal-body {
+    position: static !important;
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+    width: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: none !important;
+    box-shadow: none !important;
+    display: block !important;
+  }
+
+  .gs-no-print {
+    display: none !important;
+  }
+
+  .print-page {
+    max-width: 100% !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+}
