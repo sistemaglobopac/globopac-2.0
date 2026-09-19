@@ -42,13 +42,16 @@ select is(
 );
 
 -- 2) ADMIN_MASTER não consegue UPDATE direto (nenhuma policy de escrita existe — só a Edge
--- Function desbloquear-ip-login, com service_role, pode gravar).
+-- Function desbloquear-ip-login, com service_role, pode gravar). O UPDATE roda como statement
+-- de topo (uma CTE com UPDATE só é permitida no nível mais externo de uma query — não dentro do
+-- argumento de is(), que gerava "WITH clause containing a data-modifying statement must be at
+-- the top level"), e a checagem compara o estado antes/depois em vez de contar linhas via
+-- RETURNING: sob RLS sem policy de escrita, o UPDATE roda mas afeta 0 linhas, silenciosamente.
+update bloqueios_login_ip set status = 'normal' where ip = '203.0.113.10';
+
 select is(
-  (with tentativa as (
-     update bloqueios_login_ip set status = 'normal' where ip = '203.0.113.10' returning 1
-   )
-   select count(*)::int from tentativa),
-  0,
+  (select status from bloqueios_login_ip where ip = '203.0.113.10'),
+  'aguardando_captcha',
   'ADMIN_MASTER não consegue UPDATE em bloqueios_login_ip via RLS (só service_role escreve)'
 );
 
