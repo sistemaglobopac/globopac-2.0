@@ -5,6 +5,7 @@ import { useSessionStore } from "@/store/session";
 import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/api";
 import { useRncsAbertas } from "@/modules/rnc/api";
 import { supabase } from "@/lib/supabase";
+import type { CampoTemplate } from "@/shared/schema-campos";
 import {
   pacsDoTemplate,
   useAbrirAdendo,
@@ -20,6 +21,7 @@ import { ensureLocalTime } from "./utils/tempo";
 import { KpiCard } from "./components/KpiCard";
 import { AuditRecordCard } from "./components/AuditRecordCard";
 import { DossieVerificacaoCard } from "./components/DossieVerificacaoCard";
+import { DadosColetados } from "./components/DadosColetadosFicha";
 import { RelatorioModal } from "./components/relatorio/RelatorioModal";
 import type { DossieVerificacao } from "./utils/recordGrouping";
 import { Button } from "@/shared/ui/button";
@@ -109,6 +111,7 @@ export function PainelVerificacao() {
   }, [templates]);
   const nomePorTemplateId = useMemo(() => new Map((templates ?? []).map((t) => [t.id, t.nome])), [templates]);
   const codigoPorTemplateId = useMemo(() => new Map((templates ?? []).map((t) => [t.id, t.codigo])), [templates]);
+  const camposPorTemplateId = useMemo(() => new Map((templates ?? []).map((t) => [t.id, t.schema_campos])), [templates]);
   const uniquePacs = useMemo(() => {
     const set = new Set<string>();
     for (const t of templates ?? []) for (const pac of pacsDoTemplate(t)) set.add(pac);
@@ -366,6 +369,7 @@ export function PainelVerificacao() {
             onImprimirDossie={(d: DossieVerificacao) => setRelatorioIds(d.ids)}
             pacPorTemplateId={pacPorTemplateId}
             nomePorTemplateId={nomePorTemplateId}
+            camposPorTemplateId={camposPorTemplateId}
             usersMap={usuarios}
             isAdmin={Boolean(isAdmin)}
             onEncerrarTurno={(d) =>
@@ -387,6 +391,7 @@ export function PainelVerificacao() {
             onImprimir={(i) => setRelatorioIds([i.id])}
             pacPorTemplateId={pacPorTemplateId}
             nomePorTemplateId={nomePorTemplateId}
+            camposPorTemplateId={camposPorTemplateId}
             usersMap={usuarios}
             blockedIds={blockedIds}
             isAdmin={Boolean(isAdmin)}
@@ -410,6 +415,7 @@ export function PainelVerificacao() {
                 onImprimir={(i) => setRelatorioIds([i.id])}
                 pacPorTemplateId={pacPorTemplateId}
                 nomePorTemplateId={nomePorTemplateId}
+                camposPorTemplateId={camposPorTemplateId}
                 usersMap={usuarios}
                 blockedIds={blockedIds}
                 isAdmin={Boolean(isAdmin)}
@@ -573,6 +579,7 @@ export function PainelVerificacao() {
           nomeFicha={nomePorTemplateId.get(previewItem.appt.ficha_template_id) ?? "Ficha"}
           inspetorNome={usuarios.get(previewItem.appt.user_id) ?? "Inspetor"}
           verificadorNome={perfil.nomeCompleto}
+          campos={camposPorTemplateId.get(previewItem.appt.ficha_template_id) ?? []}
           onFechar={() => setPreviewItem(null)}
           onMensagem={setMensagem}
         />
@@ -604,6 +611,7 @@ function PreviewModal({
   nomeFicha,
   inspetorNome,
   verificadorNome,
+  campos,
   onFechar,
   onMensagem,
 }: {
@@ -611,6 +619,7 @@ function PreviewModal({
   nomeFicha: string;
   inspetorNome: string;
   verificadorNome: string;
+  campos: CampoTemplate[];
   onFechar: () => void;
   onMensagem: (m: { tipo: "success" | "error"; texto: string }) => void;
 }) {
@@ -635,7 +644,6 @@ function PreviewModal({
   const abrirAdendo = useAbrirAdendo();
 
   const { datePt, time } = ensureLocalTime(item.appt.criado_em);
-  const campos = Object.entries(item.appt.dados_dinamicos).filter(([chave]) => chave !== "adendos");
 
   async function aprovar() {
     try {
@@ -704,14 +712,7 @@ function PreviewModal({
           {inspetorNome} · {datePt} {time} · {item.appt.setor} · Monitoramento nº {item.ordemDia}
         </p>
 
-        <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-          {campos.map(([chave, valor]) => (
-            <div key={chave}>
-              <dt className="text-muted-foreground">{chave}</dt>
-              <dd>{String(valor)}</dd>
-            </div>
-          ))}
-        </dl>
+        <DadosColetados dadosDinamicos={item.appt.dados_dinamicos} campos={campos} />
 
         {item.status === "verificado" ? (
           <div className="space-y-3 border-t pt-4">
@@ -724,9 +725,9 @@ function PreviewModal({
                 <Label>Campo a corrigir</Label>
                 <Select value={campoAdendo} onChange={(e) => setCampoAdendo(e.target.value)}>
                   <option value="">Selecione…</option>
-                  {campos.map(([chave]) => (
-                    <option key={chave} value={chave}>
-                      {chave}
+                  {campos.map((campo) => (
+                    <option key={campo.chave} value={campo.chave}>
+                      {campo.label ?? campo.chave}
                     </option>
                   ))}
                 </Select>

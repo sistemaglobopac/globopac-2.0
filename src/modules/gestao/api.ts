@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { inicioDoDiaManaus } from "@/modules/bordo/api";
 import type { NivelAcesso } from "@/lib/database.types";
 import { type Rnc } from "@/modules/rnc/api";
+import type { CampoTemplate } from "@/shared/schema-campos";
 
 // ---------------------------------------------------------------------------------------
 // Perfil / nível de acesso — rótulos e classes do badge (seção "Aba admin" do Painel de
@@ -528,6 +529,10 @@ export interface DossieMonitoramento {
   dados_dinamicos: Record<string, unknown>;
   fichaCodigo: string | null;
   fichaNome: string | null;
+  /** Definição de campos da ficha, na ordem real — para DadosColetados renderizar rótulo/tipo
+   * em vez do dump bruto de Object.entries(dados_dinamicos) (chave técnica, "[object Object]"
+   * nos widgets "Especial SIF"). */
+  schemaCampos: CampoTemplate[];
   inspetorNome: string | null;
   verificadorNome: string | null;
   assinaturas: { tipo: string; criado_em: string }[];
@@ -561,7 +566,12 @@ export function useDossieMonitoramento(monitoramentoId: string | null) {
       if (error) throw error;
 
       const [{ data: ficha }, { data: inspetor }, { data: verificador }, { data: assinaturas }] = await Promise.all([
-        supabase.from("fichas_templates").select("codigo, nome").eq("id", m.ficha_template_id).maybeSingle().overrideTypes<{ codigo: string; nome: string } | null, { merge: false }>(),
+        supabase
+          .from("fichas_templates")
+          .select("codigo, nome, schema_campos")
+          .eq("id", m.ficha_template_id)
+          .maybeSingle()
+          .overrideTypes<{ codigo: string; nome: string; schema_campos: CampoTemplate[] } | null, { merge: false }>(),
         supabase.from("perfis_usuarios").select("nome_completo").eq("id", m.user_id).maybeSingle().overrideTypes<{ nome_completo: string } | null, { merge: false }>(),
         m.verificado_por
           ? supabase.from("perfis_usuarios").select("nome_completo").eq("id", m.verificado_por).maybeSingle().overrideTypes<{ nome_completo: string } | null, { merge: false }>()
@@ -579,6 +589,7 @@ export function useDossieMonitoramento(monitoramentoId: string | null) {
         dados_dinamicos: m.dados_dinamicos,
         fichaCodigo: ficha?.codigo ?? null,
         fichaNome: ficha?.nome ?? null,
+        schemaCampos: ficha?.schema_campos ?? [],
         inspetorNome: inspetor?.nome_completo ?? null,
         verificadorNome: verificador?.nome_completo ?? null,
         assinaturas: assinaturas ?? [],

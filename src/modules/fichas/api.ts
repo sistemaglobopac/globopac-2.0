@@ -397,18 +397,22 @@ export interface TemplateResumo {
   codigo: string;
   nome: string;
   pac_correspondente: string;
+  schema_campos: CampoTemplate[];
 }
 
 /** Todos os templates (ativos ou não) — uma verificação pode envolver monitoramentos criados
  * com uma ficha já desativada depois, então não dá pra filtrar por `ativo` aqui como
- * `useTemplatesAtivos` faz. */
+ * `useTemplatesAtivos` faz. Inclui schema_campos: é a fonte de rótulo/ordem/tipo dos campos
+ * usada por DadosColetados (card da lista, modal "Ver" e relatório impresso) — sem isso, essas
+ * telas caem no dump bruto de `Object.entries(dados_dinamicos)` (chave técnica ao invés de
+ * rótulo, "[object Object]" nos widgets "Especial SIF"). */
 export function useFichasTemplatesTodas() {
   return useQuery({
     queryKey: ["fichas_templates", "todas"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("fichas_templates")
-        .select("id, codigo, nome, pac_correspondente")
+        .select("id, codigo, nome, pac_correspondente, schema_campos")
         .overrideTypes<TemplateResumo[], { merge: false }>();
       if (error) throw error;
       return data ?? [];

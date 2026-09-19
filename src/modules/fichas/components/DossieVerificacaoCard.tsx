@@ -1,4 +1,5 @@
 import { Layers, Lock, Printer, Unlock } from "lucide-react";
+import type { CampoTemplate } from "@/shared/schema-campos";
 import { Button } from "@/shared/ui/button";
 import type { AppointmentDisplay, DossieVerificacao } from "../utils/recordGrouping";
 import { ensureLocalTime } from "../utils/tempo";
@@ -14,6 +15,7 @@ interface DossieVerificacaoCardProps {
   onImprimirDossie: (dossie: DossieVerificacao) => void;
   pacPorTemplateId: Map<string, string>;
   nomePorTemplateId: Map<string, string>;
+  camposPorTemplateId: Map<string, CampoTemplate[]>;
   usersMap: Map<string, string>;
   isAdmin: boolean;
   onEncerrarTurno: (dossie: DossieVerificacao) => void;
@@ -35,6 +37,7 @@ export function DossieVerificacaoCard({
   onImprimirDossie,
   pacPorTemplateId,
   nomePorTemplateId,
+  camposPorTemplateId,
   usersMap,
   isAdmin,
   onEncerrarTurno,
@@ -109,6 +112,7 @@ export function DossieVerificacaoCard({
             onImprimir={onImprimir}
             pacPorTemplateId={pacPorTemplateId}
             nomePorTemplateId={nomePorTemplateId}
+            camposPorTemplateId={camposPorTemplateId}
             usersMap={usersMap}
             blockedIds={dossie.bloqueado ? new Set(dossie.ids) : new Set()}
             isAdmin={isAdmin}

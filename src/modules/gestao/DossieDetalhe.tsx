@@ -1,4 +1,5 @@
 import { ChevronLeft } from "lucide-react";
+import { DadosColetados } from "@/modules/fichas/components/DadosColetadosFicha";
 import { useDossieMonitoramento } from "./api";
 
 /** Documento de auditoria de um monitoramento, aberto de dentro dos modais de "Monitoramentos
@@ -62,16 +63,7 @@ export function DossieDetalhe({ monitoramentoId, onVoltar }: { monitoramentoId: 
 
           <div>
             <h4 className="mb-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">Dados apontados</h4>
-            <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {Object.entries(dossie.dados_dinamicos)
-                .filter(([campo]) => campo !== "adendos")
-                .map(([campo, valor]) => (
-                  <div key={campo} className="rounded-md bg-surface-soft p-2 text-xs">
-                    <dt className="font-bold text-muted-foreground">{campo}</dt>
-                    <dd className="text-ink">{typeof valor === "object" ? JSON.stringify(valor) : String(valor)}</dd>
-                  </div>
-                ))}
-            </dl>
+            <DadosColetados dadosDinamicos={dossie.dados_dinamicos} campos={dossie.schemaCampos} />
           </div>
         </div>
       )}
