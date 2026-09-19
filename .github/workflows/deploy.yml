@@ -64,3 +64,30 @@ jobs:
         run: supabase functions deploy
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      # Só migrations e Edge Functions são publicadas acima — nada aqui sincroniza [auth] do
+      # config.toml (site_url, additional_redirect_urls, auth.hook.custom_access_token, etc.)
+      # com o projeto hospedado. Bug real encontrado: o Auth Hook (seção RBAC, ver
+      # supabase/migrations/20260916000004_rbac_claims_hook.sql) ficou habilitado só em
+      # config.toml, nunca aplicado no projeto hospedado — todo JWT saía sem o claim `perfil`,
+      # e toda escrita protegida por RLS falhava com "new row violates row-level security
+      # policy" para QUALQUER usuário, mesmo ADMIN_MASTER (ver ASSUMPTIONS.md item 61).
+      #
+      # Deliberadamente NÃO automatizado como `supabase config push`: config.toml tem
+      # site_url/additional_redirect_urls apontando para localhost (valores de dev local) —
+      # `supabase config push --yes` sem revisão aplicaria isso ao projeto de produção,
+      # quebrando redirecionamento de e-mails de auth para usuários de verdade. Este passo só
+      # avisa (não falha o deploy, não escreve nada) — aplicar a correção é manual e revisado:
+      # `supabase link --project-ref <ref> && supabase config diff` (ler o que mudaria) e só
+      # então `supabase config push`, aceitando/recusando cada propriedade no prompt.
+      - name: Checar deriva entre config.toml e o projeto hospedado (ex. Auth Hooks)
+        id: config-diff
+        run: supabase config diff --exit-code
+        continue-on-error: true
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Avisar sobre deriva de configuração (não bloqueia o deploy)
+        if: steps.config-diff.outcome == 'failure'
+        run: |
+          echo "::warning::supabase/config.toml difere da configuração do projeto hospedado (Auth Hooks, site_url, etc.) — veja o passo anterior para o diff. Aplique manualmente com 'supabase config push' após revisar cada propriedade (nunca automatizado: site_url/additional_redirect_urls deste arquivo são valores de desenvolvimento local)."

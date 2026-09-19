@@ -30,6 +30,11 @@ interface PerfilUsuarioRow {
   ativo: boolean;
   desligado_em: string | null;
   criado_em: string;
+  // Painel de Gestão (20260926000001_painel_gestao.sql): e-mail real para alertas de
+  // Melhoria Contínua/CAPA e um JSON serializado (texto, não jsonb) com campos sem coluna
+  // própria — setor do dia do inspetor e cobertura temporária de almoço.
+  email_alerta: string | null;
+  configuracoes_extras: string | null;
 }
 
 interface FichaTemplateRow {

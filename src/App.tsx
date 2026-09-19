@@ -21,11 +21,14 @@ import { NovaOsPage } from "@/modules/pcm/NovaOsPage";
 import { PainelOsPage } from "@/modules/pcm/PainelOsPage";
 import { DashboardPage } from "@/modules/bi/DashboardPage";
 import { PainelBordo } from "@/modules/bordo/PainelBordo";
+import { PainelGestao } from "@/modules/gestao/PainelGestao";
+import { RelatorioFolhaPausaPage } from "@/modules/gestao/RelatorioFolhaPausaPage";
+import { MelhoriaContinuaPage } from "@/modules/gestao/MelhoriaContinuaPage";
 
 const ROTA_INICIAL_POR_PERFIL: Record<string, string> = {
   INSPETOR_QUALIDADE: "/painel",
   VERIFICADOR: "/verificacao",
-  ADMIN_MASTER: "/fichas/nova",
+  ADMIN_MASTER: "/gestao",
   INSPECAO_FEDERAL: "/auditoria",
   GESTOR_SETOR: "/rnc",
   INSPETOR_PCM: "/pcm",
@@ -153,6 +156,30 @@ function AppRoutes() {
           element={
             <ProtectedRoute perfisPermitidos={["ADMIN_MASTER", "GESTOR_SETOR", "INSPETOR_PCM"]}>
               <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/gestao"
+          element={
+            <ProtectedRoute perfisPermitidos={["ADMIN_MASTER"]}>
+              <PainelGestao />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/relatorios/folha-pausa"
+          element={
+            <ProtectedRoute perfisPermitidos={["ADMIN_MASTER"]}>
+              <RelatorioFolhaPausaPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/melhoria-continua"
+          element={
+            <ProtectedRoute perfisPermitidos={["ADMIN_MASTER"]}>
+              <MelhoriaContinuaPage />
             </ProtectedRoute>
           }
         />

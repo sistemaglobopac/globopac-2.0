@@ -499,3 +499,111 @@ de um export real do v1 que não existe (item 47)** —
 [docs/runbooks/corte-migracao-legado.md](docs/runbooks/corte-migracao-legado.md) é um
 checklist preparado com antecedência, testado só na forma de "o script roda e é idempotente
 contra o stack local" (`fluxo-11-migracao-legado.spec.ts`), não como um corte real.
+
+## Premissas do Painel de Gestão (fora do roteiro de 11 fases)
+
+Console administrativo master do ADMIN_MASTER (`/gestao`, `src/modules/gestao/`), pedido após
+o fechamento da Fase 10 — não corresponde a nenhuma fase numerada do PROMPT MESTRE. Várias
+peças pedidas na especificação não têm equivalente no schema atual; as decisões abaixo
+resolvem essas lacunas.
+
+### 52. Mapeamento dos três grupos de "RNCs Pendentes" para o `status_rnc` real
+🟡 **Assumida (pendente de confirmação)** — a especificação do painel pede status
+`ABERTA`/`DEVOLVIDA`/`RESPONDIDA`/`CONCLUIDA`/`ESCALADO_CAPA`, que não existem em `status_rnc`
+(item 20: só `ABERTA`/`EM_TRATATIVA`/`TRATADA`/`REABERTA`/`FECHADA`). Mapeado como: "Em
+Tratativa com Encarregados de Setor" = `ABERTA`/`REABERTA`/`EM_TRATATIVA`; "Pendente de
+Verificação" = `TRATADA`; terceira seção = `monitoramentos.conformidade = false` dos últimos
+30 dias sem nenhuma linha em `rnc` (`monitoramento_id`) ainda vinculada — não existe conceito
+de "RNC formal" separado de ficha não conforme neste schema.
+
+### 53. Presença ("Usuários Ativos") é o primeiro uso de Supabase Presence no projeto
+🟡 **Assumida (pendente de confirmação)** — nenhuma tabela/coluna "online" foi criada; um
+canal global (`presenca-usuarios`) é montado em `AppShell` para todo usuário autenticado, e o
+KPI lê `presenceState()` desse canal (efêmero, em memória — nunca persistido). Consequência
+aceita: "ativo" significa "com o app aberto no navegador", não "logado nas últimas N horas".
+
+### 54. Equipamentos, desvios, comunicados e controle de pragas viraram listas em `app_config`
+✅ **Confirmada, decisão deliberada** — mesmo padrão já usado por `setores_cadastrados`
+(`src/modules/admin/api.ts`): um array JSON por chave (`equipamentos_cadastrados`,
+`desvios_cadastrados`, `comunicados_publicados`, `controle_pragas_registros`), sem migração de
+tabela nova. Evita relacionar quatro tabelas novas para CRUDs simples de baixo volume; se o
+volume real crescer (ex.: histórico de pragas com muitas linhas/mês), a correção é promover
+a chave específica para uma tabela relacional, sem afetar as demais.
+
+### 55. "Áreas e Custos" do Painel de Gestão reaproveita `centros_custo`, não uma tabela nova
+✅ **Confirmada, decisão deliberada** — `centros_custo` (item 6 da migração
+`20260916000006_app_config_centros_custo.sql`) já é exatamente "código + nome" para o módulo
+de PCM, com RLS e permissão `gerenciar` já existentes. O aviso histórico de "nunca confundir
+`centros_custo` com setor de inspeção" continua válido — esta aba do painel é sobre custo
+contábil do PCM, não sobre `setores_cadastrados`.
+
+### 56. Criação de colaborador e redefinição de senha exigem duas Edge Functions novas
+✅ **Confirmada, decisão deliberada** — a RLS de `perfis_usuarios` só libera `UPDATE` para
+`ADMIN_MASTER` (nunca `INSERT`), e só a Admin API (`service_role`) cria um usuário no Auth ou
+troca sua senha — o mesmo motivo pelo qual `scripts/seed-dev-users.mjs` roda com
+`service_role` fora do navegador. `supabase/functions/criar-usuario` e
+`supabase/functions/redefinir-senha` replicam esse fluxo como Edge Functions autenticadas
+(checagem de `ADMIN_MASTER` via JWT do chamador, igual a `liberar-sif`), em vez de expandir a
+RLS para permitir `INSERT` do cliente.
+
+### 57. Duas colunas novas em `perfis_usuarios`: `email_alerta` e `configuracoes_extras`
+🟡 **Assumida (pendente de confirmação)** — a especificação pede campos sem coluna própria
+(setor do dia do inspetor, cobertura temporária de almoço, turno fixo, e-mail real para
+alertas). `email_alerta` ganhou coluna própria (dado estruturado, pesquisável); o resto foi
+serializado como texto JSON em `configuracoes_extras` (mesclado no cliente a cada update),
+para não empilhar uma coluna nova a cada campo administrativo futuro — mesmo espírito de
+`app_config` para configuração, aplicado a uma linha de usuário em vez de global.
+
+### 58. Campo "Matrícula" incluído no cadastro de colaborador, embora a especificação não o liste
+✅ **Confirmada, decisão deliberada** — o login deste sistema é por matrícula desde a Fase 6
+(`perfis_usuarios.matricula`, `NOT NULL UNIQUE`, resolvida via `email_por_matricula`); um
+cadastro sem esse campo criaria um usuário que não conseguiria entrar. Tratado como uma
+correção de fidelidade ao sistema real, não como um campo inventado.
+
+### 59. Abas "simulador"/"controle_pragas"/"comunicados"/"admin_os_aprovacao"/"fichas_builder"/"dashboard_bi" reaproveitam módulos existentes
+✅ **Confirmada, decisão deliberada** — "simulador" embute `PainelBordo` (o painel operacional
+do Monitor de Qualidade/Inspetor, "simulado" pelo admin); "verificacao" e "tratativas" embutem
+`PainelVerificacao`/`RncTratativasPage` sem alteração; "admin_os_aprovacao" embute
+`PainelOsPage` (a etapa `AUTORIZACAO` já é a aprovação de OS, item 24); "fichas_builder" e
+"dashboard_bi" embutem `ConstrutorFichasPage`/`DashboardPage`. Nenhum desses módulos foi
+duplicado ou reescrito — o Painel de Gestão só os monta atrás de um aviso de operação quando
+fazem sentido como "painel de outro perfil operado pelo admin" (seção correspondente do
+próprio painel).
+
+### 60. "Melhoria Contínua" é um placeholder — não existe módulo de CAPA neste projeto
+🟡 **Assumida (pendente de confirmação)** — o botão navega para `/melhoria-continua`, uma
+página que apenas explica que o módulo ainda não foi construído. Implementá-lo de verdade
+(planos de ação, vínculo com RNC, notificação via `email_alerta`) é escopo novo, não coberto
+pela especificação do Painel de Gestão em si.
+
+## Bug real encontrado em produção: `deploy.yml` nunca sincroniza a config de Auth
+
+### 61. Auth Hook (`custom_access_token`) habilitado em `config.toml`, mas nunca aplicado ao projeto hospedado
+🔴 **Confirmada por execução real — bloqueava toda escrita protegida por RLS** — reportado pelo
+usuário ao tentar salvar uma ficha no Construtor de Fichas, logado como `ADMIN_MASTER`:
+`new row violates row-level security policy for table "fichas_templates"`. Causa raiz: `.github/
+workflows/deploy.yml` só executa `supabase db push` (migrations) e `supabase functions deploy`
+(Edge Functions) — nunca nada que sincronize a seção `[auth]` de `supabase/config.toml` com o
+projeto hospedado. `[auth.hook.custom_access_token]` (ver
+[supabase/migrations/20260916000004_rbac_claims_hook.sql](supabase/migrations/20260916000004_rbac_claims_hook.sql))
+só é aplicado automaticamente pela stack local (`supabase start`); num projeto hospedado ele
+precisa ser habilitado manualmente (Dashboard → Authentication → Hooks → Custom Access Token
+Hook → função `public.custom_access_token_hook`) ou via `supabase config push`. Sem isso, todo
+JWT emitido sai sem o claim `perfil`/`setores_permitidos`, `public.meu_perfil()` sempre retorna
+`NULL`, e `tem_permissao()` nega tudo — não é um problema específico de `fichas_templates`, é
+qualquer escrita em qualquer tabela deste projeto, para qualquer perfil, incluindo
+`ADMIN_MASTER`. Depois de habilitar o hook no Dashboard, é necessário logout/login (o JWT
+atual já foi emitido sem o claim; só renova na próxima expiração, `jwt_expiry = 900`).
+
+**Por que não foi automatizado com `supabase config push` no CI:** o próprio `config.toml`
+tem `site_url`/`additional_redirect_urls` apontando para `http://127.0.0.1:5173` (valores de
+desenvolvimento local, nunca atualizados para produção). Um `config push` não-interativo no CI
+aplicaria isso ao projeto de produção, quebrando o redirecionamento de e-mails de autenticação
+(reset de senha, magic link) para usuários reais — o próprio texto de ajuda do comando
+(`supabase config push --help`) alerta exatamente para esse risco. Em vez disso, `deploy.yml`
+ganhou um passo `supabase config diff --exit-code` (somente leitura, `continue-on-error: true`)
+que emite um aviso não-bloqueante quando `config.toml` diverge do projeto hospedado, para que
+essa lacuna nunca mais fique silenciosa — mas aplicar a correção (`supabase config push`)
+continua sendo uma ação manual e revisada (aceitar o Auth Hook, recusar `site_url`/
+`additional_redirect_urls` a menos que já estejam corretos para produção), não uma etapa
+automática do pipeline.

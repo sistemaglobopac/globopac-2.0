@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { useSessionStore } from "@/store/session";
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/lib/utils";
+import { usePresenceTracking } from "@/modules/gestao/usePresenceTracking";
 
 interface ItemMenu {
   rota: string;
@@ -36,6 +37,7 @@ const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
     { rota: "/dashboard", rotulo: "Painel gerencial" },
   ],
   ADMIN_MASTER: [
+    { rota: "/gestao", rotulo: "Painel de Gestão" },
     { rota: "/painel", rotulo: "Painel de Bordo" },
     { rota: "/fichas/nova", rotulo: "Nova ficha" },
     { rota: "/verificacao", rotulo: "Painel de Verificação" },
@@ -54,6 +56,9 @@ const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
 export function AppShell() {
   const perfil = useSessionStore((s) => s.perfil);
   const itens = perfil ? (MENU_POR_PERFIL[perfil.nivelAcesso] ?? []) : [];
+  // Presença global (qualquer perfil, não só ADMIN_MASTER) — o KPI "Usuários Ativos" do Painel
+  // de Gestão precisa ver todo mundo com o app aberto, não só quem abriu o próprio painel.
+  usePresenceTracking(perfil?.id);
 
   return (
     <div className="page-wash flex min-h-screen">
