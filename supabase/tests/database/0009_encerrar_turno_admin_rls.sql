@@ -102,8 +102,12 @@ set local role authenticated;
 -- Diferente de UPDATE (onde a policy USING só filtra a linha silenciosamente, 0 linhas
 -- afetadas, sem erro), um INSERT cujo WITH CHECK falha lança exceção direto — throws_ok, não
 -- is()/count(*), senão a exceção não capturada aborta o script antes do finish() rodar.
+-- O 2º argumento de throws_ok é o SQLSTATE esperado (42501 = insufficient_privilege, o
+-- código de uma violação de RLS), não uma descrição solta — a forma de 2 argumentos
+-- (sql, descrição) não existe: o 2º parâmetro é sempre erro/código, nunca texto livre.
 select throws_ok(
   $$insert into turnos_inspetores (user_id, inicio, fim) values ('e0000000-0000-0000-0000-000000000003', now(), now())$$,
+  '42501',
   'INSPETOR_QUALIDADE não consegue inserir turno em nome de outro inspetor via RLS'
 );
 
