@@ -72,10 +72,10 @@ function Cabecalho({ titulo, conforme }: { titulo: string; conforme: boolean }) 
   );
 }
 
-export function ChillerCarcacasRelatorio({ valor }: { valor: ChillerCarcacasValor }) {
+export function ChillerCarcacasRelatorio({ valor, titulo = "Renovação da Água — SPR Carcaças" }: { valor: ChillerCarcacasValor; titulo?: string }) {
   return (
     <div className="col-span-full space-y-2 rounded-lg border border-hairline bg-gray-50 p-3 print:p-2">
-      <Cabecalho titulo="Renovação da Água — SPR Carcaças" conforme={valor.conformidade} />
+      <Cabecalho titulo={titulo} conforme={valor.conformidade} />
       <div className="grid grid-cols-2 gap-2 text-[10px] print:text-[8px] sm:grid-cols-4">
         <div><span className="text-muted-foreground">Aves no período</span><br /><strong>{valor.totalAves.toLocaleString("pt-BR")}</strong></div>
         <div><span className="text-muted-foreground">Aves bruto</span><br /><strong>{valor.totalAvesBruto.toLocaleString("pt-BR")}</strong></div>
@@ -114,10 +114,10 @@ export function ChillerCarcacasRelatorio({ valor }: { valor: ChillerCarcacasValo
   );
 }
 
-export function ChillerPartesRelatorio({ valor }: { valor: ChillerPartesValor }) {
+export function ChillerPartesRelatorio({ valor, titulo = "Renovação da Água — Chiller de Partes" }: { valor: ChillerPartesValor; titulo?: string }) {
   return (
     <div className="col-span-full space-y-2 rounded-lg border border-hairline bg-gray-50 p-3 print:p-2">
-      <Cabecalho titulo="Renovação da Água — Chiller de Partes" conforme={valor.conformidade} />
+      <Cabecalho titulo={titulo} conforme={valor.conformidade} />
       <TabelaTanques
         tanques={{
           chiller1: { ...valor.tanques.chiller1, rotulo: "Chiller 01 Partes" },
@@ -133,10 +133,10 @@ export function ChillerPartesRelatorio({ valor }: { valor: ChillerPartesValor })
   );
 }
 
-export function LavagemFinalRelatorio({ valor }: { valor: LavagemFinalValor }) {
+export function LavagemFinalRelatorio({ valor, titulo = "Chuveiro de Lavagem Final" }: { valor: LavagemFinalValor; titulo?: string }) {
   return (
     <div className="col-span-full space-y-2 rounded-lg border border-hairline bg-gray-50 p-3 print:p-2">
-      <Cabecalho titulo="Chuveiro de Lavagem Final" conforme={valor.conformidade} />
+      <Cabecalho titulo={titulo} conforme={valor.conformidade} />
       <TabelaTanques tanques={{ chuveiro: { ...valor.chuveiro, rotulo: "Chuveiro Final" } }} />
       <div className="grid grid-cols-2 gap-2 text-[10px] print:text-[8px] sm:grid-cols-3">
         <div><span className="text-muted-foreground">Aves no período</span><br /><strong>{valor.totalAves.toLocaleString("pt-BR")}</strong></div>
@@ -150,13 +150,13 @@ export function LavagemFinalRelatorio({ valor }: { valor: LavagemFinalValor }) {
 
 const ROTULO_MIUDO: Record<string, string> = { coracao: "Coração", moela: "Moela", figado: "Fígado", cabeca: "Cabeça", pes: "Pés" };
 
-export function MiniChillersRelatorio({ valor }: { valor: MiniChillersValor }) {
+export function MiniChillersRelatorio({ valor, titulo = "Renovação da Água — Mini-Chillers de Miúdos" }: { valor: MiniChillersValor; titulo?: string }) {
   const tanques = Object.fromEntries(
     Object.entries(valor.tanques).map(([chave, t]) => [chave, { ...t, rotulo: ROTULO_MIUDO[chave] ?? chave }])
   );
   return (
     <div className="col-span-full space-y-2 rounded-lg border border-hairline bg-gray-50 p-3 print:p-2">
-      <Cabecalho titulo="Renovação da Água — Mini-Chillers de Miúdos" conforme={valor.conformidade} />
+      <Cabecalho titulo={titulo} conforme={valor.conformidade} />
       <TabelaTanques tanques={tanques} />
       <div className="grid grid-cols-2 gap-2 text-[10px] print:text-[8px] sm:grid-cols-3">
         <div><span className="text-muted-foreground">Aves no período</span><br /><strong>{valor.totalAves.toLocaleString("pt-BR")}</strong></div>
@@ -167,11 +167,11 @@ export function MiniChillersRelatorio({ valor }: { valor: MiniChillersValor }) {
   );
 }
 
-export function AbsorcaoAguaRelatorio({ valor }: { valor: AbsorcaoAguaValor }) {
+export function AbsorcaoAguaRelatorio({ valor, titulo = "Teste de Absorção de Água (Especial SIF)" }: { valor: AbsorcaoAguaValor; titulo?: string }) {
   const conforme = valor.status === "conforme";
   return (
     <div className="col-span-full space-y-2 rounded-lg border border-hairline bg-gray-50 p-3 print:p-2">
-      <Cabecalho titulo="Teste de Absorção de Água (Especial SIF)" conforme={conforme} />
+      <Cabecalho titulo={titulo} conforme={conforme} />
       <table className="w-full border-collapse text-[10px] print:text-[8px]">
         <thead>
           <tr className="bg-primary/5 text-left uppercase text-muted-foreground">
@@ -202,11 +202,11 @@ export function AbsorcaoAguaRelatorio({ valor }: { valor: AbsorcaoAguaValor }) {
   );
 }
 
-export function DrippingTestRelatorio({ valor }: { valor: DrippingTestValor }) {
+export function DrippingTestRelatorio({ valor, titulo = "Dripping Test — Portaria 210/98 (Especial SIF)" }: { valor: DrippingTestValor; titulo?: string }) {
   const conforme = valor.status === "conforme";
   return (
     <div className="col-span-full space-y-2 rounded-lg border border-hairline bg-gray-50 p-3 print:p-2">
-      <Cabecalho titulo="Dripping Test — Portaria 210/98 (Especial SIF)" conforme={conforme} />
+      <Cabecalho titulo={titulo} conforme={conforme} />
       <div className="grid grid-cols-2 gap-2 text-[10px] print:text-[8px] sm:grid-cols-3">
         <div><span className="text-muted-foreground">Lote</span><br /><strong>{valor.lote || "—"}</strong></div>
         <div><span className="text-muted-foreground">Início</span><br /><strong>{valor.horaInicio || "—"}</strong></div>
@@ -246,10 +246,10 @@ export function DrippingTestRelatorio({ valor }: { valor: DrippingTestValor }) {
   );
 }
 
-export function ParadaEquipamentoRelatorio({ valor }: { valor: ParadaEquipamentoValor }) {
+export function ParadaEquipamentoRelatorio({ valor, titulo = "Registro de Parada de Equipamento" }: { valor: ParadaEquipamentoValor; titulo?: string }) {
   return (
     <div className="col-span-full space-y-2 rounded-lg border border-hairline bg-gray-50 p-3 print:p-2">
-      <span className="text-[10px] font-black uppercase tracking-wider text-primary print:text-[9px]">Registro de Parada de Equipamento</span>
+      <span className="text-[10px] font-black uppercase tracking-wider text-primary print:text-[9px]">{titulo}</span>
       <div className="grid grid-cols-3 gap-2 text-[10px] print:text-[8px]">
         <div><span className="text-muted-foreground">Parada</span><br /><strong>{valor.hora_parada || "—"}</strong></div>
         <div><span className="text-muted-foreground">Retomada</span><br /><strong>{valor.hora_retomada || "—"}</strong></div>

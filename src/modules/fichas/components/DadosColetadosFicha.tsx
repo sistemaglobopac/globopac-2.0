@@ -69,19 +69,19 @@ export function DadosColetados({ dadosDinamicos, campos }: { dadosDinamicos: Rec
 
         switch (campo.tipo) {
           case "chiller_carcacas":
-            return valor ? <ChillerCarcacasRelatorio key={campo.chave} valor={valor as ChillerCarcacasValor} /> : null;
+            return valor ? <ChillerCarcacasRelatorio key={campo.chave} valor={valor as ChillerCarcacasValor} titulo={rotulo} /> : null;
           case "chiller_partes":
-            return valor ? <ChillerPartesRelatorio key={campo.chave} valor={valor as ChillerPartesValor} /> : null;
+            return valor ? <ChillerPartesRelatorio key={campo.chave} valor={valor as ChillerPartesValor} titulo={rotulo} /> : null;
           case "lavagem_final":
-            return valor ? <LavagemFinalRelatorio key={campo.chave} valor={valor as LavagemFinalValor} /> : null;
+            return valor ? <LavagemFinalRelatorio key={campo.chave} valor={valor as LavagemFinalValor} titulo={rotulo} /> : null;
           case "mini_chillers":
-            return valor ? <MiniChillersRelatorio key={campo.chave} valor={valor as MiniChillersValor} /> : null;
+            return valor ? <MiniChillersRelatorio key={campo.chave} valor={valor as MiniChillersValor} titulo={rotulo} /> : null;
           case "absorcao_agua":
-            return valor ? <AbsorcaoAguaRelatorio key={campo.chave} valor={valor as AbsorcaoAguaValor} /> : null;
+            return valor ? <AbsorcaoAguaRelatorio key={campo.chave} valor={valor as AbsorcaoAguaValor} titulo={rotulo} /> : null;
           case "dripping_test":
-            return valor ? <DrippingTestRelatorio key={campo.chave} valor={valor as DrippingTestValor} /> : null;
+            return valor ? <DrippingTestRelatorio key={campo.chave} valor={valor as DrippingTestValor} titulo={rotulo} /> : null;
           case "parada_equipamento":
-            return valor ? <ParadaEquipamentoRelatorio key={campo.chave} valor={valor as ParadaEquipamentoValor} /> : null;
+            return valor ? <ParadaEquipamentoRelatorio key={campo.chave} valor={valor as ParadaEquipamentoValor} titulo={rotulo} /> : null;
           case "foto":
           case "assinatura":
             return (
