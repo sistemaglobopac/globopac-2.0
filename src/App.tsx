@@ -12,7 +12,7 @@ import { PainelVerificacao } from "@/modules/fichas/PainelVerificacao";
 import { ConstrutorFichasPage } from "@/modules/fichas/ConstrutorFichasPage";
 import { SetoresPage } from "@/modules/admin/SetoresPage";
 import { CarimbosPendentesPage } from "@/modules/carimbos/CarimbosPendentesPage";
-import { LiberarSifPage } from "@/modules/sif/LiberarSifPage";
+import { PainelArquivoPage } from "@/modules/sif/PainelArquivoPage";
 import { AuditoriaFederalPage } from "@/modules/sif/AuditoriaFederalPage";
 import { VerificarPage } from "@/modules/verificacao-publica/VerificarPage";
 import { RncTratativasPage } from "@/modules/rnc/RncTratativasPage";
@@ -114,8 +114,8 @@ function AppRoutes() {
         <Route
           path="/sif/liberar"
           element={
-            <ProtectedRoute perfisPermitidos={["ADMIN_MASTER"]}>
-              <LiberarSifPage />
+            <ProtectedRoute perfisPermitidos={["VERIFICADOR", "ADMIN_MASTER"]}>
+              <PainelArquivoPage />
             </ProtectedRoute>
           }
         />

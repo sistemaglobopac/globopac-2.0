@@ -50,6 +50,7 @@ const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
   VERIFICADOR: [
     { rota: "/verificacao", rotulo: "Painel de Verificação" },
     { rota: "/rnc", rotulo: "Revisão de RNC" },
+    { rota: "/sif/liberar", rotulo: "Painel de Arquivo" },
   ],
   INSPECAO_FEDERAL: [{ rota: "/auditoria", rotulo: "Auditoria" }],
   GESTOR_SETOR: [
@@ -70,7 +71,7 @@ const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
     { rota: "/pcm/nova", rotulo: "Nova OS" },
     { rota: "/templates", rotulo: "Construtor de Fichas" },
     { rota: "/admin/setores", rotulo: "Gestão de Setores" },
-    { rota: "/sif/liberar", rotulo: "Liberar ao SIF" },
+    { rota: "/sif/liberar", rotulo: "Painel de Arquivo" },
     { rota: "/auditoria", rotulo: "Auditoria" },
     { rota: "/carimbos", rotulo: "Carimbos de tempo" },
     { rota: "/dashboard", rotulo: "Painel gerencial" },

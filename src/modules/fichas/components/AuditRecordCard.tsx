@@ -1,10 +1,8 @@
 import { Eye, Lock, Printer, ShieldAlert, Unlock } from "lucide-react";
-import type { CampoTemplate } from "@/shared/schema-campos";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { ensureLocalTime } from "../utils/tempo";
 import type { AppointmentDisplay } from "../utils/recordGrouping";
-import { DadosColetados } from "./DadosColetadosFicha";
 
 const STATUS_ROTULO: Record<AppointmentDisplay["status"], string> = {
   aguardando: "Aguardando verificação",
@@ -30,7 +28,6 @@ export interface AuditRecordCardProps {
   onImprimir: (item: AppointmentDisplay) => void;
   pacPorTemplateId: Map<string, string>;
   nomePorTemplateId: Map<string, string>;
-  camposPorTemplateId: Map<string, CampoTemplate[]>;
   usersMap: Map<string, string>;
   blockedIds: Set<string>;
   isAdmin: boolean;
@@ -47,7 +44,6 @@ export function AuditRecordCard({
   onImprimir,
   pacPorTemplateId,
   nomePorTemplateId,
-  camposPorTemplateId,
   usersMap,
   blockedIds,
   isAdmin,
@@ -60,7 +56,6 @@ export function AuditRecordCard({
   const nomeFicha = nomePorTemplateId.get(appt.ficha_template_id) ?? "Ficha";
   const pac = pacPorTemplateId.get(appt.ficha_template_id) ?? "—";
   const inspetorNome = usersMap.get(appt.user_id) ?? "Inspetor";
-  const campos = camposPorTemplateId.get(appt.ficha_template_id) ?? [];
 
   return (
     <div className={`space-y-2 rounded-lg border bg-card p-4 shadow-sm ${bloqueado ? "opacity-70" : ""}`}>
@@ -118,12 +113,6 @@ export function AuditRecordCard({
           Capturado offline em {new Date(appt.capturado_em).toLocaleString("pt-BR")} (informado pelo dispositivo,
           não verificado) — sincronizado em {new Date(appt.criado_em).toLocaleString("pt-BR")}.
         </p>
-      )}
-
-      {campos.length > 0 && (
-        <div className="border-t pt-2">
-          <DadosColetados dadosDinamicos={appt.dados_dinamicos} campos={campos} />
-        </div>
       )}
 
       {appt.conformidade === false && (

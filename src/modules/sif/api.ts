@@ -8,17 +8,20 @@ export interface MonitoramentoVerificado {
   verificado_em: string | null;
   liberado_sif: boolean;
   criado_em: string;
+  ficha_template_id: string;
+  user_id: string;
 }
 
-/** Verificados (aprovados ou reprovados) ainda não liberados — candidatos à liberação em
- * lote ao SIF (seção 7.3 e 6.2). */
+/** Verificados (aprovados ou reprovados) ainda não liberados — o "Painel de Arquivo": mesma
+ * ação de sempre (aprovar e assinar em Painel de Verificação), só que agora com uma tela
+ * dedicada em vez de ir só pro pool cru de liberação ao SIF (seção 7.3 e 6.2). */
 export function useMonitoramentosParaLiberar() {
   return useQuery({
     queryKey: ["monitoramentos", "para-liberar"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("monitoramentos")
-        .select("id, setor, conformidade, verificado_em, liberado_sif, criado_em")
+        .select("id, setor, conformidade, verificado_em, liberado_sif, criado_em, ficha_template_id, user_id")
         .not("verificado_por", "is", null)
         .eq("liberado_sif", false)
         .order("verificado_em", { ascending: true })

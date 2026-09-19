@@ -366,10 +366,9 @@ export function PainelVerificacao() {
             toggleGroupSelection={toggleGroupSelection}
             onPreview={setPreviewItem}
             onImprimir={(item) => setRelatorioIds([item.id])}
-            onImprimirDossie={(d: DossieVerificacao) => setRelatorioIds(d.ids)}
+            onVerDossie={(d: DossieVerificacao) => setRelatorioIds(d.ids)}
             pacPorTemplateId={pacPorTemplateId}
             nomePorTemplateId={nomePorTemplateId}
-            camposPorTemplateId={camposPorTemplateId}
             usersMap={usuarios}
             isAdmin={Boolean(isAdmin)}
             onEncerrarTurno={(d) =>
@@ -391,7 +390,6 @@ export function PainelVerificacao() {
             onImprimir={(i) => setRelatorioIds([i.id])}
             pacPorTemplateId={pacPorTemplateId}
             nomePorTemplateId={nomePorTemplateId}
-            camposPorTemplateId={camposPorTemplateId}
             usersMap={usuarios}
             blockedIds={blockedIds}
             isAdmin={Boolean(isAdmin)}
@@ -415,7 +413,6 @@ export function PainelVerificacao() {
                 onImprimir={(i) => setRelatorioIds([i.id])}
                 pacPorTemplateId={pacPorTemplateId}
                 nomePorTemplateId={nomePorTemplateId}
-                camposPorTemplateId={camposPorTemplateId}
                 usersMap={usuarios}
                 blockedIds={blockedIds}
                 isAdmin={Boolean(isAdmin)}
