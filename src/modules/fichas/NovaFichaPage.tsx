@@ -5,6 +5,7 @@ import { AlertTriangle, ArrowLeft, BellRing, CheckCircle2, Clock, Lock } from "l
 import { useSessionStore, type PerfilSessao } from "@/store/session";
 import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/api";
 import { zodFromSchemaCampos, valoresIniciaisDe, type CampoTemplate } from "@/shared/schema-campos";
+import { supabase } from "@/lib/supabase";
 import { useCriarMonitoramento, useTemplatesAtivos, useUltimoRegistroFicha, useUltimosApontamentosHoje, type TemplateAtivo } from "./api";
 import { useSincronizacaoOffline } from "./useSincronizacaoOffline";
 import { useAudioAlarm } from "./useAudioAlarm";
@@ -12,6 +13,8 @@ import { DynamicField } from "./DynamicField";
 import type { ChillerCarcacasValor } from "./fields/tiposCompostos";
 import { Button } from "@/shared/ui/button";
 import { Select } from "@/shared/ui/select";
+import { Input } from "@/shared/ui/input";
+import { Label } from "@/shared/ui/label";
 import { Badge } from "@/shared/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 
@@ -250,6 +253,10 @@ interface FichaFormProps {
 
 function FichaForm({ templateId, versaoTemplate, campos, nome, setor, perfil, onVoltar }: FichaFormProps) {
   const [sucesso, setSucesso] = useState<"online" | "offline" | null>(null);
+  const [dadosPendentes, setDadosPendentes] = useState<FieldValues | null>(null);
+  const [senha, setSenha] = useState("");
+  const [autenticando, setAutenticando] = useState(false);
+  const [erroSenha, setErroSenha] = useState<string | null>(null);
   const criarMonitoramento = useCriarMonitoramento();
   const { data: ultimoRegistro } = useUltimoRegistroFicha(templateId, setor);
 
@@ -293,7 +300,20 @@ function FichaForm({ templateId, versaoTemplate, campos, nome, setor, perfil, on
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [valoresForm]);
 
+  /** A assinatura eletrônica avançada (Lei 14.063/2020, Art. 4º §2º) exige reautenticação por
+   * senha no momento de assinar — mesmo mecanismo de PainelVerificacao (confirmarComSenha):
+   * sem rede, não há como validar a senha contra o servidor, então esse passo é pulado e o
+   * registro vai direto para a fila offline (useCriarMonitoramento já assina automaticamente
+   * ao sincronizar, seção 7.5/ADR 0002). */
   async function aoEnviar(dados: FieldValues) {
+    if (!navigator.onLine) {
+      await salvar(dados);
+      return;
+    }
+    setDadosPendentes(dados);
+  }
+
+  async function salvar(dados: FieldValues) {
     setSucesso(null);
     try {
       const resultado = await criarMonitoramento.mutateAsync({
@@ -305,9 +325,43 @@ function FichaForm({ templateId, versaoTemplate, campos, nome, setor, perfil, on
       });
       reset(valoresIniciaisDe(campos));
       setSucesso(resultado.modo);
+      setDadosPendentes(null);
+      // A ficha "fecha" (volta para a lista, onde o cronômetro de calcularStatus passa a
+      // mostrar BLOQUEADO até vencer tempo_entre_apontamentos_min) em vez de ficar aberta
+      // permitindo reenvio imediato do mesmo monitoramento.
+      setTimeout(onVoltar, 1500);
     } catch {
-      // erro já refletido em criarMonitoramento.isError, renderizado abaixo.
+      // erro já refletido em criarMonitoramento.isError, renderizado abaixo — dadosPendentes
+      // permanece preenchido para o usuário tentar assinar de novo sem perder os dados.
     }
+  }
+
+  async function confirmarComSenha() {
+    if (!dadosPendentes) return;
+    setErroSenha(null);
+    setAutenticando(true);
+    try {
+      const { data: userData, error: erroUser } = await supabase.auth.getUser();
+      if (erroUser || !userData.user?.email) {
+        setErroSenha("Não foi possível identificar seu usuário. Faça login novamente.");
+        return;
+      }
+      const { error: erroAuth } = await supabase.auth.signInWithPassword({ email: userData.user.email, password: senha });
+      if (erroAuth) {
+        setErroSenha("Senha incorreta. A assinatura eletrônica falhou.");
+        return;
+      }
+      await salvar(dadosPendentes);
+    } finally {
+      setAutenticando(false);
+      setSenha("");
+    }
+  }
+
+  function cancelarAssinatura() {
+    setDadosPendentes(null);
+    setSenha("");
+    setErroSenha(null);
   }
 
   return (
@@ -321,33 +375,72 @@ function FichaForm({ templateId, versaoTemplate, campos, nome, setor, perfil, on
 
       <Card>
         <CardContent className="pt-6">
-          <form onSubmit={handleSubmit(aoEnviar)} className="space-y-4" noValidate>
-            {camposVisiveis.map((campo) => (
-              <DynamicField
-                key={campo.chave}
-                campo={campo}
-                register={register}
-                errors={errors}
-                control={control}
-                prevAppointment={ultimoRegistro?.dados_dinamicos}
-                carcacasAtual={carcacasAtual}
-              />
-            ))}
-
-            {criarMonitoramento.isError && (
-              <p className="text-sm text-destructive">Falha ao criar/assinar a ficha. Tente novamente.</p>
-            )}
-            {sucesso === "online" && <p className="text-sm text-success">Ficha criada e assinada com sucesso.</p>}
-            {sucesso === "offline" && (
-              <p className="text-sm text-warning">
-                Sem conexão — ficha salva no dispositivo e será enviada e assinada automaticamente assim que a rede voltar.
+          {dadosPendentes ? (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Confirme sua senha (a mesma do login) para assinar eletronicamente este monitoramento.
               </p>
-            )}
+              <div className="space-y-2">
+                <Label htmlFor="senha-assinatura-ficha">Sua senha</Label>
+                <Input
+                  id="senha-assinatura-ficha"
+                  type="password"
+                  value={senha}
+                  onChange={(e) => setSenha(e.target.value)}
+                  disabled={autenticando}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && senha && !autenticando) void confirmarComSenha();
+                  }}
+                />
+              </div>
+              {erroSenha && <p className="text-sm text-destructive">{erroSenha}</p>}
+              {criarMonitoramento.isError && (
+                <p className="text-sm text-destructive">Falha ao criar/assinar a ficha. Tente novamente.</p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" className="flex-1" disabled={autenticando} onClick={cancelarAssinatura}>
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  className="flex-1"
+                  disabled={autenticando || !senha || criarMonitoramento.isPending}
+                  onClick={confirmarComSenha}
+                >
+                  {autenticando || criarMonitoramento.isPending ? "Assinando…" : "Confirmar e Assinar"}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit(aoEnviar)} className="space-y-4" noValidate>
+              {camposVisiveis.map((campo) => (
+                <DynamicField
+                  key={campo.chave}
+                  campo={campo}
+                  register={register}
+                  errors={errors}
+                  control={control}
+                  prevAppointment={ultimoRegistro?.dados_dinamicos}
+                  carcacasAtual={carcacasAtual}
+                />
+              ))}
 
-            <Button type="submit" disabled={isSubmitting || criarMonitoramento.isPending}>
-              {isSubmitting || criarMonitoramento.isPending ? "Salvando e assinando…" : "Criar e assinar"}
-            </Button>
-          </form>
+              {criarMonitoramento.isError && (
+                <p className="text-sm text-destructive">Falha ao criar/assinar a ficha. Tente novamente.</p>
+              )}
+              {sucesso === "online" && <p className="text-sm text-success">Ficha criada e assinada com sucesso.</p>}
+              {sucesso === "offline" && (
+                <p className="text-sm text-warning">
+                  Sem conexão — ficha salva no dispositivo e será enviada e assinada automaticamente assim que a rede voltar.
+                </p>
+              )}
+
+              <Button type="submit" disabled={isSubmitting || criarMonitoramento.isPending}>
+                {isSubmitting || criarMonitoramento.isPending ? "Salvando e assinando…" : "Criar e assinar"}
+              </Button>
+            </form>
+          )}
         </CardContent>
       </Card>
     </div>
