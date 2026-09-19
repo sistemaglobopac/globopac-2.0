@@ -33,8 +33,18 @@ function apuracaoTanque(tanque: TanqueHidrometro, totalAvesPeriodo: number): num
   return aguaUsada / totalAvesPeriodo;
 }
 
-function tanqueVazio(prev: string): TanqueHidrometro {
-  return { prev, cur: "", ice: "332" };
+// Gelo padrão (kg) por tanque ao abrir um monitoramento — portado literalmente de
+// ChillerField.jsx (v1). São os valores calibrados de cada tanque físico desta planta, não
+// um placeholder: por isso diferem entre si (Chiller 01 é maior que o Pré-chiller, que por
+// sua vez é maior que o Chiller 02) em vez de um único valor genérico para os três.
+const GELO_PADRAO: Record<ChaveTanque, string> = {
+  preChiller: "1995",
+  chiller1: "2394",
+  chiller2: "1596",
+};
+
+function tanqueVazio(tanque: ChaveTanque, prev: string): TanqueHidrometro {
+  return { prev, cur: "", ice: GELO_PADRAO[tanque] };
 }
 
 interface ChillerCarcacasFieldProps {
@@ -57,9 +67,9 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
   const [condenasParcial, setCondenasParcial] = useState(value?.condenasParcial ?? "");
   const [condenasTotal, setCondenasTotal] = useState(value?.condenasTotal ?? "");
   const [tanques, setTanques] = useState({
-    preChiller: value?.tanques.preChiller ?? tanqueVazio(prevAppointment?.tanques.preChiller.cur ?? ""),
-    chiller1: value?.tanques.chiller1 ?? tanqueVazio(prevAppointment?.tanques.chiller1.cur ?? ""),
-    chiller2: value?.tanques.chiller2 ?? tanqueVazio(prevAppointment?.tanques.chiller2.cur ?? ""),
+    preChiller: value?.tanques.preChiller ?? tanqueVazio("preChiller", prevAppointment?.tanques.preChiller.cur ?? ""),
+    chiller1: value?.tanques.chiller1 ?? tanqueVazio("chiller1", prevAppointment?.tanques.chiller1.cur ?? ""),
+    chiller2: value?.tanques.chiller2 ?? tanqueVazio("chiller2", prevAppointment?.tanques.chiller2.cur ?? ""),
   });
   const [prevTravado, setPrevTravado] = useState({
     preChiller: !!(value?.tanques.preChiller.prev || prevAppointment?.tanques.preChiller.cur),
