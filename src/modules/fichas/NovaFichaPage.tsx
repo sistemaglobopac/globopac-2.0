@@ -231,6 +231,7 @@ export function NovaFichaPage() {
     <FichaForm
       key={templateSelecionado.id}
       templateId={templateSelecionado.id}
+      codigo={templateSelecionado.codigo}
       versaoTemplate={templateSelecionado.versao}
       campos={templateSelecionado.schema_campos as CampoTemplate[]}
       nome={templateSelecionado.nome}
@@ -243,6 +244,7 @@ export function NovaFichaPage() {
 
 interface FichaFormProps {
   templateId: string;
+  codigo: string;
   versaoTemplate: number;
   campos: CampoTemplate[];
   nome: string;
@@ -251,14 +253,14 @@ interface FichaFormProps {
   onVoltar: () => void;
 }
 
-function FichaForm({ templateId, versaoTemplate, campos, nome, setor, perfil, onVoltar }: FichaFormProps) {
+function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, setor, perfil, onVoltar }: FichaFormProps) {
   const [sucesso, setSucesso] = useState<"online" | "offline" | null>(null);
   const [dadosPendentes, setDadosPendentes] = useState<FieldValues | null>(null);
   const [senha, setSenha] = useState("");
   const [autenticando, setAutenticando] = useState(false);
   const [erroSenha, setErroSenha] = useState<string | null>(null);
   const criarMonitoramento = useCriarMonitoramento();
-  const { data: ultimoRegistro } = useUltimoRegistroFicha(templateId, setor);
+  const { data: ultimoRegistro } = useUltimoRegistroFicha(codigo, setor);
 
   const schema = zodFromSchemaCampos(campos);
   const {

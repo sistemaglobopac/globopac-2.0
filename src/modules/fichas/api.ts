@@ -99,17 +99,35 @@ export function useUltimosApontamentosHoje(setor: string | undefined) {
 
 /** Registro mais recente de HOJE desta ficha+setor — usado para herdar a leitura anterior
  * dos widgets "Especial SIF" (ex.: hidrômetro do chiller), igual a `registrosRecentes[0]`
- * no v1. Não é a fila de "apontamentos recentes para editar" (fora do escopo desta fase). */
-export function useUltimoRegistroFicha(fichaTemplateId: string | undefined, setor: string | undefined) {
+ * no v1. Não é a fila de "apontamentos recentes para editar" (fora do escopo desta fase).
+ *
+ * Busca por `codigo` (todas as versões da ficha, ativa ou não) em vez do `ficha_template_id`
+ * exato: o versionamento é não-destrutivo (uma edição no Construtor de Fichas no meio do turno
+ * cria uma linha NOVA em `fichas_templates`, com um id diferente) — se a busca filtrasse pelo id
+ * exato do template selecionado agora, uma edição da ficha entre dois monitoramentos do mesmo
+ * dia faria o sistema "esquecer" a leitura anterior e tratar o 2º apontamento como se fosse o
+ * primeiro, mesmo sendo a mesma ficha do ponto de vista do inspetor (bug real, encontrado em
+ * produção: RAC-001/006 V2 foi editada no meio do dia e o SPR Carcaças voltou a pedir só a
+ * leitura atual no apontamento seguinte). */
+export function useUltimoRegistroFicha(codigo: string | undefined, setor: string | undefined) {
   return useQuery({
-    queryKey: ["monitoramentos", "ultimo-registro-ficha", fichaTemplateId, setor],
-    enabled: !!fichaTemplateId && !!setor,
+    queryKey: ["monitoramentos", "ultimo-registro-ficha", codigo, setor],
+    enabled: !!codigo && !!setor,
     queryFn: async () => {
+      const { data: versoes, error: erroVersoes } = await supabase
+        .from("fichas_templates")
+        .select("id")
+        .eq("codigo", codigo as string)
+        .overrideTypes<{ id: string }[], { merge: false }>();
+      if (erroVersoes) throw erroVersoes;
+      const idsDasVersoes = (versoes ?? []).map((v) => v.id);
+      if (idsDasVersoes.length === 0) return null;
+
       const desde = inicioDoDiaManaus(new Date()).toISOString();
       const { data, error } = await supabase
         .from("monitoramentos")
         .select("id, dados_dinamicos, criado_em")
-        .eq("ficha_template_id", fichaTemplateId as string)
+        .in("ficha_template_id", idsDasVersoes)
         .eq("setor", setor as string)
         .gte("criado_em", desde)
         .order("criado_em", { ascending: false })
