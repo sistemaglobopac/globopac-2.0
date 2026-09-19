@@ -20,6 +20,8 @@ import { ensureLocalTime } from "./utils/tempo";
 import { KpiCard } from "./components/KpiCard";
 import { AuditRecordCard } from "./components/AuditRecordCard";
 import { DossieVerificacaoCard } from "./components/DossieVerificacaoCard";
+import { RelatorioModal } from "./components/relatorio/RelatorioModal";
+import type { DossieVerificacao } from "./utils/recordGrouping";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -73,6 +75,7 @@ export function PainelVerificacao() {
 
   const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
   const [previewItem, setPreviewItem] = useState<AppointmentDisplay | null>(null);
+  const [relatorioIds, setRelatorioIds] = useState<string[] | null>(null);
   const [encerrarAlvo, setEncerrarAlvo] = useState<{ userId: string; dia: string; nome: string } | null>(null);
   const [mensagem, setMensagem] = useState<{ tipo: "success" | "error"; texto: string } | null>(null);
 
@@ -359,6 +362,8 @@ export function PainelVerificacao() {
             toggleSelection={toggleSelection}
             toggleGroupSelection={toggleGroupSelection}
             onPreview={setPreviewItem}
+            onImprimir={(item) => setRelatorioIds([item.id])}
+            onImprimirDossie={(d: DossieVerificacao) => setRelatorioIds(d.ids)}
             pacPorTemplateId={pacPorTemplateId}
             nomePorTemplateId={nomePorTemplateId}
             usersMap={usuarios}
@@ -379,6 +384,7 @@ export function PainelVerificacao() {
             selectedIds={selectedIds}
             toggleSelection={toggleSelection}
             onPreview={setPreviewItem}
+            onImprimir={(i) => setRelatorioIds([i.id])}
             pacPorTemplateId={pacPorTemplateId}
             nomePorTemplateId={nomePorTemplateId}
             usersMap={usuarios}
@@ -401,6 +407,7 @@ export function PainelVerificacao() {
                 selectedIds={selectedIds}
                 toggleSelection={toggleSelection}
                 onPreview={setPreviewItem}
+                onImprimir={(i) => setRelatorioIds([i.id])}
                 pacPorTemplateId={pacPorTemplateId}
                 nomePorTemplateId={nomePorTemplateId}
                 usersMap={usuarios}
@@ -570,6 +577,8 @@ export function PainelVerificacao() {
           onMensagem={setMensagem}
         />
       )}
+
+      {relatorioIds && <RelatorioModal ids={relatorioIds} onFechar={() => setRelatorioIds(null)} />}
     </div>
   );
 }

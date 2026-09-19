@@ -1,4 +1,4 @@
-import { Eye, Lock, ShieldAlert, Unlock } from "lucide-react";
+import { Eye, Lock, Printer, ShieldAlert, Unlock } from "lucide-react";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { ensureLocalTime } from "../utils/tempo";
@@ -25,6 +25,7 @@ export interface AuditRecordCardProps {
   selectedIds: Set<string>;
   toggleSelection: (id: string) => void;
   onPreview: (item: AppointmentDisplay) => void;
+  onImprimir: (item: AppointmentDisplay) => void;
   pacPorTemplateId: Map<string, string>;
   nomePorTemplateId: Map<string, string>;
   usersMap: Map<string, string>;
@@ -40,6 +41,7 @@ export function AuditRecordCard({
   selectedIds,
   toggleSelection,
   onPreview,
+  onImprimir,
   pacPorTemplateId,
   nomePorTemplateId,
   usersMap,
@@ -96,6 +98,10 @@ export function AuditRecordCard({
               Encerrar turno
             </Button>
           )}
+          <Button type="button" size="sm" variant="ghost" onClick={() => onImprimir(item)}>
+            <Printer className="h-3.5 w-3.5" />
+            Imprimir
+          </Button>
           <Button type="button" size="sm" variant="ghost" onClick={() => onPreview(item)}>
             <Eye className="h-3.5 w-3.5" />
             Ver

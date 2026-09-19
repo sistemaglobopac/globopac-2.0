@@ -1,4 +1,4 @@
-import { Layers, Lock, Unlock } from "lucide-react";
+import { Layers, Lock, Printer, Unlock } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import type { AppointmentDisplay, DossieVerificacao } from "../utils/recordGrouping";
 import { ensureLocalTime } from "../utils/tempo";
@@ -10,6 +10,8 @@ interface DossieVerificacaoCardProps {
   toggleSelection: (id: string) => void;
   toggleGroupSelection: (ids: string[]) => void;
   onPreview: (item: AppointmentDisplay) => void;
+  onImprimir: (item: AppointmentDisplay) => void;
+  onImprimirDossie: (dossie: DossieVerificacao) => void;
   pacPorTemplateId: Map<string, string>;
   nomePorTemplateId: Map<string, string>;
   usersMap: Map<string, string>;
@@ -29,6 +31,8 @@ export function DossieVerificacaoCard({
   toggleSelection,
   toggleGroupSelection,
   onPreview,
+  onImprimir,
+  onImprimirDossie,
   pacPorTemplateId,
   nomePorTemplateId,
   usersMap,
@@ -67,6 +71,10 @@ export function DossieVerificacaoCard({
             </p>
           </div>
         </div>
+        <Button type="button" size="sm" variant="ghost" onClick={() => onImprimirDossie(dossie)}>
+          <Printer className="h-3.5 w-3.5" />
+          Imprimir Consolidado
+        </Button>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
@@ -98,6 +106,7 @@ export function DossieVerificacaoCard({
             selectedIds={selectedIds}
             toggleSelection={toggleSelection}
             onPreview={onPreview}
+            onImprimir={onImprimir}
             pacPorTemplateId={pacPorTemplateId}
             nomePorTemplateId={nomePorTemplateId}
             usersMap={usersMap}

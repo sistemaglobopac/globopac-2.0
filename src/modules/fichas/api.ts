@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase";
 import type { CampoTemplate } from "@/shared/schema-campos";
 import { PRAZO_ONLINE_MS, enfileirarFicha, estaOffline } from "@/lib/offlineQueue";
 import { inicioDoDiaManaus } from "@/modules/bordo/api";
-import type { StatusRnc } from "@/modules/rnc/api";
+import type { Rnc, StatusRnc } from "@/modules/rnc/api";
 import type { MonitoramentoVerificacao } from "./utils/recordGrouping";
 
 export interface TemplateAtivo {
@@ -586,6 +586,129 @@ export function useAbrirAdendo() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["monitoramentos"] });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------------------
+// Relatório imprimível (dossiê de verificação) — busca tudo que useFilaVerificacao não
+// carrega hoje (schema_campos completo da ficha, nomes completos dos perfis envolvidos,
+// assinaturas eletrônicas e RNC vinculada), para um ou mais monitoramento_id de uma vez
+// (dossiê consolidado = vários ids do mesmo grupo).
+// ---------------------------------------------------------------------------------------
+export interface MonitoramentoRelatorio {
+  id: string;
+  ficha_template_id: string;
+  versao_template: number;
+  user_id: string;
+  setor: string;
+  dados_dinamicos: Record<string, unknown>;
+  conformidade: boolean | null;
+  verificado_por: string | null;
+  verificado_em: string | null;
+  liberado_sif: boolean;
+  origem_versao: string;
+  aditivo_de: string | null;
+  criado_em: string;
+  capturado_em: string | null;
+}
+
+export interface AssinaturaRelatorio {
+  id: string;
+  monitoramento_id: string;
+  user_id: string;
+  tipo: "INSPETOR" | "VERIFICADOR" | "GESTOR" | "ADMIN" | "LIBERACAO_DIARIA";
+  hash_documento: string;
+  criado_em: string;
+  tsa_emitido_em: string | null;
+  tsa_utilizada: string | null;
+}
+
+export interface TemplateRelatorio {
+  id: string;
+  codigo: string;
+  nome: string;
+  pac_correspondente: string;
+  schema_campos: CampoTemplate[];
+}
+
+export interface DadosRelatorio {
+  monitoramentos: MonitoramentoRelatorio[];
+  assinaturas: AssinaturaRelatorio[];
+  rncs: Rnc[];
+  templatesPorId: Map<string, TemplateRelatorio>;
+  nomesPorId: Map<string, string>;
+}
+
+const CAMPOS_MONITORAMENTO_RELATORIO =
+  "id, ficha_template_id, versao_template, user_id, setor, dados_dinamicos, conformidade, verificado_por, " +
+  "verificado_em, liberado_sif, origem_versao, aditivo_de, criado_em, capturado_em";
+const CAMPOS_ASSINATURA_RELATORIO = "id, monitoramento_id, user_id, tipo, hash_documento, criado_em, tsa_emitido_em, tsa_utilizada";
+const CAMPOS_RNC_RELATORIO =
+  "id, monitoramento_id, descricao, setor, status, severidade, aberto_por, tratado_por, tratativa, prazo_sla, " +
+  "rnc_anterior_id, revisado_por, motivo_devolucao, fechado_em, criado_em";
+
+export function useDadosRelatorio(ids: string[]) {
+  const idsKey = [...ids].sort().join(",");
+  return useQuery({
+    queryKey: ["monitoramentos", "relatorio", idsKey],
+    enabled: ids.length > 0,
+    queryFn: async (): Promise<DadosRelatorio> => {
+      const [
+        { data: monitoramentos, error: erroMonitoramentos },
+        { data: assinaturas, error: erroAssinaturas },
+        { data: rncs, error: erroRncs },
+      ] = await Promise.all([
+        supabase
+          .from("monitoramentos")
+          .select(CAMPOS_MONITORAMENTO_RELATORIO)
+          .in("id", ids)
+          .overrideTypes<MonitoramentoRelatorio[], { merge: false }>(),
+        supabase
+          .from("assinaturas_eletronicas")
+          .select(CAMPOS_ASSINATURA_RELATORIO)
+          .in("monitoramento_id", ids)
+          .order("criado_em", { ascending: true })
+          .overrideTypes<AssinaturaRelatorio[], { merge: false }>(),
+        supabase.from("rnc").select(CAMPOS_RNC_RELATORIO).in("monitoramento_id", ids).overrideTypes<Rnc[], { merge: false }>(),
+      ]);
+      if (erroMonitoramentos) throw erroMonitoramentos;
+      if (erroAssinaturas) throw erroAssinaturas;
+      if (erroRncs) throw erroRncs;
+
+      const templateIds = [...new Set((monitoramentos ?? []).map((m) => m.ficha_template_id))];
+      const userIds = [
+        ...new Set(
+          [
+            ...(monitoramentos ?? []).flatMap((m) => [m.user_id, m.verificado_por]),
+            ...(assinaturas ?? []).map((a) => a.user_id),
+            ...(rncs ?? []).flatMap((r) => [r.tratado_por, r.revisado_por]),
+          ].filter((id): id is string => Boolean(id))
+        ),
+      ];
+
+      const [{ data: templates, error: erroTemplates }, { data: perfis, error: erroPerfis }] = await Promise.all([
+        supabase
+          .from("fichas_templates")
+          .select("id, codigo, nome, pac_correspondente, schema_campos")
+          .in("id", templateIds)
+          .overrideTypes<TemplateRelatorio[], { merge: false }>(),
+        supabase
+          .from("perfis_usuarios")
+          .select("id, nome_completo")
+          .in("id", userIds)
+          .overrideTypes<{ id: string; nome_completo: string }[], { merge: false }>(),
+      ]);
+      if (erroTemplates) throw erroTemplates;
+      if (erroPerfis) throw erroPerfis;
+
+      return {
+        monitoramentos: monitoramentos ?? [],
+        assinaturas: assinaturas ?? [],
+        rncs: rncs ?? [],
+        templatesPorId: new Map((templates ?? []).map((t) => [t.id, t])),
+        nomesPorId: new Map((perfis ?? []).map((p) => [p.id, p.nome_completo])),
+      };
     },
   });
 }
