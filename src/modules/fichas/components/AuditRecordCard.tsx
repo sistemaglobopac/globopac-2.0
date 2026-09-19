@@ -1,4 +1,4 @@
-import { Eye, Lock, Printer, ShieldAlert, Unlock } from "lucide-react";
+import { Lock, Printer, ShieldAlert, ShieldCheck, Unlock } from "lucide-react";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { ensureLocalTime } from "../utils/tempo";
@@ -117,9 +117,9 @@ export function AuditRecordCard({
             <Printer className="h-3.5 w-3.5" />
             Imprimir
           </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={() => onPreview(item)}>
-            <Eye className="h-3.5 w-3.5" />
-            Ver
+          <Button type="button" size="sm" disabled={bloqueado} onClick={() => onPreview(item)}>
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Verificar
           </Button>
         </div>
       </div>

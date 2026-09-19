@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Eye, FolderClosed, Lock, Unlock } from "lucide-react";
+import { ChevronDown, ChevronUp, FolderClosed, Lock, ShieldCheck, Unlock } from "lucide-react";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import type { AppointmentDisplay, DossieVerificacao } from "../utils/recordGrouping";
@@ -26,10 +26,10 @@ interface DossieVerificacaoCardProps {
 /** Card agregado de um "dossiê" — N apontamentos horários da mesma ficha/inspetor/turno. É só
  * um RESUMO clicável (título, badges, "Apurações" pra expandir): a fila de verificação lista
  * dezenas de dossiês por dia, então o relatório completo de cada um não pode aparecer inteiro
- * aqui — fica atrás de "Ver Dados" (RelatorioModal, que já tem o botão Imprimir dentro) ou de
- * "Apurações", que revela os cards individuais (cada um continua com seu próprio "Ver"/
- * checkbox — agrupar N apontamentos não pode significar perder a capacidade de tratar UM deles
- * isoladamente). */
+ * aqui — fica atrás de "Verificar" (leva à tela cheia de VerificarFichaPage, com o relatório
+ * consolidado e as ações do verificador) ou de "Apurações", que revela os cards individuais
+ * (cada um continua com seu próprio "Verificar"/checkbox — agrupar N apontamentos não pode
+ * significar perder a capacidade de tratar UM deles isoladamente). */
 export function DossieVerificacaoCard({
   dossie,
   selectedIds,
@@ -99,9 +99,9 @@ export function DossieVerificacaoCard({
               Encerrar Turno (Admin)
             </Button>
           )}
-          <Button type="button" size="sm" variant="outline" onClick={() => onVerDossie(dossie)}>
-            <Eye className="h-3.5 w-3.5" />
-            Ver Dados
+          <Button type="button" size="sm" disabled={dossie.bloqueado} onClick={() => onVerDossie(dossie)}>
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Verificar
           </Button>
           <Button type="button" size="sm" variant="ghost" onClick={() => setApuracoesAbertas((atual) => !atual)}>
             Apurações

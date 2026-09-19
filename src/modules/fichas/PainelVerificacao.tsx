@@ -1,44 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, ClipboardCheck, Filter, Layers, Loader2, Sparkles, X } from "lucide-react";
 import { useSessionStore } from "@/store/session";
 import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/api";
 import { useRncsAbertas } from "@/modules/rnc/api";
 import { supabase } from "@/lib/supabase";
-import type { CampoTemplate } from "@/shared/schema-campos";
-import {
-  pacsDoTemplate,
-  useAbrirAdendo,
-  useFichasTemplatesTodas,
-  useFilaVerificacao,
-  useUsuariosMap,
-  useVerificarLote,
-  useVerificarMonitoramento,
-} from "./api";
+import { pacsDoTemplate, useFichasTemplatesTodas, useFilaVerificacao, useUsuariosMap, useVerificarLote } from "./api";
 import { diaTurno, turnosBloqueadosMap, turnosPendentes, encerrarTurnoAdmin } from "./utils/turnoUtils";
 import { groupFichaCards, calcularOrdemDia, type AppointmentDisplay, type MonitoramentoVerificacao, type StatusVerificacao } from "./utils/recordGrouping";
 import { ensureLocalTime } from "./utils/tempo";
 import { KpiCard } from "./components/KpiCard";
 import { AuditRecordCard } from "./components/AuditRecordCard";
 import { DossieVerificacaoCard } from "./components/DossieVerificacaoCard";
-import { DadosColetados } from "./components/DadosColetadosFicha";
 import { RelatorioModal } from "./components/relatorio/RelatorioModal";
 import type { DossieVerificacao } from "./utils/recordGrouping";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Select } from "@/shared/ui/select";
-import { Textarea } from "@/shared/ui/textarea";
 
 const PESO_STATUS: Record<StatusVerificacao, number> = { aguardando: 1, adendo_pendente: 2, verificado: 3 };
-
-const SEVERIDADES = ["CRITICA", "ALTA", "MEDIA", "BAIXA"] as const;
-const ROTULO_SEVERIDADE: Record<(typeof SEVERIDADES)[number], string> = {
-  CRITICA: "Crítica",
-  ALTA: "Alta",
-  MEDIA: "Média",
-  BAIXA: "Baixa",
-};
 
 function statusDoItem(m: MonitoramentoVerificacao): StatusVerificacao {
   const adendos = (m.dados_dinamicos as { adendos?: { status: string }[] } | null)?.adendos;
@@ -55,6 +36,7 @@ function hojeManaus(): string {
  * e abertura de adendos nos monitoramentos registrados pelos inspetores. */
 export function PainelVerificacao() {
   const navigate = useNavigate();
+  const location = useLocation();
   const perfil = useSessionStore((s) => s.perfil);
   const { data: masterSetores } = useSetoresCadastrados();
   const { data: templates } = useFichasTemplatesTodas();
@@ -76,10 +58,18 @@ export function PainelVerificacao() {
   const [batchError, setBatchError] = useState<string | null>(null);
 
   const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
-  const [previewItem, setPreviewItem] = useState<AppointmentDisplay | null>(null);
   const [relatorioIds, setRelatorioIds] = useState<string[] | null>(null);
   const [encerrarAlvo, setEncerrarAlvo] = useState<{ userId: string; dia: string; nome: string } | null>(null);
   const [mensagem, setMensagem] = useState<{ tipo: "success" | "error"; texto: string } | null>(null);
+
+  // Mensagem de sucesso/erro vinda da tela cheia de verificação (VerificarFichaPage), passada
+  // via navigate(..., { state }) — lida só na montagem porque a rota /verificacao remonta a
+  // cada navegação de volta (não é um re-render in-place).
+  useEffect(() => {
+    const estado = location.state as { mensagem?: { tipo: "success" | "error"; texto: string } } | null;
+    if (estado?.mensagem) setMensagem(estado.mensagem);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const usuarios = useMemo(() => usersMap ?? new Map<string, string>(), [usersMap]);
   const isAdmin = perfil?.nivelAcesso === "ADMIN_MASTER";
@@ -111,7 +101,6 @@ export function PainelVerificacao() {
   }, [templates]);
   const nomePorTemplateId = useMemo(() => new Map((templates ?? []).map((t) => [t.id, t.nome])), [templates]);
   const codigoPorTemplateId = useMemo(() => new Map((templates ?? []).map((t) => [t.id, t.codigo])), [templates]);
-  const camposPorTemplateId = useMemo(() => new Map((templates ?? []).map((t) => [t.id, t.schema_campos])), [templates]);
   const uniquePacs = useMemo(() => {
     const set = new Set<string>();
     for (const t of templates ?? []) for (const pac of pacsDoTemplate(t)) set.add(pac);
@@ -219,6 +208,10 @@ export function PainelVerificacao() {
       }
       return next;
     });
+  }
+
+  function abrirVerificacao(ids: string[]) {
+    navigate(`/verificacao/relatorio?ids=${ids.join(",")}`);
   }
 
   function selecionarPendentes() {
@@ -364,9 +357,9 @@ export function PainelVerificacao() {
             selectedIds={selectedIds}
             toggleSelection={toggleSelection}
             toggleGroupSelection={toggleGroupSelection}
-            onPreview={setPreviewItem}
+            onPreview={(item) => abrirVerificacao([item.id])}
             onImprimir={(item) => setRelatorioIds([item.id])}
-            onVerDossie={(d: DossieVerificacao) => setRelatorioIds(d.ids)}
+            onVerDossie={(d: DossieVerificacao) => abrirVerificacao(d.ids)}
             pacPorTemplateId={pacPorTemplateId}
             nomePorTemplateId={nomePorTemplateId}
             codigoPorTemplateId={codigoPorTemplateId}
@@ -387,7 +380,7 @@ export function PainelVerificacao() {
             mode="verificacao"
             selectedIds={selectedIds}
             toggleSelection={toggleSelection}
-            onPreview={setPreviewItem}
+            onPreview={(item) => abrirVerificacao([item.id])}
             onImprimir={(i) => setRelatorioIds([i.id])}
             pacPorTemplateId={pacPorTemplateId}
             nomePorTemplateId={nomePorTemplateId}
@@ -411,7 +404,7 @@ export function PainelVerificacao() {
                 mode="verificacao"
                 selectedIds={selectedIds}
                 toggleSelection={toggleSelection}
-                onPreview={setPreviewItem}
+                onPreview={(item) => abrirVerificacao([item.id])}
                 onImprimir={(i) => setRelatorioIds([i.id])}
                 pacPorTemplateId={pacPorTemplateId}
                 nomePorTemplateId={nomePorTemplateId}
@@ -573,18 +566,6 @@ export function PainelVerificacao() {
         </ModalBase>
       )}
 
-      {previewItem && (
-        <PreviewModal
-          item={previewItem}
-          nomeFicha={nomePorTemplateId.get(previewItem.appt.ficha_template_id) ?? "Ficha"}
-          inspetorNome={usuarios.get(previewItem.appt.user_id) ?? "Inspetor"}
-          verificadorNome={perfil.nomeCompleto}
-          campos={camposPorTemplateId.get(previewItem.appt.ficha_template_id) ?? []}
-          onFechar={() => setPreviewItem(null)}
-          onMensagem={setMensagem}
-        />
-      )}
-
       {relatorioIds && <RelatorioModal ids={relatorioIds} onFechar={() => setRelatorioIds(null)} />}
     </div>
   );
@@ -603,229 +584,5 @@ function ModalBase({ titulo, onFechar, children }: { titulo: string; onFechar: (
         <div className="max-h-[80vh] overflow-y-auto p-4">{children}</div>
       </div>
     </div>
-  );
-}
-
-function PreviewModal({
-  item,
-  nomeFicha,
-  inspetorNome,
-  verificadorNome,
-  campos,
-  onFechar,
-  onMensagem,
-}: {
-  item: AppointmentDisplay;
-  nomeFicha: string;
-  inspetorNome: string;
-  verificadorNome: string;
-  campos: CampoTemplate[];
-  onFechar: () => void;
-  onMensagem: (m: { tipo: "success" | "error"; texto: string }) => void;
-}) {
-  const [mostrarReprovacao, setMostrarReprovacao] = useState(false);
-  const [severidade, setSeveridade] = useState<(typeof SEVERIDADES)[number]>("MEDIA");
-  const [descricao, setDescricao] = useState("");
-  const [mostrarAdendo, setMostrarAdendo] = useState(false);
-  const [campoAdendo, setCampoAdendo] = useState("");
-  const [valorNovoAdendo, setValorNovoAdendo] = useState("");
-  const [notaAdendo, setNotaAdendo] = useState("");
-
-  // Assinatura eletrônica avançada (Lei 14.063/2020, Art. 4º §2º) exige reautenticação por
-  // senha no momento de assinar — tanto aprovar quanto reprovar gravam uma assinatura em
-  // `assinaturas_eletronicas` (verificar-monitoramento chama assinarMonitoramento nos dois
-  // casos), então os dois pedem senha aqui, igual ao lote (confirmarAssinaturaLote acima).
-  const [acaoPendente, setAcaoPendente] = useState<"aprovar" | "reprovar" | null>(null);
-  const [senha, setSenha] = useState("");
-  const [autenticando, setAutenticando] = useState(false);
-  const [erroSenha, setErroSenha] = useState<string | null>(null);
-
-  const verificar = useVerificarMonitoramento();
-  const abrirAdendo = useAbrirAdendo();
-
-  const { datePt, time } = ensureLocalTime(item.appt.criado_em);
-
-  async function aprovar() {
-    try {
-      await verificar.mutateAsync({ monitoramentoId: item.id, decisao: "aprovar" });
-      onMensagem({ tipo: "success", texto: "Monitoramento aprovado e assinado." });
-      onFechar();
-    } catch (erro) {
-      onMensagem({ tipo: "error", texto: erro instanceof Error ? erro.message : "Falha ao aprovar." });
-    }
-  }
-
-  async function reprovar() {
-    try {
-      await verificar.mutateAsync({ monitoramentoId: item.id, decisao: "reprovar", severidade, descricao: descricao || undefined });
-      onMensagem({ tipo: "success", texto: "Monitoramento reprovado — RNC aberta automaticamente." });
-      onFechar();
-    } catch (erro) {
-      onMensagem({ tipo: "error", texto: erro instanceof Error ? erro.message : "Falha ao reprovar." });
-    }
-  }
-
-  async function confirmarComSenha() {
-    setErroSenha(null);
-    setAutenticando(true);
-    try {
-      const { data: userData, error: erroUser } = await supabase.auth.getUser();
-      if (erroUser || !userData.user?.email) {
-        setErroSenha("Não foi possível identificar seu usuário. Faça login novamente.");
-        return;
-      }
-      const { error: erroAuth } = await supabase.auth.signInWithPassword({ email: userData.user.email, password: senha });
-      if (erroAuth) {
-        setErroSenha("Senha incorreta. A assinatura eletrônica falhou.");
-        return;
-      }
-      if (acaoPendente === "aprovar") await aprovar();
-      else if (acaoPendente === "reprovar") await reprovar();
-    } finally {
-      setAutenticando(false);
-      setSenha("");
-    }
-  }
-
-  async function enviarAdendo() {
-    if (!campoAdendo || !notaAdendo.trim()) return;
-    try {
-      await abrirAdendo.mutateAsync({
-        monitoramentoId: item.id,
-        campo: campoAdendo,
-        valorAntigo: item.appt.dados_dinamicos[campoAdendo],
-        valorNovo: valorNovoAdendo,
-        notes: notaAdendo,
-        verificadorNome,
-      });
-      onMensagem({ tipo: "success", texto: "Adendo aberto — aguardando assinatura do inspetor." });
-      onFechar();
-    } catch (erro) {
-      onMensagem({ tipo: "error", texto: erro instanceof Error ? erro.message : "Falha ao abrir adendo." });
-    }
-  }
-
-  return (
-    <ModalBase titulo={nomeFicha} onFechar={onFechar}>
-      <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          {inspetorNome} · {datePt} {time} · {item.appt.setor} · Monitoramento nº {item.ordemDia}
-        </p>
-
-        <DadosColetados dadosDinamicos={item.appt.dados_dinamicos} campos={campos} />
-
-        {item.status === "verificado" ? (
-          <div className="space-y-3 border-t pt-4">
-            {!mostrarAdendo ? (
-              <Button type="button" variant="outline" onClick={() => setMostrarAdendo(true)}>
-                Abrir Adendo (pedir correção ao inspetor)
-              </Button>
-            ) : (
-              <div className="space-y-2">
-                <Label>Campo a corrigir</Label>
-                <Select value={campoAdendo} onChange={(e) => setCampoAdendo(e.target.value)}>
-                  <option value="">Selecione…</option>
-                  {campos.map((campo) => (
-                    <option key={campo.chave} value={campo.chave}>
-                      {campo.label ?? campo.chave}
-                    </option>
-                  ))}
-                </Select>
-                <Label>Novo valor</Label>
-                <Input value={valorNovoAdendo} onChange={(e) => setValorNovoAdendo(e.target.value)} />
-                <Label>Observação</Label>
-                <Textarea value={notaAdendo} onChange={(e) => setNotaAdendo(e.target.value)} />
-                <Button type="button" disabled={abrirAdendo.isPending || !campoAdendo || !notaAdendo.trim()} onClick={enviarAdendo} className="w-full">
-                  {abrirAdendo.isPending ? "Enviando…" : "Enviar Adendo"}
-                </Button>
-              </div>
-            )}
-          </div>
-        ) : acaoPendente ? (
-          <div className="space-y-3 border-t pt-4">
-            <p className="text-sm text-muted-foreground">
-              {acaoPendente === "aprovar"
-                ? "Confirme sua senha para aprovar e assinar eletronicamente este monitoramento."
-                : "Confirme sua senha para registrar a reprovação e assinar eletronicamente."}
-            </p>
-            <div className="space-y-2">
-              <Label htmlFor="senhaPreview">Sua senha</Label>
-              <Input
-                id="senhaPreview"
-                type="password"
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
-                disabled={autenticando}
-                autoFocus
-              />
-            </div>
-            {erroSenha && <p className="text-sm text-destructive">{erroSenha}</p>}
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="flex-1"
-                disabled={autenticando}
-                onClick={() => {
-                  setAcaoPendente(null);
-                  setSenha("");
-                  setErroSenha(null);
-                }}
-              >
-                Cancelar
-              </Button>
-              <Button type="button" className="flex-1" disabled={autenticando || !senha} onClick={confirmarComSenha}>
-                {autenticando ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                {autenticando ? "Autenticando…" : "Confirmar e Assinar"}
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-3 border-t pt-4">
-            {mostrarReprovacao && (
-              <div className="space-y-2">
-                <Label>Severidade</Label>
-                <Select value={severidade} onChange={(e) => setSeveridade(e.target.value as (typeof SEVERIDADES)[number])}>
-                  {SEVERIDADES.map((s) => (
-                    <option key={s} value={s}>
-                      {ROTULO_SEVERIDADE[s]}
-                    </option>
-                  ))}
-                </Select>
-                <Label>Descrição da não conformidade (opcional)</Label>
-                <Textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} />
-              </div>
-            )}
-            <div className="flex flex-wrap gap-2">
-              {!mostrarReprovacao ? (
-                <>
-                  <Button type="button" disabled={verificar.isPending} onClick={() => setAcaoPendente("aprovar")} className="flex-1">
-                    Aprovar e assinar
-                  </Button>
-                  <Button type="button" variant="destructive" onClick={() => setMostrarReprovacao(true)} className="flex-1">
-                    Reprovar
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    disabled={verificar.isPending}
-                    onClick={() => setAcaoPendente("reprovar")}
-                    className="flex-1"
-                  >
-                    Confirmar reprovação (abre RNC)
-                  </Button>
-                  <Button type="button" variant="outline" onClick={() => setMostrarReprovacao(false)} className="flex-1">
-                    Cancelar
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    </ModalBase>
   );
 }

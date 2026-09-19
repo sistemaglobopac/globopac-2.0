@@ -9,6 +9,7 @@ import { AppShell } from "@/shared/AppShell";
 import { UpdateNotifier } from "@/shared/UpdateNotifier";
 import { NovaFichaPage } from "@/modules/fichas/NovaFichaPage";
 import { PainelVerificacao } from "@/modules/fichas/PainelVerificacao";
+import { VerificarFichaPage } from "@/modules/fichas/VerificarFichaPage";
 import { ConstrutorFichasPage } from "@/modules/fichas/ConstrutorFichasPage";
 import { SetoresPage } from "@/modules/admin/SetoresPage";
 import { CarimbosPendentesPage } from "@/modules/carimbos/CarimbosPendentesPage";
@@ -84,6 +85,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute perfisPermitidos={["VERIFICADOR", "ADMIN_MASTER"]}>
               <PainelVerificacao />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/verificacao/relatorio"
+          element={
+            <ProtectedRoute perfisPermitidos={["VERIFICADOR", "ADMIN_MASTER"]}>
+              <VerificarFichaPage />
             </ProtectedRoute>
           }
         />
