@@ -50,9 +50,9 @@ function SeloAssinatura({
 }) {
   return (
     <div className="relative flex w-full flex-col items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-ink/70 bg-white p-3 print:p-2">
-      {/* Marca d'água da logo a 30% de opacidade (70% de transparência, a pedido do usuário) —
+      {/* Marca d'água da logo a 10% de opacidade (90% de transparência, a pedido do usuário) —
           mesma ideia do selo de assinatura do v1, atrás do conteúdo, sem interferir na leitura. */}
-      <div className="pointer-events-none absolute inset-0 z-0 flex select-none items-center justify-center" style={{ opacity: 0.3 }}>
+      <div className="pointer-events-none absolute inset-0 z-0 flex select-none items-center justify-center" style={{ opacity: 0.1 }}>
         <img src="/logo-globopac.png" alt="" className="max-h-[85%] max-w-[85%] object-contain" />
       </div>
       <div className="relative z-10 flex w-full flex-col items-center">
@@ -263,6 +263,8 @@ export function RelatorioMonitoramento({ ids, dados }: RelatorioMonitoramentoPro
   const todasTratadas = rncsDoGrupo.length > 0 && rncsDoGrupo.every((r) => r.status === "FECHADA");
 
   const turnos = [...new Set(records.map((r) => turnoDoDia(new Date(r.criado_em))))];
+  const horarios = records.map((r) => ensureLocalTime(r.criado_em).time).sort();
+  const horarioDocumento = horarios.length <= 1 ? horarios[0] ?? "—" : `${horarios[0]}–${horarios[horarios.length - 1]}`;
 
   return (
     <div className="print-page mx-auto flex w-full max-w-4xl flex-col bg-white font-sans text-ink shadow-2xl print:max-w-[210mm]" style={{ margin: "0 auto" }}>
@@ -335,10 +337,14 @@ export function RelatorioMonitoramento({ ids, dados }: RelatorioMonitoramentoPro
           <h3 className="mb-4 flex items-center gap-2 border-b-2 border-primary/20 pb-2 text-sm font-bold uppercase tracking-wider text-primary print:mb-1 print:pb-1 print:text-xs">
             <FileText className="h-4 w-4 print:h-3 print:w-3" /> Dados Gerais do Monitoramento
           </h3>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-6 rounded-lg border border-hairline bg-gray-50 p-4 sm:grid-cols-4 print:grid-cols-4 print:gap-y-2 print:p-2">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-6 rounded-lg border border-hairline bg-gray-50 p-4 sm:grid-cols-5 print:grid-cols-5 print:gap-y-2 print:p-2">
             <div>
               <p className="mb-1 text-[10px] font-bold uppercase text-muted-foreground print:mb-0">Data</p>
               <p className="text-sm font-bold text-ink print:text-[11px]">{diaDocumento}</p>
+            </div>
+            <div>
+              <p className="mb-1 text-[10px] font-bold uppercase text-muted-foreground print:mb-0">Horário</p>
+              <p className="text-sm font-bold text-ink print:text-[11px]">{horarioDocumento}</p>
             </div>
             <div>
               <p className="mb-1 text-[10px] font-bold uppercase text-muted-foreground print:mb-0">Turno</p>
