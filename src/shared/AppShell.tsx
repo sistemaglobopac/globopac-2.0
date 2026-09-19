@@ -45,7 +45,6 @@ function capitalizar(texto: string): string {
 const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
   INSPETOR_QUALIDADE: [
     { rota: "/painel", rotulo: "Painel de Bordo" },
-    { rota: "/fichas/nova", rotulo: "Nova ficha" },
     { rota: "/nova-rnc", rotulo: "Abrir RNC" },
   ],
   VERIFICADOR: [
@@ -65,7 +64,6 @@ const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
   ADMIN_MASTER: [
     { rota: "/gestao", rotulo: "Painel de Gestão" },
     { rota: "/painel", rotulo: "Painel de Bordo" },
-    { rota: "/fichas/nova", rotulo: "Nova ficha" },
     { rota: "/verificacao", rotulo: "Painel de Verificação" },
     { rota: "/rnc", rotulo: "Tratativas RNC" },
     { rota: "/pcm", rotulo: "Ordens de Serviço" },
