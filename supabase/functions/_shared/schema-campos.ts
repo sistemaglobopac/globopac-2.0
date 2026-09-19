@@ -7,6 +7,15 @@
 // importe nada específico de Node ou de Deno aqui — mantenha este módulo puro.
 import { z } from "zod";
 
+/** Visibilidade condicional (porte do v1: NovoRegistro.jsx) — o campo só aparece na tela de
+ * preenchimento quando `campo` (a `chave` de outro campo da mesma ficha) tiver exatamente
+ * `valor`. Comum a qualquer tipo de campo, por isso fica fora do discriminated union por
+ * `tipo`. */
+export interface DependeDe {
+  campo: string;
+  valor: string;
+}
+
 export type CampoTemplate =
   | {
       chave: string;
@@ -16,29 +25,33 @@ export type CampoTemplate =
       min?: number;
       max?: number;
       unidade?: string;
+      dependeDe?: DependeDe;
     }
-  | { chave: string; tipo: "texto"; obrigatorio: boolean; label?: string; maxLength?: number }
-  | { chave: string; tipo: "booleano"; obrigatorio: boolean; label?: string }
-  | { chave: string; tipo: "selecao"; obrigatorio: boolean; label?: string; opcoes: string[] }
+  | { chave: string; tipo: "texto"; obrigatorio: boolean; label?: string; maxLength?: number; dependeDe?: DependeDe }
+  | { chave: string; tipo: "booleano"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
+  | { chave: string; tipo: "selecao"; obrigatorio: boolean; label?: string; opcoes: string[]; dependeDe?: DependeDe }
   // Tipos abaixo: catálogo do Construtor de Fichas (painel administrativo). "simples" e
   // "unica_escolha" coexistem com "booleano"/"selecao" (mesma semântica, nomes do novo
   // catálogo) — os antigos continuam existindo para não invalidar templates já versionados.
-  | { chave: string; tipo: "simples"; obrigatorio: boolean; label?: string }
-  | { chave: string; tipo: "inteiro"; obrigatorio: boolean; label?: string; valorMinimo?: number; valorMaximo?: number }
-  | { chave: string; tipo: "decimal"; obrigatorio: boolean; label?: string; valorMinimo?: number; valorMaximo?: number }
-  | { chave: string; tipo: "unica_escolha"; obrigatorio: boolean; label?: string; opcoes: string[] }
-  | { chave: string; tipo: "hora"; obrigatorio: boolean; label?: string }
-  | { chave: string; tipo: "texto_longo"; obrigatorio: boolean; label?: string }
-  | { chave: string; tipo: "foto"; obrigatorio: boolean; label?: string }
-  | { chave: string; tipo: "assinatura"; obrigatorio: boolean; label?: string }
+  | { chave: string; tipo: "simples"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
+  | { chave: string; tipo: "inteiro"; obrigatorio: boolean; label?: string; valorMinimo?: number; valorMaximo?: number; dependeDe?: DependeDe }
+  | { chave: string; tipo: "decimal"; obrigatorio: boolean; label?: string; valorMinimo?: number; valorMaximo?: number; dependeDe?: DependeDe }
+  | { chave: string; tipo: "unica_escolha"; obrigatorio: boolean; label?: string; opcoes: string[]; dependeDe?: DependeDe }
+  | { chave: string; tipo: "hora"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
+  | { chave: string; tipo: "texto_longo"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
+  | { chave: string; tipo: "foto"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
+  | { chave: string; tipo: "assinatura"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
   // Widgets compostos "Especial SIF": o construtor só lista o tipo — a renderização e a
   // validação de cada um vivem na tela de preenchimento do inspetor, fora deste módulo.
-  | { chave: string; tipo: "chiller_carcacas"; obrigatorio: boolean; label?: string }
-  | { chave: string; tipo: "chiller_partes"; obrigatorio: boolean; label?: string }
-  | { chave: string; tipo: "mini_chillers"; obrigatorio: boolean; label?: string }
-  | { chave: string; tipo: "lavagem_final"; obrigatorio: boolean; label?: string }
-  | { chave: string; tipo: "absorcao_agua"; obrigatorio: boolean; label?: string }
-  | { chave: string; tipo: "dripping_test"; obrigatorio: boolean; label?: string };
+  | { chave: string; tipo: "chiller_carcacas"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
+  | { chave: string; tipo: "chiller_partes"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
+  | { chave: string; tipo: "mini_chillers"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
+  | { chave: string; tipo: "lavagem_final"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
+  | { chave: string; tipo: "absorcao_agua"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
+  | { chave: string; tipo: "dripping_test"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
+  | { chave: string; tipo: "parada_equipamento"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe };
+
+const dependeDeSchema = z.object({ campo: z.string().min(1), valor: z.string() }).optional();
 
 /** Valida a própria definição de schema_campos (usado pelo builder de templates, Fase 1, e
  * pelo Construtor de Fichas). */
@@ -51,6 +64,7 @@ export const campoTemplateSchema: z.ZodType<CampoTemplate> = z.discriminatedUnio
     min: z.number().optional(),
     max: z.number().optional(),
     unidade: z.string().optional(),
+    dependeDe: dependeDeSchema,
   }),
   z.object({
     chave: z.string().min(1),
@@ -58,12 +72,14 @@ export const campoTemplateSchema: z.ZodType<CampoTemplate> = z.discriminatedUnio
     obrigatorio: z.boolean(),
     label: z.string().optional(),
     maxLength: z.number().int().positive().optional(),
+    dependeDe: dependeDeSchema,
   }),
   z.object({
     chave: z.string().min(1),
     tipo: z.literal("booleano"),
     obrigatorio: z.boolean(),
     label: z.string().optional(),
+    dependeDe: dependeDeSchema,
   }),
   z.object({
     chave: z.string().min(1),
@@ -71,12 +87,14 @@ export const campoTemplateSchema: z.ZodType<CampoTemplate> = z.discriminatedUnio
     obrigatorio: z.boolean(),
     label: z.string().optional(),
     opcoes: z.array(z.string().min(1)).min(1),
+    dependeDe: dependeDeSchema,
   }),
   z.object({
     chave: z.string().min(1),
     tipo: z.literal("simples"),
     obrigatorio: z.boolean(),
     label: z.string().optional(),
+    dependeDe: dependeDeSchema,
   }),
   z.object({
     chave: z.string().min(1),
@@ -85,6 +103,7 @@ export const campoTemplateSchema: z.ZodType<CampoTemplate> = z.discriminatedUnio
     label: z.string().optional(),
     valorMinimo: z.number().optional(),
     valorMaximo: z.number().optional(),
+    dependeDe: dependeDeSchema,
   }),
   z.object({
     chave: z.string().min(1),
@@ -93,6 +112,7 @@ export const campoTemplateSchema: z.ZodType<CampoTemplate> = z.discriminatedUnio
     label: z.string().optional(),
     valorMinimo: z.number().optional(),
     valorMaximo: z.number().optional(),
+    dependeDe: dependeDeSchema,
   }),
   z.object({
     chave: z.string().min(1),
@@ -100,66 +120,84 @@ export const campoTemplateSchema: z.ZodType<CampoTemplate> = z.discriminatedUnio
     obrigatorio: z.boolean(),
     label: z.string().optional(),
     opcoes: z.array(z.string().min(1)).min(1),
+    dependeDe: dependeDeSchema,
   }),
   z.object({
     chave: z.string().min(1),
     tipo: z.literal("hora"),
     obrigatorio: z.boolean(),
     label: z.string().optional(),
+    dependeDe: dependeDeSchema,
   }),
   z.object({
     chave: z.string().min(1),
     tipo: z.literal("texto_longo"),
     obrigatorio: z.boolean(),
     label: z.string().optional(),
+    dependeDe: dependeDeSchema,
   }),
   z.object({
     chave: z.string().min(1),
     tipo: z.literal("foto"),
     obrigatorio: z.boolean(),
     label: z.string().optional(),
+    dependeDe: dependeDeSchema,
   }),
   z.object({
     chave: z.string().min(1),
     tipo: z.literal("assinatura"),
     obrigatorio: z.boolean(),
     label: z.string().optional(),
+    dependeDe: dependeDeSchema,
   }),
   z.object({
     chave: z.string().min(1),
     tipo: z.literal("chiller_carcacas"),
     obrigatorio: z.boolean(),
     label: z.string().optional(),
+    dependeDe: dependeDeSchema,
   }),
   z.object({
     chave: z.string().min(1),
     tipo: z.literal("chiller_partes"),
     obrigatorio: z.boolean(),
     label: z.string().optional(),
+    dependeDe: dependeDeSchema,
   }),
   z.object({
     chave: z.string().min(1),
     tipo: z.literal("mini_chillers"),
     obrigatorio: z.boolean(),
     label: z.string().optional(),
+    dependeDe: dependeDeSchema,
   }),
   z.object({
     chave: z.string().min(1),
     tipo: z.literal("lavagem_final"),
     obrigatorio: z.boolean(),
     label: z.string().optional(),
+    dependeDe: dependeDeSchema,
   }),
   z.object({
     chave: z.string().min(1),
     tipo: z.literal("absorcao_agua"),
     obrigatorio: z.boolean(),
     label: z.string().optional(),
+    dependeDe: dependeDeSchema,
   }),
   z.object({
     chave: z.string().min(1),
     tipo: z.literal("dripping_test"),
     obrigatorio: z.boolean(),
     label: z.string().optional(),
+    dependeDe: dependeDeSchema,
+  }),
+  z.object({
+    chave: z.string().min(1),
+    tipo: z.literal("parada_equipamento"),
+    obrigatorio: z.boolean(),
+    label: z.string().optional(),
+    dependeDe: dependeDeSchema,
   }),
 ]);
 
@@ -172,7 +210,7 @@ export const schemaCamposSchema = z.array(campoTemplateSchema);
  * formulário (React Hook Form) quanto na Edge Function de gravação, para nunca haver duas
  * implementações de validação divergentes (débito técnico da v1: validação só no cliente).
  */
-export function zodFromSchemaCampos(campos: CampoTemplate[]): z.ZodObject<z.ZodRawShape> {
+export function zodFromSchemaCampos(campos: CampoTemplate[]): z.ZodEffects<z.ZodObject<z.ZodRawShape>> {
   const shape: z.ZodRawShape = {};
 
   for (const campo of campos) {
@@ -225,14 +263,28 @@ export function zodFromSchemaCampos(campos: CampoTemplate[]): z.ZodObject<z.ZodR
       case "lavagem_final":
       case "absorcao_agua":
       case "dripping_test":
+      case "parada_equipamento":
         fieldSchema = z.unknown();
         break;
     }
 
-    shape[campo.chave] = campo.obrigatorio ? fieldSchema : fieldSchema.optional();
+    // Campo com `dependeDe` é sempre opcional na forma base — ele nem aparece na tela quando
+    // a dependência não está satisfeita, então o zod não pode exigi-lo incondicionalmente. A
+    // obrigatoriedade "só quando visível" é reforçada abaixo, no superRefine.
+    shape[campo.chave] = campo.obrigatorio && !campo.dependeDe ? fieldSchema : fieldSchema.optional();
   }
 
-  return z.object(shape);
+  return z.object(shape).superRefine((dados, ctx) => {
+    for (const campo of campos) {
+      if (!campo.dependeDe || !campo.obrigatorio) continue;
+      const condicaoAtendida = dados[campo.dependeDe.campo] === campo.dependeDe.valor;
+      if (!condicaoAtendida) continue;
+      const valor = dados[campo.chave];
+      if (valor === undefined || valor === null || valor === "") {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: [campo.chave], message: "Campo obrigatório" });
+      }
+    }
+  });
 }
 
 /** Valor inicial (vazio) para um formulário gerado a partir de schema_campos. */
@@ -248,7 +300,8 @@ export function valoresIniciaisDe(campos: CampoTemplate[]): Record<string, unkno
       campo.tipo === "mini_chillers" ||
       campo.tipo === "lavagem_final" ||
       campo.tipo === "absorcao_agua" ||
-      campo.tipo === "dripping_test"
+      campo.tipo === "dripping_test" ||
+      campo.tipo === "parada_equipamento"
     )
       valores[campo.chave] = null;
     else valores[campo.chave] = "";

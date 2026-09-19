@@ -59,5 +59,13 @@ verify_jwt = false
 [functions.healthcheck]
 verify_jwt = false
 
+# processar-fila-carimbo decodifica o JWT sem reverificar assinatura (_shared/jwt.ts) — só é
+# seguro porque o Kong já valida o JWT ANTES de rotear para a função, o que só acontece com
+# verify_jwt = true. Fixado explicitamente (em vez de depender do default implícito) para que
+# uma mudança futura de config nunca desative essa proteção silenciosamente — item do checklist
+# de segurança.
+[functions.processar-fila-carimbo]
+verify_jwt = true
+
 [analytics]
 enabled = false

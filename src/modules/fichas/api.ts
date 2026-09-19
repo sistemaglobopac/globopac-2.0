@@ -2,15 +2,22 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import type { CampoTemplate } from "@/shared/schema-campos";
 import { PRAZO_ONLINE_MS, enfileirarFicha, estaOffline } from "@/lib/offlineQueue";
+import { inicioDoDiaManaus } from "@/modules/bordo/api";
+import type { StatusRnc } from "@/modules/rnc/api";
 import type { MonitoramentoVerificacao } from "./utils/recordGrouping";
 
-interface TemplateAtivo {
+export interface TemplateAtivo {
   id: string;
   codigo: string;
   versao: number;
   nome: string;
   pac_correspondente: string;
   schema_campos: CampoTemplate[];
+  tipo_apontamento: "Recorrente" | "Demanda";
+  frequencia: "Diário" | "Por Turno" | null;
+  tempo_entre_apontamentos_min: number | null;
+  tempo_edicao_min: number | null;
+  locais_aplicacao: string[];
 }
 
 export function useTemplatesAtivos() {
@@ -19,10 +26,96 @@ export function useTemplatesAtivos() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("fichas_templates")
-        .select("id, codigo, versao, nome, pac_correspondente, schema_campos")
+        .select(
+          "id, codigo, versao, nome, pac_correspondente, schema_campos, tipo_apontamento, frequencia, " +
+            "tempo_entre_apontamentos_min, tempo_edicao_min, locais_aplicacao"
+        )
         .eq("ativo", true)
         .order("nome")
         .overrideTypes<TemplateAtivo[], { merge: false }>();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------------------
+// Tela de seleção de ficha (Nova Ficha) — cronômetro de liberado/bloqueado/atrasado por
+// ficha, igual à mecânica do v1 (NovoRegistro.jsx): compara o horário do último
+// apontamento de HOJE (mesmo setor) com `tempo_entre_apontamentos_min`, com 5 min de
+// tolerância antes de virar "atrasado".
+// ---------------------------------------------------------------------------------------
+export interface UltimosApontamentosHoje {
+  /** ficha_template_id → horário (ISO) do apontamento mais recente de hoje, neste setor. */
+  mapaUltimos: Map<string, string>;
+  /** ficha_template_id com um desvio ainda ativo hoje (não conforme, sem RNC fechada). */
+  fichasComDesvio: Set<string>;
+}
+
+export function useUltimosApontamentosHoje(setor: string | undefined) {
+  return useQuery({
+    queryKey: ["monitoramentos", "ultimos-hoje", setor],
+    enabled: !!setor,
+    refetchInterval: 15_000,
+    queryFn: async (): Promise<UltimosApontamentosHoje> => {
+      const desde = inicioDoDiaManaus(new Date()).toISOString();
+      const { data: hoje, error } = await supabase
+        .from("monitoramentos")
+        .select("id, ficha_template_id, criado_em, conformidade")
+        .eq("setor", setor as string)
+        .gte("criado_em", desde)
+        .order("criado_em", { ascending: false })
+        .overrideTypes<{ id: string; ficha_template_id: string; criado_em: string; conformidade: boolean | null }[], { merge: false }>();
+      if (error) throw error;
+
+      const mapaUltimos = new Map<string, string>();
+      for (const m of hoje ?? []) {
+        if (!mapaUltimos.has(m.ficha_template_id)) mapaUltimos.set(m.ficha_template_id, m.criado_em);
+      }
+
+      const naoConformes = (hoje ?? []).filter((m) => m.conformidade === false);
+      const fichasComDesvio = new Set<string>();
+      if (naoConformes.length > 0) {
+        const { data: rncs, error: erroRnc } = await supabase
+          .from("rnc")
+          .select("monitoramento_id, status")
+          .in(
+            "monitoramento_id",
+            naoConformes.map((m) => m.id)
+          )
+          .neq("status", "FECHADA")
+          .overrideTypes<{ monitoramento_id: string | null; status: StatusRnc }[], { merge: false }>();
+        if (erroRnc) throw erroRnc;
+        const idsComRncAtiva = new Set((rncs ?? []).map((r) => r.monitoramento_id));
+        for (const m of naoConformes) {
+          if (idsComRncAtiva.has(m.id)) fichasComDesvio.add(m.ficha_template_id);
+        }
+      }
+
+      return { mapaUltimos, fichasComDesvio };
+    },
+  });
+}
+
+/** Registro mais recente de HOJE desta ficha+setor — usado para herdar a leitura anterior
+ * dos widgets "Especial SIF" (ex.: hidrômetro do chiller), igual a `registrosRecentes[0]`
+ * no v1. Não é a fila de "apontamentos recentes para editar" (fora do escopo desta fase). */
+export function useUltimoRegistroFicha(fichaTemplateId: string | undefined, setor: string | undefined) {
+  return useQuery({
+    queryKey: ["monitoramentos", "ultimo-registro-ficha", fichaTemplateId, setor],
+    enabled: !!fichaTemplateId && !!setor,
+    queryFn: async () => {
+      const desde = inicioDoDiaManaus(new Date()).toISOString();
+      const { data, error } = await supabase
+        .from("monitoramentos")
+        .select("id, dados_dinamicos, criado_em")
+        .eq("ficha_template_id", fichaTemplateId as string)
+        .eq("setor", setor as string)
+        .gte("criado_em", desde)
+        .order("criado_em", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+        .overrideTypes<{ id: string; dados_dinamicos: Record<string, unknown>; criado_em: string } | null, { merge: false }>();
       if (error) throw error;
       return data;
     },

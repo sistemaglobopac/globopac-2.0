@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, ClipboardCheck, Filter, Layers, Loader2, Sparkles, X } from "lucide-react";
 import { useSessionStore } from "@/store/session";
 import { useSetoresCadastrados } from "@/modules/admin/api";
@@ -49,6 +50,7 @@ function hojeManaus(): string {
 /** Fila de QA do VERIFICADOR (e ADMIN_MASTER, com visão global): revisão, assinatura em lote
  * e abertura de adendos nos monitoramentos registrados pelos inspetores. */
 export function PainelVerificacao() {
+  const navigate = useNavigate();
   const perfil = useSessionStore((s) => s.perfil);
   const { data: masterSetores } = useSetoresCadastrados();
   const { data: templates } = useFichasTemplatesTodas();
@@ -163,7 +165,10 @@ export function PainelVerificacao() {
     (i) => i.status === "verificado" && ensureLocalTime(i.appt.verificado_em ?? i.appt.criado_em).isoLocal === dateBase
   ).length;
   const kpiAdendos = displayItems.filter((i) => i.status === "adendo_pendente").length;
-  const kpiRncTratativa = (rncsAbertas ?? []).filter((r) => r.status === "ABERTA" || r.status === "EM_TRATATIVA" || r.status === "REABERTA").length;
+  // Conta o que está TRATADA — é a fila de revisão do próprio VERIFICADOR (useRevisarRnc, em
+  // /rnc), não o total de RNCs em qualquer estágio; ABERTA/REABERTA/DEVOLVIDA ainda estão com
+  // o Gestor de Setor e não exigem ação do Verificador ainda.
+  const kpiRncTratativa = (rncsAbertas ?? []).filter((r) => r.status === "TRATADA").length;
 
   const filtrosAtivos = Boolean(filtroSetor || filtroPac || filtroStatus || filtroInspetor || dateBase !== hojeManaus());
 
@@ -297,7 +302,7 @@ export function PainelVerificacao() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button type="button" variant="outline" size="sm" onClick={() => alterarDia(-1)}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -331,7 +336,7 @@ export function PainelVerificacao() {
         <KpiCard tag="Fila QA" label="Fichas Por Verificar" value={kpiAguardando} tom="primary" />
         <KpiCard tag="OK" label="Fichas Verificadas" value={kpiVerificadas} tom="lima" />
         <KpiCard tag="Pendente" label="Adendos Pendentes" value={kpiAdendos} tom="alerta" />
-        <KpiCard tag="Gestor" label="RNCs em Tratativa" value={kpiRncTratativa} tom="destrutivo" />
+        <KpiCard tag="Revisor" label="RNCs Aguardando Revisão" value={kpiRncTratativa} tom="destrutivo" onClick={() => navigate("/rnc")} />
       </div>
 
       <div className="flex items-center justify-between">
@@ -409,14 +414,14 @@ export function PainelVerificacao() {
       )}
 
       {selectedIds.size > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-between gap-4 border-t bg-surface-dark p-4 text-ondark shadow-lg">
+        <div className="fixed inset-x-0 bottom-0 z-40 flex flex-wrap items-center justify-between gap-3 border-t bg-surface-dark p-3 text-ondark shadow-lg sm:gap-4 sm:p-4">
           <div className="flex items-center gap-3">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary font-semibold text-primary-foreground">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary font-semibold text-primary-foreground">
               {selectedIds.size}
             </span>
-            <span>ficha(s) selecionada(s)</span>
+            <span className="text-sm sm:text-base">ficha(s) selecionada(s)</span>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button type="button" variant="ghost" className="text-ondark" onClick={() => setSelectedIds(new Set())}>
               Cancelar
             </Button>
@@ -431,7 +436,7 @@ export function PainelVerificacao() {
       {showFilters && (
         <ModalBase titulo="Filtros Avançados" onFechar={() => setShowFilters(false)}>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Setor</Label>
                 <Select value={filtroSetor ?? ""} onChange={(e) => setFiltroSetor(e.target.value || null)}>
@@ -455,7 +460,7 @@ export function PainelVerificacao() {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Inspetor</Label>
                 <Select value={filtroInspetor ?? ""} onChange={(e) => setFiltroInspetor(e.target.value || null)}>
@@ -477,7 +482,7 @@ export function PainelVerificacao() {
                 </Select>
               </div>
             </div>
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-wrap justify-end gap-2">
               <Button type="button" variant="outline" onClick={limparFiltros}>
                 Limpar Filtros
               </Button>
@@ -543,7 +548,7 @@ export function PainelVerificacao() {
               <span className="font-medium">{ensureLocalTime(`${encerrarAlvo.dia}T12:00:00`).datePt}</span> como finalizado. Use apenas se o inspetor
               esqueceu de finalizar o turno.
             </p>
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-wrap justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setEncerrarAlvo(null)}>
                 Cancelar
               </Button>
@@ -608,6 +613,15 @@ function PreviewModal({
   const [valorNovoAdendo, setValorNovoAdendo] = useState("");
   const [notaAdendo, setNotaAdendo] = useState("");
 
+  // Assinatura eletrônica avançada (Lei 14.063/2020, Art. 4º §2º) exige reautenticação por
+  // senha no momento de assinar — tanto aprovar quanto reprovar gravam uma assinatura em
+  // `assinaturas_eletronicas` (verificar-monitoramento chama assinarMonitoramento nos dois
+  // casos), então os dois pedem senha aqui, igual ao lote (confirmarAssinaturaLote acima).
+  const [acaoPendente, setAcaoPendente] = useState<"aprovar" | "reprovar" | null>(null);
+  const [senha, setSenha] = useState("");
+  const [autenticando, setAutenticando] = useState(false);
+  const [erroSenha, setErroSenha] = useState<string | null>(null);
+
   const verificar = useVerificarMonitoramento();
   const abrirAdendo = useAbrirAdendo();
 
@@ -631,6 +645,28 @@ function PreviewModal({
       onFechar();
     } catch (erro) {
       onMensagem({ tipo: "error", texto: erro instanceof Error ? erro.message : "Falha ao reprovar." });
+    }
+  }
+
+  async function confirmarComSenha() {
+    setErroSenha(null);
+    setAutenticando(true);
+    try {
+      const { data: userData, error: erroUser } = await supabase.auth.getUser();
+      if (erroUser || !userData.user?.email) {
+        setErroSenha("Não foi possível identificar seu usuário. Faça login novamente.");
+        return;
+      }
+      const { error: erroAuth } = await supabase.auth.signInWithPassword({ email: userData.user.email, password: senha });
+      if (erroAuth) {
+        setErroSenha("Senha incorreta. A assinatura eletrônica falhou.");
+        return;
+      }
+      if (acaoPendente === "aprovar") await aprovar();
+      else if (acaoPendente === "reprovar") await reprovar();
+    } finally {
+      setAutenticando(false);
+      setSenha("");
     }
   }
 
@@ -659,7 +695,7 @@ function PreviewModal({
           {inspetorNome} · {datePt} {time} · {item.appt.setor} · Monitoramento nº {item.ordemDia}
         </p>
 
-        <dl className="grid grid-cols-2 gap-2 text-sm">
+        <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
           {campos.map(([chave, valor]) => (
             <div key={chave}>
               <dt className="text-muted-foreground">{chave}</dt>
@@ -695,6 +731,45 @@ function PreviewModal({
               </div>
             )}
           </div>
+        ) : acaoPendente ? (
+          <div className="space-y-3 border-t pt-4">
+            <p className="text-sm text-muted-foreground">
+              {acaoPendente === "aprovar"
+                ? "Confirme sua senha para aprovar e assinar eletronicamente este monitoramento."
+                : "Confirme sua senha para registrar a reprovação e assinar eletronicamente."}
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="senhaPreview">Sua senha</Label>
+              <Input
+                id="senhaPreview"
+                type="password"
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                disabled={autenticando}
+                autoFocus
+              />
+            </div>
+            {erroSenha && <p className="text-sm text-destructive">{erroSenha}</p>}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                disabled={autenticando}
+                onClick={() => {
+                  setAcaoPendente(null);
+                  setSenha("");
+                  setErroSenha(null);
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button type="button" className="flex-1" disabled={autenticando || !senha} onClick={confirmarComSenha}>
+                {autenticando ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {autenticando ? "Autenticando…" : "Confirmar e Assinar"}
+              </Button>
+            </div>
+          </div>
         ) : (
           <div className="space-y-3 border-t pt-4">
             {mostrarReprovacao && (
@@ -711,10 +786,10 @@ function PreviewModal({
                 <Textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} />
               </div>
             )}
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {!mostrarReprovacao ? (
                 <>
-                  <Button type="button" disabled={verificar.isPending} onClick={aprovar} className="flex-1">
+                  <Button type="button" disabled={verificar.isPending} onClick={() => setAcaoPendente("aprovar")} className="flex-1">
                     Aprovar e assinar
                   </Button>
                   <Button type="button" variant="destructive" onClick={() => setMostrarReprovacao(true)} className="flex-1">
@@ -723,7 +798,13 @@ function PreviewModal({
                 </>
               ) : (
                 <>
-                  <Button type="button" variant="destructive" disabled={verificar.isPending} onClick={reprovar} className="flex-1">
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={verificar.isPending}
+                    onClick={() => setAcaoPendente("reprovar")}
+                    className="flex-1"
+                  >
                     Confirmar reprovação (abre RNC)
                   </Button>
                   <Button type="button" variant="outline" onClick={() => setMostrarReprovacao(false)} className="flex-1">

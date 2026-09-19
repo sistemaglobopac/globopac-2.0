@@ -13,6 +13,7 @@ import {
   MapPin,
   Megaphone,
   Settings,
+  ShieldAlert,
   Timer,
   TrendingUp,
   Users,
@@ -28,7 +29,6 @@ import { DashboardPage } from "@/modules/bi/DashboardPage";
 import { PainelOsPage } from "@/modules/pcm/PainelOsPage";
 import { SetoresPage } from "@/modules/admin/SetoresPage";
 import { DialogProvider } from "./dialogSystem";
-import { PageHeaderGestao } from "./PageHeaderGestao";
 import { usePresenceStore } from "./presenceStore";
 import { useMonitoramentosHoje, usePausasEmAndamento, useRncsPendentesDetalhado } from "./api";
 import { ModalUsuariosAtivos } from "./modals/ModalUsuariosAtivos";
@@ -42,6 +42,7 @@ import { EquipamentosAdminPanel } from "./admin/EquipamentosAdminPanel";
 import { DesviosAdminPanel } from "./admin/DesviosAdminPanel";
 import { ComunicadosPanel } from "./admin/ComunicadosPanel";
 import { ControlePragasPanel } from "./admin/ControlePragasPanel";
+import { SegurancaLoginPanel } from "./admin/SegurancaLoginPanel";
 
 const ABAS_VALIDAS = [
   "bi",
@@ -58,6 +59,7 @@ const ABAS_VALIDAS = [
   "desvios",
   "comunicados",
   "controle_pragas",
+  "seguranca_login",
 ] as const;
 type AbaGestao = (typeof ABAS_VALIDAS)[number];
 
@@ -99,6 +101,8 @@ function EstilosGestao() {
   );
 }
 
+/** Título elegante da página, abaixo do cabeçalho global sticky (saudação/relógio já vivem lá,
+ * em AppShell) — rola normalmente com o conteúdo, não fica fixo. */
 function TituloPainelGestao() {
   return (
     <div className="flex items-center gap-3 rounded-2xl bg-gradient-to-br from-primary to-primary-active p-4 text-ondark shadow-md">
@@ -307,6 +311,7 @@ function AbaHome({ irPara }: { irPara: (aba: AbaGestao) => void }) {
           <BotaoGestaoSistema icon={Wrench} categoria="PCM" titulo="Aprovação de OS" indice={4} onClick={() => irPara("admin_os_aprovacao")} />
           <BotaoGestaoSistema icon={Cog} categoria="Configurações" titulo="Equipamentos" indice={5} onClick={() => irPara("equipamentos")} />
           <BotaoGestaoSistema icon={AlertTriangle} categoria="Configurações" titulo="Desvios" indice={6} onClick={() => irPara("desvios")} />
+          <BotaoGestaoSistema icon={ShieldAlert} categoria="Configurações" titulo="Segurança de Login" indice={7} onClick={() => irPara("seguranca_login")} />
         </div>
       </section>
 
@@ -333,6 +338,7 @@ const PAINEL_POR_ABA: Partial<Record<AbaGestao, ComponentType>> = {
   desvios: DesviosAdminPanel,
   comunicados: ComunicadosPanel,
   controle_pragas: ControlePragasPanel,
+  seguranca_login: SegurancaLoginPanel,
 };
 
 /** Painel de Gestão — console administrativo master do ADMIN_MASTER. Componente único e
@@ -348,7 +354,6 @@ export function PainelGestao() {
     <DialogProvider>
       <div className="gs-scope space-y-6">
         <EstilosGestao />
-        <PageHeaderGestao />
         {!ABAS_SEM_TITULO.has(aba) && <TituloPainelGestao />}
         {ABAS_COM_AVISO_ADMIN.has(aba) && <AvisoOperacaoAdmin aba={aba} />}
         {aba === "bi" ? <AbaHome irPara={irPara} /> : Painel ? <Painel /> : <AbaHome irPara={irPara} />}

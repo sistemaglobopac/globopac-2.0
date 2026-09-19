@@ -80,7 +80,7 @@ export function ControlePragasPanel() {
 
   return (
     <div className="rounded-2xl border border-hairline bg-card p-5 shadow-sm">
-      <div className="mb-4 flex items-start justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <Bug className="h-7 w-7 shrink-0 text-primary" />
           <div>

@@ -7,7 +7,7 @@
 // segunda implementação de hash/gravação de assinatura).
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { corsHeaders } from "../_shared/cors.ts";
+import { corsHeadersAutenticado } from "../_shared/cors.ts";
 import { assinarMonitoramento } from "../_shared/assinar.ts";
 
 const requestSchema = z.discriminatedUnion("decisao", [
@@ -34,7 +34,8 @@ Deno.serve(async (req) => {
       JSON.stringify({ correlationId, funcao: "verificar-monitoramento", nivel, evento, ...extra })
     );
 
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const cors = corsHeadersAutenticado(req);
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
   try {
     const authHeader = req.headers.get("Authorization");
@@ -143,7 +144,7 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({ monitoramento: atualizado, rnc, assinatura_id: assinatura.id }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 200, headers: { ...cors, "Content-Type": "application/json" } }
     );
   } catch (erro) {
     log("error", "excecao_nao_tratada", { erro: erro instanceof Error ? erro.message : String(erro) });

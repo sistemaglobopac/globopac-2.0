@@ -73,7 +73,7 @@ export function ComunicadosPanel() {
 
   return (
     <div className="rounded-2xl border border-hairline bg-card p-5 shadow-sm">
-      <div className="mb-4 flex items-start justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <Megaphone className="h-7 w-7 shrink-0 text-primary" />
           <div>
@@ -92,7 +92,7 @@ export function ComunicadosPanel() {
       <div className="space-y-3">
         {ordenados.map((item) => (
           <article key={item.id} className="rounded-xl border border-hairline p-4">
-            <div className="mb-1 flex items-start justify-between gap-3">
+            <div className="mb-1 flex flex-wrap items-start justify-between gap-3">
               <h3 className="text-sm font-bold text-ink">{item.titulo}</h3>
               <div className="flex shrink-0 gap-1.5">
                 <Button type="button" variant="outline" size="sm" aria-label={`Editar ${item.titulo}`} onClick={() => abrirModal(item)}>

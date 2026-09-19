@@ -8,7 +8,7 @@
 // LIBERACAO_DIARIA — ver ADR 0012.
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { corsHeaders } from "../_shared/cors.ts";
+import { corsHeadersAutenticado } from "../_shared/cors.ts";
 import { assinarLiberacaoOs } from "../_shared/assinar-os.ts";
 import { canonicalizar, sha256Hex } from "../_shared/hash.ts";
 
@@ -19,7 +19,8 @@ Deno.serve(async (req) => {
   const log = (nivel: "info" | "error", evento: string, extra: Record<string, unknown> = {}) =>
     console.log(JSON.stringify({ correlationId, funcao: "liberar-relatorio-os-sif", nivel, evento, ...extra }));
 
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const cors = corsHeadersAutenticado(req);
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
   try {
     const authHeader = req.headers.get("Authorization");
@@ -216,7 +217,7 @@ Deno.serve(async (req) => {
         quantidade_liberada: liberadas?.length ?? 0,
         hash_agregador: hashAgregador,
       }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 200, headers: { ...cors, "Content-Type": "application/json" } }
     );
   } catch (erro) {
     log("error", "excecao_nao_tratada", { erro: erro instanceof Error ? erro.message : String(erro) });

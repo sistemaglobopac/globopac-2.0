@@ -202,6 +202,56 @@ export function useRedefinirSenhaGestao() {
 }
 
 // ---------------------------------------------------------------------------------------
+// Segurança de Login — IPs em CAPTCHA/bloqueados (ver ADR 0015 e migração
+// 20260928000001_seguranca_login_bloqueio_ip.sql). Pedido explícito do responsável do
+// projeto: 5 falhas de login do mesmo IP exigem CAPTCHA, 10 bloqueiam o IP até um
+// ADMIN_MASTER liberar de volta.
+// ---------------------------------------------------------------------------------------
+export interface BloqueioLoginIp {
+  ip: string;
+  tentativas_falhas: number;
+  status: "aguardando_captcha" | "bloqueado";
+  primeira_falha_em: string | null;
+  ultima_falha_em: string | null;
+  bloqueado_em: string | null;
+  desbloqueado_por: string | null;
+  desbloqueado_em: string | null;
+}
+
+export function useBloqueiosLoginIp() {
+  return useQuery({
+    queryKey: ["gestao", "bloqueios-login-ip"],
+    refetchInterval: 30_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("bloqueios_login_ip")
+        .select(
+          "ip, tentativas_falhas, status, primeira_falha_em, ultima_falha_em, bloqueado_em, desbloqueado_por, desbloqueado_em"
+        )
+        .neq("status", "normal")
+        .order("ultima_falha_em", { ascending: false })
+        .overrideTypes<BloqueioLoginIp[], { merge: false }>();
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+/** Só ADMIN_MASTER desbloqueia — a RLS de bloqueios_login_ip não libera UPDATE para nenhum
+ * papel de cliente (mesmo padrão de assinaturas_eletronicas), por isso passa por Edge
+ * Function com service_role. Ver supabase/functions/desbloquear-ip-login. */
+export function useDesbloquearIp() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (ip: string) => {
+      const { error } = await supabase.functions.invoke("desbloquear-ip-login", { body: { ip } });
+      if (error) throw error;
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["gestao", "bloqueios-login-ip"] }),
+  });
+}
+
+// ---------------------------------------------------------------------------------------
 // KPI "Usuários Ativos": a contagem em si vem do usePresenceStore (efêmero, ver
 // presenceStore.ts) — não há query aqui, só os dados de perfil pra cruzar no modal.
 // ---------------------------------------------------------------------------------------
@@ -418,11 +468,12 @@ export interface RncsPendentesDetalhado {
 }
 
 /** Mapeamento dos três grupos do modal para o enum status_rnc real deste projeto (ABERTA /
- * EM_TRATATIVA / TRATADA / REABERTA / FECHADA — não há um status "DEVOLVIDA"/"RESPONDIDA"
- * dedicado): "Em Tratativa com Encarregados de Setor" = ABERTA/REABERTA/EM_TRATATIVA (ainda
- * não recebeu tratativa do Gestor de Setor); "Pendente de Verificação" = TRATADA (Gestor já
- * respondeu, falta o fechamento); "Histórico de Fichas com Desvios" = monitoramentos
- * reprovados nos últimos 30 dias que ainda não têm nenhuma RNC vinculada. */
+ * EM_TRATATIVA / TRATADA / REABERTA / DEVOLVIDA / FECHADA): "Em Tratativa com Encarregados de
+ * Setor" = ABERTA/REABERTA/EM_TRATATIVA/DEVOLVIDA (ainda não recebeu tratativa do Gestor de
+ * Setor, ou o Verificador devolveu para nova tratativa); "Pendente de Verificação" = TRATADA
+ * (Gestor já respondeu, aguardando revisão do Verificador — useRevisarRnc); "Histórico de
+ * Fichas com Desvios" = monitoramentos reprovados nos últimos 30 dias que ainda não têm
+ * nenhuma RNC vinculada. */
 export function useRncsPendentesDetalhado() {
   return useQuery({
     queryKey: ["gestao", "rncs-pendentes"],
@@ -436,7 +487,9 @@ export function useRncsPendentesDetalhado() {
         .overrideTypes<Rnc[], { merge: false }>();
       if (error) throw error;
 
-      const emTratativa = (rncs ?? []).filter((r) => r.status === "ABERTA" || r.status === "REABERTA" || r.status === "EM_TRATATIVA");
+      const emTratativa = (rncs ?? []).filter(
+        (r) => r.status === "ABERTA" || r.status === "REABERTA" || r.status === "EM_TRATATIVA" || r.status === "DEVOLVIDA"
+      );
       const pendenteVerificacao = (rncs ?? []).filter((r) => r.status === "TRATADA");
 
       const desde = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();

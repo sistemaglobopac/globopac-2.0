@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useSessionStore } from "@/store/session";
 import { useSetoresCadastrados } from "@/modules/admin/api";
+import { useEquipamentosCadastrados, useDesviosCadastrados } from "@/modules/gestao/api";
 import { supabase } from "@/lib/supabase";
 import {
   turnoDoDia,
@@ -32,8 +33,12 @@ import {
   useRegistrarParada,
   useKpisTurno,
   useAssinarAdendo,
+  PAUSAS_CONFIG,
+  fichasAplicaveisAoInspetor,
+  calcularFichasAtrasadas,
   type TipoPausa,
   type FichaAtivaResumo,
+  type FichaAtrasada,
   type DesvioAtivo,
   type AdendoPendente,
 } from "./api";
@@ -43,81 +48,12 @@ import { Label } from "@/shared/ui/label";
 import { Select } from "@/shared/ui/select";
 import { Textarea } from "@/shared/ui/textarea";
 
-const ROTULO_PERFIL: Record<string, string> = {
-  INSPETOR_QUALIDADE: "Inspetor de Qualidade",
-  ADMIN_MASTER: "Administrador",
-};
-
 const MOTIVOS_PARADA_FALLBACK = ["Higiene Operacional", "Manutenção Quebra", "Contaminação", "Falta de Matéria-Prima", "Intervenção SIF"];
-
-const PAUSAS_CONFIG: Record<TipoPausa, { label: string; desc: string; limiteMin: number }> = {
-  CURTA_20M: { label: "Pausa (20 min)", desc: "Café / Descanso curto", limiteMin: 20 },
-  ALMOCO_72M: { label: "Almoço (1h12)", desc: "Pausa principal 1", limiteMin: 72 },
-  JANTAR_72M: { label: "Jantar (1h12)", desc: "Pausa principal 2", limiteMin: 72 },
-};
 
 type CategoriaKpi = "monitoramentos" | "fichasAtivas" | "fichasAtrasadas" | "rnc";
 
-interface FichaAtrasada {
-  ficha: FichaAtivaResumo;
-  motivo: string;
-}
-
-function fichasAplicaveisAoInspetor(fichasAtivas: FichaAtivaResumo[], userSetores: string[]): FichaAtivaResumo[] {
-  return fichasAtivas.filter((f) => f.locais_aplicacao?.some((s) => userSetores.includes(s)));
-}
-
-/** Ficha "atrasada": recorrente, aplicável ao inspetor, e sem apontamento neste turno depois de
- * 2h de turno iniciado, OU cujo último apontamento do dia já passou de
- * tempo_entre_apontamentos_min + 5 minutos (Painel de Bordo, seção 8). */
-function calcularFichasAtrasadas(
-  fichasAplicaveis: FichaAtivaResumo[],
-  monitoramentosHoje: { ficha_template_id: string; criado_em: string }[],
-  turnoInicio: Date,
-  agora: Date
-): FichaAtrasada[] {
-  const ultimoPorFicha = new Map<string, Date>();
-  for (const m of monitoramentosHoje) {
-    const criado = new Date(m.criado_em);
-    const atual = ultimoPorFicha.get(m.ficha_template_id);
-    if (!atual || criado > atual) ultimoPorFicha.set(m.ficha_template_id, criado);
-  }
-
-  const duasHorasMs = 2 * 60 * 60 * 1000;
-  const atrasadas: FichaAtrasada[] = [];
-
-  for (const ficha of fichasAplicaveis) {
-    if (ficha.tipo_apontamento !== "Recorrente") continue;
-    const ultimo = ultimoPorFicha.get(ficha.id);
-    if (!ultimo) {
-      if (agora.getTime() - turnoInicio.getTime() > duasHorasMs) {
-        atrasadas.push({ ficha, motivo: "Sem nenhum apontamento neste turno" });
-      }
-      continue;
-    }
-    if (ficha.tempo_entre_apontamentos_min != null) {
-      const limiteMs = (ficha.tempo_entre_apontamentos_min + 5) * 60 * 1000;
-      if (agora.getTime() - ultimo.getTime() > limiteMs) {
-        atrasadas.push({ ficha, motivo: "Último apontamento atrasado" });
-      }
-    }
-  }
-
-  return atrasadas;
-}
-
 function formatarHoraManaus(iso: string): string {
   return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Manaus" });
-}
-
-function formatarDataPorExtenso(data: Date): string {
-  return data.toLocaleDateString("pt-BR", {
-    timeZone: "America/Manaus",
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
 }
 
 function formatarMmSs(ms: number): string {
@@ -146,6 +82,8 @@ export function PainelBordo() {
   const navigate = useNavigate();
   const perfil = useSessionStore((s) => s.perfil);
   const { data: masterSetores } = useSetoresCadastrados();
+  const { data: equipamentosCadastrados } = useEquipamentosCadastrados();
+  const { data: desviosCadastrados } = useDesviosCadastrados();
 
   const userSetores = perfil && perfil.setoresPermitidos.length > 0 ? perfil.setoresPermitidos : masterSetores ?? [];
   const activeSetorLabel = userSetores.length === 1 ? userSetores[0] : userSetores.length > 1 ? `${userSetores.length} Setores (Múltiplos)` : "—";
@@ -183,11 +121,20 @@ export function PainelBordo() {
 
   const [paradaSetor, setParadaSetor] = useState("");
   const [paradaEquipamento, setParadaEquipamento] = useState("");
+  const [paradaEquipamentoCustom, setParadaEquipamentoCustom] = useState(false);
   const [paradaMotivoSelecionado, setParadaMotivoSelecionado] = useState("");
   const [paradaMotivoCustomizado, setParadaMotivoCustomizado] = useState("");
   const [paradaDetalhes, setParadaDetalhes] = useState("");
   const [paradaHoraInicio, setParadaHoraInicio] = useState(() => paraDatetimeLocal(new Date()));
   const [paradaHoraFim, setParadaHoraFim] = useState("");
+
+  // Catálogo cadastrado pelo admin (Painel de Gestão) — mesmo padrão do v1 (globalEquipamentos/
+  // globalDesvios do MasterConfigContext): usa a lista cadastrada quando existir para o setor
+  // selecionado, com "+Outro" liberando texto livre; cai no fallback hardcoded só quando o
+  // catálogo de desvios está vazio (equipamento sempre cai para texto livre, sem fallback fixo,
+  // pois não há uma lista genérica de equipamentos por setor sensata para hardcodar).
+  const equipamentosDoSetor = (equipamentosCadastrados ?? []).filter((eq) => eq.setor === paradaSetor);
+  const motivosParada = (desviosCadastrados ?? []).length > 0 ? (desviosCadastrados ?? []).map((d) => d.nome) : MOTIVOS_PARADA_FALLBACK;
 
   // Relógio de 1s: alimenta o GlobalClock, o cronômetro de pausa e o recálculo de atraso das
   // fichas (que depende de "agora" para saber se já passou dos minutos configurados).
@@ -339,6 +286,7 @@ export function PainelBordo() {
       setMensagem({ tipo: "success", texto: "Parada de processo registrada." });
       setShowModalParada(false);
       setParadaEquipamento("");
+      setParadaEquipamentoCustom(false);
       setParadaMotivoSelecionado("");
       setParadaMotivoCustomizado("");
       setParadaDetalhes("");
@@ -373,19 +321,10 @@ export function PainelBordo() {
             </div>
             <div>
               <h1 className="text-xl font-semibold">Painel de Bordo</h1>
-              <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span className="capitalize">{formatarDataPorExtenso(agora)}</span>
-                <span aria-hidden>•</span>
-                <span className="font-mono">{agora.toLocaleTimeString("pt-BR", { timeZone: "America/Manaus" })}</span>
-              </p>
             </div>
           </div>
 
           <div className="flex flex-wrap gap-4 text-sm">
-            <div>
-              <p className="text-xs uppercase text-muted-foreground">{ROTULO_PERFIL[perfil.nivelAcesso] ?? "Inspetor"}</p>
-              <p className="font-medium">{perfil.nomeCompleto}</p>
-            </div>
             <div>
               <p className="text-xs uppercase text-muted-foreground">Setor Operacional</p>
               <p className="font-medium">{activeSetorLabel}</p>
@@ -557,7 +496,7 @@ export function PainelBordo() {
                     Cronômetro de Aferição
                   </p>
                   <p className="text-center font-mono text-3xl">{formatarCronometro(cronometroMs)}</p>
-                  <div className="flex justify-center gap-2">
+                  <div className="flex flex-wrap justify-center gap-2">
                     <Button
                       type="button"
                       size="sm"
@@ -690,19 +629,51 @@ export function PainelBordo() {
 
             <div className="space-y-2">
               <Label htmlFor="paradaEquipamento">Equipamento/Linha</Label>
-              <Input
-                id="paradaEquipamento"
-                placeholder="Ex: Chiller 2, Linha de corte…"
-                value={paradaEquipamento}
-                onChange={(e) => setParadaEquipamento(e.target.value)}
-              />
+              {equipamentosDoSetor.length > 0 && !paradaEquipamentoCustom ? (
+                <Select
+                  id="paradaEquipamento"
+                  value={paradaEquipamento}
+                  disabled={!paradaSetor}
+                  onChange={(e) => {
+                    if (e.target.value === "OUTRO") {
+                      setParadaEquipamentoCustom(true);
+                      setParadaEquipamento("");
+                    } else {
+                      setParadaEquipamento(e.target.value);
+                    }
+                  }}
+                >
+                  <option value="">Selecione o equipamento…</option>
+                  {equipamentosDoSetor.map((eq) => (
+                    <option key={eq.id} value={eq.nome}>
+                      {eq.codigo ? `${eq.codigo} - ` : ""}
+                      {eq.nome}
+                    </option>
+                  ))}
+                  <option value="OUTRO">+ Outro (Não Listado)</option>
+                </Select>
+              ) : (
+                <div className="flex gap-2">
+                  <Input
+                    id="paradaEquipamento"
+                    placeholder="Ex: Chiller 2, Linha de corte…"
+                    value={paradaEquipamento}
+                    onChange={(e) => setParadaEquipamento(e.target.value)}
+                  />
+                  {equipamentosDoSetor.length > 0 && (
+                    <Button type="button" variant="outline" onClick={() => { setParadaEquipamentoCustom(false); setParadaEquipamento(""); }}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="paradaMotivo">Motivo da Parada</Label>
               <Select id="paradaMotivo" required value={paradaMotivoSelecionado} onChange={(e) => setParadaMotivoSelecionado(e.target.value)}>
                 <option value="">Selecione…</option>
-                {MOTIVOS_PARADA_FALLBACK.map((m) => (
+                {motivosParada.map((m) => (
                   <option key={m} value={m}>
                     {m}
                   </option>
@@ -724,7 +695,7 @@ export function PainelBordo() {
               <Textarea id="paradaDetalhes" value={paradaDetalhes} onChange={(e) => setParadaDetalhes(e.target.value)} />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="paradaInicio">Hora de Início</Label>
                 <Input
@@ -903,8 +874,9 @@ function CardDesvio({
   const ESTILO_STATUS = {
     ABERTA: { texto: "Aguardando Gestor", classe: "border-warning bg-warning/10 text-warning" },
     EM_TRATATIVA: { texto: "Em Tratativa", classe: "border-warning bg-warning/10 text-warning" },
-    TRATADA: { texto: "Tratada — Aguardando Fechamento", classe: "border-primary bg-primary/10 text-primary" },
-    REABERTA: { texto: "Devolvida ao Gestor", classe: "border-destructive bg-destructive/10 text-destructive" },
+    TRATADA: { texto: "Tratada — Aguardando Revisão do Verificador", classe: "border-primary bg-primary/10 text-primary" },
+    DEVOLVIDA: { texto: "Devolvida pelo Verificador", classe: "border-destructive bg-destructive/10 text-destructive" },
+    REABERTA: { texto: "Reaberta pela Administração", classe: "border-destructive bg-destructive/10 text-destructive" },
   } satisfies Record<string, { texto: string; classe: string }>;
   const estilo: { texto: string; classe: string } =
     (ESTILO_STATUS as Record<string, { texto: string; classe: string }>)[desvio.rnc.status] ?? ESTILO_STATUS.ABERTA;
@@ -1015,7 +987,7 @@ function ModalConfirmacao({
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">{icone}</div>
         <h3 className="text-lg font-semibold">{titulo}</h3>
         <p className="text-sm text-muted-foreground">{mensagem}</p>
-        <div className="flex justify-center gap-2">
+        <div className="flex flex-wrap justify-center gap-2">
           <Button type="button" variant="outline" onClick={onCancelar}>
             Cancelar
           </Button>

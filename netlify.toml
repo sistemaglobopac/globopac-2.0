@@ -1,0 +1,28 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  # Mesma versão usada em .github/workflows/ci.yml e package.json engines.node.
+  NODE_VERSION = "20"
+
+# SPA (React Router com BrowserRouter, ver src/App.tsx) — sem isto, recarregar a página em
+# qualquer rota que não seja "/" (ex.: /gestao, /verificacao) devolve 404 do Netlify em vez de
+# deixar o React Router decidir a tela.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Nunca cachear o service worker nem o build-meta.json que o UpdateNotifier consulta — o
+# autoUpdate do vite-plugin-pwa (ver vite.config.ts) e o aviso de "nova versão disponível"
+# dependem de sempre buscar a versão mais recente desses dois arquivos, nunca uma cacheada.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/build-meta.json"
+  [headers.values]
+    Cache-Control = "no-cache"

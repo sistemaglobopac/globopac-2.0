@@ -8,7 +8,7 @@
 // (RLS manutencao_os_update decide setor/permissão), a assinatura é gravada com service_role.
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { corsHeaders } from "../_shared/cors.ts";
+import { corsHeadersAutenticado } from "../_shared/cors.ts";
 import { assinarEtapaOs, TRANSICOES_OS } from "../_shared/assinar-os.ts";
 
 const requestSchema = z.object({
@@ -21,7 +21,8 @@ Deno.serve(async (req) => {
   const log = (nivel: "info" | "error", evento: string, extra: Record<string, unknown> = {}) =>
     console.log(JSON.stringify({ correlationId, funcao: "avancar-etapa-os", nivel, evento, ...extra }));
 
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const cors = corsHeadersAutenticado(req);
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
   try {
     const authHeader = req.headers.get("Authorization");
@@ -71,7 +72,7 @@ Deno.serve(async (req) => {
         hash_documento: resultado.hash_documento,
         os: resultado.os,
       }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 200, headers: { ...cors, "Content-Type": "application/json" } }
     );
   } catch (erro) {
     log("error", "excecao_nao_tratada", { erro: erro instanceof Error ? erro.message : String(erro) });

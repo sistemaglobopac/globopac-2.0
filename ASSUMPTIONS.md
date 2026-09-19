@@ -223,6 +223,9 @@ em `assinaturas_eletronicas`, embora aqui seja convenção de aplicação, não 
 já que `rnc` não carrega valor jurídico de assinatura eletrônica — só rastreabilidade
 operacional).
 
+**Atualização (Fase 11):** a reabertura de uma RNC **fechada** continua restrita a
+`ADMIN_MASTER` como exceção deliberada — o que muda é o fechamento de rotina (ver item 22).
+
 ### 22. Nenhuma Edge Function nova para tratar/fechar/reabrir RNC
 ✅ **Confirmada, decisão deliberada** — ao contrário de `assinar-documento` ou
 `liberar-sif`, a tratativa de RNC não envolve hash recomputado, assinatura eletrônica ou
@@ -233,6 +236,19 @@ de tratamento de uma não conformidade). As policies de RLS já existentes desde
 diretamente do cliente Supabase, sem precisar de um `SECURITY DEFINER` server-side. Nenhuma
 migration de `permissoes_perfil` foi necessária: `GESTOR_SETOR` e `ADMIN_MASTER` já tinham
 `rnc: ler/criar/tratar` desde a seed da Fase 0.
+
+**Atualização (Fase 11 — decisão do cliente):** o cliente decidiu que o **VERIFICADOR
+atuará como revisor de RNC**, superando a premissa dos itens 21/22 de que "nenhum perfil de
+revisor distinto de quem trata existe". `useFecharRnc` foi removido: o Gestor de Setor só
+trata (`ABERTA/REABERTA/DEVOLVIDA → TRATADA`, ação `tratar`); o fechamento de rotina agora é
+uma revisão do VERIFICADOR/ADMIN_MASTER (`TRATADA → FECHADA` aprovando, ou `TRATADA →
+DEVOLVIDA` com `motivo_devolucao` devolvendo ao gestor — `useRevisarRnc`, ação `revisar`),
+espelhando `VerificadorReview.jsx` da v1. Ainda sem Edge Function dedicada — RLS
+(`rnc_update_revisar`) e um novo trigger de segregação de funções
+(`trg_segregacao_funcoes_rnc`, `tratado_por <> revisado_por`, mesmo princípio de
+`trg_segregacao_funcoes` em `monitoramentos`) bastam. Ver
+[supabase/migrations/20260927000001_rnc_revisor_verificador.sql](supabase/migrations/20260927000001_rnc_revisor_verificador.sql)
+e [docs/permissions-matrix.md](docs/permissions-matrix.md).
 
 ## Premissas da Fase 5 (Portal PCM/OS)
 
@@ -607,3 +623,36 @@ essa lacuna nunca mais fique silenciosa — mas aplicar a correção (`supabase 
 continua sendo uma ação manual e revisada (aceitar o Auth Hook, recusar `site_url`/
 `additional_redirect_urls` a menos que já estejam corretos para produção), não uma etapa
 automática do pipeline.
+
+## Premissas de Segurança de Login (bloqueio por IP, fora do roteiro de 11 fases)
+
+### 62. Bloqueio de login por IP (5 falhas -> CAPTCHA, 10 -> bloqueio) é por IP, não por matrícula
+✅ **Confirmada, decisão deliberada** — pedido explícito do responsável do projeto. Ver ADR
+0015 para as alternativas consideradas (bloqueio por matrícula foi rejeitado: abriria uma
+negação de serviço trivial contra um colega cuja matrícula se conhece) e para o trade-off
+aceito (colaboradores atrás do mesmo IP/NAT compartilham o mesmo contador).
+
+### 63. IP armazenado em claro em `bloqueios_login_ip`, ao contrário do hash de `log_acessos_verificacao`
+✅ **Confirmada, decisão deliberada** — as duas tabelas resolvem problemas diferentes:
+`log_acessos_verificacao` é sobre o portal público anônimo (minimização LGPD faz sentido
+porque ninguém nunca precisa ler o IP de volta); `bloqueios_login_ip` é um controle interno
+onde o ADMIN_MASTER precisa **identificar** qual IP está bloqueado para decidir se libera — um
+hash irreversível tornaria essa tela inutilizável. Ver ADR 0015.
+
+### 64. Contador de tentativas de `bloqueios_login_ip` não é atômico (lê-então-grava)
+🟡 **Assumida (pendente de necessidade real)** — sob concorrência extrema do MESMO IP no mesmo
+milissegundo, duas falhas simultâneas podem subcontar uma. Aceito porque o pior caso atrasa o
+gate em uma tentativa, nunca conta a mais (nunca uma falha de segurança na direção oposta).
+Revisitar com uma função SQL atômica (`SECURITY DEFINER`) se a operação real mostrar um padrão
+de ataque distribuído e simultâneo do mesmo IP. Ver ADR 0015.
+
+### 65. CORS das Edge Functions autenticadas restringido via `ALLOWED_ORIGINS` (fail-closed para localhost em dev)
+✅ **Confirmada, decisão deliberada** — item do checklist de segurança (ver
+`supabase/functions/_shared/cors.ts`): `corsHeaders` (wildcard `*`) fica restrito só a
+`verificar-documento`/`healthcheck` (público de propósito); todas as demais Edge Functions
+usam `corsHeadersAutenticado`, que só reflete a origem da requisição se ela estiver na
+allowlist `ALLOWED_ORIGINS`. **Ação necessária do responsável do projeto:** configurar
+`ALLOWED_ORIGINS` via `supabase secrets set` no projeto hospedado com o domínio real do
+frontend antes do go-live (sem isso, as chamadas autenticadas do frontend em produção falham
+por CORS) — mesma lacuna operacional já registrada no item 8/44 (projeto hospedado ainda não
+provisionado).

@@ -4,7 +4,7 @@
 // perfis_usuarios (a senha vive só no Auth).
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { corsHeaders } from "../_shared/cors.ts";
+import { corsHeadersAutenticado } from "../_shared/cors.ts";
 
 const requestSchema = z.object({
   user_id: z.string().uuid(),
@@ -16,11 +16,12 @@ Deno.serve(async (req) => {
   const log = (nivel: "info" | "error", evento: string, extra: Record<string, unknown> = {}) =>
     console.log(JSON.stringify({ correlationId, funcao: "redefinir-senha", nivel, evento, ...extra }));
 
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const cors = corsHeadersAutenticado(req);
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return jsonError(401, "não autenticado", correlationId);
+    if (!authHeader) return jsonError(401, "não autenticado", correlationId, cors);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -34,7 +35,7 @@ Deno.serve(async (req) => {
       data: { user },
       error: authError,
     } = await callerClient.auth.getUser();
-    if (authError || !user) return jsonError(401, "não autenticado", correlationId);
+    if (authError || !user) return jsonError(401, "não autenticado", correlationId, cors);
 
     const { data: perfilChamador } = await callerClient
       .from("perfis_usuarios")
@@ -42,13 +43,13 @@ Deno.serve(async (req) => {
       .eq("id", user.id)
       .single();
     if (perfilChamador?.nivel_acesso !== "ADMIN_MASTER") {
-      return jsonError(403, "só ADMIN_MASTER redefine senhas", correlationId);
+      return jsonError(403, "só ADMIN_MASTER redefine senhas", correlationId, cors);
     }
 
     const body = await req.json().catch(() => null);
     const parsed = requestSchema.safeParse(body);
     if (!parsed.success) {
-      return jsonError(400, "payload inválido", correlationId, parsed.error.flatten());
+      return jsonError(400, "payload inválido", correlationId, cors, parsed.error.flatten());
     }
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
@@ -57,23 +58,23 @@ Deno.serve(async (req) => {
     });
     if (erroUpdate) {
       log("error", "redefinir_falhou", { erro: erroUpdate.message, userId: parsed.data.user_id });
-      return jsonError(500, "falha ao redefinir a senha", correlationId);
+      return jsonError(500, "falha ao redefinir a senha", correlationId, cors);
     }
 
     log("info", "senha_redefinida", { userId: parsed.data.user_id });
     return new Response(JSON.stringify({ ok: true }), {
       status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...cors, "Content-Type": "application/json" },
     });
   } catch (erro) {
     log("error", "excecao_nao_tratada", { erro: erro instanceof Error ? erro.message : String(erro) });
-    return jsonError(500, "erro interno", correlationId);
+    return jsonError(500, "erro interno", correlationId, cors);
   }
 });
 
-function jsonError(status: number, mensagem: string, correlationId: string, detalhes?: unknown) {
+function jsonError(status: number, mensagem: string, correlationId: string, cors: HeadersInit, detalhes?: unknown) {
   return new Response(JSON.stringify({ erro: mensagem, correlationId, detalhes }), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...cors, "Content-Type": "application/json" },
   });
 }

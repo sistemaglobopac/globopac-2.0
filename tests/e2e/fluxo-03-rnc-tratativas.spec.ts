@@ -1,12 +1,15 @@
 import { test, expect } from "@playwright/test";
 import { login, logout, clienteAdminDeTeste } from "./helpers";
 
-// Fluxo E2E nº 3 (seção 10 do PROMPT MESTRE):
-// "Verificador reprova → RNC criada automaticamente → Gestor de Setor trata → fecha."
+// Fluxo E2E nº 3 (seção 10 do PROMPT MESTRE), atualizado na Fase 11 (decisão do cliente: o
+// VERIFICADOR atua como revisor de RNC — ver ASSUMPTIONS.md item 22):
+// "Verificador reprova → RNC criada automaticamente → Gestor de Setor trata → Verificador
+// revisa e fecha." Gestor de Setor não fecha mais a própria tratativa (segregação de funções
+// reforçada por trg_segregacao_funcoes_rnc).
 // DoD da Fase 4 também exige "SLA configurável funcional com alerta" — coberto pelo segundo
 // teste abaixo, que força um prazo_sla vencido e confirma o badge "SLA VENCIDO".
 
-test("verificador reprova, RNC é criada, gestor de setor trata e fecha (fluxo 3)", async ({ page }) => {
+test("verificador reprova, RNC é criada, gestor de setor trata e verificador revisa e fecha (fluxo 3)", async ({ page }) => {
   const marcador = `E2E-fluxo3-${Date.now()}`;
   const admin = await clienteAdminDeTeste();
 
@@ -43,20 +46,34 @@ test("verificador reprova, RNC é criada, gestor de setor trata e fecha (fluxo 3
 
   await login(page, "1003", "121072");
   await page.goto("/rnc");
-  const cartaoRnc = page.locator(".rounded-lg.border").filter({ hasText: marcador });
-  await expect(cartaoRnc).toBeVisible({ timeout: 15_000 });
+  const cartaoGestor = page.locator(".rounded-lg.border").filter({ hasText: marcador });
+  await expect(cartaoGestor).toBeVisible({ timeout: 15_000 });
 
-  await cartaoRnc.locator("textarea").fill(`Tratativa: ${marcador}`);
-  await cartaoRnc.getByRole("button", { name: "Registrar tratativa" }).click();
-  await expect(cartaoRnc.getByText("Tratada — aguardando fechamento")).toBeVisible({ timeout: 15_000 });
-
-  await cartaoRnc.getByRole("button", { name: "Fechar RNC" }).click();
-  await expect(cartaoRnc).not.toBeVisible({ timeout: 15_000 });
+  await cartaoGestor.locator("textarea").fill(`Tratativa: ${marcador}`);
+  await cartaoGestor.getByRole("button", { name: "Registrar tratativa" }).click();
+  await expect(cartaoGestor.getByText("Tratada — aguardando revisão do Verificador")).toBeVisible({ timeout: 15_000 });
+  // Gestor de Setor não tem mais o botão de fechamento — só o Verificador revisa.
+  await expect(cartaoGestor.getByRole("button", { name: "Fechar RNC" })).toHaveCount(0);
   await logout(page);
 
-  const { data: rncFechada } = await admin.from("rnc").select("status, fechado_em").eq("id", rncCriada!.id).single();
+  await login(page, "1002", "121072");
+  await page.goto("/rnc");
+  const cartaoVerificador = page.locator(".rounded-lg.border").filter({ hasText: marcador });
+  await expect(cartaoVerificador).toBeVisible({ timeout: 15_000 });
+  await expect(cartaoVerificador.getByText(`Tratativa: ${marcador}`)).toBeVisible();
+  await cartaoVerificador.getByRole("button", { name: "Aprovar e Fechar RNC" }).click();
+  await expect(cartaoVerificador).not.toBeVisible({ timeout: 15_000 });
+  await logout(page);
+
+  const { data: rncFechada } = await admin
+    .from("rnc")
+    .select("status, fechado_em, tratado_por, revisado_por")
+    .eq("id", rncCriada!.id)
+    .single();
   expect(rncFechada!.status).toBe("FECHADA");
   expect(rncFechada!.fechado_em).toBeTruthy();
+  expect(rncFechada!.revisado_por).toBeTruthy();
+  expect(rncFechada!.revisado_por).not.toBe(rncFechada!.tratado_por);
 });
 
 test("RNC com prazo_sla vencido exibe alerta de SLA (DoD: SLA configurável com alerta)", async ({ page }) => {

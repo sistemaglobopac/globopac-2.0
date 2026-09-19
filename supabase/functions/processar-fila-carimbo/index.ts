@@ -7,7 +7,7 @@
 // Nunca bloqueia a operação do usuário: quem assina uma ficha recebe a assinatura na hora
 // (Fase 1); o carimbo em si é sempre assíncrono, processado aqui.
 import { createClient } from "@supabase/supabase-js";
-import { corsHeaders } from "../_shared/cors.ts";
+import { corsHeadersAutenticado } from "../_shared/cors.ts";
 import { decodificarPayloadJwt } from "../_shared/jwt.ts";
 import { solicitarCarimboRFC3161 } from "../_shared/rfc3161.ts";
 import { calcularProximaTentativa, lerPoliticaRetryCarimbo } from "../_shared/tsa-config.ts";
@@ -34,7 +34,8 @@ Deno.serve(async (req) => {
       JSON.stringify({ correlationId, funcao: "processar-fila-carimbo", nivel, evento, ...extra })
     );
 
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const cors = corsHeadersAutenticado(req);
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
   const claims = decodificarPayloadJwt(req.headers.get("Authorization"));
   const chamadorConfiavel = claims?.role === "service_role" || claims?.perfil === "ADMIN_MASTER";
@@ -155,6 +156,6 @@ Deno.serve(async (req) => {
 
   return new Response(
     JSON.stringify({ processados, concluidos, falharam, correlationId }),
-    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    { status: 200, headers: { ...cors, "Content-Type": "application/json" } }
   );
 });

@@ -4,12 +4,13 @@ import { DossieDetalhe } from "../DossieDetalhe";
 import { type Rnc } from "@/modules/rnc/api";
 import { type FichaSemRnc, useRncsPendentesDetalhado } from "../api";
 
-// Mesmo mapeamento de status de RNC usado no Painel de Bordo (ver STATUS_RNC em
+// Mesmo mapeamento de status de RNC usado no Painel de Bordo (ver ESTILO_STATUS em
 // src/modules/bordo/PainelBordo.tsx) — cores semânticas do design system, não hex por status.
 const VARIANTE_STATUS: Record<Rnc["status"], string> = {
   ABERTA: "bg-warning/10 text-warning",
   EM_TRATATIVA: "bg-warning/10 text-warning",
   REABERTA: "bg-destructive/10 text-destructive",
+  DEVOLVIDA: "bg-destructive/10 text-destructive",
   TRATADA: "bg-primary/10 text-primary",
   FECHADA: "bg-secondary text-secondary-foreground",
 };

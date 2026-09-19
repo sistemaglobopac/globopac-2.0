@@ -80,7 +80,7 @@ export function SetoresPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <Card>
-        <CardHeader className="flex-row items-start justify-between space-y-0">
+        <CardHeader className="flex flex-wrap flex-row items-start justify-between gap-3 space-y-0">
           <div className="flex items-start gap-3">
             <MapPin className="h-7 w-7 shrink-0 text-primary" />
             <div>
@@ -187,7 +187,7 @@ export function SetoresPage() {
                 </p>
               )}
 
-              <div className="flex justify-end gap-2 border-t pt-4">
+              <div className="flex flex-wrap justify-end gap-2 border-t pt-4">
                 <Button type="button" variant="outline" onClick={fecharModal}>
                   Cancelar
                 </Button>

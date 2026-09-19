@@ -31,6 +31,8 @@ test("verificador aprova, admin libera ao SIF, e o registro aparece para a Inspe
   await expect(cartaoDoRegistro).toBeVisible({ timeout: 15_000 });
   await cartaoDoRegistro.getByRole("button", { name: "Ver" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Aprovar e assinar" }).click();
+  await page.getByRole("dialog").getByLabel("Sua senha").fill("121072");
+  await page.getByRole("dialog").getByRole("button", { name: "Confirmar e Assinar" }).click();
   await expect(cartaoDoRegistro).not.toBeVisible({ timeout: 15_000 });
   await logout(page);
 

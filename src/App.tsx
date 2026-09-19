@@ -122,7 +122,7 @@ function AppRoutes() {
         <Route
           path="/rnc"
           element={
-            <ProtectedRoute perfisPermitidos={["GESTOR_SETOR", "ADMIN_MASTER"]}>
+            <ProtectedRoute perfisPermitidos={["GESTOR_SETOR", "VERIFICADOR", "ADMIN_MASTER"]}>
               <RncTratativasPage />
             </ProtectedRoute>
           }

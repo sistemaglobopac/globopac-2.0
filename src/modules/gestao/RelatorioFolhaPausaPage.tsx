@@ -37,7 +37,7 @@ export function RelatorioFolhaPausaPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 print:max-w-none">
-      <div className="flex items-center justify-between print:hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
         <div>
           <h1 className="text-xl font-bold">Folha de Pausa — {mes}</h1>
           <p className="text-sm text-muted-foreground">Jornada e pausas consolidadas do mês, prontas para assinatura.</p>
@@ -60,51 +60,55 @@ export function RelatorioFolhaPausaPage() {
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Turnos</h3>
             {inspetor.turnos.length === 0 && <p className="text-sm text-muted-foreground">Nenhum turno registrado.</p>}
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-xs uppercase text-muted-foreground">
-                  <th className="py-1">Data</th>
-                  <th className="py-1">Início</th>
-                  <th className="py-1">Fim</th>
-                  <th className="py-1">Setor</th>
-                </tr>
-              </thead>
-              <tbody>
-                {inspetor.turnos.map((t) => (
-                  <tr key={t.id} className="border-b">
-                    <td className="py-1">{formatarData(t.inicio)}</td>
-                    <td className="py-1">{formatarHora(t.inicio)}</td>
-                    <td className="py-1">{formatarHora(t.fim)}</td>
-                    <td className="py-1">{t.setor ?? "—"}</td>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[420px] text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs uppercase text-muted-foreground">
+                    <th className="py-1">Data</th>
+                    <th className="py-1">Início</th>
+                    <th className="py-1">Fim</th>
+                    <th className="py-1">Setor</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {inspetor.turnos.map((t) => (
+                    <tr key={t.id} className="border-b">
+                      <td className="py-1">{formatarData(t.inicio)}</td>
+                      <td className="py-1">{formatarHora(t.inicio)}</td>
+                      <td className="py-1">{formatarHora(t.fim)}</td>
+                      <td className="py-1">{t.setor ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Pausas</h3>
             {inspetor.pausas.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma pausa registrada.</p>}
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-xs uppercase text-muted-foreground">
-                  <th className="py-1">Data</th>
-                  <th className="py-1">Tipo</th>
-                  <th className="py-1">Início</th>
-                  <th className="py-1">Fim</th>
-                </tr>
-              </thead>
-              <tbody>
-                {inspetor.pausas.map((p) => (
-                  <tr key={p.id} className="border-b">
-                    <td className="py-1">{formatarData(p.hora_inicio)}</td>
-                    <td className="py-1">{ROTULO_TIPO_PAUSA[p.tipo_pausa] ?? p.tipo_pausa}</td>
-                    <td className="py-1">{formatarHora(p.hora_inicio)}</td>
-                    <td className="py-1">{formatarHora(p.hora_fim)}</td>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[420px] text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs uppercase text-muted-foreground">
+                    <th className="py-1">Data</th>
+                    <th className="py-1">Tipo</th>
+                    <th className="py-1">Início</th>
+                    <th className="py-1">Fim</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {inspetor.pausas.map((p) => (
+                    <tr key={p.id} className="border-b">
+                      <td className="py-1">{formatarData(p.hora_inicio)}</td>
+                      <td className="py-1">{ROTULO_TIPO_PAUSA[p.tipo_pausa] ?? p.tipo_pausa}</td>
+                      <td className="py-1">{formatarHora(p.hora_inicio)}</td>
+                      <td className="py-1">{formatarHora(p.hora_fim)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <div className="mt-8 flex justify-between gap-8 pt-8 text-xs text-muted-foreground">

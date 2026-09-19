@@ -9,6 +9,7 @@ import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Card, CardContent, CardDescription, CardHeader } from "@/shared/ui/card";
+import { TurnstileWidget } from "./TurnstileWidget";
 
 const loginSchema = z.object({
   matricula: z.string().min(1, "Informe a matrícula"),
@@ -17,9 +18,31 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 
 const ERRO_CREDENCIAIS = "Matrícula ou senha inválidos.";
+const ERRO_IP_BLOQUEADO = "Login bloqueado para este IP por excesso de tentativas. Contate um administrador.";
+
+interface RespostaLogin {
+  access_token?: string;
+  refresh_token?: string;
+  erro?: string;
+  flag?: "captcha_necessario" | "ip_bloqueado";
+}
+
+async function lerCorpoErro(error: unknown): Promise<RespostaLogin | null> {
+  const contexto = (error as { context?: Response } | null)?.context;
+  if (!contexto) return null;
+  try {
+    return (await contexto.json()) as RespostaLogin;
+  } catch {
+    return null;
+  }
+}
 
 export function LoginPage() {
   const [erro, setErro] = useState<string | null>(null);
+  const [exigeCaptcha, setExigeCaptcha] = useState(false);
+  const [bloqueado, setBloqueado] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [captchaNonce, setCaptchaNonce] = useState(0);
   const navigate = useNavigate();
   const perfil = useSessionStore((s) => s.perfil);
   const {
@@ -38,24 +61,44 @@ export function LoginPage() {
 
   async function aoEnviar(dados: LoginForm) {
     setErro(null);
+    const tokenParaEnviar = turnstileToken;
+    // Um token do Turnstile só serve para UMA verificação — descarta e força o widget a gerar
+    // um novo a cada tentativa (o key={captchaNonce} abaixo remonta o componente).
+    setTurnstileToken(null);
+    setCaptchaNonce((n) => n + 1);
 
-    // Supabase Auth só autentica por e-mail/telefone — resolve matrícula -> e-mail via RPC
-    // antes de chamar signInWithPassword. Mesma mensagem genérica para matrícula inexistente
-    // e senha errada, para não revelar qual das duas está incorreta.
-    const { data: email, error: erroLookup } = await supabase.rpc("email_por_matricula", {
-      p_matricula: dados.matricula,
+    // O gate de tentativas por IP (5 falhas -> CAPTCHA, 10 -> bloqueio só desbloqueável por
+    // ADMIN_MASTER) só pode ser aplicado no servidor — por isso o login passa pela Edge
+    // Function "login" em vez de chamar supabase.auth.signInWithPassword diretamente daqui.
+    // Ver ADR 0015.
+    const { data, error } = await supabase.functions.invoke<RespostaLogin>("login", {
+      body: { matricula: dados.matricula, senha: dados.senha, turnstile_token: tokenParaEnviar },
     });
 
-    if (erroLookup || !email) {
+    const corpo = data ?? (await lerCorpoErro(error));
+
+    if (corpo?.flag === "ip_bloqueado") {
+      setBloqueado(true);
+      setExigeCaptcha(false);
+      setErro(ERRO_IP_BLOQUEADO);
+      return;
+    }
+    if (corpo?.flag === "captcha_necessario") {
+      setExigeCaptcha(true);
+      setErro("Confirme o desafio abaixo para continuar tentando.");
+      return;
+    }
+    if (error || !corpo?.access_token || !corpo.refresh_token) {
       setErro(ERRO_CREDENCIAIS);
       return;
     }
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password: dados.senha,
+    setErro(null);
+    setExigeCaptcha(false);
+    await supabase.auth.setSession({
+      access_token: corpo.access_token,
+      refresh_token: corpo.refresh_token,
     });
-    if (error) setErro(ERRO_CREDENCIAIS);
   }
 
   return (
@@ -85,8 +128,13 @@ export function LoginPage() {
               <Input id="senha" type="password" autoComplete="current-password" {...register("senha")} />
               {errors.senha && <p className="text-sm text-destructive">{errors.senha.message}</p>}
             </div>
+            {exigeCaptcha && !bloqueado && <TurnstileWidget key={captchaNonce} onToken={setTurnstileToken} />}
             {erro && <p className="text-sm text-destructive">{erro}</p>}
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={isSubmitting || bloqueado || (exigeCaptcha && !turnstileToken)}
+            >
               {isSubmitting ? "Entrando…" : "Entrar"}
             </Button>
           </form>

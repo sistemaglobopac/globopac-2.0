@@ -1,12 +1,5 @@
 import { useState } from "react";
-import {
-  type Rnc,
-  useFecharRnc,
-  useReabrirRnc,
-  useRncsAbertas,
-  useRncsFechadasRecentes,
-  useTratarRnc,
-} from "./api";
+import { type Rnc, useReabrirRnc, useRevisarRnc, useRncsAbertas, useRncsFechadasRecentes, useTratarRnc } from "./api";
 import { useSessionStore } from "@/store/session";
 import { Button } from "@/shared/ui/button";
 import { Badge } from "@/shared/ui/badge";
@@ -23,8 +16,9 @@ const VARIANTE_SEVERIDADE: Record<Rnc["severidade"], "destructive" | "warning" |
 const RENOME_STATUS: Record<Rnc["status"], string> = {
   ABERTA: "Aberta",
   EM_TRATATIVA: "Em tratativa",
-  TRATADA: "Tratada — aguardando fechamento",
+  TRATADA: "Tratada — aguardando revisão do Verificador",
   REABERTA: "Reaberta",
+  DEVOLVIDA: "Devolvida pelo Verificador",
   FECHADA: "Fechada",
 };
 
@@ -32,17 +26,24 @@ function estaAtrasada(rnc: Rnc) {
   return rnc.status !== "FECHADA" && new Date(rnc.prazo_sla).getTime() < Date.now();
 }
 
-function CartaoRnc({ rnc }: { rnc: Rnc }) {
+/** Tratativas de RNC (seção 7.2) — GESTOR_SETOR trata as RNCs do próprio setor (RLS já
+ * restringe), mas não fecha mais a própria tratativa: o VERIFICADOR (ou ADMIN_MASTER) revisa
+ * e aprova o fechamento ou devolve para nova tratativa — segregação de funções reforçada no
+ * banco (trg_segregacao_funcoes_rnc), não só escondida na UI. Reabrir uma RNC já FECHADA
+ * continua restrito a ADMIN_MASTER (ação de exceção, distinta da revisão de rotina). */
+function CartaoRnc({ rnc, podeTratar, podeRevisar, podeReabrir }: { rnc: Rnc; podeTratar: boolean; podeRevisar: boolean; podeReabrir: boolean }) {
   const perfil = useSessionStore((s) => s.perfil);
   const [tratativa, setTratativa] = useState(rnc.tratativa ?? "");
+  const [devolvendo, setDevolvendo] = useState(false);
+  const [motivoDevolucao, setMotivoDevolucao] = useState("");
   const [novaDescricaoReabertura, setNovaDescricaoReabertura] = useState("");
   const [reabrindo, setReabrindo] = useState(false);
   const tratar = useTratarRnc();
-  const fechar = useFecharRnc();
+  const revisar = useRevisarRnc();
   const reabrir = useReabrirRnc();
 
   const atrasada = estaAtrasada(rnc);
-  const podeReabrir = perfil?.nivelAcesso === "ADMIN_MASTER";
+  const emTratativa = rnc.status === "ABERTA" || rnc.status === "EM_TRATATIVA" || rnc.status === "REABERTA" || rnc.status === "DEVOLVIDA";
 
   return (
     <Card className={atrasada ? "border-destructive" : undefined}>
@@ -60,30 +61,85 @@ function CartaoRnc({ rnc }: { rnc: Rnc }) {
       <CardContent className="space-y-3">
         <p className="text-sm">{rnc.descricao}</p>
 
-        {rnc.status !== "FECHADA" && (
+        {rnc.status === "DEVOLVIDA" && rnc.motivo_devolucao && (
+          <p className="rounded-md border border-destructive bg-destructive/10 p-2 text-sm text-destructive">
+            <span className="font-semibold">Motivo da devolução: </span>
+            {rnc.motivo_devolucao}
+          </p>
+        )}
+
+        {emTratativa && podeTratar && (
           <div className="space-y-2">
             <Textarea
               placeholder="Descreva a tratativa aplicada…"
               value={tratativa}
               onChange={(e) => setTratativa(e.target.value)}
-              disabled={rnc.status === "TRATADA"}
             />
-            <div className="flex gap-2">
-              {rnc.status !== "TRATADA" && (
-                <Button
-                  size="sm"
-                  onClick={() => tratar.mutate({ id: rnc.id, tratativa, userId: perfil!.id })}
-                  disabled={tratativa.trim().length === 0 || tratar.isPending}
-                >
-                  {tratar.isPending ? "Salvando…" : "Registrar tratativa"}
-                </Button>
-              )}
-              {rnc.status === "TRATADA" && (
-                <Button size="sm" onClick={() => fechar.mutate(rnc.id)} disabled={fechar.isPending}>
-                  {fechar.isPending ? "Fechando…" : "Fechar RNC"}
-                </Button>
-              )}
-            </div>
+            <Button
+              size="sm"
+              onClick={() => tratar.mutate({ id: rnc.id, tratativa, userId: perfil!.id })}
+              disabled={tratativa.trim().length === 0 || tratar.isPending}
+            >
+              {tratar.isPending ? "Salvando…" : "Registrar tratativa"}
+            </Button>
+          </div>
+        )}
+        {emTratativa && !podeTratar && (
+          <p className="text-sm text-muted-foreground">Aguardando o Gestor de Setor registrar a tratativa.</p>
+        )}
+
+        {rnc.status === "TRATADA" && (
+          <div className="space-y-2 border-t pt-3">
+            {rnc.tratativa && (
+              <p className="text-sm">
+                <span className="font-semibold">Tratativa registrada: </span>
+                {rnc.tratativa}
+              </p>
+            )}
+            {podeRevisar ? (
+              !devolvendo ? (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => revisar.mutate({ id: rnc.id, decisao: "aprovar", userId: perfil!.id })}
+                    disabled={revisar.isPending}
+                  >
+                    {revisar.isPending ? "Fechando…" : "Aprovar e Fechar RNC"}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setDevolvendo(true)} disabled={revisar.isPending}>
+                    Devolver ao Gestor
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <Textarea
+                    placeholder="Motivo da devolução (o que precisa ser revisto na tratativa)…"
+                    value={motivoDevolucao}
+                    onChange={(e) => setMotivoDevolucao(e.target.value)}
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() =>
+                        revisar.mutate(
+                          { id: rnc.id, decisao: "devolver", userId: perfil!.id, motivo: motivoDevolucao },
+                          { onSuccess: () => setDevolvendo(false) }
+                        )
+                      }
+                      disabled={motivoDevolucao.trim().length === 0 || revisar.isPending}
+                    >
+                      {revisar.isPending ? "Devolvendo…" : "Confirmar devolução"}
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setDevolvendo(false)}>
+                      Cancelar
+                    </Button>
+                  </div>
+                </>
+              )
+            ) : (
+              <p className="text-sm text-muted-foreground">Aguardando revisão do Verificador.</p>
+            )}
           </div>
         )}
 
@@ -100,7 +156,7 @@ function CartaoRnc({ rnc }: { rnc: Rnc }) {
                   value={novaDescricaoReabertura}
                   onChange={(e) => setNovaDescricaoReabertura(e.target.value)}
                 />
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button
                     size="sm"
                     onClick={() =>
@@ -126,23 +182,25 @@ function CartaoRnc({ rnc }: { rnc: Rnc }) {
   );
 }
 
-/** Tratativas de RNC (seção 7.2) — GESTOR_SETOR trata as RNCs do próprio setor (RLS já
- * restringe); ADMIN_MASTER vê todas e é o único perfil habilitado a reabrir uma RNC fechada,
- * já que o PROMPT MESTRE não define um perfil dedicado de revisor (ver ASSUMPTIONS.md). */
 export function RncTratativasPage() {
   const { data: abertas, isLoading } = useRncsAbertas();
   const { data: fechadas } = useRncsFechadasRecentes();
   const perfil = useSessionStore((s) => s.perfil);
+
+  const isAdmin = perfil?.nivelAcesso === "ADMIN_MASTER";
+  const podeTratar = perfil?.nivelAcesso === "GESTOR_SETOR" || isAdmin;
+  const podeRevisar = perfil?.nivelAcesso === "VERIFICADOR" || isAdmin;
 
   const atrasadas = (abertas ?? []).filter(estaAtrasada);
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold">Tratativas de RNC</h1>
+        <h1 className="text-2xl font-semibold">{podeTratar && !podeRevisar ? "Tratativas de RNC" : "RNCs — Tratativa e Revisão"}</h1>
         <p className="text-sm text-muted-foreground">
-          Não conformidades abertas a partir de reprovações na verificação — registre a
-          tratativa e feche quando resolvido.
+          {podeRevisar && !podeTratar
+            ? "Não conformidades tratadas pelo Gestor de Setor, aguardando sua revisão — aprove o fechamento ou devolva para nova tratativa."
+            : "Não conformidades abertas a partir de reprovações na verificação — registre a tratativa; o Verificador revisa e fecha."}
         </p>
       </div>
 
@@ -155,13 +213,15 @@ export function RncTratativasPage() {
       {isLoading && <p className="text-muted-foreground">Carregando…</p>}
       {!isLoading && abertas?.length === 0 && <p className="text-muted-foreground">Nenhuma RNC pendente.</p>}
 
-      {abertas?.map((rnc) => <CartaoRnc key={rnc.id} rnc={rnc} />)}
+      {abertas?.map((rnc) => (
+        <CartaoRnc key={rnc.id} rnc={rnc} podeTratar={podeTratar} podeRevisar={podeRevisar} podeReabrir={isAdmin} />
+      ))}
 
-      {perfil?.nivelAcesso === "ADMIN_MASTER" && fechadas && fechadas.length > 0 && (
+      {isAdmin && fechadas && fechadas.length > 0 && (
         <div className="space-y-2 pt-6">
           <h2 className="text-lg font-medium text-muted-foreground">Fechadas recentemente</h2>
           {fechadas.map((rnc) => (
-            <CartaoRnc key={rnc.id} rnc={rnc} />
+            <CartaoRnc key={rnc.id} rnc={rnc} podeTratar={false} podeRevisar={false} podeReabrir={isAdmin} />
           ))}
         </div>
       )}

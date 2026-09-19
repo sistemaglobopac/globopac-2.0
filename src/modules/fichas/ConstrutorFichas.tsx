@@ -50,6 +50,7 @@ type TipoCampo =
   | "lavagem_final"
   | "absorcao_agua"
   | "dripping_test"
+  | "parada_equipamento"
   | "assinatura";
 
 const TIPOS_CAMPO: { value: TipoCampo; label: string }[] = [
@@ -67,6 +68,7 @@ const TIPOS_CAMPO: { value: TipoCampo; label: string }[] = [
   { value: "lavagem_final", label: "Monitoramento da Vazão do Chuveiro Final de Lavagem de Carcaças" },
   { value: "absorcao_agua", label: "Teste de Absorção de Água (Especial SIF)" },
   { value: "dripping_test", label: "Dripping Test - Portaria 210/98 (Especial SIF)" },
+  { value: "parada_equipamento", label: "Registro de Parada de Equipamento (Especial SIF)" },
   { value: "assinatura", label: "Assinatura Eletrônica (Fim)" },
 ];
 
@@ -80,6 +82,10 @@ interface CampoForm {
   opcoes: string[];
   valorMinimo: number | null;
   valorMaximo: number | null;
+  /** Visibilidade condicional (seção "Especial SIF" do preenchimento): este campo só aparece
+   * quando o campo de chave `dependeDeCampo` tiver exatamente `dependeDeValor`. */
+  dependeDeCampo: string | null;
+  dependeDeValor: string;
 }
 
 interface FormularioFicha {
@@ -131,11 +137,31 @@ function paraCampoForm(campo: CampoTemplate): CampoForm {
     opcoes: "opcoes" in campo ? campo.opcoes : [],
     valorMinimo: "valorMinimo" in campo ? campo.valorMinimo ?? null : "min" in campo ? campo.min ?? null : null,
     valorMaximo: "valorMaximo" in campo ? campo.valorMaximo ?? null : "max" in campo ? campo.max ?? null : null,
+    dependeDeCampo: campo.dependeDe?.campo ?? null,
+    dependeDeValor: campo.dependeDe?.valor ?? "",
   };
 }
 
+/** Extrai uma mensagem legível de qualquer erro capturado (PostgrestError, erro de rede,
+ * exceção genérica) e sempre loga o objeto completo no console — sem isso, um erro do banco
+ * (RLS, constraint, etc.) virava só o texto genérico de fallback na tela, sem nenhuma pista de
+ * qual foi a causa real. */
+function mensagemDeErro(erro: unknown, fallback: string): string {
+  console.error(fallback, erro);
+  if (erro instanceof Error) return erro.message;
+  if (erro && typeof erro === "object" && "message" in erro && typeof (erro as { message: unknown }).message === "string") {
+    return (erro as { message: string }).message;
+  }
+  return fallback;
+}
+
 function paraCampoTemplate(campo: CampoForm): CampoTemplate {
-  const base = { chave: campo.chave, label: campo.label, obrigatorio: campo.obrigatorio };
+  const base = {
+    chave: campo.chave,
+    label: campo.label,
+    obrigatorio: campo.obrigatorio,
+    dependeDe: campo.dependeDeCampo ? { campo: campo.dependeDeCampo, valor: campo.dependeDeValor } : undefined,
+  };
   switch (campo.tipo) {
     case "unica_escolha":
       return { ...base, tipo: "unica_escolha", opcoes: campo.opcoes };
@@ -167,6 +193,8 @@ function paraCampoTemplate(campo: CampoForm): CampoTemplate {
       return { ...base, tipo: "absorcao_agua" };
     case "dripping_test":
       return { ...base, tipo: "dripping_test" };
+    case "parada_equipamento":
+      return { ...base, tipo: "parada_equipamento" };
   }
 }
 
@@ -229,7 +257,7 @@ export function ConstrutorFichas({ setoresDisponiveis }: ConstrutorFichasProps) 
       await inativar.mutateAsync(ficha.id);
       setMensagem({ tipo: "success", texto: "Ficha inativada." });
     } catch (erro) {
-      setMensagem({ tipo: "error", texto: erro instanceof Error ? erro.message : "Erro ao inativar a ficha." });
+      setMensagem({ tipo: "error", texto: mensagemDeErro(erro, "Erro ao inativar a ficha.") });
     }
   }
 
@@ -260,7 +288,17 @@ export function ConstrutorFichas({ setoresDisponiveis }: ConstrutorFichasProps) 
       ...atual,
       campos: [
         ...atual.campos,
-        { chave, tipo: "simples", label: "", obrigatorio: true, opcoes: [], valorMinimo: null, valorMaximo: null },
+        {
+          chave,
+          tipo: "simples",
+          label: "",
+          obrigatorio: true,
+          opcoes: [],
+          valorMinimo: null,
+          valorMaximo: null,
+          dependeDeCampo: null,
+          dependeDeValor: "",
+        },
       ],
     }));
   }
@@ -336,7 +374,7 @@ export function ConstrutorFichas({ setoresDisponiveis }: ConstrutorFichasProps) 
       setMensagem({ tipo: "success", texto: "Ficha salva com sucesso." });
       setView("list");
     } catch (erro) {
-      setMensagem({ tipo: "error", texto: erro instanceof Error ? erro.message : "Erro ao salvar a ficha." });
+      setMensagem({ tipo: "error", texto: mensagemDeErro(erro, "Erro ao salvar a ficha.") });
     }
   }
 
@@ -356,12 +394,12 @@ export function ConstrutorFichas({ setoresDisponiveis }: ConstrutorFichasProps) 
   if (view === "form") {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <Button type="button" variant="ghost" size="sm" onClick={() => { setView("list"); setMensagem(null); }}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <h1 className="text-2xl font-semibold">
+            <h1 className="text-xl font-semibold sm:text-2xl">
               {formData.idAnterior ? `Editar Ficha - v${formData.versaoBase}` : "Criar Nova Ficha"}
             </h1>
           </div>
@@ -427,7 +465,7 @@ export function ConstrutorFichas({ setoresDisponiveis }: ConstrutorFichasProps) 
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="tipoApontamento">Tipo *</Label>
                   <Select
@@ -454,7 +492,7 @@ export function ConstrutorFichas({ setoresDisponiveis }: ConstrutorFichasProps) 
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="tempoEntre" className="flex min-h-8 items-end">
                     Intervalo Mínimo entre Monitoramentos (min)
@@ -532,6 +570,7 @@ export function ConstrutorFichas({ setoresDisponiveis }: ConstrutorFichasProps) 
                   onRemover={() => handleRemoveCampo(indice)}
                   onAddOpcao={(opcao) => handleAddOpcao(indice, opcao)}
                   onRemoveOpcao={(i) => handleRemoveOpcao(indice, i)}
+                  outrosCampos={formData.campos.filter((_, i) => i !== indice)}
                 />
               ))}
             </div>
@@ -549,10 +588,10 @@ export function ConstrutorFichas({ setoresDisponiveis }: ConstrutorFichasProps) 
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-semibold">
-            <Layers className="h-6 w-6 text-primary" />
+          <h1 className="flex items-center gap-2 text-xl font-semibold sm:text-2xl">
+            <Layers className="h-6 w-6 shrink-0 text-primary" />
             Construtor de Fichas de Monitoramento
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">Selecione um setor abaixo para ver as fichas configuradas para ele.</p>
@@ -682,7 +721,7 @@ function FichaCard({ ficha, onEdit, onDuplicate, onInativar }: FichaCardProps) {
         </div>
 
         <div className="flex items-center justify-between border-t pt-3">
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" size="sm" onClick={() => onEdit(ficha)}>
               <Edit className="h-3.5 w-3.5" />
               Editar
@@ -708,12 +747,16 @@ interface CampoEditorCardProps {
   onRemover: () => void;
   onAddOpcao: (opcao: string) => void;
   onRemoveOpcao: (indice: number) => void;
+  /** Demais campos já adicionados nesta ficha — candidatos para "Depende de" (visibilidade
+   * condicional, seção correspondente do preenchimento em NovaFichaPage.tsx). */
+  outrosCampos: CampoForm[];
 }
 
-function CampoEditorCard({ numero, campo, onAtualizar, onRemover, onAddOpcao, onRemoveOpcao }: CampoEditorCardProps) {
+function CampoEditorCard({ numero, campo, onAtualizar, onRemover, onAddOpcao, onRemoveOpcao, outrosCampos }: CampoEditorCardProps) {
   const [novaOpcao, setNovaOpcao] = useState("");
   const ehNumerico = campo.tipo === "inteiro" || campo.tipo === "decimal";
   const ehEscolha = campo.tipo === "unica_escolha";
+  const campoDoQualDepende = outrosCampos.find((c) => c.chave === campo.dependeDeCampo);
 
   function adicionarOpcao() {
     onAddOpcao(novaOpcao);
@@ -768,7 +811,7 @@ function CampoEditorCard({ numero, campo, onAtualizar, onRemover, onAddOpcao, on
             <AlertTriangle className="h-3.5 w-3.5" />
             Janela de Tolerância Crítica
           </p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <Input
               type="number"
               step={campo.tipo === "decimal" ? "any" : "1"}
@@ -791,7 +834,7 @@ function CampoEditorCard({ numero, campo, onAtualizar, onRemover, onAddOpcao, on
       {ehEscolha && (
         <div className="space-y-2 rounded-md border bg-muted/40 p-3">
           <p className="text-xs font-semibold text-muted-foreground">Opções de Resposta</p>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Input
               placeholder="Digite uma opção e aperte Enter..."
               value={novaOpcao}
@@ -821,6 +864,55 @@ function CampoEditorCard({ numero, campo, onAtualizar, onRemover, onAddOpcao, on
           )}
         </div>
       )}
+
+      <div className="space-y-2 rounded-md border bg-muted/40 p-3">
+        <p className="text-xs font-semibold text-muted-foreground">Depende de (visibilidade condicional)</p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Select
+            value={campo.dependeDeCampo ?? ""}
+            onChange={(e) => onAtualizar({ dependeDeCampo: e.target.value || null, dependeDeValor: "" })}
+          >
+            <option value="">Sempre visível</option>
+            {outrosCampos
+              .filter((c) => c.label.trim())
+              .map((c) => (
+                <option key={c.chave} value={c.chave}>
+                  {c.label}
+                </option>
+              ))}
+          </Select>
+
+          {campoDoQualDepende &&
+            (campoDoQualDepende.tipo === "unica_escolha" ? (
+              <Select value={campo.dependeDeValor} onChange={(e) => onAtualizar({ dependeDeValor: e.target.value })}>
+                <option value="">Selecione o valor esperado…</option>
+                {campoDoQualDepende.opcoes.map((opcao) => (
+                  <option key={opcao} value={opcao}>
+                    {opcao}
+                  </option>
+                ))}
+              </Select>
+            ) : campoDoQualDepende.tipo === "simples" ? (
+              <Select value={campo.dependeDeValor} onChange={(e) => onAtualizar({ dependeDeValor: e.target.value })}>
+                <option value="">Selecione o valor esperado…</option>
+                <option value="Sim">Sim</option>
+                <option value="Não">Não</option>
+              </Select>
+            ) : (
+              <Input
+                placeholder="Valor esperado"
+                value={campo.dependeDeValor}
+                onChange={(e) => onAtualizar({ dependeDeValor: e.target.value })}
+              />
+            ))}
+        </div>
+        {campoDoQualDepende && (
+          <p className="text-xs text-muted-foreground">
+            Este campo só aparece para o inspetor quando "{campoDoQualDepende.label}" for "{campo.dependeDeValor || "…"}"
+            .
+          </p>
+        )}
+      </div>
     </div>
   );
 }

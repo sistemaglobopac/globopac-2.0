@@ -7,7 +7,7 @@
 create extension if not exists pgtap with schema extensions;
 
 begin;
-select plan(8);
+select plan(10);
 
 -- ------------------------------------------------------------------------------------------
 -- Fixtures: dois usuários (criador e verificador), um template de ficha.
@@ -102,6 +102,40 @@ select throws_matching(
   $$ delete from perfis_usuarios where id = 'a0000000-0000-0000-0000-000000000001' $$,
   '^perfis_usuarios nunca é excluído fisicamente',
   'perfis_usuarios nunca aceita DELETE físico (desativar com ativo=false)'
+);
+
+-- ------------------------------------------------------------------------------------------
+-- 5) Segregação de funções em RNC (Fase 11): quem tratou não pode revisar a mesma RNC.
+-- ------------------------------------------------------------------------------------------
+insert into rnc (id, descricao, setor, severidade, aberto_por, tratado_por, status, prazo_sla)
+values (
+  'e0000000-0000-0000-0000-000000000001',
+  'RNC de teste - segregação de funções',
+  'LINHA_DIF',
+  'MEDIA',
+  'a0000000-0000-0000-0000-000000000001',
+  'a0000000-0000-0000-0000-000000000001',
+  'TRATADA',
+  now() + interval '7 days'
+);
+
+select throws_matching(
+  $$
+    update rnc
+       set status = 'FECHADA', revisado_por = 'a0000000-0000-0000-0000-000000000001', fechado_em = now()
+     where id = 'e0000000-0000-0000-0000-000000000001'
+  $$,
+  '^Segregação de funções violada',
+  'RNC: quem tratou não pode revisar/fechar a mesma RNC (rnc %)'
+);
+
+select lives_ok(
+  $$
+    update rnc
+       set status = 'FECHADA', revisado_por = 'a0000000-0000-0000-0000-000000000002', fechado_em = now()
+     where id = 'e0000000-0000-0000-0000-000000000001'
+  $$,
+  'RNC com revisor diferente de quem tratou deve ser aceita'
 );
 
 select * from finish();

@@ -1,20 +1,46 @@
-import type { FieldErrors, FieldValues, UseFormRegister } from "react-hook-form";
+import { Controller, type Control, type FieldErrors, type FieldValues, type UseFormRegister } from "react-hook-form";
 import type { CampoTemplate } from "@/shared/schema-campos";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Select } from "@/shared/ui/select";
 import { Textarea } from "@/shared/ui/textarea";
+import { ChillerCarcacasField } from "./fields/ChillerCarcacasField";
+import { ChillerPartesField } from "./fields/ChillerPartesField";
+import { LavagemFinalField } from "./fields/LavagemFinalField";
+import { MiniChillersField } from "./fields/MiniChillersField";
+import { AbsorcaoAguaField } from "./fields/AbsorcaoAguaField";
+import { DrippingTestField } from "./fields/DrippingTestField";
+import { ParadaEquipamentoField } from "./fields/ParadaEquipamentoField";
+import type {
+  AbsorcaoAguaValor,
+  ChillerCarcacasValor,
+  ChillerPartesValor,
+  DrippingTestValor,
+  LavagemFinalValor,
+  MiniChillersValor,
+  ParadaEquipamentoValor,
+} from "./fields/tiposCompostos";
 
 interface DynamicFieldProps {
   campo: CampoTemplate;
   register: UseFormRegister<FieldValues>;
   errors: FieldErrors;
+  /** Só usado pelos widgets "Especial SIF" (chiller_carcacas, etc.) — os demais tipos de
+   * campo continuam simples inputs não controlados via `register`. */
+  control: Control<FieldValues>;
+  /** dados_dinamicos[chave] do monitoramento mais recente de hoje desta ficha+setor, quando
+   * o widget precisa herdar uma leitura anterior (ver useUltimoRegistroFicha). */
+  prevAppointment?: Record<string, unknown>;
+  /** Valor AO VIVO do campo chiller_carcacas desta mesma ficha (útil via useWatch em
+   * FichaForm) — chiller_partes/lavagem_final/mini_chillers dependem dele, não de uma busca
+   * no banco (igual ao v1: NovoRegistro.jsx lê o "campo irmão" do próprio formData). */
+  carcacasAtual?: ChillerCarcacasValor;
 }
 
 /** Renderiza um campo de formulário a partir da definição declarativa de schema_campos —
  * o mesmo dado que gera o Zod de validação (src/shared/schema-campos.ts), garantindo que
  * UI e validação nunca divirjam (seção 7.1 do PROMPT MESTRE). */
-export function DynamicField({ campo, register, errors }: DynamicFieldProps) {
+export function DynamicField({ campo, register, errors, control, prevAppointment, carcacasAtual }: DynamicFieldProps) {
   const erro = errors[campo.chave]?.message as string | undefined;
 
   return (
@@ -53,15 +79,91 @@ export function DynamicField({ campo, register, errors }: DynamicFieldProps) {
           ))}
         </Select>
       )}
-      {(campo.tipo === "foto" ||
-        campo.tipo === "assinatura" ||
-        campo.tipo === "chiller_carcacas" ||
-        campo.tipo === "chiller_partes" ||
-        campo.tipo === "mini_chillers" ||
-        campo.tipo === "lavagem_final" ||
-        campo.tipo === "absorcao_agua" ||
-        campo.tipo === "dripping_test") && (
-        <p className="text-sm text-muted-foreground">Este campo é preenchido em uma tela dedicada.</p>
+      {campo.tipo === "chiller_carcacas" && (
+        <Controller
+          name={campo.chave}
+          control={control}
+          render={({ field }) => (
+            <ChillerCarcacasField
+              value={field.value as ChillerCarcacasValor | undefined}
+              onChange={field.onChange}
+              prevAppointment={prevAppointment?.[campo.chave] as ChillerCarcacasValor | undefined}
+            />
+          )}
+        />
+      )}
+
+      {campo.tipo === "chiller_partes" && (
+        <Controller
+          name={campo.chave}
+          control={control}
+          render={({ field }) => (
+            <ChillerPartesField
+              value={field.value as ChillerPartesValor | undefined}
+              onChange={field.onChange}
+              prevAppointment={prevAppointment?.[campo.chave] as ChillerPartesValor | undefined}
+              carcacasAtual={carcacasAtual}
+            />
+          )}
+        />
+      )}
+
+      {campo.tipo === "lavagem_final" && (
+        <Controller
+          name={campo.chave}
+          control={control}
+          render={({ field }) => (
+            <LavagemFinalField
+              value={field.value as LavagemFinalValor | undefined}
+              onChange={field.onChange}
+              prevAppointment={prevAppointment?.[campo.chave] as LavagemFinalValor | undefined}
+              carcacasAtual={carcacasAtual}
+            />
+          )}
+        />
+      )}
+
+      {campo.tipo === "mini_chillers" && (
+        <Controller
+          name={campo.chave}
+          control={control}
+          render={({ field }) => (
+            <MiniChillersField
+              value={field.value as MiniChillersValor | undefined}
+              onChange={field.onChange}
+              prevAppointment={prevAppointment?.[campo.chave] as MiniChillersValor | undefined}
+              carcacasAtual={carcacasAtual}
+            />
+          )}
+        />
+      )}
+
+      {campo.tipo === "absorcao_agua" && (
+        <Controller
+          name={campo.chave}
+          control={control}
+          render={({ field }) => <AbsorcaoAguaField value={field.value as AbsorcaoAguaValor | undefined} onChange={field.onChange} />}
+        />
+      )}
+
+      {campo.tipo === "dripping_test" && (
+        <Controller
+          name={campo.chave}
+          control={control}
+          render={({ field }) => <DrippingTestField value={field.value as DrippingTestValor | undefined} onChange={field.onChange} />}
+        />
+      )}
+
+      {campo.tipo === "parada_equipamento" && (
+        <Controller
+          name={campo.chave}
+          control={control}
+          render={({ field }) => <ParadaEquipamentoField value={field.value as ParadaEquipamentoValor | undefined} onChange={field.onChange} />}
+        />
+      )}
+
+      {(campo.tipo === "foto" || campo.tipo === "assinatura") && (
+        <p className="text-sm text-muted-foreground">Este campo ainda não tem tela dedicada nesta versão — em construção.</p>
       )}
 
       {erro && <p className="text-sm text-destructive">{erro}</p>}

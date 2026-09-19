@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
-export type StatusRnc = "ABERTA" | "EM_TRATATIVA" | "TRATADA" | "REABERTA" | "FECHADA";
+export type StatusRnc = "ABERTA" | "EM_TRATATIVA" | "TRATADA" | "REABERTA" | "DEVOLVIDA" | "FECHADA";
 export type SeveridadeRnc = "CRITICA" | "ALTA" | "MEDIA" | "BAIXA";
 
 export interface Rnc {
@@ -16,6 +16,11 @@ export interface Rnc {
   tratativa: string | null;
   prazo_sla: string;
   rnc_anterior_id: string | null;
+  /** VERIFICADOR/ADMIN_MASTER que aprovou o fechamento ou devolveu a tratativa — nunca a
+   * mesma pessoa que tratou (ver trg_segregacao_funcoes_rnc). */
+  revisado_por: string | null;
+  /** Preenchido pelo revisor ao devolver a RNC (status = DEVOLVIDA) para nova tratativa. */
+  motivo_devolucao: string | null;
   fechado_em: string | null;
   criado_em: string;
 }
@@ -102,9 +107,10 @@ export function useAbrirRnc() {
   });
 }
 
-/** Registra a tratativa (ABERTA/REABERTA → TRATADA). Ação e fechamento são passos
- * separados — reflete literalmente o fluxo E2E nº 3 ("Gestor de Setor trata → fecha"),
- * dois verbos, duas ações. */
+/** Registra a tratativa (ABERTA/REABERTA/DEVOLVIDA → TRATADA), feita pelo Gestor de Setor.
+ * Ação e revisão são passos separados e por atores diferentes — reflete o fluxo E2E nº 3
+ * ("Gestor de Setor trata → Verificador revisa"), segregação de funções reforçada por
+ * trg_segregacao_funcoes_rnc (tratado_por nunca pode ser igual a revisado_por). */
 export function useTratarRnc() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -119,23 +125,35 @@ export function useTratarRnc() {
   });
 }
 
-export function useFecharRnc() {
+/** Revisão da tratativa (TRATADA → FECHADA ou DEVOLVIDA), feita pelo VERIFICADOR/ADMIN_MASTER
+ * — nunca pelo mesmo usuário que tratou (rnc_update_revisar + trg_segregacao_funcoes_rnc
+ * bloqueiam isso no banco, não só na UI). Espelha o Verificador da Qualidade da v1
+ * (VerificadorReview.jsx), que aprovava ou devolvia a tratativa do Gestor de Setor antes de a
+ * RNC ser considerada concluída. */
+export function useRevisarRnc() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("rnc")
-        .update({ status: "FECHADA", fechado_em: new Date().toISOString() })
-        .eq("id", id);
+    mutationFn: async (
+      input:
+        | { id: string; decisao: "aprovar"; userId: string }
+        | { id: string; decisao: "devolver"; userId: string; motivo: string }
+    ) => {
+      const payload =
+        input.decisao === "aprovar"
+          ? { status: "FECHADA" as const, revisado_por: input.userId, fechado_em: new Date().toISOString() }
+          : { status: "DEVOLVIDA" as const, revisado_por: input.userId, motivo_devolucao: input.motivo };
+      const { error } = await supabase.from("rnc").update(payload).eq("id", input.id);
       if (error) throw error;
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["rnc"] }),
   });
 }
 
-/** Reabertura (seção 7.2, "Novo"): cria uma NOVA linha referenciando a anterior — nunca
- * sobrescreve a tratativa original. Só ADMIN_MASTER (nenhum perfil dedicado de "revisor de
- * RNC" existe no PROMPT MESTRE; ver ASSUMPTIONS.md). */
+/** Reabertura (seção 7.2, "Novo") de uma RNC já FECHADA: cria uma NOVA linha referenciando a
+ * anterior — nunca sobrescreve a tratativa original. Continua restrita a ADMIN_MASTER: é uma
+ * ação distinta e mais sensível do que a revisão de rotina (TRATADA → FECHADA/DEVOLVIDA, essa
+ * sim delegada ao VERIFICADOR via useRevisarRnc) — reabrir um caso já encerrado é exceção, não
+ * parte do fluxo normal. */
 export function useReabrirRnc() {
   const queryClient = useQueryClient();
   return useMutation({

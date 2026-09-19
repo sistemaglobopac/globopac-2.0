@@ -10,7 +10,7 @@
 // fallback entre TSAs é escopo da Fase 2 (ver docs/adr/0001-fila-carimbo-tempo.md).
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { corsHeaders } from "../_shared/cors.ts";
+import { corsHeadersAutenticado } from "../_shared/cors.ts";
 import { assinarMonitoramento, TIPO_PERMITIDO_POR_PERFIL } from "../_shared/assinar.ts";
 
 const requestSchema = z.object({
@@ -25,7 +25,8 @@ Deno.serve(async (req) => {
       JSON.stringify({ correlationId, funcao: "assinar-documento", nivel, evento, ...extra })
     );
 
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const cors = corsHeadersAutenticado(req);
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
   try {
     const authHeader = req.headers.get("Authorization");
@@ -94,7 +95,7 @@ Deno.serve(async (req) => {
         hash_documento: resultado.hash_documento,
         criado_em: resultado.criado_em,
       }),
-      { status: 201, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 201, headers: { ...cors, "Content-Type": "application/json" } }
     );
   } catch (erro) {
     log("error", "excecao_nao_tratada", { erro: erro instanceof Error ? erro.message : String(erro) });

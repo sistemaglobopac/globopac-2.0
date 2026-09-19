@@ -79,7 +79,7 @@ export function PainelOsPage() {
             Informe a data de referência (baseada em quando a OS foi concluída) e libere o
             relatório do dia.
           </p>
-          <div className="flex items-end gap-2">
+          <div className="flex flex-wrap items-end gap-2">
             <div className="space-y-2">
               <Label htmlFor="data_relatorio">Data de referência</Label>
               <Input

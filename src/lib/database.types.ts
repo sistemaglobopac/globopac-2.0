@@ -82,13 +82,16 @@ interface RncRow {
   monitoramento_id: string | null;
   descricao: string;
   setor: string;
-  status: "ABERTA" | "EM_TRATATIVA" | "TRATADA" | "REABERTA" | "FECHADA";
+  status: "ABERTA" | "EM_TRATATIVA" | "TRATADA" | "REABERTA" | "DEVOLVIDA" | "FECHADA";
   severidade: "CRITICA" | "ALTA" | "MEDIA" | "BAIXA";
   aberto_por: string;
   tratado_por: string | null;
   tratativa: string | null;
   prazo_sla: string;
   rnc_anterior_id: string | null;
+  // Fase 11 (20260927000001_rnc_revisor_verificador.sql): revisão do VERIFICADOR.
+  revisado_por: string | null;
+  motivo_devolucao: string | null;
   fechado_em: string | null;
   criado_em: string;
 }

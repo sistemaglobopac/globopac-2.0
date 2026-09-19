@@ -68,7 +68,7 @@ export function EquipamentosAdminPanel() {
 
   return (
     <div className="rounded-2xl border border-hairline bg-card p-5 shadow-sm">
-      <div className="mb-4 flex items-start justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <Cog className="h-7 w-7 shrink-0 text-primary" />
           <div>
@@ -147,7 +147,7 @@ export function EquipamentosAdminPanel() {
           }
         >
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="codigo-equip">Código</Label>
                 <Input id="codigo-equip" value={codigo} onChange={(e) => setCodigo(e.target.value)} />

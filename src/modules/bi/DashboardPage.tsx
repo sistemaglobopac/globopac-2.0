@@ -140,7 +140,7 @@ export function DashboardPage() {
       {carregando && <p className="text-muted-foreground">Carregando…</p>}
 
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-medium">Monitoramentos (30 dias)</h2>
           <Button variant="outline" size="sm" onClick={exportarMonitoramentos} disabled={!monitoramentos?.length}>
             Exportar CSV
@@ -155,7 +155,7 @@ export function DashboardPage() {
       </div>
 
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-medium">RNC — por severidade</h2>
           <Button variant="outline" size="sm" onClick={exportarRnc} disabled={!rncs?.length}>
             Exportar CSV
@@ -175,7 +175,7 @@ export function DashboardPage() {
       </div>
 
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-medium">Ordens de Serviço — por status</h2>
           <Button variant="outline" size="sm" onClick={exportarOs} disabled={!osList?.length}>
             Exportar CSV

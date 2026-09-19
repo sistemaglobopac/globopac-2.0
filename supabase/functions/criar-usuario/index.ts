@@ -9,7 +9,7 @@
 // colaborador.
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { corsHeaders } from "../_shared/cors.ts";
+import { corsHeadersAutenticado } from "../_shared/cors.ts";
 
 const DOMINIO_EMAIL_FICTICIO = "colaborador.globopac.com.br";
 
@@ -40,11 +40,12 @@ Deno.serve(async (req) => {
   const log = (nivel: "info" | "error", evento: string, extra: Record<string, unknown> = {}) =>
     console.log(JSON.stringify({ correlationId, funcao: "criar-usuario", nivel, evento, ...extra }));
 
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const cors = corsHeadersAutenticado(req);
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return jsonError(401, "não autenticado", correlationId);
+    if (!authHeader) return jsonError(401, "não autenticado", correlationId, cors);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -58,7 +59,7 @@ Deno.serve(async (req) => {
       data: { user },
       error: authError,
     } = await callerClient.auth.getUser();
-    if (authError || !user) return jsonError(401, "não autenticado", correlationId);
+    if (authError || !user) return jsonError(401, "não autenticado", correlationId, cors);
 
     const { data: perfilChamador } = await callerClient
       .from("perfis_usuarios")
@@ -66,13 +67,13 @@ Deno.serve(async (req) => {
       .eq("id", user.id)
       .single();
     if (perfilChamador?.nivel_acesso !== "ADMIN_MASTER") {
-      return jsonError(403, "só ADMIN_MASTER cadastra colaboradores", correlationId);
+      return jsonError(403, "só ADMIN_MASTER cadastra colaboradores", correlationId, cors);
     }
 
     const body = await req.json().catch(() => null);
     const parsed = requestSchema.safeParse(body);
     if (!parsed.success) {
-      return jsonError(400, "payload inválido", correlationId, parsed.error.flatten());
+      return jsonError(400, "payload inválido", correlationId, cors, parsed.error.flatten());
     }
     const input = parsed.data;
 
@@ -91,7 +92,7 @@ Deno.serve(async (req) => {
     // nunca criaria a linha em perfis_usuarios.
     if (erroCriar || !criado.user || criado.user.identities?.length === 0) {
       log("error", "criar_auth_falhou", { erro: erroCriar?.message, nomeUsuario: input.nome_usuario });
-      return jsonError(409, `usuário "${input.nome_usuario}" já está cadastrado`, correlationId);
+      return jsonError(409, `usuário "${input.nome_usuario}" já está cadastrado`, correlationId, cors);
     }
 
     const { error: erroPerfil } = await adminClient.from("perfis_usuarios").insert({
@@ -113,23 +114,23 @@ Deno.serve(async (req) => {
       const mensagem = erroPerfil.message.includes("matricula")
         ? `matrícula "${input.matricula}" já está em uso`
         : "falha ao criar o perfil do colaborador";
-      return jsonError(409, mensagem, correlationId);
+      return jsonError(409, mensagem, correlationId, cors);
     }
 
     log("info", "usuario_criado", { userId: criado.user.id, nomeUsuario: input.nome_usuario });
     return new Response(JSON.stringify({ id: criado.user.id }), {
       status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...cors, "Content-Type": "application/json" },
     });
   } catch (erro) {
     log("error", "excecao_nao_tratada", { erro: erro instanceof Error ? erro.message : String(erro) });
-    return jsonError(500, "erro interno", correlationId);
+    return jsonError(500, "erro interno", correlationId, cors);
   }
 });
 
-function jsonError(status: number, mensagem: string, correlationId: string, detalhes?: unknown) {
+function jsonError(status: number, mensagem: string, correlationId: string, cors: HeadersInit, detalhes?: unknown) {
   return new Response(JSON.stringify({ erro: mensagem, correlationId, detalhes }), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...cors, "Content-Type": "application/json" },
   });
 }

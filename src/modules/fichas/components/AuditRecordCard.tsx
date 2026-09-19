@@ -111,7 +111,7 @@ export function AuditRecordCard({
       )}
 
       {campos.length > 0 && (
-        <dl className="grid grid-cols-2 gap-2 border-t pt-2 text-sm">
+        <dl className="grid grid-cols-1 gap-2 border-t pt-2 text-sm sm:grid-cols-2">
           {campos.map(([chave, valor]) => (
             <div key={chave}>
               <dt className="text-muted-foreground">{chave}</dt>

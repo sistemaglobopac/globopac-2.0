@@ -35,8 +35,8 @@ export function CarimbosPendentesPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Carimbos de tempo — pendências</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold sm:text-2xl">Carimbos de tempo — pendências</h1>
         <Button onClick={() => processar.mutate()} disabled={processar.isPending}>
           {processar.isPending ? "Processando…" : "Processar agora"}
         </Button>
@@ -79,42 +79,44 @@ export function CarimbosPendentesPage() {
         </CardHeader>
         <CardContent>
           {isLoading && <p className="text-muted-foreground">Carregando…</p>}
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                <th className="py-1">Tipo</th>
-                <th>Status</th>
-                <th>Tentativas</th>
-                <th>Criado em</th>
-                <th>Último erro</th>
-              </tr>
-            </thead>
-            <tbody>
-              {itens?.map((item) => (
-                <tr key={item.id} className="border-t">
-                  <td className="py-1">{item.tipo_assinatura}</td>
-                  <td>
-                    <Badge
-                      variant={
-                        item.status === "concluido"
-                          ? "success"
-                          : item.status === "falhou_definitivo"
-                            ? "destructive"
-                            : "outline"
-                      }
-                    >
-                      {ROTULO_STATUS[item.status]}
-                    </Badge>
-                  </td>
-                  <td>{item.tentativas}</td>
-                  <td>{new Date(item.criado_em).toLocaleString("pt-BR")}</td>
-                  <td className="max-w-xs truncate text-muted-foreground" title={item.ultimo_erro ?? ""}>
-                    {item.ultimo_erro ?? "—"}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-sm">
+              <thead>
+                <tr className="text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <th className="py-1">Tipo</th>
+                  <th>Status</th>
+                  <th>Tentativas</th>
+                  <th>Criado em</th>
+                  <th>Último erro</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {itens?.map((item) => (
+                  <tr key={item.id} className="border-t">
+                    <td className="py-1">{item.tipo_assinatura}</td>
+                    <td>
+                      <Badge
+                        variant={
+                          item.status === "concluido"
+                            ? "success"
+                            : item.status === "falhou_definitivo"
+                              ? "destructive"
+                              : "outline"
+                        }
+                      >
+                        {ROTULO_STATUS[item.status]}
+                      </Badge>
+                    </td>
+                    <td>{item.tentativas}</td>
+                    <td>{new Date(item.criado_em).toLocaleString("pt-BR")}</td>
+                    <td className="max-w-xs truncate text-muted-foreground" title={item.ultimo_erro ?? ""}>
+                      {item.ultimo_erro ?? "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
     </div>
