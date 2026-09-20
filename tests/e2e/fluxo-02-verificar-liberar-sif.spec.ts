@@ -41,7 +41,11 @@ test("verificador aprova, admin libera ao SIF, e o registro aparece para a Inspe
   await page.getByLabel("Sua senha").fill("121072");
   await page.getByRole("button", { name: "Confirmar e Assinar" }).click();
   await expect(page).toHaveURL(/\/verificacao$/, { timeout: 15_000 });
-  await expect(cartaoDoRegistro).not.toBeVisible();
+  // O card não some da página — sai da fila de pendentes e passa a aparecer em "Verificadas
+  // em <data>" (mesmo componente/testid, seção diferente). Escopa a checagem à fila.
+  await expect(page.getByTestId("fila-pendente").getByTestId(`registro-verificacao-${registroId}`)).not.toBeVisible({
+    timeout: 15_000,
+  });
   await logout(page);
 
   await login(page, "1004", "121072");
