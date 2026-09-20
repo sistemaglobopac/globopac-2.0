@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { login, logout, selecionarTemplate, assinarComSenha, clienteAdminDeTeste, idDoMonitoramentoPorMarcador } from "./helpers";
+import { login, logout, selecionarTemplate, assinarComSenha, clienteAdminDeTeste, idDoMonitoramentoPorMarcador, localizarCartaoRegistro } from "./helpers";
 
 // Fluxo E2E nº 2 (seção 10 do PROMPT MESTRE): "Verificador aprova → assina → Admin libera
 // SIF → aparece para Inspeção Federal." A liberação (Fase 3) é em lote, com hash agregador —
@@ -30,7 +30,7 @@ test("verificador aprova, admin libera ao SIF, e o registro aparece para a Inspe
   await login(page, "1002", "121072");
   await page.goto("/verificacao");
   const registroId = await idDoMonitoramentoPorMarcador(admin, marcador);
-  const cartaoDoRegistro = page.getByTestId(`registro-verificacao-${registroId}`);
+  const cartaoDoRegistro = await localizarCartaoRegistro(page, registroId);
   await expect(cartaoDoRegistro).toBeVisible({ timeout: 15_000 });
   await cartaoDoRegistro.getByRole("button", { name: "Verificar" }).click();
 

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { login, logout, clienteAdminDeTeste, selecionarTemplate, assinarComSenha } from "./helpers";
+import { login, logout, clienteAdminDeTeste, selecionarTemplate, assinarComSenha, localizarCartaoRegistro } from "./helpers";
 
 // Fase 8 (PWA offline e sincronização, ADR 0002/0014) — sem número de fluxo na seção 10
 // (feature adicionada além do roteiro original, ver ASSUMPTIONS.md). Cobre o caminho
@@ -85,7 +85,7 @@ test("ficha criada sem rede é enfileirada e sincronizada automaticamente quando
   await login(page, "1002", "121072");
   await page.goto("/verificacao");
   // registro.id já veio da consulta acima — evita repetir a busca por marcador.
-  const cartao = page.getByTestId(`registro-verificacao-${registro!.id}`);
+  const cartao = await localizarCartaoRegistro(page, registro!.id);
   await expect(cartao).toBeVisible({ timeout: 15_000 });
   await expect(cartao.getByText(/Capturado offline em/)).toBeVisible();
 });

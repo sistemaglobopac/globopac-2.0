@@ -85,6 +85,27 @@ export async function idDoMonitoramentoPorMarcador(
   return data.id as string;
 }
 
+/** Fichas simples do mesmo inspetor/dia/turno/PAC/setor se agrupam visualmente num "dossiê"
+ * colapsado (DossieVerificacaoCard) quando há 2+ — um item sozinho fica "avulso" (visível
+ * direto), mas como os specs de E2E rodam em sequência sem resetar o banco (e alguns, como o
+ * fluxo 1, deixam a própria ficha "aguardando" de propósito, sem verificá-la), um item pode
+ * acabar dentro de um dossiê de uma execução posterior — o card individual só existe no DOM
+ * depois de expandir "Apurações". Faz polling: procura o card, expande qualquer "Apurações"
+ * visível, procura de novo. */
+export async function localizarCartaoRegistro(page: Page, monitoramentoId: string) {
+  const cartao = page.getByTestId(`registro-verificacao-${monitoramentoId}`);
+  const prazo = Date.now() + 15_000;
+  while (Date.now() < prazo) {
+    if ((await cartao.count()) > 0) return cartao;
+    const botoesApuracoes = page.getByRole("button", { name: "Apurações" });
+    const total = await botoesApuracoes.count();
+    for (let i = 0; i < total; i++) await botoesApuracoes.nth(i).click().catch(() => {});
+    if ((await cartao.count()) > 0) return cartao;
+    await page.waitForTimeout(500);
+  }
+  return cartao;
+}
+
 export async function selecionarTemplate(page: Page, nomeTemplate: string) {
   await page
     .getByTestId("ficha-card")

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { login, logout, clienteAdminDeTeste, selecionarTemplate, assinarComSenha, idDoMonitoramentoPorMarcador } from "./helpers";
+import { login, logout, clienteAdminDeTeste, selecionarTemplate, assinarComSenha, idDoMonitoramentoPorMarcador, localizarCartaoRegistro } from "./helpers";
 
 // Fluxos E2E nº 5 e 6 (seção 10 do PROMPT MESTRE):
 // 5) "Acesso ao portal público /verificar com UUID de documento assinado → mostra trilha e
@@ -26,7 +26,7 @@ test("documento liberado aparece com trilha e badge corretos no portal público 
   await login(page, "1002", "121072");
   await page.goto("/verificacao");
   const registroId = await idDoMonitoramentoPorMarcador(admin, marcador);
-  const cartaoVerificacao = page.getByTestId(`registro-verificacao-${registroId}`);
+  const cartaoVerificacao = await localizarCartaoRegistro(page, registroId);
   await expect(cartaoVerificacao).toBeVisible({ timeout: 15_000 });
   await cartaoVerificacao.getByRole("button", { name: "Verificar" }).click();
 

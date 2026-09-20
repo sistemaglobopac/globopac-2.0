@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { login, logout, selecionarTemplate, assinarComSenha, clienteAdminDeTeste, idDoMonitoramentoPorMarcador } from "./helpers";
+import { login, logout, selecionarTemplate, assinarComSenha, clienteAdminDeTeste, idDoMonitoramentoPorMarcador, localizarCartaoRegistro } from "./helpers";
 
 // Fluxo E2E nº 1 (seção 10 do PROMPT MESTRE): "Inspetor cria ficha → assina → aparece para
 // Verificador." Depende do stack local do Supabase rodando com supabase/seed.sql aplicado
@@ -36,7 +36,7 @@ test("inspetor cria e assina uma ficha, que aparece para o verificador", async (
   // O card da fila não mostra mais o valor dos campos (temperatura/observações), só
   // metadados — localiza pelo id real do registro (via o marcador), não mais por texto.
   const registroId = await idDoMonitoramentoPorMarcador(admin, marcador);
-  const cartaoDoRegistro = page.getByTestId(`registro-verificacao-${registroId}`);
+  const cartaoDoRegistro = await localizarCartaoRegistro(page, registroId);
   await expect(cartaoDoRegistro).toBeVisible({ timeout: 15_000 });
   await expect(cartaoDoRegistro.getByText("Monitoramento de Temperatura")).toBeVisible();
 });
