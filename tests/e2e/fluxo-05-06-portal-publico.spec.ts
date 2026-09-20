@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { login, logout, clienteAdminDeTeste, selecionarTemplate, assinarComSenha } from "./helpers";
+import { login, logout, clienteAdminDeTeste, selecionarTemplate, assinarComSenha, idDoMonitoramentoPorMarcador } from "./helpers";
 
 // Fluxos E2E nº 5 e 6 (seção 10 do PROMPT MESTRE):
 // 5) "Acesso ao portal público /verificar com UUID de documento assinado → mostra trilha e
@@ -25,13 +25,18 @@ test("documento liberado aparece com trilha e badge corretos no portal público 
 
   await login(page, "1002", "121072");
   await page.goto("/verificacao");
-  const cartaoVerificacao = page.locator('[data-testid="fila-pendente"] .rounded-lg.border').filter({ hasText: marcador });
+  const registroId = await idDoMonitoramentoPorMarcador(admin, marcador);
+  const cartaoVerificacao = page.getByTestId(`registro-verificacao-${registroId}`);
   await expect(cartaoVerificacao).toBeVisible({ timeout: 15_000 });
-  await cartaoVerificacao.getByRole("button", { name: "Ver" }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "Aprovar e assinar" }).click();
-  await page.getByRole("dialog").getByLabel("Sua senha").fill("121072");
-  await page.getByRole("dialog").getByRole("button", { name: "Confirmar e Assinar" }).click();
-  await expect(cartaoVerificacao).not.toBeVisible({ timeout: 15_000 });
+  await cartaoVerificacao.getByRole("button", { name: "Verificar" }).click();
+
+  // Tela cheia de verificação (VerificarFichaPage): relatório consolidado + as 3 ações.
+  await expect(page).toHaveURL(/\/verificacao\/relatorio/);
+  await page.getByRole("button", { name: "Verificar", exact: true }).click();
+  await page.getByLabel("Sua senha").fill("121072");
+  await page.getByRole("button", { name: "Confirmar e Assinar" }).click();
+  await expect(page).toHaveURL(/\/verificacao$/, { timeout: 15_000 });
+  await expect(cartaoVerificacao).not.toBeVisible();
   await logout(page);
 
   // Libera TODOS os pendentes (não só o nosso) — mais simples e robusto do que garantir que

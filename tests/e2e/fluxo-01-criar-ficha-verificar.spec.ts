@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { login, logout, selecionarTemplate, assinarComSenha } from "./helpers";
+import { login, logout, selecionarTemplate, assinarComSenha, clienteAdminDeTeste, idDoMonitoramentoPorMarcador } from "./helpers";
 
 // Fluxo E2E nº 1 (seção 10 do PROMPT MESTRE): "Inspetor cria ficha → assina → aparece para
 // Verificador." Depende do stack local do Supabase rodando com supabase/seed.sql aplicado
@@ -13,6 +13,7 @@ import { login, logout, selecionarTemplate, assinarComSenha } from "./helpers";
 
 test("inspetor cria e assina uma ficha, que aparece para o verificador", async ({ page }) => {
   const marcador = `E2E-fluxo1-${Date.now()}`;
+  const admin = await clienteAdminDeTeste();
 
   await login(page, "1001", "121072");
 
@@ -32,8 +33,10 @@ test("inspetor cria e assina uma ficha, que aparece para o verificador", async (
   await login(page, "1002", "121072");
   await page.goto("/verificacao");
 
-  const cartaoDoRegistro = page.locator(".rounded-lg.border").filter({ hasText: marcador });
+  // O card da fila não mostra mais o valor dos campos (temperatura/observações), só
+  // metadados — localiza pelo id real do registro (via o marcador), não mais por texto.
+  const registroId = await idDoMonitoramentoPorMarcador(admin, marcador);
+  const cartaoDoRegistro = page.getByTestId(`registro-verificacao-${registroId}`);
   await expect(cartaoDoRegistro).toBeVisible({ timeout: 15_000 });
   await expect(cartaoDoRegistro.getByText("Monitoramento de Temperatura")).toBeVisible();
-  await expect(cartaoDoRegistro.getByText(temperatura, { exact: true })).toBeVisible();
 });

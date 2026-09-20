@@ -67,6 +67,24 @@ export async function login(page: Page, matricula: string, senha: string) {
  * cronômetro de liberado/bloqueado/atrasado em be0f61c) — localiza o card pelo nome do
  * template e clica no botão dele (único por card, texto varia com o status: "Preencher
  * monitoramento"/"Preencher urgente"/"Aguarde o tempo"). */
+/** AuditRecordCard não mostra mais o conteúdo dos campos (temperatura, observações) no resumo
+ * da fila de verificação — só metadados (código, inspetor, data, setor); o detalhe fica
+ * atrás do botão "Verificar" (tela cheia com relatório consolidado). Sem o marcador visível
+ * no card, localizar pelo texto (hasText) não funciona mais — busca o id real do registro
+ * (o card tem data-testid={`registro-verificacao-${id}`}) via o marcador em observacoes. */
+export async function idDoMonitoramentoPorMarcador(
+  admin: Awaited<ReturnType<typeof clienteAdminDeTeste>>,
+  marcador: string
+): Promise<string> {
+  const { data, error } = await admin
+    .from("monitoramentos")
+    .select("id")
+    .eq("dados_dinamicos->>observacoes", marcador)
+    .single();
+  if (error || !data) throw new Error(`monitoramento com marcador ${marcador} não encontrado: ${error?.message}`);
+  return data.id as string;
+}
+
 export async function selecionarTemplate(page: Page, nomeTemplate: string) {
   await page
     .getByTestId("ficha-card")

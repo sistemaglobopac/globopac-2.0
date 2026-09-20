@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { login, logout, selecionarTemplate, assinarComSenha } from "./helpers";
+import { login, logout, selecionarTemplate, assinarComSenha, clienteAdminDeTeste, idDoMonitoramentoPorMarcador } from "./helpers";
 
 // Fluxo E2E nº 2 (seção 10 do PROMPT MESTRE): "Verificador aprova → assina → Admin libera
 // SIF → aparece para Inspeção Federal." A liberação (Fase 3) é em lote, com hash agregador —
@@ -15,6 +15,7 @@ test("verificador aprova, admin libera ao SIF, e o registro aparece para a Inspe
   page,
 }) => {
   const marcador = `E2E-fluxo2-${Date.now()}`;
+  const admin = await clienteAdminDeTeste();
 
   await login(page, "1001", "121072");
   await page.goto("/fichas/nova");
@@ -28,13 +29,19 @@ test("verificador aprova, admin libera ao SIF, e o registro aparece para a Inspe
 
   await login(page, "1002", "121072");
   await page.goto("/verificacao");
-  const cartaoDoRegistro = page.locator('[data-testid="fila-pendente"] .rounded-lg.border').filter({ hasText: marcador });
+  const registroId = await idDoMonitoramentoPorMarcador(admin, marcador);
+  const cartaoDoRegistro = page.getByTestId(`registro-verificacao-${registroId}`);
   await expect(cartaoDoRegistro).toBeVisible({ timeout: 15_000 });
-  await cartaoDoRegistro.getByRole("button", { name: "Ver" }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "Aprovar e assinar" }).click();
-  await page.getByRole("dialog").getByLabel("Sua senha").fill("121072");
-  await page.getByRole("dialog").getByRole("button", { name: "Confirmar e Assinar" }).click();
-  await expect(cartaoDoRegistro).not.toBeVisible({ timeout: 15_000 });
+  await cartaoDoRegistro.getByRole("button", { name: "Verificar" }).click();
+
+  // Tela cheia de verificação (VerificarFichaPage): relatório consolidado + as 3 ações do
+  // verificador — substituiu o antigo dialog de decisão.
+  await expect(page).toHaveURL(/\/verificacao\/relatorio/);
+  await page.getByRole("button", { name: "Verificar", exact: true }).click();
+  await page.getByLabel("Sua senha").fill("121072");
+  await page.getByRole("button", { name: "Confirmar e Assinar" }).click();
+  await expect(page).toHaveURL(/\/verificacao$/, { timeout: 15_000 });
+  await expect(cartaoDoRegistro).not.toBeVisible();
   await logout(page);
 
   await login(page, "1004", "121072");

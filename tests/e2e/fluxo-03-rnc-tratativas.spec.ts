@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { login, logout, clienteAdminDeTeste, selecionarTemplate, assinarComSenha } from "./helpers";
+import { login, logout, clienteAdminDeTeste, selecionarTemplate, assinarComSenha, idDoMonitoramentoPorMarcador } from "./helpers";
 
 // Fluxo E2E nº 3 (seção 10 do PROMPT MESTRE), atualizado na Fase 11 (decisão do cliente: o
 // VERIFICADOR atua como revisor de RNC — ver ASSUMPTIONS.md item 22):
@@ -25,20 +25,22 @@ test("verificador reprova, RNC é criada, gestor de setor trata e verificador re
 
   await login(page, "1002", "121072");
   await page.goto("/verificacao");
-  const cartaoVerificacao = page.locator('[data-testid="fila-pendente"] .rounded-lg.border').filter({ hasText: marcador });
+  const registroId = await idDoMonitoramentoPorMarcador(admin, marcador);
+  const cartaoVerificacao = page.getByTestId(`registro-verificacao-${registroId}`);
   await expect(cartaoVerificacao).toBeVisible({ timeout: 15_000 });
-  await cartaoVerificacao.getByRole("button", { name: "Ver" }).click();
-  const dialogReprovacao = page.getByRole("dialog");
-  await dialogReprovacao.getByRole("button", { name: "Reprovar" }).click();
-  await dialogReprovacao.locator("select").selectOption("ALTA");
-  await dialogReprovacao.locator("textarea").fill(marcador);
-  await dialogReprovacao.getByRole("button", { name: "Confirmar reprovação (abre RNC)" }).click();
-  // Reprovar também exige reautenticação por senha (mesmo mecanismo de "Aprovar e assinar",
-  // já existente desde be0f61c) — nunca coberto aqui porque o CI nunca tinha chegado até este
-  // teste antes (bloqueado por outras falhas anteriores no pipeline).
-  await dialogReprovacao.getByLabel("Sua senha").fill("121072");
-  await dialogReprovacao.getByRole("button", { name: "Confirmar e Assinar" }).click();
-  await expect(cartaoVerificacao).not.toBeVisible({ timeout: 15_000 });
+  await cartaoVerificacao.getByRole("button", { name: "Verificar" }).click();
+
+  // Tela cheia de verificação (VerificarFichaPage): "Rejeitar e Iniciar Tratativa" substituiu
+  // o antigo dialog "Reprovar" -> "Confirmar reprovação (abre RNC)". Também exige senha (mesmo
+  // mecanismo do fluxo de aprovação).
+  await expect(page).toHaveURL(/\/verificacao\/relatorio/);
+  await page.getByRole("button", { name: "Rejeitar e Iniciar Tratativa" }).click();
+  await page.locator("select").selectOption("ALTA");
+  await page.locator("textarea").fill(marcador);
+  await page.getByLabel("Sua senha").fill("121072");
+  await page.getByRole("button", { name: "Confirmar Rejeição (abre RNC)" }).click();
+  await expect(page).toHaveURL(/\/verificacao$/, { timeout: 15_000 });
+  await expect(cartaoVerificacao).not.toBeVisible();
   await logout(page);
 
   const { data: rncCriada } = await admin

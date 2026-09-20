@@ -84,7 +84,8 @@ test("ficha criada sem rede é enfileirada e sincronizada automaticamente quando
 
   await login(page, "1002", "121072");
   await page.goto("/verificacao");
-  const cartao = page.locator(".rounded-lg.border").filter({ hasText: marcador });
+  // registro.id já veio da consulta acima — evita repetir a busca por marcador.
+  const cartao = page.getByTestId(`registro-verificacao-${registro!.id}`);
   await expect(cartao).toBeVisible({ timeout: 15_000 });
   await expect(cartao.getByText(/Capturado offline em/)).toBeVisible();
 });
