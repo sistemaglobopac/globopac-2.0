@@ -107,6 +107,44 @@
    do print). Técnica padrão "imprimir só este elemento": esconde tudo, mostra só
    #relatorio-impressao, e neutraliza overflow/position dos wrappers do modal (sem isso, o
    overflow-hidden/max-h-full do diálogo corta o relatório mesmo com o conteúdo "visível"). */
+/* Responsividade (tablet/celular): no iOS, campos com fonte < 16px fazem a pagina dar zoom ao
+   focar e ela nao volta sozinha. Forca 16px so em tela pequena (nao afeta desktop nem impressao). */
+@media screen and (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Itens tocaveis: alvo minimo confortavel em telas de toque (dedo), sem mexer no desktop. */
+@media (pointer: coarse) {
+  input[type="checkbox"],
+  input[type="radio"] {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+}
+
+/* Textos sem espaco (hash, GTA, e-mail, codigo) quebram em vez de empurrar a pagina para o lado.
+   Tabelas ficam de fora: la a rolagem horizontal ja cuida do excesso. */
+@media screen and (max-width: 1023px) {
+  main {
+    overflow-wrap: anywhere;
+  }
+  main td,
+  main th {
+    overflow-wrap: normal;
+  }
+}
+
+/* Midia nunca maior que a tela. */
+img,
+video,
+canvas {
+  max-width: 100%;
+}
+
 @media print {
   body * {
     visibility: hidden;
@@ -146,6 +184,12 @@
     display: block !important;
   }
 
+  /* visibility:hidden mantém o app escondido ocupando espaço — gerava páginas em branco extras
+     depois do relatório. Tira do fluxo tudo que não é o relatório nem ancestral dele. */
+  body *:not(#relatorio-impressao):not(#relatorio-impressao *):not(:has(#relatorio-impressao)) {
+    display: none !important;
+  }
+
   .gs-no-print {
     display: none !important;
   }
@@ -157,8 +201,16 @@
     margin: 0 !important;
     box-shadow: none !important;
     border: none !important;
-    page-break-after: always !important;
-    break-after: page !important;
+    /* Sem quebra forçada: "always" gerava uma página em branco depois do relatório. */
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+
+  /* Relatório de um único registro cabe numa folha A4: reduz a escala (o layout é refeito na
+     largura útil, não é um "encolher imagem"). Consolidados (vários registros) fluem em
+     quantas folhas precisarem, sem escala, para não ficarem ilegíveis. */
+  .print-page.print-fit-one-page {
+    zoom: 0.7;
   }
 
   @page {

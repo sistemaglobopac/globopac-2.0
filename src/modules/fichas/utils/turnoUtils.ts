@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { horaEmManaus } from "@/modules/bordo/api";
 
 /** Corte de dia em UTC puro (sem ajuste de fuso) — é assim que turnos_inspetores.inicio é
  * comparado ao dia do monitoramento no Painel de Bordo. Não usar o dia ajustado para
@@ -100,4 +101,25 @@ export async function encerrarTurnoAdmin(inspetorId: string, dataTurno: string):
     const { error } = await supabase.from("turnos_inspetores").insert({ user_id: inspetorId, inicio: agora, fim: agora });
     if (error) throw error;
   }
+}
+
+// ---------------------------------------------------------------------------------------
+// Turno usado para HERDAR a leitura anterior dos hidrômetros (widgets SPR/Chuveiro): o
+// "monitoramento anterior" é o mais recente de hoje, do mesmo tipo de ficha, no mesmo setor E
+// NO MESMO TURNO. Regra de dedução por horário de Manaus: 04h–17h = 1º Turno; caso contrário
+// 2º Turno (mesma faixa de turnoDoDia() em bordo/api.ts).
+// ---------------------------------------------------------------------------------------
+export type TurnoHeranca = "1º Turno" | "2º Turno";
+
+export function turnoParaHeranca(referencia: Date): TurnoHeranca {
+  const hora = horaEmManaus(referencia);
+  return hora >= 4 && hora < 17 ? "1º Turno" : "2º Turno";
+}
+
+/** Turno fixo do usuário ("Turno 1"/"Turno 2") vale como está; "Ambos" (ou ausente) deduz pelo
+ * horário atual de Manaus. */
+export function turnoAlvoHeranca(turnoFixo: "Turno 1" | "Turno 2" | "Ambos" | undefined, agora: Date): TurnoHeranca {
+  if (turnoFixo === "Turno 1") return "1º Turno";
+  if (turnoFixo === "Turno 2") return "2º Turno";
+  return turnoParaHeranca(agora);
 }

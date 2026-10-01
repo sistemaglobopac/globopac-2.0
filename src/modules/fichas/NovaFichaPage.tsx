@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useForm, useWatch, type FieldValues } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertTriangle, ArrowLeft, BellRing, CheckCircle2, Clock, Lock, ShieldCheck, X } from "lucide-react";
@@ -6,7 +7,13 @@ import { useSessionStore, type PerfilSessao } from "@/store/session";
 import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/api";
 import { zodFromSchemaCampos, valoresIniciaisDe, type CampoTemplate } from "@/shared/schema-campos";
 import { supabase } from "@/lib/supabase";
-import { useCriarMonitoramento, useTemplatesAtivos, useUltimoRegistroFicha, useUltimosApontamentosHoje, type TemplateAtivo } from "./api";
+import { useCriarMonitoramento, useTemplatesAtivos, useTurnoFixoDoUsuario, useUltimoRegistroFicha, useUltimosApontamentosHoje, type TemplateAtivo } from "./api";
+import { motivosDeBloqueioSpr } from "./utils/bloqueiosSpr";
+import { desviosEspeciais, temNaoConformidade } from "./utils/desviosEspeciais";
+import { drippingEmFase1, validarFaseInicial } from "./fields/calculosAbsorcao";
+import type { AbsorcaoAguaValor, DrippingTestValor } from "./fields/tiposCompostos";
+import { MonitoramentosEmAndamento } from "./components/MonitoramentosEmAndamento";
+import { turnoAlvoHeranca } from "./utils/turnoUtils";
 import { useSincronizacaoOffline } from "./useSincronizacaoOffline";
 import { useAudioAlarm } from "./useAudioAlarm";
 import { DynamicField } from "./DynamicField";
@@ -38,7 +45,7 @@ function FilaOfflinePainel() {
       </CardHeader>
       <CardContent className="space-y-2 text-sm">
         {fila.map((item) => (
-          <div key={item.id} className="flex items-center justify-between">
+          <div key={item.id} className="flex flex-wrap gap-2 items-center justify-between">
             <span className="text-muted-foreground">
               Capturada em {new Date(item.capturadoEm).toLocaleString("pt-BR")}
             </span>
@@ -88,13 +95,22 @@ export function NovaFichaPage() {
   const { data: templates, isLoading } = useTemplatesAtivos();
   const { data: masterSetores } = useSetoresCadastrados();
   const setoresDoUsuario = resolverSetoresEfetivos(perfil?.setoresPermitidos ?? [], masterSetores);
-  const [setor, setSetor] = useState(setoresDoUsuario[0] ?? "");
-  const [templateId, setTemplateId] = useState("");
+  // Deep link do Painel de Bordo (card "Fichas Atrasadas"): abre direto a ficha no setor certo.
+  const [searchParams] = useSearchParams();
+  const setorDoLink = searchParams.get("setor") ?? "";
+  const [setor, setSetor] = useState(setorDoLink || (setoresDoUsuario[0] ?? ""));
+  const [templateId, setTemplateId] = useState(searchParams.get("ficha") ?? "");
   const [agora, setAgora] = useState(() => new Date());
 
   useEffect(() => {
     if (!perfil) return;
-    setSetor((atual) => (atual && setoresDoUsuario.includes(atual) ? atual : (setoresDoUsuario[0] ?? "")));
+    setSetor((atual) =>
+      atual && setoresDoUsuario.includes(atual)
+        ? atual
+        : setorDoLink && setoresDoUsuario.includes(setorDoLink)
+          ? setorDoLink
+          : (setoresDoUsuario[0] ?? "")
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [perfil, masterSetores]);
 
@@ -143,6 +159,7 @@ export function NovaFichaPage() {
         </div>
 
         <FilaOfflinePainel />
+        <MonitoramentosEmAndamento />
 
         {alarmeAtivo && (
           <div className="flex items-center gap-3 rounded-lg bg-destructive p-4 text-destructive-foreground shadow-lg">
@@ -182,7 +199,7 @@ export function NovaFichaPage() {
                 }
               >
                 <CardContent className="flex flex-col gap-3 p-5">
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
                     <Badge variant="outline">{ficha.codigo}</Badge>
                     <div className="flex flex-col items-end gap-1">
                       <Badge variant={status === "ATRASADO" ? "destructive" : status === "BLOQUEADO" ? "secondary" : "success"}>
@@ -254,13 +271,33 @@ interface FichaFormProps {
 }
 
 function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, setor, perfil, onVoltar }: FichaFormProps) {
-  const [sucesso, setSucesso] = useState<"online" | "offline" | null>(null);
+  const [sucesso, setSucesso] = useState<"online" | "offline" | "em_andamento" | null>(null);
   const [dadosPendentes, setDadosPendentes] = useState<FieldValues | null>(null);
   const [senha, setSenha] = useState("");
   const [autenticando, setAutenticando] = useState(false);
   const [erroSenha, setErroSenha] = useState<string | null>(null);
   const criarMonitoramento = useCriarMonitoramento();
-  const { data: ultimoRegistro } = useUltimoRegistroFicha(codigo, setor);
+  // Leitura anterior herdada: mesmo tipo de ficha, setor e TURNO, criada hoje. O turno fixo do
+  // usuário vale; "Ambos" deduz pelo horário de Manaus (05h–17h = 1º Turno). A consulta só roda
+  // depois de o turno ser conhecido, para não travar uma leitura de outro turno.
+  const { data: turnoFixo, isSuccess: turnoConhecido } = useTurnoFixoDoUsuario(
+    perfil.id,
+  );
+  const turnoAlvo = turnoAlvoHeranca(turnoFixo, new Date());
+  const { data: ultimoRegistro } = useUltimoRegistroFicha(
+    codigo,
+    setor,
+    turnoAlvo,
+    turnoConhecido,
+  );
+  const [motivosBloqueio, setMotivosBloqueio] = useState<string[]>([]);
+  const [avisosDesvio, setAvisosDesvio] = useState<string[]>([]);
+  // Dados aguardando a confirmação "assinar monitoramento NÃO CONFORME?" (antes do modal de senha).
+  const [confirmarNc, setConfirmarNc] = useState<FieldValues | null>(null);
+  // Monitoramento JÁ assinado com não conformidade: avisa na hora para emitir a RNC (vale para qualquer
+  // perfil e não depende de turno aberto nem do painel de bordo carregar).
+  const [ncAposAssinar, setNcAposAssinar] = useState<{ id: string; offline: boolean } | null>(null);
+  const navigate = useNavigate();
 
   const schema = zodFromSchemaCampos(campos);
   const {
@@ -308,11 +345,80 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, setor, pe
    * registro vai direto para a fila offline (useCriarMonitoramento já assina automaticamente
    * ao sincronizar, seção 7.5/ADR 0002). */
   async function aoEnviar(dados: FieldValues) {
+    // Dripping em 1ª etapa (sem Retirada/M2): não assina — só "Salvar 1ª etapa do teste" (Enter no formulário não pode furar isso).
+    if (drippingFase1) {
+      setMotivosBloqueio(['Dripping Test: salve a 1ª etapa do teste. A assinatura só vem depois da Retirada e do M2 (2ª etapa).']);
+      return;
+    }
+    // Partes/Miúdos/Chuveiro dependem do SPR Carcaças: sem a base vinda dele (fora do 1º
+    // monitoramento do dia) a ficha não pode ser assinada nem enfileirada offline.
+    const motivos = motivosDeBloqueioSpr(camposVisiveis, dados);
+    setMotivosBloqueio(motivos);
+    if (motivos.length > 0) return;
+
+    // Absorção de Água / Dripping Test 'nao-conforme': a ficha é NÃO CONFORME e o aviso de desvio
+    // aparece ANTES da assinatura (não bloqueia — o desvio segue o fluxo normal de RNC).
+    const desvios = desviosEspeciais(camposVisiveis, dados);
+    setAvisosDesvio(desvios);
+
+    // Ficha NÃO CONFORME: pede confirmação ANTES do modal de assinatura (e antes de enfileirar offline).
+    if (desvios.length > 0) {
+      setConfirmarNc(dados);
+      return;
+    }
+    await seguirParaAssinatura(dados);
+  }
+
+  /** Teste de Absorção em duas fases — fase 1: grava só a pesagem inicial (EM_ANDAMENTO), sem
+   * conformidade, e assina como INSPETOR_PARCIAL. A pesagem final vem depois, no mesmo registro. */
+  const campoAbsorcao = campos.find((c) => c.tipo === "absorcao_agua");
+  // Dripping Test: enquanto só a 1ª etapa foi preenchida (sem Retirada/M2) não existe "Criar e assinar".
+  const campoDripping = campos.find((c) => c.tipo === "dripping_test");
+  const drippingFase1 = Boolean(campoDripping) && drippingEmFase1((valoresForm?.[campoDripping?.chave ?? ""] as DrippingTestValor | null | undefined)?.items);
+
+  async function aoSalvarDepois(dados: FieldValues) {
+    if (!campoAbsorcao) return;
+    const valor = dados[campoAbsorcao.chave] as AbsorcaoAguaValor | null | undefined;
+    const impedimentos = validarFaseInicial(valor?.items ?? []);
+    setMotivosBloqueio(impedimentos);
+    if (impedimentos.length > 0) return;
+
+    setSucesso(null);
+    try {
+      await criarMonitoramento.mutateAsync({
+        fichaTemplateId: templateId,
+        versaoTemplate,
+        userId: perfil.id,
+        setor,
+        statusFicha: "EM_ANDAMENTO",
+        dadosDinamicos: { ...dados, [campoAbsorcao.chave]: { ...valor, fase: "INICIAL" } },
+      });
+      reset(valoresIniciaisDe(campos));
+      setSucesso("em_andamento");
+      setTimeout(onVoltar, 1800);
+    } catch {
+      // erro refletido em criarMonitoramento.isError (ex.: lacre já em andamento em outro registro).
+    }
+  }
+
+  async function seguirParaAssinatura(dados: FieldValues) {
     if (!navigator.onLine) {
       await salvar(dados);
       return;
     }
     setDadosPendentes(dados);
+  }
+
+  async function confirmarAssinarNaoConforme() {
+    if (!confirmarNc) return;
+    const dados = confirmarNc;
+    setConfirmarNc(null);
+    await seguirParaAssinatura(dados);
+  }
+
+  function cancelarConfirmacaoNc() {
+    setConfirmarNc(null);
+    setAvisosDesvio([]);
   }
 
   async function salvar(dados: FieldValues) {
@@ -328,6 +434,11 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, setor, pe
       reset(valoresIniciaisDe(campos));
       setSucesso(resultado.modo);
       setDadosPendentes(null);
+      if (temNaoConformidade(dados)) {
+        // Fica na tela até o inspetor decidir emitir a RNC agora ou depois.
+        setNcAposAssinar({ id: resultado.id, offline: resultado.modo === "offline" });
+        return;
+      }
       // A ficha "fecha" (volta para a lista, onde o cronômetro de calcularStatus passa a
       // mostrar BLOQUEADO até vencer tempo_entre_apontamentos_min) em vez de ficar aberta
       // permitindo reenvio imediato do mesmo monitoramento.
@@ -364,6 +475,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, setor, pe
     setDadosPendentes(null);
     setSenha("");
     setErroSenha(null);
+    setAvisosDesvio([]);
   }
 
   return (
@@ -377,7 +489,9 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, setor, pe
 
       <Card>
         <CardContent className="pt-6">
-          <form onSubmit={handleSubmit(aoEnviar)} className="space-y-4" noValidate>
+          {/* Ficha com absorção de água: 1ª etapa (pesagem inicial) — não há "Criar e assinar" aqui; a pesagem
+              final e a assinatura vêm depois, pela lista "Monitoramentos em andamento". */}
+          <form onSubmit={handleSubmit(campoAbsorcao ? aoSalvarDepois : aoEnviar)} className="space-y-4" noValidate>
             {camposVisiveis.map((campo) => (
               <DynamicField
                 key={campo.chave}
@@ -387,11 +501,36 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, setor, pe
                 control={control}
                 prevAppointment={ultimoRegistro?.dados_dinamicos}
                 carcacasAtual={carcacasAtual}
+                faseAbsorcao={campoAbsorcao ? "INICIAL" : undefined}
+                aoSalvarPrimeiraEtapaDripping={onVoltar}
               />
             ))}
 
+            {motivosBloqueio.length > 0 && (
+              <div
+                role="alert"
+                className="space-y-1 rounded-md border-2 border-destructive bg-destructive/10 p-3 text-sm text-destructive"
+              >
+                <p className="font-bold">
+                  Não é possível assinar esta ficha ainda:
+                </p>
+                <ul className="list-disc pl-5">
+                  {motivosBloqueio.map((motivo) => (
+                    <li key={motivo}>{motivo}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {criarMonitoramento.isError && (
-              <p className="text-sm text-destructive">Falha ao criar/assinar a ficha. Tente novamente.</p>
+              <p className="text-sm text-destructive">
+                Falha ao criar/assinar a ficha. Tente novamente.
+                {(criarMonitoramento.error as { message?: string } | null)?.message?.includes("lacre") && ` ${(criarMonitoramento.error as { message: string }).message}`}
+              </p>
+            )}
+            {sucesso === "em_andamento" && (
+              <p className="text-sm text-success">
+                Primeira etapa salva. O monitoramento ficou em andamento — faça a pesagem final pela lista "Monitoramentos em andamento".
+              </p>
             )}
             {sucesso === "online" && <p className="text-sm text-success">Ficha criada e assinada com sucesso.</p>}
             {sucesso === "offline" && (
@@ -400,16 +539,101 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, setor, pe
               </p>
             )}
 
-            <Button type="submit" disabled={isSubmitting || criarMonitoramento.isPending}>
-              {isSubmitting || criarMonitoramento.isPending ? "Salvando e assinando…" : "Criar e assinar"}
-            </Button>
+            {campoAbsorcao ? (
+              <Button type="submit" disabled={isSubmitting || criarMonitoramento.isPending}>
+                {isSubmitting || criarMonitoramento.isPending ? "Salvando…" : "Salvar primeira etapa"}
+              </Button>
+            ) : drippingFase1 ? (
+              <p className="rounded-md border border-primary/30 bg-primary/5 p-2 text-sm text-muted-foreground">
+                Dripping Test: a assinatura só vem na 2ª etapa, depois da drenagem (Retirada e M2). Na 1ª etapa use "Salvar 1ª etapa do teste".
+              </p>
+            ) : (
+              <Button type="submit" disabled={isSubmitting || criarMonitoramento.isPending}>
+                {isSubmitting || criarMonitoramento.isPending ? "Salvando e assinando…" : "Criar e assinar"}
+              </Button>
+            )}
           </form>
         </CardContent>
       </Card>
 
+      {confirmarNc && (
+        <ModalAssinatura titulo="Monitoramento NÃO CONFORME" onFechar={cancelarConfirmacaoNc}>
+          <div className="space-y-4" data-testid="confirmar-nao-conforme">
+            <div role="alert" className="space-y-1 rounded-md border-2 border-destructive bg-destructive/10 p-3 text-sm text-destructive">
+              <p className="flex items-center gap-2 font-bold">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                Este monitoramento será registrado como NÃO CONFORME.
+              </p>
+              <ul className="list-disc pl-5">
+                {avisosDesvio.map((aviso) => (
+                  <li key={aviso}>{aviso}</li>
+                ))}
+              </ul>
+            </div>
+            <p className="text-sm font-medium">Deseja assinar o monitoramento não conforme?</p>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={cancelarConfirmacaoNc}>
+                Não, voltar e revisar
+              </Button>
+              <Button type="button" variant="destructive" className="flex-1" onClick={() => void confirmarAssinarNaoConforme()}>
+                Sim, assinar
+              </Button>
+            </div>
+          </div>
+        </ModalAssinatura>
+      )}
+
+      {ncAposAssinar && (
+        <ModalAssinatura titulo="Emita o relatório de não conformidade" onFechar={onVoltar}>
+          <div className="space-y-4" data-testid="nc-apos-assinar">
+            <div role="alert" className="space-y-1 rounded-md border-2 border-destructive bg-destructive/10 p-3 text-sm text-destructive">
+              <p className="flex items-center gap-2 font-bold">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                Você tem um monitoramento finalizado com não conformidade.
+              </p>
+              <p>Emita agora um relatório de não conformidade (RNC).</p>
+              {ncAposAssinar.offline && (
+                <p className="text-xs">
+                  Sem conexão: o monitoramento será enviado quando a rede voltar. Emita a RNC pelo Painel de Bordo depois de sincronizar.
+                </p>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={onVoltar}>
+                Depois
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                className="flex-1"
+                disabled={ncAposAssinar.offline}
+                onClick={() => navigate(`/nova-rnc?vinculo=${ncAposAssinar.id}`)}
+              >
+                Emitir RNC agora
+              </Button>
+            </div>
+          </div>
+        </ModalAssinatura>
+      )}
+
       {dadosPendentes && (
         <ModalAssinatura titulo="Assinatura Eletrônica do Inspetor" onFechar={autenticando ? () => undefined : cancelarAssinatura}>
           <div className="space-y-4">
+            {avisosDesvio.length > 0 && (
+              <div
+                role="alert"
+                className="space-y-1 rounded-md border-2 border-destructive bg-destructive/10 p-3 text-sm text-destructive"
+              >
+                <p className="font-bold">
+                  ⚠️ Desvio: esta ficha será registrada como NÃO CONFORME.
+                </p>
+                <ul className="list-disc pl-5">
+                  {avisosDesvio.map((aviso) => (
+                    <li key={aviso}>{aviso}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <p className="text-sm text-muted-foreground">
               Confirme sua senha (a mesma do login) para assinar eletronicamente este monitoramento.
             </p>
@@ -457,7 +681,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, setor, pe
 function ModalAssinatura({ titulo, onFechar, children }: { titulo: string; onFechar: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div role="dialog" aria-modal="true" aria-label={titulo} className="w-full max-w-md rounded-xl border bg-background shadow-2xl">
+      <div role="dialog" aria-modal="true" aria-label={titulo} className="max-h-[calc(100dvh-2rem)] overflow-y-auto w-full max-w-md rounded-xl border bg-background shadow-2xl">
         <div className="flex items-center justify-between rounded-t-xl bg-primary px-4 py-3 text-primary-foreground">
           <span className="flex items-center gap-2 font-semibold">
             <ShieldCheck className="h-5 w-5" />

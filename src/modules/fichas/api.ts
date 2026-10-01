@@ -5,6 +5,8 @@ import { PRAZO_ONLINE_MS, enfileirarFicha, estaOffline } from "@/lib/offlineQueu
 import { inicioDoDiaManaus } from "@/modules/bordo/api";
 import type { Rnc, StatusRnc } from "@/modules/rnc/api";
 import type { MonitoramentoVerificacao } from "./utils/recordGrouping";
+import { parseConfigExtras } from "@/modules/gestao/api";
+import { turnoParaHeranca, type TurnoHeranca } from "./utils/turnoUtils";
 
 export interface TemplateAtivo {
   id: string;
@@ -109,10 +111,10 @@ export function useUltimosApontamentosHoje(setor: string | undefined) {
  * primeiro, mesmo sendo a mesma ficha do ponto de vista do inspetor (bug real, encontrado em
  * produção: RAC-001/006 V2 foi editada no meio do dia e o SPR Carcaças voltou a pedir só a
  * leitura atual no apontamento seguinte). */
-export function useUltimoRegistroFicha(codigo: string | undefined, setor: string | undefined) {
+export function useUltimoRegistroFicha(codigo: string | undefined, setor: string | undefined, turno?: TurnoHeranca, habilitado = true) {
   return useQuery({
-    queryKey: ["monitoramentos", "ultimo-registro-ficha", codigo, setor],
-    enabled: !!codigo && !!setor,
+    queryKey: ["monitoramentos", "ultimo-registro-ficha", codigo, setor, turno],
+    enabled: !!codigo && !!setor && habilitado,
     queryFn: async () => {
       const { data: versoes, error: erroVersoes } = await supabase
         .from("fichas_templates")
@@ -131,11 +133,31 @@ export function useUltimoRegistroFicha(codigo: string | undefined, setor: string
         .eq("setor", setor as string)
         .gte("criado_em", desde)
         .order("criado_em", { ascending: false })
-        .limit(1)
-        .maybeSingle()
-        .overrideTypes<{ id: string; dados_dinamicos: Record<string, unknown>; criado_em: string } | null, { merge: false }>();
+        .limit(50)
+        .overrideTypes<{ id: string; dados_dinamicos: Record<string, unknown>; criado_em: string }[], { merge: false }>();
       if (error) throw error;
-      return data;
+      // O "monitoramento anterior" é o mais recente DO MESMO TURNO (ver turnoParaHeranca).
+      return (data ?? []).find((m) => !turno || turnoParaHeranca(new Date(m.criado_em)) === turno) ?? null;
+    },
+  });
+}
+
+/** Turno fixo configurado para o usuário (Painel de Gestão → configuracoes_extras). Ausente ou
+ * "Ambos" → o turno é deduzido pelo horário (ver turnoAlvoHeranca). */
+export function useTurnoFixoDoUsuario(userId: string | undefined) {
+  return useQuery({
+    queryKey: ["perfis_usuarios", "turno-fixo", userId],
+    enabled: !!userId,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("perfis_usuarios")
+        .select("configuracoes_extras")
+        .eq("id", userId as string)
+        .maybeSingle()
+        .overrideTypes<{ configuracoes_extras: string | null } | null, { merge: false }>();
+      if (error) throw error;
+      return parseConfigExtras(data?.configuracoes_extras ?? null).turnoFixo;
     },
   });
 }
@@ -292,6 +314,8 @@ interface CriarMonitoramentoInput {
   userId: string;
   setor: string;
   dadosDinamicos: Record<string, unknown>;
+  /** Pesagem inicial da absorção (2 fases): grava EM_ANDAMENTO e assina só como INSPETOR_PARCIAL. */
+  statusFicha?: "EM_ANDAMENTO";
 }
 
 export type ResultadoCriarMonitoramento = { id: string; modo: "online" | "offline" };
@@ -315,6 +339,7 @@ export function useCriarMonitoramento() {
           userId: input.userId,
           setor: input.setor,
           dadosDinamicos: input.dadosDinamicos,
+          statusFicha: input.statusFicha,
           capturadoEm,
         });
         return { id, modo: "offline" };
@@ -333,6 +358,7 @@ export function useCriarMonitoramento() {
             user_id: input.userId,
             setor: input.setor,
             dados_dinamicos: input.dadosDinamicos,
+            ...(input.statusFicha ? { status_ficha: input.statusFicha } : {}),
             capturado_em: capturadoEm,
           })
           .select("id")
@@ -344,7 +370,7 @@ export function useCriarMonitoramento() {
         // Assina imediatamente como INSPETOR (seção 7.5) — a Edge Function recalcula o hash
         // no servidor a partir do que acabou de ser persistido, nunca do payload do cliente.
         const { error: assinarError } = await supabase.functions.invoke("assinar-documento", {
-          body: { monitoramento_id: monitoramento.id, tipo: "INSPETOR" },
+          body: { monitoramento_id: monitoramento.id, tipo: input.statusFicha === "EM_ANDAMENTO" ? "INSPETOR_PARCIAL" : "INSPETOR" },
           timeout: PRAZO_ONLINE_MS,
         });
         if (assinarError) throw assinarError;
@@ -362,6 +388,7 @@ export function useCriarMonitoramento() {
           userId: input.userId,
           setor: input.setor,
           dadosDinamicos: input.dadosDinamicos,
+          statusFicha: input.statusFicha,
           capturadoEm,
         });
         return { id, modo: "offline" };
@@ -496,6 +523,7 @@ export function useFilaVerificacao(filtros: FiltrosVerificacao, templateIdsDoPac
         .from("monitoramentos")
         .select(CAMPOS_MONITORAMENTO_VERIFICACAO)
         .is("verificado_por", null)
+        .neq("status_ficha", "EM_ANDAMENTO") // absorção só com pesagem inicial: ainda não vai à verificação
         .order("criado_em", { ascending: false })
         .limit(1000);
       if (filtros.setor) pendentesQuery = pendentesQuery.eq("setor", filtros.setor);
@@ -633,13 +661,16 @@ export interface MonitoramentoRelatorio {
   aditivo_de: string | null;
   criado_em: string;
   capturado_em: string | null;
+  /** EM_ANDAMENTO (só pesagem inicial) ou FINALIZADO. Início = criado_em; fim = finalizado_em (servidor). */
+  status_ficha: "EM_ANDAMENTO" | "FINALIZADO";
+  finalizado_em: string | null;
 }
 
 export interface AssinaturaRelatorio {
   id: string;
   monitoramento_id: string;
   user_id: string;
-  tipo: "INSPETOR" | "VERIFICADOR" | "GESTOR" | "ADMIN" | "LIBERACAO_DIARIA";
+  tipo: "INSPETOR" | "INSPETOR_PARCIAL" | "VERIFICADOR" | "GESTOR" | "ADMIN" | "LIBERACAO_DIARIA";
   hash_documento: string;
   criado_em: string;
   tsa_emitido_em: string | null;
@@ -664,11 +695,11 @@ export interface DadosRelatorio {
 
 const CAMPOS_MONITORAMENTO_RELATORIO =
   "id, ficha_template_id, versao_template, user_id, setor, dados_dinamicos, conformidade, verificado_por, " +
-  "verificado_em, liberado_sif, origem_versao, aditivo_de, criado_em, capturado_em";
+  "verificado_em, liberado_sif, origem_versao, aditivo_de, criado_em, capturado_em, status_ficha, finalizado_em";
 const CAMPOS_ASSINATURA_RELATORIO = "id, monitoramento_id, user_id, tipo, hash_documento, criado_em, tsa_emitido_em, tsa_utilizada";
-const CAMPOS_RNC_RELATORIO =
-  "id, monitoramento_id, descricao, setor, status, severidade, aberto_por, tratado_por, tratativa, prazo_sla, " +
-  "rnc_anterior_id, revisado_por, motivo_devolucao, fechado_em, criado_em";
+// "*": a RNC ganha colunas (ação imediata, causa, assinatura do gestor…) — um select explícito quebraria o
+// relatório inteiro num banco que ainda não recebeu a migração mais recente.
+const CAMPOS_RNC_RELATORIO = "*";
 
 export function useDadosRelatorio(ids: string[]) {
   const idsKey = [...ids].sort().join(",");
@@ -731,6 +762,95 @@ export function useDadosRelatorio(ids: string[]) {
         templatesPorId: new Map((templates ?? []).map((t) => [t.id, t])),
         nomesPorId: new Map((perfis ?? []).map((p) => [p.id, p.nome_completo])),
       };
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------------------
+// Teste de Absorção de Água em duas fases: registros EM_ANDAMENTO (só pesagem inicial) do
+// inspetor e a finalização (pesagem final + assinatura INSPETOR). Início = criado_em e fim =
+// finalizado_em são horas do SERVIDOR.
+// ---------------------------------------------------------------------------------------
+export interface MonitoramentoEmAndamento {
+  id: string;
+  ficha_template_id: string;
+  setor: string;
+  user_id: string;
+  dados_dinamicos: Record<string, unknown>;
+  criado_em: string;
+  status_ficha: "EM_ANDAMENTO";
+}
+
+const CAMPOS_EM_ANDAMENTO = "id, ficha_template_id, setor, user_id, dados_dinamicos, criado_em, status_ficha";
+
+/** Absorções abertas (só com pesagem inicial) do próprio inspetor. */
+export function useMonitoramentosEmAndamento(userId: string | undefined) {
+  return useQuery({
+    queryKey: ["monitoramentos", "em-andamento", userId],
+    enabled: !!userId,
+    refetchInterval: 30_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("monitoramentos")
+        .select(CAMPOS_EM_ANDAMENTO)
+        .eq("user_id", userId as string)
+        .eq("status_ficha", "EM_ANDAMENTO")
+        .order("criado_em", { ascending: true })
+        .overrideTypes<MonitoramentoEmAndamento[], { merge: false }>();
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+/** Um registro em andamento (para reabrir na pesagem final). `null` se não existir, já foi
+ * finalizado ou a RLS não deixa ver. */
+export function useMonitoramentoEmAndamento(id: string | undefined) {
+  return useQuery({
+    queryKey: ["monitoramentos", "em-andamento-um", id],
+    enabled: !!id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("monitoramentos")
+        .select(CAMPOS_EM_ANDAMENTO)
+        .eq("id", id as string)
+        .eq("status_ficha", "EM_ANDAMENTO")
+        .maybeSingle()
+        .overrideTypes<MonitoramentoEmAndamento | null, { merge: false }>();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+/** Finaliza a absorção: grava a pesagem final (o banco valida que lacres/pesos iniciais não
+ * mudaram, que toda linha tem peso final ou descarte com motivo, e carimba `finalizado_em` no
+ * servidor) e, só então, assina como INSPETOR (hash recalculado no servidor sobre o conjunto
+ * completo). Não é uma "edição": não marca justificativa nem depende de tempo_edicao_min. A senha
+ * já deve ter sido reconferida por quem chama. */
+export function useFinalizarAbsorcao() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; dadosDinamicos: Record<string, unknown>; jaFinalizado?: boolean; aoGravar?: () => void }) => {
+      if (!input.jaFinalizado) {
+        const { data, error } = await supabase
+          .from("monitoramentos")
+          .update({ dados_dinamicos: input.dadosDinamicos, status_ficha: "FINALIZADO" })
+          .eq("id", input.id)
+          .eq("status_ficha", "EM_ANDAMENTO")
+          .select("id");
+        if (error) throw error;
+        // A RLS filtra sem erro: 0 linhas = já finalizado, ou não é o inspetor que abriu.
+        if (!data || data.length === 0) throw new Error("Não foi possível finalizar: o registro já foi finalizado ou você não é quem o abriu.");
+        input.aoGravar?.(); // pesagem final gravada; se a assinatura falhar, dá para só re-assinar
+      }
+      const { error: erroAssinar } = await supabase.functions.invoke("assinar-documento", {
+        body: { monitoramento_id: input.id, tipo: "INSPETOR" },
+      });
+      if (erroAssinar) throw erroAssinar;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["monitoramentos"] });
     },
   });
 }

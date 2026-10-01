@@ -3,7 +3,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, ClipboardCheck, Filter, Layers, Loader2, Sparkles, X } from "lucide-react";
 import { useSessionStore } from "@/store/session";
 import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/api";
-import { useRncsAbertas } from "@/modules/rnc/api";
+import { useRncsAbertas, useRncsDosMonitoramentos } from "@/modules/rnc/api";
+import { CartaoRnc } from "@/modules/rnc/CartaoRnc";
 import { supabase } from "@/lib/supabase";
 import { pacsDoTemplate, useFichasTemplatesTodas, useFilaVerificacao, useUsuariosMap, useVerificarLote } from "./api";
 import { diaTurno, turnosBloqueadosMap, turnosPendentes, encerrarTurnoAdmin } from "./utils/turnoUtils";
@@ -139,6 +140,9 @@ export function PainelVerificacao() {
   );
 
   const pendingKey = pendingAppointments.map((i) => i.id).join(",");
+  // Encerrar o turno não muda a lista de pendentes, só o estado dos turnos — sem este contador
+  // o efeito abaixo não reexecutava e o botão "Verificar" ficava travado com o bloqueio antigo.
+  const [turnosVersao, setTurnosVersao] = useState(0);
   useEffect(() => {
     let cancelado = false;
     turnosBloqueadosMap(pendingAppointments.map((i) => ({ id: i.id, user_id: i.appt.user_id, criado_em: i.appt.criado_em }))).then((set) => {
@@ -148,11 +152,16 @@ export function PainelVerificacao() {
       cancelado = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingKey]);
+  }, [pendingKey, turnosVersao]);
 
   const { dossies, avulsos } = useMemo(
     () => groupFichaCards(pendingAppointments, blockedIds, usuarios, pacPorTemplateId, codigoPorTemplateId),
     [pendingAppointments, blockedIds, usuarios, pacPorTemplateId, codigoPorTemplateId]
+  );
+  // Verificados também consolidam: um card VERIFICADO por dossiê (tipo de ficha + turno).
+  const { dossies: dossiesVerificados, avulsos: avulsosVerificados } = useMemo(
+    () => groupFichaCards(verifiedToday, new Set(), usuarios, pacPorTemplateId, codigoPorTemplateId),
+    [verifiedToday, usuarios, pacPorTemplateId, codigoPorTemplateId]
   );
 
   const kpiAguardando = displayItems.filter((i) => i.status === "aguardando").length;
@@ -163,7 +172,11 @@ export function PainelVerificacao() {
   // Conta o que está TRATADA — é a fila de revisão do próprio VERIFICADOR (useRevisarRnc, em
   // /rnc), não o total de RNCs em qualquer estágio; ABERTA/REABERTA/DEVOLVIDA ainda estão com
   // o Gestor de Setor e não exigem ação do Verificador ainda.
-  const kpiRncTratativa = (rncsAbertas ?? []).filter((r) => r.status === "TRATADA").length;
+  const rncsParaJulgar = (rncsAbertas ?? []).filter((r) => r.status === "TRATADA");
+  const kpiRncTratativa = rncsParaJulgar.length;
+  // Status da RNC de cada monitoramento com desvio (inclui FECHADA): um monitoramento com RNC
+  // procedente não fica "não conforme" — fica TRATADO.
+  const { data: rncPorMonitoramento } = useRncsDosMonitoramentos(displayItems.filter((i) => i.appt.conformidade === false).map((i) => i.id));
 
   const filtrosAtivos = Boolean(filtroSetor || filtroPac || filtroStatus || filtroInspetor || dateBase !== hojeManaus());
 
@@ -279,6 +292,7 @@ export function PainelVerificacao() {
       await encerrarTurnoAdmin(encerrarAlvo.userId, encerrarAlvo.dia);
       setMensagem({ tipo: "success", texto: `Turno de ${encerrarAlvo.nome} encerrado.` });
       setEncerrarAlvo(null);
+      setTurnosVersao((v) => v + 1);
       void fila.refetch();
     } catch (erro) {
       setMensagem({ tipo: "error", texto: erro instanceof Error ? erro.message : "Falha ao encerrar o turno." });
@@ -320,7 +334,7 @@ export function PainelVerificacao() {
 
       {mensagem && (
         <div
-          className={`flex items-center justify-between gap-3 rounded-md border p-3 text-sm ${
+          className={`flex flex-wrap items-center justify-between gap-3 rounded-md border p-3 text-sm ${
             mensagem.tipo === "success" ? "border-success bg-success/10 text-foreground" : "border-destructive bg-destructive/10 text-destructive"
           }`}
         >
@@ -338,7 +352,21 @@ export function PainelVerificacao() {
         <KpiCard tag="Revisor" label="RNCs Aguardando Revisão" value={kpiRncTratativa} tom="destrutivo" onClick={() => navigate("/rnc")} />
       </div>
 
-      <div className="flex items-center justify-between">
+      {rncsParaJulgar.length > 0 && (
+        <section className="space-y-3 rounded-xl border-2 border-destructive/40 bg-destructive/5 p-4" data-testid="rncs-para-julgar">
+          <div>
+            <h2 className="text-lg font-medium">RNCs respondidas — aguardando seu julgamento ({rncsParaJulgar.length})</h2>
+            <p className="text-sm text-muted-foreground">
+              Se a resposta do gestor sana a não conformidade, assine e feche a RNC (o monitoramento passa a TRATADO). Se for insuficiente, devolva ao gestor com uma nota.
+            </p>
+          </div>
+          {rncsParaJulgar.map((rnc) => (
+            <CartaoRnc key={rnc.id} rnc={rnc} podeTratar={false} podeRevisar podeReabrir={false} />
+          ))}
+        </section>
+      )}
+
+      <div className="flex flex-wrap gap-2 items-center justify-between">
         <h2 className="text-lg font-medium">Fila de Verificação</h2>
         <Button type="button" variant="outline" size="sm" onClick={selecionarPendentes}>
           Selecionar Pendentes
@@ -365,6 +393,7 @@ export function PainelVerificacao() {
             codigoPorTemplateId={codigoPorTemplateId}
             usersMap={usuarios}
             isAdmin={Boolean(isAdmin)}
+            rncPorMonitoramento={rncPorMonitoramento}
             onEncerrarTurno={(d) =>
               setEncerrarAlvo({ userId: d.userId, dia: diaTurno(d.items[0]!.appt.criado_em), nome: d.inspetorNome })
             }
@@ -388,6 +417,7 @@ export function PainelVerificacao() {
             usersMap={usuarios}
             blockedIds={blockedIds}
             isAdmin={Boolean(isAdmin)}
+            rncStatus={rncPorMonitoramento?.get(item.id)}
             onEncerrarTurno={(i) => setEncerrarAlvo({ userId: i.appt.user_id, dia: diaTurno(i.appt.criado_em), nome: usuarios.get(i.appt.user_id) ?? "inspetor" })}
           />
         ))}
@@ -397,7 +427,27 @@ export function PainelVerificacao() {
         <div className="space-y-3">
           <h2 className="text-lg font-medium">Verificadas em {ensureLocalTime(`${dateBase}T12:00:00`).datePt}</h2>
           <div className="space-y-3">
-            {verifiedToday.map((item) => (
+            {dossiesVerificados.map((dossie) => (
+              <DossieVerificacaoCard
+                key={dossie.chave}
+                dossie={dossie}
+                selectedIds={selectedIds}
+                toggleSelection={toggleSelection}
+                toggleGroupSelection={toggleGroupSelection}
+                onPreview={(item) => abrirVerificacao([item.id])}
+                onImprimir={(item) => setRelatorioIds([item.id])}
+                onVerDossie={(d: DossieVerificacao) => abrirVerificacao(d.ids)}
+                pacPorTemplateId={pacPorTemplateId}
+                nomePorTemplateId={nomePorTemplateId}
+                codigoPorTemplateId={codigoPorTemplateId}
+                usersMap={usuarios}
+                isAdmin={Boolean(isAdmin)}
+                rncPorMonitoramento={rncPorMonitoramento}
+                onEncerrarTurno={() => undefined}
+                onEncerrarTurnoItem={() => undefined}
+              />
+            ))}
+            {avulsosVerificados.map((item) => (
               <AuditRecordCard
                 key={item.id}
                 item={item}
@@ -412,12 +462,15 @@ export function PainelVerificacao() {
                 usersMap={usuarios}
                 blockedIds={blockedIds}
                 isAdmin={Boolean(isAdmin)}
+                rncStatus={rncPorMonitoramento?.get(item.id)}
                 onEncerrarTurno={() => undefined}
               />
             ))}
           </div>
         </div>
       )}
+
+      {selectedIds.size > 0 && <div className="h-32 sm:h-20" aria-hidden />}
 
       {selectedIds.size > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-40 flex flex-wrap items-center justify-between gap-3 border-t bg-surface-dark p-3 text-ondark shadow-lg sm:gap-4 sm:p-4">
@@ -574,14 +627,14 @@ export function PainelVerificacao() {
 function ModalBase({ titulo, onFechar, children }: { titulo: string; onFechar: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div role="dialog" aria-modal="true" aria-label={titulo} className="w-full max-w-lg rounded-xl border bg-background shadow-2xl">
+      <div role="dialog" aria-modal="true" aria-label={titulo} className="max-h-[calc(100dvh-2rem)] overflow-y-auto w-full max-w-lg rounded-xl border bg-background shadow-2xl">
         <div className="flex items-center justify-between rounded-t-xl bg-primary px-4 py-3 text-primary-foreground">
           <span className="font-semibold">{titulo}</span>
           <button type="button" onClick={onFechar} aria-label="Fechar">
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="max-h-[80vh] overflow-y-auto p-4">{children}</div>
+        <div className="max-h-[80dvh] overflow-y-auto p-4">{children}</div>
       </div>
     </div>
   );

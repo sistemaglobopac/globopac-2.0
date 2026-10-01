@@ -2,10 +2,14 @@ import { useMemo, useState } from "react";
 import { Eye } from "lucide-react";
 import { useFichasTemplatesTodas, useUsuariosMap, pacsDoTemplate } from "@/modules/fichas/api";
 import { RelatorioModal } from "@/modules/fichas/components/relatorio/RelatorioModal";
+import { turnoDoDia } from "@/modules/bordo/api";
+import { agruparPorDossie, setoresDoGrupo, tipoPorTemplate } from "@/modules/fichas/utils/recordGrouping";
+import { ensureLocalTime } from "@/modules/fichas/utils/tempo";
 import { useLiberarLoteSif, useMonitoramentosParaLiberar } from "./api";
 import { Button } from "@/shared/ui/button";
 import { Badge } from "@/shared/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
+import { situacaoDe } from "@/shared/situacaoConformidade";
 
 /** Painel de Arquivo — fichas já verificadas (aprovadas ou reprovadas) e ainda não liberadas ao
  * SIF/auditoria. Mesma ação de "aprovar e assinar" de Painel de Verificação; esta tela é só o
@@ -24,13 +28,21 @@ export function PainelArquivoPage() {
     for (const t of templates ?? []) mapa.set(t.id, pacsDoTemplate(t).join(" / ") || "—");
     return mapa;
   }, [templates]);
+  const tipoDaFicha = useMemo(() => tipoPorTemplate(new Map((templates ?? []).map((t) => [t.id, t.codigo]))), [templates]);
   const nomePorTemplateId = useMemo(() => new Map((templates ?? []).map((t) => [t.id, t.nome])), [templates]);
 
-  function alternarSelecao(id: string) {
+  // Um relatório consolidado por tipo de ficha + turno: selecionar o card seleciona todos os
+  // monitoramentos dele.
+  const grupos = useMemo(() => agruparPorDossie(pendentes ?? [], tipoDaFicha), [pendentes, tipoDaFicha]);
+
+  function alternarGrupo(ids: string[]) {
     setSelecionados((atual) => {
       const novo = new Set(atual);
-      if (novo.has(id)) novo.delete(id);
-      else novo.add(id);
+      const todos = ids.every((id) => novo.has(id));
+      for (const id of ids) {
+        if (todos) novo.delete(id);
+        else novo.add(id);
+      }
       return novo;
     });
   }
@@ -70,38 +82,47 @@ export function PainelArquivoPage() {
         <p className="text-muted-foreground">Nada pendente de liberação.</p>
       )}
 
-      {pendentes?.map((m) => (
-        <Card key={m.id}>
-          <CardHeader className="flex-row items-center justify-between gap-3 space-y-0 pb-2">
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                className="h-4 w-4"
-                checked={selecionados.has(m.id)}
-                onChange={() => alternarSelecao(m.id)}
-                aria-label={`Selecionar monitoramento ${m.id}`}
-              />
-              <CardTitle className="text-base">
-                <Badge variant="outline">{pacPorTemplateId.get(m.ficha_template_id) ?? m.setor}</Badge>{" "}
-                <Badge variant={m.conformidade ? "success" : "destructive"}>
-                  {m.conformidade ? "Conforme" : "Não conforme"}
-                </Badge>
-              </CardTitle>
-            </div>
-            <Button type="button" size="sm" variant="ghost" onClick={() => setRelatorioIds([m.id])}>
-              <Eye className="h-3.5 w-3.5" />
-              Ver Dados
-            </Button>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            <p className="font-medium text-foreground">{nomePorTemplateId.get(m.ficha_template_id) ?? "Ficha"}</p>
-            <p>
-              {usuarios?.get(m.user_id) ?? "Inspetor"} · {m.setor} · Verificado em{" "}
-              {m.verificado_em ? new Date(m.verificado_em).toLocaleString("pt-BR") : "—"}
-            </p>
-          </CardContent>
-        </Card>
-      ))}
+      {grupos.map(({ chave, items }) => {
+        const primeiro = items[0]!;
+        const ids = items.map((m) => m.id);
+        const todosSelecionados = ids.every((id) => selecionados.has(id));
+        // Tratado (RNC procedente) não conta como desvio em aberto.
+        const desvios = items.filter((m) => situacaoDe(m) === "NAO_CONFORME").length;
+        const tratados = items.filter((m) => situacaoDe(m) === "TRATADO").length;
+        return (
+          <Card key={chave}>
+            <CardHeader className="flex flex-wrap-row items-center justify-between gap-3 space-y-0 pb-2">
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={todosSelecionados}
+                  onChange={() => alternarGrupo(ids)}
+                  aria-label={`Selecionar relatório consolidado de ${nomePorTemplateId.get(primeiro.ficha_template_id) ?? "ficha"}`}
+                />
+                <CardTitle className="text-base">
+                  <Badge variant="outline">{pacPorTemplateId.get(primeiro.ficha_template_id) ?? primeiro.setor}</Badge>{" "}
+                  <Badge variant={desvios === 0 ? "success" : "destructive"}>
+                    {desvios === 0 ? (tratados > 0 ? "Tratado" : "Conforme") : `${desvios} não conforme(s)`}
+                  </Badge>{" "}
+                  <Badge variant="secondary">{items.length} monitoramento(s)</Badge>
+                </CardTitle>
+              </div>
+              <Button type="button" size="sm" variant="ghost" onClick={() => setRelatorioIds(ids)}>
+                <Eye className="h-3.5 w-3.5" />
+                Ver Dados
+              </Button>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              <p className="font-medium text-foreground">{nomePorTemplateId.get(primeiro.ficha_template_id) ?? "Ficha"}</p>
+              <p>
+                {usuarios?.get(primeiro.user_id) ?? "Inspetor"} · {setoresDoGrupo(items)} · {turnoDoDia(new Date(primeiro.criado_em))} ·{" "}
+                {ensureLocalTime(primeiro.criado_em).datePt}
+              </p>
+            </CardContent>
+          </Card>
+        );
+      })}
 
       {relatorioIds && <RelatorioModal ids={relatorioIds} onFechar={() => setRelatorioIds(null)} />}
     </div>

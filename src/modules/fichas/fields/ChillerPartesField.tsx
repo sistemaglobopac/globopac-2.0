@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, Info, Lock } from "lucide-react";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
-import { formatHidrometro, formatMaskedValue, LIMIAR_IMPLAUSIVEL, parseHidrometro, parseNumeroHidrometro } from "./hidrometro";
+import { formatHidrometro, formatMaskedValue, LIMIAR_IMPLAUSIVEL, parseHidrometro } from "./hidrometro";
+import { apurar, detalheDesvio, GELO_PADRAO_PARTES, massaPartes, META_L_KG } from "./calculosSpr";
+import { AvisoImplausivel, AvisoPrimeiroDoDia, CampoBloqueado, LogicaCalculo, TOOLTIP_HIDR_ANTERIOR } from "./componentesSpr";
 import type { ChillerCarcacasValor, ChillerPartesValor, TanqueHidrometro } from "./tiposCompostos";
 
 type ChaveTanque = "chiller1" | "chiller2";
@@ -12,20 +14,8 @@ const CONFIG_TANQUE: Record<ChaveTanque, { nome: string; cor: string }> = {
   chiller2: { nome: "Chiller 2 Partes", cor: "#002060" },
 };
 
-const META_L_KG = 1.5;
-
 function tanqueVazio(prev: string): TanqueHidrometro {
-  return { prev, cur: "", ice: "332" };
-}
-
-function apuracaoTanque(tanque: TanqueHidrometro, totalPesoPartes: number): number | null {
-  const prev = parseNumeroHidrometro(tanque.prev);
-  const cur = parseNumeroHidrometro(tanque.cur);
-  const gelo = parseNumeroHidrometro(tanque.ice);
-  if (cur === 0) return 0;
-  const aguaUsada = (cur - prev) * 1000 + gelo;
-  if (totalPesoPartes === 0) return null;
-  return aguaUsada / totalPesoPartes;
+  return { prev, cur: "", ice: GELO_PADRAO_PARTES };
 }
 
 interface ChillerPartesFieldProps {
@@ -34,14 +24,14 @@ interface ChillerPartesFieldProps {
   disabled?: boolean;
   prevAppointment?: ChillerPartesValor;
   /** Valor ao vivo do campo "Renovação da Água do SPR Carcaças" desta mesma ficha (via
-   * useWatch em FichaForm) — não é mais buscado no banco. */
+   * useWatch em FichaForm) — não é buscado no banco nem digitado de novo. */
   carcacasAtual: ChillerCarcacasValor | undefined;
 }
 
-/** Renovação da Água do Chiller de Partes — porte do v1 (PartsChillerField.jsx). Etapa 1:
- * quilos produzidos = carcaças parcialmente aproveitadas (do SPR Carcaças) × peso médio de
- * carcaça (do SPR Carcaças) × 70%. Etapa 2: renovação = consumo de água ÷ quilos produzidos,
- * meta 1,5 L/kg. */
+/** Renovação da Água do Chiller de Partes. Massa processada = carcaças parcialmente
+ * aproveitadas (SPR Carcaças) × peso médio de carcaça (SPR Carcaças) × 0,70; renovação = água
+ * usada ÷ massa processada; meta fixa 1,5 L/kg. Não há campo de aves/lotes: a base vem
+ * BLOQUEADA do SPR Carcaças. */
 export function ChillerPartesField({ value, onChange, disabled, prevAppointment, carcacasAtual }: ChillerPartesFieldProps) {
   const [tanques, setTanques] = useState({
     chiller1: value?.tanques.chiller1 ?? tanqueVazio(prevAppointment?.tanques.chiller1.cur ?? ""),
@@ -67,13 +57,14 @@ export function ChillerPartesField({ value, onChange, disabled, prevAppointment,
 
   const pesoMedioCarcacaAtual = carcacasAtual?.pesoMedioCarcaca || 0;
   const totalCondenacoes = parseFloat(carcacasAtual?.condenasParcial ?? "") || 0;
-  const totalPesoPartes = totalCondenacoes * pesoMedioCarcacaAtual * 0.7;
+  const totalPesoPartes = massaPartes(totalCondenacoes, pesoMedioCarcacaAtual);
 
   const apurado: Record<ChaveTanque, number | null> = {
-    chiller1: apuracaoTanque(tanques.chiller1, totalPesoPartes),
-    chiller2: apuracaoTanque(tanques.chiller2, totalPesoPartes),
+    chiller1: apurar(tanques.chiller1.prev, tanques.chiller1.cur, tanques.chiller1.ice, totalPesoPartes),
+    chiller2: apurar(tanques.chiller2.prev, tanques.chiller2.cur, tanques.chiller2.ice, totalPesoPartes),
   };
   const hasCurData = !!(tanques.chiller1.cur || tanques.chiller2.cur);
+  // Só bloqueia fora do 1º monitoramento do dia.
   const pesoCarcacaIndisponivel = !isPrimeiroDoDia && !pesoMedioCarcacaAtual;
   const conformeTanque = (chave: ChaveTanque) =>
     !tanques[chave].cur ? true : totalPesoPartes === 0 ? true : (apurado[chave] ?? 0) >= META_L_KG;
@@ -83,8 +74,8 @@ export function ChillerPartesField({ value, onChange, disabled, prevAppointment,
 
   useEffect(() => {
     const detalhes: string[] = [];
-    if (!confChiller1 && totalPesoPartes > 0) detalhes.push(`Chiller 1 Partes (Apurado: ${(apurado.chiller1 ?? 0).toFixed(3)}L/kg | Meta: ${META_L_KG}L/kg)`);
-    if (!confChiller2 && totalPesoPartes > 0) detalhes.push(`Chiller 2 Partes (Apurado: ${(apurado.chiller2 ?? 0).toFixed(3)}L/kg | Meta: ${META_L_KG}L/kg)`);
+    if (!confChiller1 && totalPesoPartes > 0) detalhes.push(detalheDesvio("Chiller 1 Partes", apurado.chiller1 ?? 0, META_L_KG, "L/kg"));
+    if (!confChiller2 && totalPesoPartes > 0) detalhes.push(detalheDesvio("Chiller 2 Partes", apurado.chiller2 ?? 0, META_L_KG, "L/kg"));
 
     onChange({
       tanques,
@@ -111,12 +102,12 @@ export function ChillerPartesField({ value, onChange, disabled, prevAppointment,
 
     return (
       <div key={chave} className="overflow-hidden rounded-lg border-2" style={{ borderColor: naoConforme ? "#dc2626" : `${cor}40` }}>
-        <div className="flex items-center justify-between px-3 py-2 text-sm font-black text-white" style={{ background: cor }}>
+        <div className="flex flex-wrap gap-2 items-center justify-between px-3 py-2 text-sm font-black text-white" style={{ background: cor }}>
           {CONFIG_TANQUE[chave].nome.toUpperCase()}
-          <span className="text-xs opacity-90">Meta: {META_L_KG.toFixed(3)} L/kg</span>
+          <span className="text-xs opacity-90">Meta: {formatMaskedValue(META_L_KG.toFixed(3))} L/kg</span>
         </div>
         <div className="space-y-3 p-4">
-          <div className={`grid gap-3 ${isPrimeiroDoDia ? "grid-cols-1" : "sm:grid-cols-2"}`}>
+          <div className="grid grid-cols-1 gap-3">
             {!isPrimeiroDoDia && (
               <div className="space-y-1">
                 <Label className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -124,6 +115,7 @@ export function ChillerPartesField({ value, onChange, disabled, prevAppointment,
                 </Label>
                 <Input
                   disabled={disabled || prevTravado[chave]}
+                  title={prevTravado[chave] ? TOOLTIP_HIDR_ANTERIOR : undefined}
                   value={formatHidrometro(tanque.prev)}
                   onChange={(e) => alterarTanque(chave, "prev", parseHidrometro(e.target.value))}
                   className="font-mono"
@@ -142,7 +134,7 @@ export function ChillerPartesField({ value, onChange, disabled, prevAppointment,
               />
             </div>
             {!isPrimeiroDoDia && (
-              <div className="space-y-1 sm:col-span-2">
+              <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Gelo Adicionado (kg)</Label>
                 <Input
                   disabled={disabled}
@@ -156,7 +148,7 @@ export function ChillerPartesField({ value, onChange, disabled, prevAppointment,
           </div>
 
           <div
-            className="flex items-center justify-between rounded-md border p-2"
+            className="flex flex-wrap gap-2 items-center justify-between rounded-md border p-2"
             style={{
               background: !temResultado ? undefined : naoConforme ? "hsl(0 84% 96%)" : "hsl(142 71% 95%)",
               borderColor: !temResultado ? undefined : naoConforme ? "#dc2626" : "#059669",
@@ -170,12 +162,7 @@ export function ChillerPartesField({ value, onChange, disabled, prevAppointment,
             </span>
           </div>
 
-          {implausivel && (
-            <div className="flex items-start gap-2 rounded-md border border-warning bg-warning/10 p-2 text-xs font-medium text-warning-foreground">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>Valor {((valorApurado ?? 0) / META_L_KG).toFixed(0)}x acima da meta — confira a leitura do hidrômetro.</span>
-            </div>
-          )}
+          {implausivel && <AvisoImplausivel apurado={valorApurado ?? 0} meta={META_L_KG} />}
         </div>
       </div>
     );
@@ -202,10 +189,10 @@ export function ChillerPartesField({ value, onChange, disabled, prevAppointment,
             )}
           </p>
         </div>
-        {totalPesoPartes > 0 && (
+        {!isPrimeiroDoDia && totalPesoPartes > 0 && (
           <div className="text-right">
             <p className="text-xs font-bold text-muted-foreground">Massa Processada (70%)</p>
-            <p className="text-lg font-black">{totalPesoPartes.toFixed(3)} kg</p>
+            <p className="text-lg font-black">{formatMaskedValue(totalPesoPartes.toFixed(3))} kg</p>
           </div>
         )}
       </div>
@@ -219,12 +206,12 @@ export function ChillerPartesField({ value, onChange, disabled, prevAppointment,
           </span>
         </div>
       )}
-      {!pesoCarcacaIndisponivel && pesoMedioCarcacaAtual > 0 && (
+      {!isPrimeiroDoDia && !pesoCarcacaIndisponivel && pesoMedioCarcacaAtual > 0 && (
         <div className="flex items-center gap-3 rounded-md border border-primary/30 bg-primary/5 p-3 text-sm">
           <Info className="h-4 w-4 shrink-0 text-primary" />
           <span>
-            <strong>Peso Médio de Carcaça ({pesoMedioCarcacaAtual.toFixed(3)} kg) usado ao vivo</strong> do "Renovação da Água do SPR Carcaças" desta
-            mesma ficha.
+            <strong>Peso Médio de Carcaça ({formatMaskedValue(pesoMedioCarcacaAtual.toFixed(3))} kg) usado ao vivo</strong> do "Renovação da Água do SPR
+            Carcaças" desta mesma ficha.
           </span>
         </div>
       )}
@@ -238,20 +225,35 @@ export function ChillerPartesField({ value, onChange, disabled, prevAppointment,
         </div>
       )}
 
-      {isPrimeiroDoDia && (
-        <div className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 p-3 text-sm">
-          <Info className="h-4 w-4 shrink-0 text-primary" />
-          <span>
-            <strong>Primeiro monitoramento do dia:</strong> informe apenas a leitura atual de cada hidrômetro. Massa processada e apuração de vazão
-            começam no próximo monitoramento.
-          </span>
+      {isPrimeiroDoDia ? (
+        <AvisoPrimeiroDoDia />
+      ) : (
+        <div className="space-y-3 rounded-md border border-primary/20 bg-primary/5 p-4">
+          <h4 className="text-sm font-bold text-primary">Base de Cálculo — Massa Processada</h4>
+          <div className="flex flex-wrap items-end gap-4 rounded-md border bg-background p-3">
+            <CampoBloqueado rotulo="Carcaças Parcialmente Aproveitadas" valor={totalCondenacoes.toLocaleString("pt-BR")} />
+            <CampoBloqueado rotulo="Peso Médio de Carcaça" valor={`${formatMaskedValue(pesoMedioCarcacaAtual.toFixed(3)) || "0,000"} kg`} />
+          </div>
+          {totalPesoPartes > 0 && (
+            <p className="text-xs text-muted-foreground">
+              <strong className="text-foreground">Massa Processada (70%):</strong> {totalCondenacoes.toLocaleString("pt-BR")} ×{" "}
+              {formatMaskedValue(pesoMedioCarcacaAtual.toFixed(3))} kg × 0,70 ={" "}
+              <strong className="text-primary">{formatMaskedValue(totalPesoPartes.toFixed(3))} kg</strong>
+            </p>
+          )}
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(260px,1fr))]">
         {renderTanque("chiller1")}
         {renderTanque("chiller2")}
       </div>
+
+      <LogicaCalculo titulo="SPR Partes">
+        <li>Massa Processada (kg) = carcaças parcialmente aproveitadas (SPR Carcaças) × peso médio de carcaça (SPR Carcaças) × 0,70 (desconta 30% de aproveitamento).</li>
+        <li>Água usada (L) = (Hidr. Atual − Hidr. Anterior) × 1000 + Gelo Adicionado.</li>
+        <li>Renovação apurada (L/kg) = água usada ÷ Massa Processada. Meta fixa: maior ou igual a 1,5 L/kg em cada chiller.</li>
+      </LogicaCalculo>
     </div>
   );
 }

@@ -51,6 +51,13 @@ type TipoCampo =
   | "absorcao_agua"
   | "dripping_test"
   | "parada_equipamento"
+  | "ocorrencia_pragas"
+  | "recepcao_aves"
+  | "espera_aves"
+  | "pendura_aves"
+  | "eletronarcose_aves"
+  | "caixas_vazias"
+  | "peso_caixa"
   | "assinatura";
 
 const TIPOS_CAMPO: { value: TipoCampo; label: string }[] = [
@@ -69,6 +76,13 @@ const TIPOS_CAMPO: { value: TipoCampo; label: string }[] = [
   { value: "absorcao_agua", label: "Teste de Absorção de Água (Especial SIF)" },
   { value: "dripping_test", label: "Dripping Test - Portaria 210/98 (Especial SIF)" },
   { value: "parada_equipamento", label: "Registro de Parada de Equipamento (Especial SIF)" },
+  { value: "ocorrencia_pragas", label: "Ocorrência Diária de Pragas (Especial SIF)" },
+  { value: "recepcao_aves", label: "Recepção de Aves / Bem-Estar Animal (Especial SIF)" },
+  { value: "espera_aves", label: "Bem-Estar Animal — Área de Espera das Aves (Especial SIF)" },
+  { value: "pendura_aves", label: "Bem-Estar Animal — Sala de Pendura (Especial SIF)" },
+  { value: "eletronarcose_aves", label: "Bem-Estar Animal — Eletronarcose (Especial SIF)" },
+  { value: "caixas_vazias", label: "Caixas de Transporte Vazias antes da Imersão (Especial SIF)" },
+  { value: "peso_caixa", label: "Peso Vivo por Caixa de Transporte (Especial SIF)" },
   { value: "assinatura", label: "Assinatura Eletrônica (Fim)" },
 ];
 
@@ -195,6 +209,20 @@ function paraCampoTemplate(campo: CampoForm): CampoTemplate {
       return { ...base, tipo: "dripping_test" };
     case "parada_equipamento":
       return { ...base, tipo: "parada_equipamento" };
+    case "ocorrencia_pragas":
+      return { ...base, tipo: "ocorrencia_pragas" };
+    case "recepcao_aves":
+      return { ...base, tipo: "recepcao_aves" };
+    case "espera_aves":
+      return { ...base, tipo: "espera_aves" };
+    case "pendura_aves":
+      return { ...base, tipo: "pendura_aves" };
+    case "eletronarcose_aves":
+      return { ...base, tipo: "eletronarcose_aves" };
+    case "caixas_vazias":
+      return { ...base, tipo: "caixas_vazias" };
+    case "peso_caixa":
+      return { ...base, tipo: "peso_caixa" };
   }
 }
 
@@ -380,7 +408,7 @@ export function ConstrutorFichas({ setoresDisponiveis }: ConstrutorFichasProps) 
 
   const mensagemBanner = mensagem && (
     <div
-      className={`flex items-center justify-between gap-3 rounded-md border p-3 text-sm ${
+      className={`flex flex-wrap items-center justify-between gap-3 rounded-md border p-3 text-sm ${
         mensagem.tipo === "success" ? "border-success bg-success/10 text-foreground" : "border-destructive bg-destructive/10 text-destructive"
       }`}
     >
@@ -546,7 +574,7 @@ export function ConstrutorFichas({ setoresDisponiveis }: ConstrutorFichasProps) 
           </div>
 
           <div className="space-y-4 rounded-lg bg-muted/40 p-4 lg:col-span-2">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap gap-2 items-center justify-between">
               <h2 className="text-sm font-semibold">Campos da Ficha (Questões)</h2>
               <Button type="button" size="sm" onClick={handleAddCampo}>
                 <Plus className="h-4 w-4" />
@@ -658,7 +686,7 @@ function GrupoFichas({ titulo, fichas, aberto, onToggle, onEdit, onDuplicate, on
       <button
         type="button"
         onClick={onToggle}
-        className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors ${
+        className={`flex flex-wrap w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors ${
           destaqueAmbar ? "bg-warning/10 hover:bg-warning/20" : "bg-card hover:bg-muted"
         }`}
       >
@@ -695,7 +723,7 @@ function FichaCard({ ficha, onEdit, onDuplicate, onInativar }: FichaCardProps) {
   return (
     <Card>
       <CardContent className="space-y-3 pt-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap gap-2 items-center justify-between">
           <Badge variant="secondary" className="border-transparent bg-primary/10 text-primary">
             {ficha.codigo}
           </Badge>
@@ -720,7 +748,7 @@ function FichaCard({ ficha, onEdit, onDuplicate, onInativar }: FichaCardProps) {
           </p>
         </div>
 
-        <div className="flex items-center justify-between border-t pt-3">
+        <div className="flex flex-wrap gap-2 items-center justify-between border-t pt-3">
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" size="sm" onClick={() => onEdit(ficha)}>
               <Edit className="h-3.5 w-3.5" />

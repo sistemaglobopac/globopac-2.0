@@ -5,12 +5,13 @@
 // (o mesmo princípio do débito técnico "queryWithFallback() utilitária, não copy-paste").
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { conteudoAssinavelMonitoramento, sha256Hex } from "./hash.ts";
+import { carimbarAgora } from "./carimbo-imediato.ts";
 
 export const TIPO_PERMITIDO_POR_PERFIL: Record<string, string[]> = {
-  INSPETOR_QUALIDADE: ["INSPETOR"],
+  INSPETOR_QUALIDADE: ["INSPETOR", "INSPETOR_PARCIAL"],
   VERIFICADOR: ["VERIFICADOR"],
   GESTOR_SETOR: ["GESTOR"],
-  ADMIN_MASTER: ["INSPETOR", "VERIFICADOR", "GESTOR", "ADMIN", "LIBERACAO_DIARIA"],
+  ADMIN_MASTER: ["INSPETOR", "INSPETOR_PARCIAL", "VERIFICADOR", "GESTOR", "ADMIN", "LIBERACAO_DIARIA"],
 };
 
 export type ResultadoAssinatura =
@@ -25,12 +26,12 @@ export type ResultadoAssinatura =
 export async function assinarMonitoramento(
   callerClient: SupabaseClient,
   adminClient: SupabaseClient,
-  params: { monitoramentoId: string; tipo: string; userId: string }
+  params: { monitoramentoId: string; tipo: string; userId: string; aguardarCarimbo?: boolean }
 ): Promise<ResultadoAssinatura> {
   const { data: monitoramento, error: monitoramentoError } = await callerClient
     .from("monitoramentos")
     .select(
-      "id, ficha_template_id, versao_template, user_id, setor, dados_dinamicos, conformidade, verificado_por, criado_em"
+      "id, ficha_template_id, versao_template, user_id, setor, dados_dinamicos, conformidade, verificado_por, criado_em, status_ficha"
     )
     .eq("id", params.monitoramentoId)
     .single();
@@ -39,7 +40,18 @@ export async function assinarMonitoramento(
     return { ok: false, status: 404, mensagem: "monitoramento não encontrado" };
   }
 
-  if (params.tipo === "INSPETOR" && monitoramento.user_id !== params.userId) {
+  // Absorção em duas fases: EM_ANDAMENTO só aceita a assinatura PARCIAL (prova da pesagem inicial);
+  // a assinatura INSPETOR completa só existe depois de FINALIZADO; nenhuma outra assinatura
+  // (verificador, gestor, liberação) vale para um registro em andamento.
+  const emAndamento = monitoramento.status_ficha === "EM_ANDAMENTO";
+  if (params.tipo === "INSPETOR_PARCIAL" && !emAndamento) {
+    return { ok: false, status: 409, mensagem: "a assinatura parcial só vale para registro em andamento" };
+  }
+  if (params.tipo !== "INSPETOR_PARCIAL" && emAndamento) {
+    return { ok: false, status: 409, mensagem: "registro em andamento só pode receber a assinatura INSPETOR_PARCIAL" };
+  }
+
+  if ((params.tipo === "INSPETOR" || params.tipo === "INSPETOR_PARCIAL") && monitoramento.user_id !== params.userId) {
     return { ok: false, status: 403, mensagem: "só o criador do registro pode assiná-lo como INSPETOR" };
   }
   if (params.tipo === "VERIFICADOR" && monitoramento.verificado_por !== params.userId) {
@@ -68,11 +80,11 @@ export async function assinarMonitoramento(
     return { ok: false, status: 500, mensagem: "falha ao gravar assinatura" };
   }
 
-  const { error: filaError } = await adminClient.from("fila_carimbo_tempo").insert({
-    assinatura_id: assinatura.id,
-    tipo_assinatura: "ficha",
-    status: "pendente",
-  });
+  const { data: itemFila, error: filaError } = await adminClient
+    .from("fila_carimbo_tempo")
+    .insert({ assinatura_id: assinatura.id, tipo_assinatura: "ficha", status: "pendente" })
+    .select("id")
+    .single();
   if (filaError) {
     console.log(
       JSON.stringify({
@@ -82,6 +94,10 @@ export async function assinarMonitoramento(
         erro: filaError.message,
       })
     );
+  }
+
+  if (!filaError && itemFila) {
+    await carimbarAgora(adminClient, itemFila.id as string, { aguardar: params.aguardarCarimbo ?? true });
   }
 
   return { ok: true, id: assinatura.id, hash_documento: hashDocumento, criado_em: assinatura.criado_em };

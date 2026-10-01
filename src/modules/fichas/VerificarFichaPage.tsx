@@ -2,13 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, Lock, PenLine, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useSessionStore } from "@/store/session";
-import { supabase } from "@/lib/supabase";
 import { useAbrirAdendo, useDadosRelatorio, useVerificarMonitoramento, type MonitoramentoRelatorio } from "./api";
 import { turnosBloqueadosMap } from "./utils/turnoUtils";
 import { RelatorioMonitoramento } from "./components/relatorio/RelatorioMonitoramento";
 import { ensureLocalTime } from "./utils/tempo";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
+import { ModalAssinaturaSenha } from "@/shared/ModalAssinaturaSenha";
 import { Label } from "@/shared/ui/label";
 import { Select } from "@/shared/ui/select";
 import { Textarea } from "@/shared/ui/textarea";
@@ -64,14 +64,15 @@ export function VerificarFichaPage() {
   if (!perfil) return null;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 pb-16">
-      <div className="flex items-center justify-between">
+    <div className="mx-auto max-w-5xl pb-16">
+      <div className="mb-10 flex flex-wrap gap-2 items-center justify-between">
         <Button type="button" variant="outline" onClick={() => navigate(-1)}>
           <ArrowLeft className="h-4 w-4" />
           Voltar
         </Button>
       </div>
 
+      <div className="space-y-6">
       {ids.length === 0 && <p className="py-20 text-center text-sm text-destructive">Nenhum registro informado para verificação.</p>}
       {ids.length > 0 && isLoading && (
         <div className="flex items-center justify-center gap-2 py-20 text-sm text-muted-foreground">
@@ -110,7 +111,7 @@ export function VerificarFichaPage() {
                   <p className="font-semibold text-ink">Turno do inspetor ainda em aberto</p>
                   <p className="text-sm text-muted-foreground">
                     O inspetor responsável ainda não finalizou o turno no Painel de Bordo — o dia ainda pode receber novas apurações
-                    desta ficha. A verificação fica disponível assim que o turno for encerrado.
+                    desta ficha. Você está vendo uma prévia: a verificação fica disponível assim que o turno for encerrado.
                   </p>
                 </div>
               </div>
@@ -154,16 +155,9 @@ export function VerificarFichaPage() {
           </div>
         </>
       )}
+      </div>
     </div>
   );
-}
-
-async function reautenticar(senha: string): Promise<string | null> {
-  const { data: userData, error: erroUser } = await supabase.auth.getUser();
-  if (erroUser || !userData.user?.email) return "Não foi possível identificar seu usuário. Faça login novamente.";
-  const { error: erroAuth } = await supabase.auth.signInWithPassword({ email: userData.user.email, password: senha });
-  if (erroAuth) return "Senha incorreta. A assinatura eletrônica falhou.";
-  return null;
 }
 
 interface PainelAcaoProps {
@@ -173,23 +167,12 @@ interface PainelAcaoProps {
   onErro: (mensagem: string | null) => void;
 }
 
+/** Aprovar e assinar: a senha é conferida no MODAL único de assinatura (ModalAssinaturaSenha). */
 function PainelVerificar({ pendentes, onCancelar, onConcluido, onErro }: PainelAcaoProps) {
   const verificar = useVerificarMonitoramento();
-  const [senha, setSenha] = useState("");
-  const [processando, setProcessando] = useState(false);
   const [progresso, setProgresso] = useState<{ atual: number; total: number } | null>(null);
-  const [erroSenha, setErroSenha] = useState<string | null>(null);
 
-  async function confirmar() {
-    setErroSenha(null);
-    setProcessando(true);
-    const erro = await reautenticar(senha);
-    if (erro) {
-      setProcessando(false);
-      setErroSenha(erro);
-      return;
-    }
-
+  async function assinar() {
     setProgresso({ atual: 0, total: pendentes.length });
     let falhas = 0;
     for (const [indice, registro] of pendentes.entries()) {
@@ -200,73 +183,37 @@ function PainelVerificar({ pendentes, onCancelar, onConcluido, onErro }: PainelA
       }
       setProgresso({ atual: indice + 1, total: pendentes.length });
     }
-    setProcessando(false);
 
     if (falhas === 0) {
       onConcluido("success", `${pendentes.length} ficha(s) verificada(s) e assinada(s) com sucesso.`);
     } else {
+      setProgresso(null);
       onErro(`${pendentes.length - falhas} de ${pendentes.length} assinada(s) — ${falhas} falharam. Tente novamente.`);
+      onCancelar();
     }
   }
 
   return (
-    <div className="space-y-3 border-t pt-4">
-      <p className="text-sm text-muted-foreground">
-        Confirme sua senha para aprovar e assinar eletronicamente {pendentes.length > 1 ? `os ${pendentes.length} registros deste relatório` : "este registro"}.
-      </p>
-      {!progresso ? (
-        <>
-          <div className="space-y-2">
-            <Label htmlFor="senhaVerificar">Sua senha</Label>
-            <Input
-              id="senhaVerificar"
-              type="password"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              disabled={processando}
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && senha && !processando) {
-                  e.preventDefault();
-                  void confirmar();
-                }
-              }}
-            />
-          </div>
-          {erroSenha && <p className="text-sm text-destructive">{erroSenha}</p>}
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" className="flex-1" onClick={onCancelar} disabled={processando}>
-              Cancelar
-            </Button>
-            <Button type="button" className="flex-1" disabled={processando || !senha} onClick={confirmar}>
-              {processando ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {processando ? "Assinando…" : "Confirmar e Assinar"}
-            </Button>
-          </div>
-        </>
-      ) : (
-        <div className="space-y-2">
-          <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-            <div className="h-full bg-primary transition-all" style={{ width: `${Math.round((progresso.atual / progresso.total) * 100)}%` }} />
-          </div>
-          <p className="text-center text-xs text-muted-foreground">
-            {progresso.atual}/{progresso.total} — Computando SHA-256 e solicitando carimbo RFC 3161…
-          </p>
-        </div>
-      )}
-    </div>
+    <ModalAssinaturaSenha
+      titulo="Assinatura Eletrônica do Verificador"
+      descricao={`Confirme sua senha para aprovar e assinar eletronicamente ${pendentes.length > 1 ? `os ${pendentes.length} registros deste relatório` : "este registro"}.`}
+      onAssinar={assinar}
+      onCancelar={onCancelar}
+      progresso={progresso}
+      testId="modal-assinar-verificacao"
+    />
   );
 }
 
+/** Rejeitar: o formulário (quais apurações, severidade, descrição) fica na página; a senha é
+ * pedida no MODAL único de assinatura só ao confirmar. */
 function PainelRejeitar({ pendentes, onCancelar, onConcluido, onErro }: PainelAcaoProps) {
   const verificar = useVerificarMonitoramento();
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set(pendentes.length === 1 ? [pendentes[0]!.id] : []));
   const [severidade, setSeveridade] = useState<(typeof SEVERIDADES)[number]>("MEDIA");
   const [descricao, setDescricao] = useState("");
-  const [senha, setSenha] = useState("");
-  const [processando, setProcessando] = useState(false);
+  const [pedirSenha, setPedirSenha] = useState(false);
   const [progresso, setProgresso] = useState<{ atual: number; total: number } | null>(null);
-  const [erroSenha, setErroSenha] = useState<string | null>(null);
 
   function alternar(id: string) {
     setSelecionados((prev) => {
@@ -277,17 +224,7 @@ function PainelRejeitar({ pendentes, onCancelar, onConcluido, onErro }: PainelAc
     });
   }
 
-  async function confirmar() {
-    if (selecionados.size === 0) return;
-    setErroSenha(null);
-    setProcessando(true);
-    const erro = await reautenticar(senha);
-    if (erro) {
-      setProcessando(false);
-      setErroSenha(erro);
-      return;
-    }
-
+  async function assinar() {
     const alvos = pendentes.filter((p) => selecionados.has(p.id));
     setProgresso({ atual: 0, total: alvos.length });
     let falhas = 0;
@@ -299,7 +236,6 @@ function PainelRejeitar({ pendentes, onCancelar, onConcluido, onErro }: PainelAc
       }
       setProgresso({ atual: indice + 1, total: alvos.length });
     }
-    setProcessando(false);
 
     if (falhas === 0) {
       const restantes = pendentes.length - alvos.length;
@@ -308,6 +244,8 @@ function PainelRejeitar({ pendentes, onCancelar, onConcluido, onErro }: PainelAc
         `${alvos.length} registro(s) reprovado(s) — RNC aberta automaticamente.${restantes > 0 ? ` ${restantes} registro(s) permanecem pendentes de verificação.` : ""}`
       );
     } else {
+      setProgresso(null);
+      setPedirSenha(false);
       onErro(`${alvos.length - falhas} de ${alvos.length} reprovado(s) — ${falhas} falharam. Tente novamente.`);
     }
   }
@@ -343,32 +281,26 @@ function PainelRejeitar({ pendentes, onCancelar, onConcluido, onErro }: PainelAc
         <Textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Descreva o desvio identificado…" />
       </div>
 
-      {!progresso ? (
-        <>
-          <div className="space-y-2">
-            <Label htmlFor="senhaRejeitar">Sua senha</Label>
-            <Input id="senhaRejeitar" type="password" value={senha} onChange={(e) => setSenha(e.target.value)} disabled={processando} />
-          </div>
-          {erroSenha && <p className="text-sm text-destructive">{erroSenha}</p>}
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" className="flex-1" onClick={onCancelar} disabled={processando}>
-              Cancelar
-            </Button>
-            <Button type="button" variant="destructive" className="flex-1" disabled={processando || !senha || selecionados.size === 0} onClick={confirmar}>
-              {processando ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {processando ? "Registrando…" : "Confirmar Rejeição (abre RNC)"}
-            </Button>
-          </div>
-        </>
-      ) : (
-        <div className="space-y-2">
-          <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-            <div className="h-full bg-destructive transition-all" style={{ width: `${Math.round((progresso.atual / progresso.total) * 100)}%` }} />
-          </div>
-          <p className="text-center text-xs text-muted-foreground">
-            {progresso.atual}/{progresso.total} — Registrando reprovação e abrindo RNC…
-          </p>
-        </div>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" variant="outline" className="flex-1" onClick={onCancelar}>
+          Cancelar
+        </Button>
+        <Button type="button" variant="destructive" className="flex-1" disabled={selecionados.size === 0} onClick={() => setPedirSenha(true)}>
+          Confirmar Rejeição (abre RNC)
+        </Button>
+      </div>
+
+      {pedirSenha && (
+        <ModalAssinaturaSenha
+          titulo="Assinatura Eletrônica do Verificador"
+          descricao="Confirme sua senha para assinar eletronicamente a reprovação. Será aberta uma RNC para o(s) registro(s) selecionado(s)."
+          textoConfirmar="Confirmar e Reprovar"
+          onAssinar={assinar}
+          onCancelar={() => setPedirSenha(false)}
+          progresso={progresso}
+          legendaProgresso="Registrando reprovação e abrindo RNC…"
+          testId="modal-assinar-reprovacao"
+        />
       )}
     </div>
   );

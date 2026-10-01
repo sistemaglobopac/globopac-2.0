@@ -18,7 +18,7 @@ function ColunaPausas({ titulo, pausas, agoraMs }: { titulo: string; pausas: Pau
 
   return (
     <div className="flex-1 rounded-xl border border-hairline bg-surface-soft p-3">
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-2 flex flex-wrap gap-2 items-center justify-between">
         <h4 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{titulo}</h4>
         <span className="text-xs font-bold text-ink">
           {pausas.length} · {totalMin} min
@@ -34,7 +34,7 @@ function ColunaPausas({ titulo, pausas, agoraMs }: { titulo: string; pausas: Pau
           return (
             <li
               key={p.id}
-              className={`flex items-center justify-between rounded-md border px-2 py-1.5 text-xs ${
+              className={`flex flex-wrap gap-2 items-center justify-between rounded-md border px-2 py-1.5 text-xs ${
                 excedeu ? "border-hairline bg-destructive/10" : "border-hairline bg-canvas"
               }`}
             >

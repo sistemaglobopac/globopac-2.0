@@ -11,6 +11,7 @@ import { z } from "zod";
 import { corsHeadersAutenticado } from "../_shared/cors.ts";
 import { assinarLiberacaoOs } from "../_shared/assinar-os.ts";
 import { canonicalizar, sha256Hex } from "../_shared/hash.ts";
+import { carimbarAgora } from "../_shared/carimbo-imediato.ts";
 
 const requestSchema = z.object({ data_referencia: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) });
 
@@ -192,18 +193,20 @@ Deno.serve(async (req) => {
         osId: os.id as string,
         userId: user.id,
         os: os as unknown as Parameters<typeof assinarLiberacaoOs>[1]["os"],
+        aguardarCarimbo: false,
       });
       if (resultado.ok) assinaturaIds.push(resultado.id);
       else log("error", "assinatura_liberacao_falhou", { osId: os.id, motivo: resultado.mensagem });
     }
 
     // 6) Enfileira o carimbo do hash agregador do relatório.
-    const { error: erroFila } = await adminClient.from("fila_carimbo_tempo").insert({
-      assinatura_id: relatorioId,
-      tipo_assinatura: "relatorio_os",
-      status: "pendente",
-    });
-    if (erroFila) log("error", "enfileirar_carimbo_relatorio_falhou", { erro: erroFila.message, relatorioId });
+    const { data: itemFila, error: erroFila } = await adminClient
+      .from("fila_carimbo_tempo")
+      .insert({ assinatura_id: relatorioId, tipo_assinatura: "relatorio_os", status: "pendente" })
+      .select("id")
+      .single();
+    if (erroFila || !itemFila) log("error", "enfileirar_carimbo_relatorio_falhou", { erro: erroFila?.message, relatorioId });
+    else await carimbarAgora(adminClient, itemFila.id as string, { aguardar: false });
 
     log("info", "relatorio_liberado", {
       relatorioId,

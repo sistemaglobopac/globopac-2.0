@@ -67,7 +67,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
       {children}
       {estado.aberto && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-sm rounded-2xl border border-hairline bg-background shadow-2xl">
+          <div className="max-h-[calc(100dvh-2rem)] overflow-y-auto w-full max-w-sm rounded-2xl border border-hairline bg-background shadow-2xl">
             <div className="flex items-start gap-3 p-5">
               <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${iconeClassName}`}>
                 <Icon className="h-5 w-5" />

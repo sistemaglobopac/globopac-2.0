@@ -15,7 +15,7 @@ import { assinarMonitoramento, TIPO_PERMITIDO_POR_PERFIL } from "../_shared/assi
 
 const requestSchema = z.object({
   monitoramento_id: z.string().uuid(),
-  tipo: z.enum(["INSPETOR", "VERIFICADOR", "GESTOR", "ADMIN", "LIBERACAO_DIARIA"]),
+  tipo: z.enum(["INSPETOR", "INSPETOR_PARCIAL", "VERIFICADOR", "GESTOR", "ADMIN", "LIBERACAO_DIARIA"]),
 });
 
 Deno.serve(async (req) => {

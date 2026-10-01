@@ -23,12 +23,12 @@ function ehErroDeAutenticacao(erro: unknown): boolean {
   return /jwt|jwt expired|not authenticated|401|invalid.*token/i.test(mensagem);
 }
 
-async function jaAssinadaComoInspetor(monitoramentoId: string, userId: string): Promise<boolean> {
+async function jaAssinadaComoInspetor(monitoramentoId: string, userId: string, tipo: "INSPETOR" | "INSPETOR_PARCIAL"): Promise<boolean> {
   const { data, error } = await supabase
     .from("assinaturas_eletronicas")
     .select("id")
     .eq("monitoramento_id", monitoramentoId)
-    .eq("tipo", "INSPETOR")
+    .eq("tipo", tipo)
     .eq("user_id", userId)
     .limit(1);
   if (error) throw error;
@@ -46,6 +46,7 @@ async function sincronizarUmaFicha(item: FichaEnfileirada): Promise<void> {
       user_id: item.userId,
       setor: item.setor,
       dados_dinamicos: item.dadosDinamicos,
+      ...(item.statusFicha ? { status_ficha: item.statusFicha } : {}),
       capturado_em: item.capturadoEm,
     },
     { onConflict: "id", ignoreDuplicates: true }
@@ -54,10 +55,11 @@ async function sincronizarUmaFicha(item: FichaEnfileirada): Promise<void> {
 
   // 2) Assina como INSPETOR só se ainda não assinou (idempotência do passo 2, independente
   // do passo 1 — o upsert acima não informa se a linha já existia antes desta chamada).
-  if (await jaAssinadaComoInspetor(item.id, item.userId)) return;
+  const tipoAssinatura = item.statusFicha === "EM_ANDAMENTO" ? "INSPETOR_PARCIAL" : "INSPETOR";
+  if (await jaAssinadaComoInspetor(item.id, item.userId, tipoAssinatura)) return;
 
   const { error: erroAssinar } = await supabase.functions.invoke("assinar-documento", {
-    body: { monitoramento_id: item.id, tipo: "INSPETOR" },
+    body: { monitoramento_id: item.id, tipo: tipoAssinatura },
   });
   if (erroAssinar) throw erroAssinar;
 }

@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import type { SituacaoConformidade } from "@/shared/situacaoConformidade";
 
 export interface MonitoramentoVerificado {
   id: string;
   setor: string;
   conformidade: boolean | null;
+  situacao_conformidade: SituacaoConformidade | null;
   verificado_em: string | null;
   liberado_sif: boolean;
   criado_em: string;
@@ -21,7 +23,7 @@ export function useMonitoramentosParaLiberar() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("monitoramentos")
-        .select("id, setor, conformidade, verificado_em, liberado_sif, criado_em, ficha_template_id, user_id")
+        .select("id, setor, conformidade, situacao_conformidade, verificado_em, liberado_sif, criado_em, ficha_template_id, user_id")
         .not("verificado_por", "is", null)
         .eq("liberado_sif", false)
         .order("verificado_em", { ascending: true })
@@ -58,7 +60,7 @@ export function useMonitoramentosLiberados() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("monitoramentos")
-        .select("id, setor, conformidade, verificado_em, liberado_sif, criado_em")
+        .select("id, setor, conformidade, situacao_conformidade, verificado_em, liberado_sif, criado_em, ficha_template_id, user_id")
         .eq("liberado_sif", true)
         .order("liberado_em", { ascending: false })
         .overrideTypes<MonitoramentoVerificado[], { merge: false }>();

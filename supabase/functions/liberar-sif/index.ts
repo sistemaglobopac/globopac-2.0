@@ -10,6 +10,7 @@ import { z } from "zod";
 import { corsHeadersAutenticado } from "../_shared/cors.ts";
 import { assinarMonitoramento } from "../_shared/assinar.ts";
 import { canonicalizar, sha256Hex } from "../_shared/hash.ts";
+import { carimbarAgora } from "../_shared/carimbo-imediato.ts";
 
 const requestSchema = z.object({ monitoramento_ids: z.array(z.string().uuid()).min(1) });
 
@@ -154,18 +155,20 @@ Deno.serve(async (req) => {
         monitoramentoId: m.id as string,
         tipo: "LIBERACAO_DIARIA",
         userId: user.id,
+        aguardarCarimbo: false,
       });
       if (resultado.ok) assinaturaIds.push(resultado.id);
       else log("error", "assinatura_individual_falhou", { monitoramentoId: m.id, motivo: resultado.mensagem });
     }
 
     // 6) Enfileira o carimbo de tempo do LOTE (hash agregador) — mesma fila, mesmo worker.
-    const { error: erroFila } = await adminClient.from("fila_carimbo_tempo").insert({
-      assinatura_id: lote.id,
-      tipo_assinatura: "lote",
-      status: "pendente",
-    });
-    if (erroFila) log("error", "enfileirar_carimbo_lote_falhou", { erro: erroFila.message, loteId: lote.id });
+    const { data: itemFila, error: erroFila } = await adminClient
+      .from("fila_carimbo_tempo")
+      .insert({ assinatura_id: lote.id, tipo_assinatura: "lote", status: "pendente" })
+      .select("id")
+      .single();
+    if (erroFila || !itemFila) log("error", "enfileirar_carimbo_lote_falhou", { erro: erroFila?.message, loteId: lote.id });
+    else await carimbarAgora(adminClient, itemFila.id as string, { aguardar: false });
 
     log("info", "lote_liberado", {
       loteId: lote.id,

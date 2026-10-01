@@ -3,6 +3,7 @@ import { AlertTriangle } from "lucide-react";
 import { ModalShell } from "../ModalShell";
 import { DossieDetalhe } from "../DossieDetalhe";
 import { useMonitoramentosHojeDetalhado } from "../api";
+import { rotuloSituacao } from "@/shared/situacaoConformidade";
 
 export function ModalMonitoramentosAndamento({ onClose }: { onClose: () => void }) {
   const { data, isLoading } = useMonitoramentosHojeDetalhado();
@@ -40,7 +41,7 @@ export function ModalMonitoramentosAndamento({ onClose }: { onClose: () => void 
 
           {data?.porSetor.map((grupo) => (
             <div key={grupo.setor}>
-              <div className="mb-1.5 flex items-center justify-between">
+              <div className="mb-1.5 flex flex-wrap gap-2 items-center justify-between">
                 <h4 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{grupo.setor}</h4>
                 <span className="text-xs font-bold text-ink">{grupo.quantidade}</span>
               </div>
@@ -53,7 +54,7 @@ export function ModalMonitoramentosAndamento({ onClose }: { onClose: () => void 
                       className="w-full rounded-md border border-hairline bg-surface-soft px-2 py-1.5 text-left text-xs text-ink hover:opacity-80"
                     >
                       {new Date(item.criado_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} ·{" "}
-                      {item.conformidade === false ? "Não conforme" : item.conformidade === true ? "Conforme" : "Aguardando verificação"}
+                      {rotuloSituacao(item)}
                     </button>
                   </li>
                 ))}

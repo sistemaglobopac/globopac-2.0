@@ -29,6 +29,9 @@ export interface ChillerCarcacasValor {
   };
   condenasParcial: string;
   condenasTotal: string;
+  /** Campo legado de registros antigos: se só existir `condenas`, ele entra como "totalmente
+   * condenadas" (ver ChillerCarcacasField). */
+  condenas?: string;
   /** Aves no período (bruto − condenas) — base do cálculo de vazão unitária. */
   totalAves: number;
   /** Total bruto das cargas, antes de descontar condenas — usado pelos widgets seguintes da
@@ -58,7 +61,8 @@ export interface ChillerPartesValor {
 /** Vazão do Chuveiro Final de Lavagem de Carcaças — mesma dependência ao vivo do SPR
  * Carcaças (total de aves e condenas totais) desta ficha. */
 export interface LavagemFinalValor {
-  chuveiro: TanqueHidrometro;
+  /** O Chuveiro Final NÃO tem gelo — só as leituras do hidrômetro. */
+  chuveiro: { prev: string; cur: string };
   condenacoesParciais: string;
   totalAvesBruto: number;
   condenasTotalSPR: number;
@@ -92,12 +96,20 @@ export interface AmostraAbsorcaoAgua {
   seal: string;
   initial: string;
   final: string;
+  /** Carcaça descartada na fase 2: sai do cálculo e exige `motivoDescarte`. */
+  descartada?: boolean;
+  motivoDescarte?: string;
 }
+
+/** Fase do teste de absorção: INICIAL = só pesagem inicial salva (EM_ANDAMENTO); FINAL = concluído. */
+export type FaseAbsorcao = "INICIAL" | "FINAL";
 
 /** Teste de Absorção de Água (Especial SIF) — 10 amostras de peso inicial/final; limite de
  * 8% de ganho médio de peso. */
 export interface AbsorcaoAguaValor {
   items: AmostraAbsorcaoAgua[];
+  /** Só preenchida nos registros de duas fases (ausente = teste feito de uma vez, como antes). */
+  fase?: FaseAbsorcao;
   status: "conforme" | "nao-conforme";
   averagePercentage: number;
   validCount: number;
@@ -122,6 +134,8 @@ export interface DrippingTestValor {
   items: AmostraDrippingTest[];
   lote: string;
   horaInicio: string;
+  /** Instante (ISO) em que a 1ª etapa foi salva — a "hora inicial" do relatório. Ausente se o teste foi feito de uma vez. */
+  primeiraEtapaSalvaEm?: string;
   status: "conforme" | "nao-conforme";
   averagePercentage: number;
   validCount: number;
@@ -133,4 +147,161 @@ export interface ParadaEquipamentoValor {
   hora_parada: string;
   hora_retomada: string;
   tempo_minutos: number;
+}
+
+/** Monitoramento Diário de Ocorrência de Pragas (Especial SIF). `pragas[chave] = true` = presença
+ * no dia; tudo false = ausência de pragas. Só o inspetor marca; a conformidade final segue com o
+ * Verificador. */
+export interface OcorrenciaPragasValor {
+  pragas: Record<string, boolean>;
+  /** Descrição de "Outras Pragas (citar)" — obrigatória quando `pragas.outras` é true. */
+  outrasPragas: string;
+  /** Alguma praga marcada como presente. */
+  houvePraga: boolean;
+  /** Ações corretivas executadas — obrigatório marcar quando houve praga. */
+  acoesCorretivas: boolean;
+  /** Texto das medidas, congelado no registro quando `acoesCorretivas` é true. */
+  medidasCorretivas: string | null;
+}
+
+export interface BoxEsperaAves {
+  /** Identificação do box na área de espera (texto livre: "1", "A2"…). */
+  box: string;
+  cargaId: string;
+  gta: string;
+  integrado: string;
+  aviario: string;
+  nucleo: string;
+  qtdAves: number;
+  /** Comportamento das aves no box: chave de COMPORTAMENTOS_AVES. */
+  comportamento: string;
+  outrasCondicoes: string;
+}
+
+/** Bem-Estar Animal na Área de Espera (Especial SIF): cargas por box + comportamento das aves,
+ * temperatura ambiente e estado de aspersores/ventiladores. Com aves ofegantes, a ação corretiva é
+ * ligar os dois equipamentos. */
+export interface EsperaAvesValor {
+  boxes: BoxEsperaAves[];
+  /** Temperatura ambiente (°C), como digitada. */
+  temperaturaC: string;
+  aspersoresLigados: boolean | null;
+  ventiladoresLigados: boolean | null;
+  houveOfegantes: boolean;
+  /** Aspersores e ventiladores acionados como ação corretiva por aves ofegantes. */
+  acaoCorretiva: boolean;
+  /** `YYYY-MM-DDTHH:mm` (Manaus) em que a ação corretiva foi acionada. */
+  acaoCorretivaEm: string;
+  conformidade: boolean;
+  detalhesRNC: string | null;
+}
+
+/** Uma carga no monitoramento de peso vivo por caixa de transporte. */
+export interface CargaPesoCaixa {
+  cargaId: string;
+  gta: string;
+  integrado: string;
+  aviario: string;
+  nucleo: string;
+  qtdAves: number;
+  /** Aves por caixa (gaiola), como digitado. */
+  avesPorCaixa: string;
+  /** Peso médio das aves da carga (kg), como digitado. */
+  pesoMedioKg: string;
+}
+
+/** Peso vivo por caixa de transporte (Especial SIF): conforme até 25 kg por caixa. */
+export interface PesoCaixaValor {
+  cargas: CargaPesoCaixa[];
+  conformidade: boolean;
+  detalhesRNC: string | null;
+}
+
+/** Caixas de transporte vazias antes do tanque de imersão (Especial SIF). */
+export interface CaixasVaziasValor {
+  /** true = todas as caixas estão vazias. `null` = não respondido. */
+  todasVazias: boolean | null;
+  caixasNaoVazias: string;
+  acaoCorretiva: string;
+  conformidade: boolean;
+  detalhesRNC: string | null;
+}
+
+/** Bem-Estar Animal na Sala de Pendura (Especial SIF): temperatura, ventiladores, luzes, ruídos
+ * desnecessários e conduta dos auxiliares na pendura. `null` = ainda não respondido. */
+export interface PenduraAvesValor {
+  /** Temperatura da sala (°C), como digitada. */
+  temperaturaC: string;
+  ventiladoresLigados: boolean | null;
+  luzesAcesas: boolean | null;
+  /** true = há ruídos desnecessários (desvio). */
+  ruidosDesnecessarios: boolean | null;
+  /** true = auxiliares pendurando conforme os princípios de bem-estar animal. */
+  auxiliaresConformes: boolean | null;
+  /** Ocorrência e ação corretiva — obrigatória quando há desvio. */
+  descricaoDesvio: string;
+  conformidade: boolean;
+  detalhesRNC: string | null;
+}
+
+/** Bem-Estar Animal — Eletronarcose (Especial SIF): parâmetros elétricos, tempos da linha (em
+ * segundos, como digitados), pré-choque, aves sem sangrar e sinais de insensibilização.
+ * `null` = ainda não respondido. Nos sinais, true ("Sim") = ave consciente (desvio). */
+export interface EletronarcoseAvesValor {
+  voltagemV: string;
+  frequenciaHz: string;
+  correnteMa: string;
+  /** Contenção da pendura até a cuba de insensibilização (máx. 60 s). */
+  contencaoS: string;
+  /** Tempo dentro da cuba de insensibilização. */
+  tempoCubaS: string;
+  /** Saída da cuba até a sangria (máx. 12 s). */
+  saidaSangriaS: string;
+  /** Tempo de sangria (mín. 180 s = 3 min). */
+  sangriaS: string;
+  /** true = aves recebendo pré-choque (desvio). */
+  preChoque: boolean | null;
+  /** true = há aves sem sangrar após o disco automático e o rapasse da sangria (desvio). */
+  avesSemSangrar: boolean | null;
+  vocalizacao: boolean | null;
+  reflexosOculares: boolean | null;
+  asasAfastadas: boolean | null;
+  respiracaoRitmica: boolean | null;
+  tremores: boolean | null;
+  /** Tempo para restabelecer a postura de estação, em MINUTOS (máx. 60). */
+  posturaEstacaoMin: string;
+  /** Ocorrência e ação corretiva — obrigatória quando há desvio. */
+  descricaoDesvio: string;
+  conformidade: boolean;
+  detalhesRNC: string | null;
+}
+
+/** Recepção de Aves / Bem-Estar Animal (Especial SIF): uma carga (GTA) por monitoramento. Datas e
+ * horas são `YYYY-MM-DDTHH:mm` no horário de Manaus (formato do input datetime-local). */
+export interface RecepcaoAvesValor {
+  cargaId: string;
+  gta: string;
+  integrado: string;
+  aviario: string;
+  nucleo: string;
+  qtdAves: number;
+  veiculoId: string;
+  placa: string;
+  condicaoVeiculo: "CONFORME" | "NAO_CONFORME" | "";
+  obsVeiculo: string;
+  retiradaRacaoEm: string;
+  embarqueInicioEm: string;
+  embarqueFimEm: string;
+  chegadaEm: string;
+  penduraInicioEm: string;
+  /** Condição geral da carga na chegada (uma só): chave de CONDICOES_ANIMAIS. */
+  condicaoAnimais: string;
+  outrasCondicoes: string;
+  /** Calculados (minutos) — gravados para o relatório não depender de recalcular. */
+  jejumMin: number | null;
+  dietaHidricaMin: number | null;
+  viagemMin: number | null;
+  esperaMin: number | null;
+  conformidade: boolean;
+  detalhesRNC: string | null;
 }
