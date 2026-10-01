@@ -17,6 +17,7 @@ import {
   Timer,
   TrendingUp,
   Truck,
+  ArrowRightLeft,
   Users,
   Wrench,
   type LucideIcon,
@@ -37,6 +38,7 @@ import { ModalPausasInspetores } from "./modals/ModalPausasInspetores";
 import { ModalMonitoramentosAndamento } from "./modals/ModalMonitoramentosAndamento";
 import { ModalRncsPendentes } from "./modals/ModalRncsPendentes";
 import { ModalFolhasPausa } from "./modals/ModalFolhasPausa";
+import { TrocaSetorInspetorModal } from "./TrocaSetorInspetorModal";
 import { UsuariosAdminPanel } from "./admin/UsuariosAdminPanel";
 import { AreasAdminPanel } from "./admin/AreasAdminPanel";
 import { EquipamentosAdminPanel } from "./admin/EquipamentosAdminPanel";
@@ -235,7 +237,7 @@ function BotaoGestaoSistema({
   );
 }
 
-type ModalKpi = "usuarios" | "pausas" | "monitoramentos" | "rncs" | "folhas" | null;
+type ModalKpi = "usuarios" | "pausas" | "monitoramentos" | "rncs" | "folhas" | "troca_setor" | null;
 
 function AbaHome({ irPara }: { irPara: (aba: AbaGestao) => void }) {
   const navigate = useNavigate();
@@ -299,6 +301,7 @@ function AbaHome({ irPara }: { irPara: (aba: AbaGestao) => void }) {
           <BotaoFerramenta icon={BarChart3} categoria="Análise" titulo="Dashboard BI" indice={5} onClick={() => irPara("dashboard_bi")} />
           <BotaoFerramenta icon={TrendingUp} categoria="Gestão" titulo="Melhoria Contínua" indice={6} onClick={() => navigate("/melhoria-continua")} />
           <BotaoFerramenta icon={Truck} categoria="Bem-Estar Animal" titulo="Cargas e Veículos" indice={7} onClick={() => navigate("/gestao/cargas-aves")} />
+          <BotaoFerramenta icon={ArrowRightLeft} categoria="Inspetores" titulo="Trocar Setor / Cobertura" indice={8} onClick={() => setModalAberto("troca_setor")} />
         </div>
       </section>
 
@@ -322,6 +325,7 @@ function AbaHome({ irPara }: { irPara: (aba: AbaGestao) => void }) {
       {modalAberto === "monitoramentos" && <ModalMonitoramentosAndamento onClose={() => setModalAberto(null)} />}
       {modalAberto === "rncs" && <ModalRncsPendentes onClose={() => setModalAberto(null)} />}
       {modalAberto === "folhas" && <ModalFolhasPausa onClose={() => setModalAberto(null)} />}
+      {modalAberto === "troca_setor" && <TrocaSetorInspetorModal onClose={() => setModalAberto(null)} />}
     </div>
   );
 }

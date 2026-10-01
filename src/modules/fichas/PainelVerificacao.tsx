@@ -16,6 +16,7 @@ import { DossieVerificacaoCard } from "./components/DossieVerificacaoCard";
 import { RelatorioModal } from "./components/relatorio/RelatorioModal";
 import type { DossieVerificacao } from "./utils/recordGrouping";
 import { Button } from "@/shared/ui/button";
+import { TrocaSetorInspetorModal } from "@/modules/gestao/TrocaSetorInspetorModal";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Select } from "@/shared/ui/select";
@@ -50,6 +51,7 @@ export function PainelVerificacao() {
   const [filtroStatus, setFiltroStatus] = useState<StatusVerificacao | null>(null);
   const [filtroInspetor, setFiltroInspetor] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [showTrocaSetor, setShowTrocaSetor] = useState(false);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBatchModal, setShowBatchModal] = useState(false);
@@ -60,7 +62,7 @@ export function PainelVerificacao() {
 
   const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
   const [relatorioIds, setRelatorioIds] = useState<string[] | null>(null);
-  const [encerrarAlvo, setEncerrarAlvo] = useState<{ userId: string; dia: string; nome: string } | null>(null);
+  const [encerrarAlvo, setEncerrarAlvo] = useState<{ userIds: string[]; dia: string; nome: string } | null>(null);
   const [mensagem, setMensagem] = useState<{ tipo: "success" | "error"; texto: string } | null>(null);
 
   // Mensagem de sucesso/erro vinda da tela cheia de verificação (VerificarFichaPage), passada
@@ -282,14 +284,14 @@ export function PainelVerificacao() {
       texto:
         falhas.length === 0
           ? `${resultados.length} ficha(s) assinada(s) com sucesso.`
-          : `${resultados.length - falhas.length} de ${resultados.length} assinada(s) — ${falhas.length} falharam.`,
+          : `${resultados.length - falhas.length} de ${resultados.length} assinada(s) — ${falhas.length} falharam: ${[...new Set(falhas.map((f) => f.erro ?? "erro desconhecido"))].slice(0, 2).join(" · ")}`,
     });
   }
 
   async function confirmarEncerrarTurno() {
     if (!encerrarAlvo) return;
     try {
-      await encerrarTurnoAdmin(encerrarAlvo.userId, encerrarAlvo.dia);
+      for (const userId of encerrarAlvo.userIds) await encerrarTurnoAdmin(userId, encerrarAlvo.dia);
       setMensagem({ tipo: "success", texto: `Turno de ${encerrarAlvo.nome} encerrado.` });
       setEncerrarAlvo(null);
       setTurnosVersao((v) => v + 1);
@@ -322,6 +324,9 @@ export function PainelVerificacao() {
             <span className="min-w-32 text-center text-sm font-medium">{ensureLocalTime(`${dateBase}T12:00:00`).datePt}</span>
             <Button type="button" variant="outline" size="sm" onClick={() => alterarDia(1)}>
               <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => setShowTrocaSetor(true)}>
+              Trocar setor de inspetor
             </Button>
             <Button type="button" variant={filtrosAtivos ? "default" : "outline"} size="sm" onClick={() => setShowFilters(true)}>
               <Filter className="h-4 w-4" />
@@ -387,6 +392,7 @@ export function PainelVerificacao() {
             toggleGroupSelection={toggleGroupSelection}
             onPreview={(item) => abrirVerificacao([item.id])}
             onImprimir={(item) => setRelatorioIds([item.id])}
+            onImprimirDossie={(d) => setRelatorioIds(d.ids)}
             onVerDossie={(d: DossieVerificacao) => abrirVerificacao(d.ids)}
             pacPorTemplateId={pacPorTemplateId}
             nomePorTemplateId={nomePorTemplateId}
@@ -395,10 +401,10 @@ export function PainelVerificacao() {
             isAdmin={Boolean(isAdmin)}
             rncPorMonitoramento={rncPorMonitoramento}
             onEncerrarTurno={(d) =>
-              setEncerrarAlvo({ userId: d.userId, dia: diaTurno(d.items[0]!.appt.criado_em), nome: d.inspetorNome })
+              setEncerrarAlvo({ userIds: d.userIds, dia: diaTurno(d.items[0]!.appt.criado_em), nome: d.inspetorNome })
             }
             onEncerrarTurnoItem={(i) =>
-              setEncerrarAlvo({ userId: i.appt.user_id, dia: diaTurno(i.appt.criado_em), nome: usuarios.get(i.appt.user_id) ?? "inspetor" })
+              setEncerrarAlvo({ userIds: [i.appt.user_id], dia: diaTurno(i.appt.criado_em), nome: usuarios.get(i.appt.user_id) ?? "inspetor" })
             }
           />
         ))}
@@ -418,7 +424,7 @@ export function PainelVerificacao() {
             blockedIds={blockedIds}
             isAdmin={Boolean(isAdmin)}
             rncStatus={rncPorMonitoramento?.get(item.id)}
-            onEncerrarTurno={(i) => setEncerrarAlvo({ userId: i.appt.user_id, dia: diaTurno(i.appt.criado_em), nome: usuarios.get(i.appt.user_id) ?? "inspetor" })}
+            onEncerrarTurno={(i) => setEncerrarAlvo({ userIds: [i.appt.user_id], dia: diaTurno(i.appt.criado_em), nome: usuarios.get(i.appt.user_id) ?? "inspetor" })}
           />
         ))}
       </div>
@@ -436,6 +442,7 @@ export function PainelVerificacao() {
                 toggleGroupSelection={toggleGroupSelection}
                 onPreview={(item) => abrirVerificacao([item.id])}
                 onImprimir={(item) => setRelatorioIds([item.id])}
+                onImprimirDossie={(d) => setRelatorioIds(d.ids)}
                 onVerDossie={(d: DossieVerificacao) => abrirVerificacao(d.ids)}
                 pacPorTemplateId={pacPorTemplateId}
                 nomePorTemplateId={nomePorTemplateId}
@@ -491,6 +498,8 @@ export function PainelVerificacao() {
           </div>
         </div>
       )}
+
+      {showTrocaSetor && <TrocaSetorInspetorModal onClose={() => setShowTrocaSetor(false)} />}
 
       {showFilters && (
         <ModalBase titulo="Filtros Avançados" onFechar={() => setShowFilters(false)}>
@@ -562,7 +571,7 @@ export function PainelVerificacao() {
         >
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Confirme sua senha para assinar {selectedIds.size} ficha(s) selecionada(s) como VERIFICADOR.
+              Confirme sua senha para assinar {selectedIds.size} ficha(s) selecionada(s) como {isAdmin ? "Administrador" : "VERIFICADOR"}.
             </p>
             {!batchProgress ? (
               <>

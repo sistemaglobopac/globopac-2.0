@@ -368,37 +368,37 @@ export function RelatorioMonitoramento({ ids, dados }: RelatorioMonitoramentoPro
     <div className={`print-page mx-auto flex w-full max-w-4xl flex-col bg-white font-sans text-ink shadow-2xl print:max-w-[210mm] ${isGrouped ? "" : "print-fit-one-page"}`} style={{ margin: "0 auto" }}>
       {/* Cabeçalho — identificação no topo, título da ficha e uma grade de metadados rotulados
           (antes eram chips soltos + uma seção "Dados Gerais" separada, que repetia data/turno). */}
-      <div className="w-full rounded-t-lg bg-surface-dark p-6 text-ondark print:p-4">
+      <div className="cabecalho-relatorio w-full rounded-t-lg bg-surface-dark p-6 text-ondark">
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
-            <Shield className="h-9 w-9 shrink-0 opacity-80 print:h-7 print:w-7" />
+            <Shield className="h-9 w-9 shrink-0 opacity-80" />
             <div className="min-w-0">
-              <p className="text-lg font-black leading-tight tracking-wide print:text-sm">{RAZAO_SOCIAL}</p>
-              <p className="mt-0.5 text-[10px] uppercase tracking-widest opacity-80 print:text-[8px]">
+              <p className="text-lg font-black leading-tight tracking-wide">{RAZAO_SOCIAL}</p>
+              <p className="mt-0.5 text-[10px] uppercase tracking-widest opacity-80">
                 Sistema de Gestão de Qualidade — Relatório Oficial{isGrouped ? " Consolidado" : ""}
               </p>
             </div>
           </div>
-          <div className="shrink-0 rounded-lg border border-ondark/20 bg-ondark/10 px-3 py-2 text-right print:px-2 print:py-1">
-            <p className="text-[9px] uppercase tracking-widest opacity-80 print:text-[7px]">Protocolo</p>
-            <p className="font-mono text-base font-black tracking-wider print:text-[11px]">{protocolo}</p>
-            <p className="mt-0.5 text-[10px] opacity-80 print:text-[8px]">Emitido em {emitidoEm}</p>
+          <div className="shrink-0 rounded-lg border border-ondark/20 bg-ondark/10 px-3 py-2 text-right">
+            <p className="text-[9px] uppercase tracking-widest opacity-80">Protocolo</p>
+            <p className="font-mono text-base font-black tracking-wider">{protocolo}</p>
+            <p className="mt-0.5 text-[10px] opacity-80">Emitido em {emitidoEm}</p>
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-ondark/20 pt-3 print:mt-2 print:pt-2">
-          <h1 className="min-w-0 text-lg font-extrabold leading-snug print:text-sm">{template?.nome ?? "Ficha de Monitoramento"}</h1>
+        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-ondark/20 pt-3">
+          <h1 className="min-w-0 text-lg font-extrabold leading-snug">{template?.nome ?? "Ficha de Monitoramento"}</h1>
           {template?.codigo && (
-            <span className="whitespace-nowrap rounded bg-lime/15 px-2 py-0.5 text-xs font-black tracking-wider text-lime print:text-[9px]">{template.codigo}</span>
+            <span className="whitespace-nowrap rounded bg-lime/15 px-2 py-0.5 text-xs font-black tracking-wider text-lime">{template.codigo}</span>
           )}
           {isGrouped && (
-            <span className="whitespace-nowrap rounded bg-lime/15 px-2 py-0.5 text-xs font-black tracking-wider text-lime print:text-[9px]">
+            <span className="whitespace-nowrap rounded bg-lime/15 px-2 py-0.5 text-xs font-black tracking-wider text-lime">
               {records.length} APURAÇÕES NO DIA
             </span>
           )}
         </div>
 
-        <dl className="mt-3 grid grid-cols-2 gap-px overflow-hidden rounded-md border border-ondark/20 bg-ondark/20 sm:grid-cols-3 print:mt-2 print:grid-cols-3">
+        <dl className="mt-3 grid grid-cols-2 gap-px overflow-hidden rounded-md border border-ondark/20 bg-ondark/20 sm:grid-cols-3">
           {[
             ["Setor", primary.setor.toUpperCase()],
             ["PAC", template?.pac_correspondente ?? "PAC não definido"],
@@ -407,9 +407,9 @@ export function RelatorioMonitoramento({ ids, dados }: RelatorioMonitoramentoPro
             ["Turno", turnos.length === 1 ? turnos[0] : "Múltiplos Turnos"],
             ["Status", isGrouped ? `Concluído · ${records.length} apurações` : "Concluído · Assinado digitalmente"],
           ].map(([rotulo, valor]) => (
-            <div key={rotulo} className="min-w-0 bg-surface-dark px-3 py-1.5 print:px-2 print:py-1">
-              <dt className="text-[9px] font-bold uppercase tracking-widest opacity-70 print:text-[7px]">{rotulo}</dt>
-              <dd className="truncate text-sm font-bold print:text-[10px]">{valor}</dd>
+            <div key={rotulo} className="min-w-0 bg-surface-dark px-3 py-1.5">
+              <dt className="text-[9px] font-bold uppercase tracking-widest opacity-70">{rotulo}</dt>
+              <dd className="truncate text-sm font-bold">{valor}</dd>
             </div>
           ))}
         </dl>
@@ -484,7 +484,7 @@ export function RelatorioMonitoramento({ ids, dados }: RelatorioMonitoramentoPro
         </div>
 
         {/* Rodapé de conformidade legal */}
-        <div className="mt-4 overflow-hidden rounded-lg border border-hairline print:mt-2" style={{ breakInside: "avoid" }}>
+        <div className="rodape-relatorio mt-4 overflow-hidden rounded-lg border border-hairline print:mt-2" style={{ breakInside: "avoid" }}>
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline bg-gray-50 px-4 py-2 print:px-3 print:py-1">
             <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-primary print:text-[9px]">
               <Shield className="h-4 w-4 print:h-3 print:w-3" /> Atestado de Validade Jurídica e Compliance Tecnológico

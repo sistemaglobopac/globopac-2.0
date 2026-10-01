@@ -57,7 +57,7 @@ test("documento liberado aparece com trilha e badge corretos no portal público 
   const total = await checkboxes.count();
   for (let i = 0; i < total; i++) await checkboxes.nth(i).check();
   // O botao conta MONITORAMENTOS selecionados; cada checkbox pode ser um grupo (dossie) com varios.
-  await page.getByRole("button", { name: /Liberar selecionados \((?!0\))\d+\)/ }).click();
+  await page.getByRole("button", { name: /Liberar selecionados para Auditoria \((?!0\))\d+\)/ }).click();
   await expect(page.getByText(/liberado:/)).toBeVisible({ timeout: 15_000 });
   await logout(page);
 

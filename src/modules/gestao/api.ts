@@ -156,6 +156,9 @@ export function useEditarUsuarioGestao() {
           nome_completo: input.nomeCompleto,
           nivel_acesso: input.nivelAcesso,
           setores_permitidos: input.setoresPermitidos,
+          // Editar os setores no cadastro vale como definitivo: cancela troca/cobertura temporária ativa.
+          setores_base: null,
+          troca_setor_expira_em: null,
           email_alerta: input.emailAlerta,
           configuracoes_extras: JSON.stringify(input.configuracoesExtras),
         })
@@ -181,6 +184,58 @@ export function useAtualizarConfigExtras() {
       if (error) throw error;
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["perfis_usuarios"] }),
+  });
+}
+
+export interface InspetorTrocaSetor {
+  id: string;
+  nome_completo: string;
+  matricula: string;
+  setores_permitidos: string[];
+  /** Setores de origem enquanto há troca/cobertura ativa (null = sem troca). */
+  setores_base: string[] | null;
+  troca_setor_expira_em: string | null;
+}
+
+/** Inspetores ativos com a situação de setor — via função do banco (o verificador não lê perfis_usuarios). */
+export function useInspetoresTrocaSetor() {
+  return useQuery({
+    queryKey: ["troca_setor", "inspetores"],
+    refetchInterval: 30_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("listar_inspetores_troca_setor");
+      if (error) throw error;
+      return (data ?? []) as InspetorTrocaSetor[];
+    },
+  });
+}
+
+/** Troca RÁPIDA de setor (administrador/verificador): o inspetor passa a ter acesso SÓ ao setor novo.
+ * Sem `ate`, volta sozinho ao setor de origem ao fim do turno; com `ate` (cobertura de almoço), volta
+ * nesse horário. */
+export function useTrocarSetorInspetor() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { userId: string; setor: string; ate?: Date }) => {
+      const { error } = await supabase.rpc("trocar_setor_inspetor", {
+        p_user: input.userId,
+        p_setor: input.setor,
+        p_ate: input.ate ? input.ate.toISOString() : null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["troca_setor"] }),
+  });
+}
+
+export function useRestaurarSetorInspetor() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      const { error } = await supabase.rpc("restaurar_setor_inspetor", { p_user: userId });
+      if (error) throw error;
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["troca_setor"] }),
   });
 }
 

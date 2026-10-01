@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";
+import { useSincronizarSetores } from "@/modules/auth/useSincronizarSetores";
 import { supabase } from "@/lib/supabase";
 import { useSessionStore, type PerfilSessao } from "@/store/session";
 import { Button } from "@/shared/ui/button";
@@ -22,7 +23,7 @@ const NIVEL_ACESSO_ROTULO: Record<string, string> = {
   VERIFICADOR: "Verificador",
   GESTOR_SETOR: "Gestor de Setor",
   ADMIN_MASTER: "Administrador",
-  INSPECAO_FEDERAL: "Inspeção Federal",
+  INSPECAO_FEDERAL: "Serviço de Inspeção Federal",
   INSPETOR_PCM: "Inspetor PCM",
 };
 
@@ -53,9 +54,10 @@ const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
     { rota: "/verificacao", rotulo: "Painel de Verificação" },
     { rota: "/rnc", rotulo: "Revisão de RNC" },
     { rota: "/gestao/cargas-aves", rotulo: "Cargas e Veículos" },
+    { rota: "/trocar-setor", rotulo: "Trocar Setor / Cobertura" },
     { rota: "/sif/liberar", rotulo: "Painel de Arquivo" },
   ],
-  INSPECAO_FEDERAL: [{ rota: "/auditoria", rotulo: "Auditoria" }],
+  INSPECAO_FEDERAL: [{ rota: "/auditoria", rotulo: "Painel de Auditoria" }],
   GESTOR_SETOR: [
     { rota: "/rnc", rotulo: "Tratativas RNC" },
     { rota: "/dashboard", rotulo: "Painel gerencial" },
@@ -72,11 +74,8 @@ const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
     { rota: "/rnc", rotulo: "Tratativas RNC" },
     { rota: "/pcm", rotulo: "Ordens de Serviço" },
     { rota: "/pcm/nova", rotulo: "Nova OS" },
-    { rota: "/templates", rotulo: "Construtor de Fichas" },
-    { rota: "/gestao/cargas-aves", rotulo: "Cargas e Veículos" },
-    { rota: "/admin/setores", rotulo: "Gestão de Setores" },
     { rota: "/sif/liberar", rotulo: "Painel de Arquivo" },
-    { rota: "/auditoria", rotulo: "Auditoria" },
+    { rota: "/auditoria", rotulo: "Painel de Auditoria" },
     { rota: "/carimbos", rotulo: "Carimbos de tempo" },
     { rota: "/dashboard", rotulo: "Painel gerencial" },
   ],
@@ -227,6 +226,8 @@ export function AppShell() {
   // Presença global (qualquer perfil, não só ADMIN_MASTER) — o KPI "Usuários Ativos" do Painel
   // de Gestão precisa ver todo mundo com o app aberto, não só quem abriu o próprio painel.
   usePresenceTracking(perfil?.id);
+  // Troca/cobertura de setor feita pelo administrador/verificador vale sem o inspetor sair do sistema.
+  useSincronizarSetores();
 
   // Fecha o drawer sempre que a rota muda (ex.: navegação por trás, botão voltar do navegador)
   // — sem isso um NavLink clicado que não muda de rota (já está na página) deixaria o menu aberto.

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Eye, FolderClosed, Lock, ShieldCheck, Unlock } from "lucide-react";
+import { ChevronDown, ChevronUp, Eye, FolderClosed, Lock, Printer, ShieldCheck, Unlock } from "lucide-react";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import type { AppointmentDisplay, DossieVerificacao } from "../utils/recordGrouping";
@@ -14,6 +14,8 @@ interface DossieVerificacaoCardProps {
   toggleGroupSelection: (ids: string[]) => void;
   onPreview: (item: AppointmentDisplay) => void;
   onImprimir: (item: AppointmentDisplay) => void;
+  /** Imprime o relatório CONSOLIDADO do dossiê (todos os monitoramentos do turno num só relatório). */
+  onImprimirDossie: (dossie: DossieVerificacao) => void;
   onVerDossie: (dossie: DossieVerificacao) => void;
   pacPorTemplateId: Map<string, string>;
   nomePorTemplateId: Map<string, string>;
@@ -39,6 +41,7 @@ export function DossieVerificacaoCard({
   toggleGroupSelection,
   onPreview,
   onImprimir,
+  onImprimirDossie,
   onVerDossie,
   pacPorTemplateId,
   nomePorTemplateId,
@@ -119,6 +122,10 @@ export function DossieVerificacaoCard({
               {dossie.bloqueado ? "Prévia" : "Verificar"}
             </Button>
           )}
+          <Button type="button" size="sm" variant="outline" onClick={() => onImprimirDossie(dossie)} title="Imprimir o relatório consolidado de todos os monitoramentos deste turno">
+            <Printer className="h-3.5 w-3.5" />
+            Imprimir consolidado
+          </Button>
           <Button type="button" size="sm" variant="ghost" onClick={() => setApuracoesAbertas((atual) => !atual)}>
             Apurações
             {apuracoesAbertas ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}

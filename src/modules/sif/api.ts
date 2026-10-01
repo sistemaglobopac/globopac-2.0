@@ -34,6 +34,26 @@ export function useMonitoramentosParaLiberar() {
   });
 }
 
+/** Arquivo: TODAS as fichas já verificadas (aprovadas ou reprovadas), liberadas ao SIF ou não — o
+ * Painel de Arquivo filtra no cliente por data, PAC, setor, turno etc. Limite de segurança de 3000
+ * registros (os mais recentes); o filtro de período do painel cobre o recorte do dia a dia. */
+export function useMonitoramentosArquivo() {
+  return useQuery({
+    queryKey: ["monitoramentos", "arquivo"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("monitoramentos")
+        .select("id, setor, conformidade, situacao_conformidade, verificado_em, liberado_sif, criado_em, ficha_template_id, user_id")
+        .not("verificado_por", "is", null)
+        .order("criado_em", { ascending: false })
+        .limit(3000)
+        .overrideTypes<MonitoramentoVerificado[], { merge: false }>();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 export function useLiberarLoteSif() {
   const queryClient = useQueryClient();
   return useMutation({

@@ -35,6 +35,9 @@ interface PerfilUsuarioRow {
   // própria — setor do dia do inspetor e cobertura temporária de almoço.
   email_alerta: string | null;
   configuracoes_extras: string | null;
+  // Troca/cobertura temporária de setor (20261001000003_troca_setor_inspetor.sql).
+  setores_base: string[] | null;
+  troca_setor_expira_em: string | null;
 }
 
 interface FichaTemplateRow {

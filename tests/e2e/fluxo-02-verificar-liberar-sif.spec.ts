@@ -50,7 +50,8 @@ test("verificador aprova, admin libera ao SIF, e o registro aparece para a Inspe
 
   await login(page, "1004", "121072");
   await page.goto("/sif/liberar");
-  const cartoesParaLiberar = page.locator(".rounded-lg.border");
+  // Cartões de grupo do Painel de Arquivo (o cartão de filtros também é .rounded-lg.border).
+  const cartoesParaLiberar = page.getByTestId("grupo-arquivo");
   await expect(cartoesParaLiberar.first()).toBeVisible({ timeout: 15_000 });
   const totalAntes = await cartoesParaLiberar.count();
 
@@ -58,10 +59,10 @@ test("verificador aprova, admin libera ao SIF, e o registro aparece para a Inspe
   const totalAuditoriaAntes = await page.locator(".rounded-lg.border").count();
 
   await page.goto("/sif/liberar");
-  await page.locator(".rounded-lg.border").first().locator('input[type="checkbox"]').check();
-  await page.getByRole("button", { name: /Liberar selecionados \(1\)/ }).click();
+  await page.getByTestId("grupo-arquivo").first().locator('input[type="checkbox"]').check();
+  await page.getByRole("button", { name: /Liberar selecionados para Auditoria \(1\)/ }).click();
   await expect(page.getByText(/liberado: 1 documento/)).toBeVisible({ timeout: 15_000 });
-  await expect(page.locator(".rounded-lg.border")).toHaveCount(totalAntes - 1, { timeout: 15_000 });
+  await expect(page.getByTestId("grupo-arquivo")).toHaveCount(totalAntes - 1, { timeout: 15_000 });
 
   await page.goto("/auditoria");
   await expect(page.locator(".rounded-lg.border")).toHaveCount(totalAuditoriaAntes + 1, { timeout: 15_000 });

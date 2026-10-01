@@ -25,7 +25,10 @@ export interface AppointmentDisplay {
 
 export interface DossieVerificacao {
   chave: string;
+  /** Primeiro inspetor do dossiê (compatibilidade). Com cobertura de almoço o dossiê tem vários: ver `userIds`. */
   userId: string;
+  /** Todos os inspetores que fizeram monitoramentos deste dossiê (o que cobre o almoço continua a sequência do outro). */
+  userIds: string[];
   turno: string;
   dia: string;
   pac: string;
@@ -61,16 +64,17 @@ export function calcularOrdemDia(items: MonitoramentoVerificacao[]): Map<string,
   return ordem;
 }
 
-/** Chave do relatório consolidado: mesmo inspetor + dia local + turno + TIPO de ficha
- * (código sem a versão; setores diferentes entram juntos). Todos os monitoramentos dessa chave viram UM relatório, para o
- * auditor ver o dia inteiro daquele tipo de monitoramento. */
+/** Chave do relatório consolidado: dia local + turno + TIPO de ficha (código sem a versão; setores
+ * diferentes entram juntos). NÃO separa por inspetor: quando um inspetor cobre o almoço do outro, ele
+ * dá sequência aos monitoramentos dele (se B fez a 2ª apuração, A faz a 3ª) e tudo sai num único
+ * relatório consolidado, em ordem de horário. */
 export function chaveDossie(
   m: { user_id: string; criado_em: string; ficha_template_id: string },
   tipoDaFicha: (templateId: string) => string = (id) => id
 ): string {
   const dia = ensureLocalTime(m.criado_em).isoLocal;
   const turno = turnoDoDia(new Date(m.criado_em));
-  return `${m.user_id}|${dia}|${turno}|${tipoDaFicha(m.ficha_template_id)}`;
+  return `${dia}|${turno}|${tipoDaFicha(m.ficha_template_id)}`;
 }
 
 /** Tipo de ficha independente de versão: "RAC-001/006 V2" e "RAC-001/006" são o mesmo tipo (a
@@ -102,7 +106,7 @@ export function agruparPorDossie<T extends { user_id: string; criado_em: string;
   }));
 }
 
-/** Monitoramentos do mesmo inspetor + dia local + turno + tipo de ficha são agrupados
+/** Monitoramentos do mesmo dia local + turno + tipo de ficha (de qualquer inspetor) são agrupados
  * num único "dossiê" (um card, um relatório consolidado) — inclusive os não conformes e com
  * adendo; a decisão continua item a item na tela de verificação. Grupos com um único item não
  * compensam virar dossiê e voltam para a lista de avulsos. */
@@ -123,6 +127,7 @@ export function groupFichaCards(
       grupo = {
         chave,
         userId: appt.user_id,
+        userIds: [],
         turno: turnoDoDia(new Date(appt.criado_em)),
         dia: ensureLocalTime(appt.criado_em).isoLocal,
         pac: pacPorTemplateId.get(appt.ficha_template_id) ?? "—",
@@ -139,6 +144,7 @@ export function groupFichaCards(
     }
     grupo.ids.push(item.id);
     grupo.items.push(item);
+    if (!grupo.userIds.includes(appt.user_id)) grupo.userIds.push(appt.user_id);
   }
 
   const dossies: DossieVerificacao[] = [];
@@ -150,6 +156,9 @@ export function groupFichaCards(
     }
     grupo.items.sort((a, b) => new Date(a.appt.criado_em).getTime() - new Date(b.appt.criado_em).getTime());
     grupo.setor = setoresDoGrupo(grupo.items.map((i) => i.appt));
+    // Inspetores na ordem em que trabalharam (quem cobre o almoço aparece depois de quem saiu).
+    grupo.userIds = [...new Set(grupo.items.map((i) => i.appt.user_id))];
+    grupo.inspetorNome = grupo.userIds.map((id) => usersMap.get(id) ?? "Inspetor").join(" / ");
     grupo.ids = grupo.items.map((i) => i.id);
     grupo.bloqueado = grupo.ids.some((id) => blockedIds.has(id));
     grupo.verificado = grupo.items.every((i) => i.status === "verificado");

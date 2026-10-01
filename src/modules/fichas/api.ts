@@ -1,3 +1,4 @@
+import { erroDeFuncao } from "@/lib/erroFuncao";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import type { CampoTemplate } from "@/shared/schema-campos";
@@ -573,7 +574,7 @@ export function useVerificarLote() {
           resultados.push({ id, ok: true });
         } catch (erro) {
           console.error(`useVerificarLote: falha ao assinar ${id}`, erro);
-          resultados.push({ id, ok: false, erro: erro instanceof Error ? erro.message : "erro desconhecido" });
+          resultados.push({ id, ok: false, erro: (await erroDeFuncao(erro)).message || "erro desconhecido" });
         }
         input.onProgress?.(indice + 1, input.ids.length);
       }

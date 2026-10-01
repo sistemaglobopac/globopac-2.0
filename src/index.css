@@ -215,27 +215,49 @@ canvas {
     zoom: 1;
   }
 
+  /* O navegador descarta cores de fundo ao imprimir (cabeçalho escuro ficaria branco com letras
+     claras). Força a impressão fiel à tela em todo o relatório. */
+  #relatorio-impressao,
+  #relatorio-impressao * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Cabeçalho do relatório: no papel fica IGUAL ao da tela. Na tela o relatório tem 896px de largura
+     (max-w-4xl) e a folha A4 útil tem ~718px; escalar a 80% reproduz a mesma composição (nome da
+     empresa e título em uma linha só, selos ao lado, grade 3x2). Rótulos minúsculos sobem para
+     12px (≈7,7pt já com o zoom) para continuarem legíveis. */
+  .cabecalho-relatorio {
+    zoom: 0.8;
+  }
+  .cabecalho-relatorio [class*="text-[9px]"],
+  .cabecalho-relatorio [class*="text-[10px]"] {
+    font-size: 12px !important;
+  }
+
+  /* O rodapé de validade jurídica (.rodape-relatorio) e a linha final (.doc-generated-by) ficam de fora
+     da escala abaixo: continuam em letras miúdas, como foram desenhados. */
   /* Letras do relatório impresso: os componentes usam tamanhos minúsculos (text-[7px] a
      text-[11px], inclusive os print:text-[Npx]). O atributo [class*="..."] casa tanto "text-[8px]"
      quanto "print:text-[8px]", então esta é a única escala do papel (1px = 0,75pt):
      rótulos 13px (~10pt), valores 14px (~10,5pt), corpo 15px (~11pt). */
-  #relatorio-impressao [class*="text-[7px]"],
-  #relatorio-impressao [class*="text-[8px]"] {
+  #relatorio-impressao [class*="text-[7px]"]:not(.cabecalho-relatorio *):not(.rodape-relatorio *):not(.doc-generated-by),
+  #relatorio-impressao [class*="text-[8px]"]:not(.cabecalho-relatorio *):not(.rodape-relatorio *):not(.doc-generated-by) {
     font-size: 13px !important;
     line-height: 1.35 !important;
   }
-  #relatorio-impressao [class*="text-[9px]"],
-  #relatorio-impressao [class*="text-[10px]"] {
+  #relatorio-impressao [class*="text-[9px]"]:not(.cabecalho-relatorio *):not(.rodape-relatorio *):not(.doc-generated-by),
+  #relatorio-impressao [class*="text-[10px]"]:not(.cabecalho-relatorio *):not(.rodape-relatorio *):not(.doc-generated-by) {
     font-size: 14px !important;
     line-height: 1.35 !important;
   }
-  #relatorio-impressao [class*="text-[11px]"],
-  #relatorio-impressao [class*="text-xs"],
-  #relatorio-impressao [class*="text-sm"] {
+  #relatorio-impressao [class*="text-[11px]"]:not(.cabecalho-relatorio *):not(.rodape-relatorio *):not(.doc-generated-by),
+  #relatorio-impressao [class*="text-xs"]:not(.cabecalho-relatorio *):not(.rodape-relatorio *):not(.doc-generated-by),
+  #relatorio-impressao [class*="text-sm"]:not(.cabecalho-relatorio *):not(.rodape-relatorio *):not(.doc-generated-by) {
     font-size: 15px !important;
     line-height: 1.4 !important;
   }
-  #relatorio-impressao [class*="text-base"] {
+  #relatorio-impressao [class*="text-base"]:not(.cabecalho-relatorio *):not(.rodape-relatorio *):not(.doc-generated-by) {
     font-size: 16px !important;
   }
 
@@ -243,6 +265,12 @@ canvas {
   #relatorio-impressao [class*="print:grid-cols-5"],
   #relatorio-impressao [class*="print:grid-cols-4"] {
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  /* Vários relatórios na mesma impressão (Painel de Arquivo): cada um começa numa folha nova. */
+  #relatorio-impressao .quebra-pagina {
+    break-before: page;
+    page-break-before: always;
   }
 
   /* Cartões e tabelas não se partem no meio de uma folha. */

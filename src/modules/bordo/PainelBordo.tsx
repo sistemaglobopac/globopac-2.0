@@ -224,12 +224,12 @@ export function PainelBordo() {
   // Card "Fichas Ativas": por setor, quantas fichas existem e quantas já foram iniciadas neste turno.
   const resumoSetores = resumoFichasPorSetor(
     fichasAplicaveis,
-    kpis?.monitoramentosHoje ?? [],
+    kpis?.monitoramentosDoSetorHoje ?? [],
     userSetores,
     turnoHoje ? new Date(turnoHoje.inicio) : inicioDoDiaManaus(agora)
   );
   const fichasIniciadasNoTurno = new Set(resumoSetores.flatMap((r) => r.idsIniciadas));
-  const fichasAtrasadas = turnoHoje ? calcularFichasAtrasadas(fichasAplicaveis, kpis?.monitoramentosHoje ?? [], agora) : [];
+  const fichasAtrasadas = turnoHoje ? calcularFichasAtrasadas(fichasAplicaveis, kpis?.monitoramentosDoSetorHoje ?? [], agora) : [];
   const desviosComRnc = (kpis?.desviosAtivos ?? []).filter((d) => d.rnc !== null);
   const bloqueadoPorPausa = pausaAtiva != null;
 

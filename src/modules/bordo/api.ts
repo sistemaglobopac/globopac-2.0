@@ -309,6 +309,9 @@ export interface AdendoPendente {
 
 export interface KpisTurno {
   monitoramentosHoje: MonitoramentoHoje[];
+  /** Monitoramentos de hoje nos setores do inspetor, de QUALQUER inspetor: quem cobre o almoço de outro continua a
+   * sequência dele, então atraso e "fichas iniciadas" olham o setor, não só o que este inspetor fez. */
+  monitoramentosDoSetorHoje: MonitoramentoHoje[];
   fichasAtivas: FichaAtivaResumo[];
   desviosAtivos: DesvioAtivo[];
   adendosPendentes: AdendoPendente[];
@@ -328,6 +331,7 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
     queryFn: async (): Promise<KpisTurno> => {
       const [
         { data: monitoramentosHoje, error: erroHoje },
+        { data: monitoramentosDoSetor, error: erroSetor },
         { data: recentes, error: erroRecentes },
         { data: fichasAtivas, error: erroFichas },
       ] = await Promise.all([
@@ -335,6 +339,12 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
           .from("monitoramentos")
           .select("id, ficha_template_id, criado_em, setor")
           .eq("user_id", userId as string)
+          .in("setor", userSetores)
+          .gte("criado_em", inicioDoDiaManaus(new Date()).toISOString())
+          .overrideTypes<MonitoramentoHoje[], { merge: false }>(),
+        supabase
+          .from("monitoramentos")
+          .select("id, ficha_template_id, criado_em, setor")
           .in("setor", userSetores)
           .gte("criado_em", inicioDoDiaManaus(new Date()).toISOString())
           .overrideTypes<MonitoramentoHoje[], { merge: false }>(),
@@ -362,6 +372,7 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
       ]);
 
       if (erroHoje) throw erroHoje;
+      if (erroSetor) throw erroSetor;
       if (erroRecentes) throw erroRecentes;
       if (erroFichas) throw erroFichas;
 
@@ -428,7 +439,7 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
         for (const f of fichasFaltantes ?? []) nomesFicha.set(f.id, { codigo: f.codigo, nome: f.nome });
       }
 
-      return { monitoramentosHoje: monitoramentosHoje ?? [], fichasAtivas: fichasAtivas ?? [], desviosAtivos, adendosPendentes, nomesFicha };
+      return { monitoramentosHoje: monitoramentosHoje ?? [], monitoramentosDoSetorHoje: monitoramentosDoSetor ?? [], fichasAtivas: fichasAtivas ?? [], desviosAtivos, adendosPendentes, nomesFicha };
     },
   });
 }

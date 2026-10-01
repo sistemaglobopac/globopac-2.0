@@ -15,6 +15,7 @@ import { CargasAvesPage } from "@/modules/recepcao/CargasAvesPage";
 import { FinalizarAbsorcaoPage } from "@/modules/fichas/FinalizarAbsorcaoPage";
 import { ConstrutorFichasPage } from "@/modules/fichas/ConstrutorFichasPage";
 import { SetoresPage } from "@/modules/admin/SetoresPage";
+import { TrocaSetorInspetorPage } from "@/modules/gestao/TrocaSetorInspetorModal";
 import { CarimbosPendentesPage } from "@/modules/carimbos/CarimbosPendentesPage";
 import { PainelArquivoPage } from "@/modules/sif/PainelArquivoPage";
 import { AuditoriaFederalPage } from "@/modules/sif/AuditoriaFederalPage";
@@ -128,6 +129,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute perfisPermitidos={["ADMIN_MASTER"]}>
               <ConstrutorFichasPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/trocar-setor"
+          element={
+            <ProtectedRoute perfisPermitidos={["VERIFICADOR", "ADMIN_MASTER"]}>
+              <TrocaSetorInspetorPage />
             </ProtectedRoute>
           }
         />

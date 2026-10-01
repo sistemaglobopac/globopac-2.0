@@ -29,7 +29,10 @@ export function AuditoriaFederalPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-8">
       <div className="space-y-4">
-        <h1 className="text-2xl font-semibold">Auditoria — documentos liberados ao SIF</h1>
+        <div>
+          <h1 className="text-2xl font-semibold">Painel de Auditoria</h1>
+          <p className="text-sm text-muted-foreground">Documentos liberados ao Serviço de Inspeção Federal para auditoria.</p>
+        </div>
 
         {isLoading && <p className="text-muted-foreground">Carregando…</p>}
         {!isLoading && liberados?.length === 0 && (

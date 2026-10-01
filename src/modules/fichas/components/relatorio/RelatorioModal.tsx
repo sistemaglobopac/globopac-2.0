@@ -14,8 +14,10 @@ const ELEMENTO_IMPRESSAO_ID = "relatorio-impressao";
  * `relatorio-modal-*` existem só para o @media print neutralizar overflow/position dos
  * wrappers do modal (ver index.css) — sem isso, o overflow-hidden/max-h-full do diálogo corta
  * o relatório na impressão mesmo com #relatorio-impressao marcado como visível. */
-export function RelatorioModal({ ids, onFechar }: { ids: string[]; onFechar: () => void }) {
-  const { data: dados, isLoading, isError } = useDadosRelatorio(ids);
+export function RelatorioModal({ ids, grupos, onFechar }: { ids: string[]; grupos?: string[][]; onFechar: () => void }) {
+  // `grupos`: vários relatórios consolidados (um por ficha/turno) impressos juntos, cada um numa nova folha.
+  const todosIds = grupos ? [...new Set(grupos.flat())] : ids;
+  const { data: dados, isLoading, isError } = useDadosRelatorio(todosIds);
 
   return (
     <div className="relatorio-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-2 sm:p-6">
@@ -48,7 +50,15 @@ export function RelatorioModal({ ids, onFechar }: { ids: string[]; onFechar: () 
           {isError && <p className="py-20 text-center text-sm text-destructive">Falha ao carregar os dados do relatório.</p>}
           {dados && (
             <div id={ELEMENTO_IMPRESSAO_ID}>
-              <RelatorioMonitoramento ids={ids} dados={dados} />
+              {grupos ? (
+                grupos.map((grupo, i) => (
+                  <div key={grupo.join(",")} className={i > 0 ? "quebra-pagina mt-8 print:mt-0" : ""}>
+                    <RelatorioMonitoramento ids={grupo} dados={dados} />
+                  </div>
+                ))
+              ) : (
+                <RelatorioMonitoramento ids={ids} dados={dados} />
+              )}
             </div>
           )}
         </div>
