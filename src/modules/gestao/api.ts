@@ -1,3 +1,4 @@
+import { erroDeFuncao } from "@/lib/erroFuncao";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { inicioDoDiaManaus } from "@/modules/bordo/api";
@@ -119,8 +120,8 @@ export function useCriarUsuarioGestao() {
           configuracoes_extras: JSON.stringify(input.configuracoesExtras),
         },
       });
-      if (error) throw error;
-      return data as { id: string };
+      if (error) throw await erroDeFuncao(error);
+      return data as { id: string; reativado?: boolean };
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["perfis_usuarios"] }),
   });

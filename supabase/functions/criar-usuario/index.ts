@@ -79,6 +79,63 @@ Deno.serve(async (req) => {
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
+    // "Excluir" colaborador é só DESLIGAR (ativo=false): o perfil nunca é apagado (LGPD + cadeia de
+    // custódia dos registros já assinados), então nome_usuario e matrícula continuam reservados.
+    // Cadastrar de novo o mesmo usuário desligado REATIVA o cadastro anterior (mesmo id, histórico
+    // preservado); usuário ativo ou matrícula de outra pessoa continuam sendo conflito.
+    const { data: porNome } = await adminClient
+      .from("perfis_usuarios")
+      .select("id, ativo, nome_completo")
+      .eq("nome_usuario", input.nome_usuario)
+      .maybeSingle();
+    const { data: porMatricula } = await adminClient
+      .from("perfis_usuarios")
+      .select("id, ativo, nome_completo")
+      .eq("matricula", input.matricula)
+      .maybeSingle();
+
+    if (porMatricula && porMatricula.id !== porNome?.id) {
+      return jsonError(
+        409,
+        `A matrícula "${input.matricula}" já pertence a ${porMatricula.nome_completo}${porMatricula.ativo ? "" : " (desligado)"}.`,
+        correlationId,
+        cors,
+      );
+    }
+
+    if (porNome) {
+      if (porNome.ativo) {
+        return jsonError(409, `O usuário "${input.nome_usuario}" já está cadastrado e ativo.`, correlationId, cors);
+      }
+      const { error: erroSenha } = await adminClient.auth.admin.updateUserById(porNome.id, { password: input.senha });
+      if (erroSenha) {
+        log("error", "reativar_senha_falhou", { erro: erroSenha.message });
+        return jsonError(500, "Não foi possível redefinir a senha do colaborador reativado.", correlationId, cors);
+      }
+      const { error: erroReativar } = await adminClient
+        .from("perfis_usuarios")
+        .update({
+          ativo: true,
+          desligado_em: null,
+          nome_completo: input.nome_completo,
+          matricula: input.matricula,
+          nivel_acesso: input.nivel_acesso,
+          setores_permitidos: input.setores_permitidos,
+          email_alerta: input.email_alerta ?? null,
+          configuracoes_extras: input.configuracoes_extras ?? null,
+        })
+        .eq("id", porNome.id);
+      if (erroReativar) {
+        log("error", "reativar_perfil_falhou", { erro: erroReativar.message });
+        return jsonError(500, "Não foi possível reativar o colaborador.", correlationId, cors);
+      }
+      log("info", "usuario_reativado", { userId: porNome.id, nomeUsuario: input.nome_usuario });
+      return new Response(JSON.stringify({ id: porNome.id, reativado: true }), {
+        status: 200,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+
     const emailFicticio = `${input.nome_usuario}@${DOMINIO_EMAIL_FICTICIO}`;
     const { data: criado, error: erroCriar } = await adminClient.auth.admin.createUser({
       email: emailFicticio,
@@ -92,7 +149,7 @@ Deno.serve(async (req) => {
     // nunca criaria a linha em perfis_usuarios.
     if (erroCriar || !criado.user || criado.user.identities?.length === 0) {
       log("error", "criar_auth_falhou", { erro: erroCriar?.message, nomeUsuario: input.nome_usuario });
-      return jsonError(409, `usuário "${input.nome_usuario}" já está cadastrado`, correlationId, cors);
+      return jsonError(409, `O usuário "${input.nome_usuario}" já está cadastrado.`, correlationId, cors);
     }
 
     const { error: erroPerfil } = await adminClient.from("perfis_usuarios").insert({

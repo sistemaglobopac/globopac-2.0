@@ -94,7 +94,7 @@ export function FormUsuarioModal({ usuario, onClose }: FormUsuarioModalProps) {
         });
         dialog.sucesso("Colaborador atualizado com sucesso.");
       } else {
-        await criar.mutateAsync({
+        const resultado = await criar.mutateAsync({
           nomeCompleto: nomeCompleto.trim(),
           nomeUsuario: nomeUsuario.trim(),
           matricula: matricula.trim(),
@@ -104,7 +104,11 @@ export function FormUsuarioModal({ usuario, onClose }: FormUsuarioModalProps) {
           emailAlerta: emailAlerta.trim() || null,
           configuracoesExtras,
         });
-        dialog.sucesso("Colaborador cadastrado com sucesso.");
+        dialog.sucesso(
+          resultado.reativado
+            ? "Colaborador reativado: o cadastro anterior (desligado) foi reaproveitado, com o histórico preservado e a nova senha."
+            : "Colaborador cadastrado com sucesso."
+        );
       }
       onClose();
     } catch (erro) {
