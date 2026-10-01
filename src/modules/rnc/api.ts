@@ -8,14 +8,6 @@ export interface Rnc {
   id: string;
   monitoramento_id: string | null;
   descricao: string;
-  /** Ação imediata informada pelo inspetor ao abrir a RNC (null em RNCs antigas/abertas pelo Verificador). */
-  acao_imediata: string | null;
-  /** Causa do desvio, informada pelo Gestor de Setor ao responder (a ação corretiva fica em `tratativa`). */
-  causa_desvio: string | null;
-  /** Assinatura eletrônica do Gestor de Setor na resposta — gravada pelo BANCO (hash e hora do servidor). */
-  assinatura_gestor_por: string | null;
-  assinatura_gestor_em: string | null;
-  assinatura_gestor_hash: string | null;
   setor: string;
   status: StatusRnc;
   severidade: SeveridadeRnc;
@@ -33,16 +25,11 @@ export interface Rnc {
   criado_em: string;
 }
 
-export function estaAtrasada(rnc: Rnc) {
-  return rnc.status !== "FECHADA" && new Date(rnc.prazo_sla).getTime() < Date.now();
-}
-
 /** RNCs ainda não fechadas — o que o gestor de setor precisa tratar (RLS já restringe ao
  * próprio setor; para ADMIN_MASTER, todas). */
-export function useRncsAbertas(opcoes?: { habilitado?: boolean }) {
+export function useRncsAbertas() {
   return useQuery({
     queryKey: ["rnc", "abertas"],
-    enabled: opcoes?.habilitado ?? true,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("rnc")
@@ -86,7 +73,6 @@ export function useAbrirRnc() {
     mutationFn: async (input: {
       monitoramentoId: string | null;
       descricao: string;
-      acaoImediata: string;
       setor: string;
       severidade: SeveridadeRnc;
       abertoPor: string;
@@ -106,7 +92,6 @@ export function useAbrirRnc() {
         .insert({
           monitoramento_id: input.monitoramentoId,
           descricao: input.descricao,
-          acao_imediata: input.acaoImediata,
           setor: input.setor,
           severidade: input.severidade,
           aberto_por: input.abertoPor,
@@ -129,19 +114,12 @@ export function useAbrirRnc() {
 export function useTratarRnc() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { id: string; causa: string; tratativa: string; userId: string }) => {
-      const { data, error } = await supabase
+    mutationFn: async (input: { id: string; tratativa: string; userId: string }) => {
+      const { error } = await supabase
         .from("rnc")
-        // revisado_por volta a null: a nova resposta ainda não foi julgada (a policy de UPDATE do
-        // gestor exige isso — sem, responder uma RNC devolvida pelo Verificador era barrado).
-        .update({ causa_desvio: input.causa, tratativa: input.tratativa, status: "TRATADA", tratado_por: input.userId, revisado_por: null })
-        .eq("id", input.id)
-        .select("id");
+        .update({ tratativa: input.tratativa, status: "TRATADA", tratado_por: input.userId })
+        .eq("id", input.id);
       if (error) throw error;
-      // A RLS filtra sem erro: 0 linhas = a RNC não é de um setor seu (ou já foi fechada).
-      if (!data || data.length === 0) {
-        throw new Error("Não foi possível responder: esta RNC não pertence a um setor sob sua responsabilidade (ou já foi fechada).");
-      }
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["rnc"] }),
   });
@@ -203,108 +181,5 @@ export function useReabrirRnc() {
       if (error) throw error;
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["rnc"] }),
-  });
-}
-
-// ------------------------------------------------------------------------------------------
-// Anexos da RNC (foto da não conformidade na abertura; fotos/documentos da tratativa)
-// ------------------------------------------------------------------------------------------
-
-export type EtapaAnexoRnc = "ABERTURA" | "TRATATIVA";
-
-export interface AnexoRnc {
-  id: string;
-  rnc_id: string;
-  etapa: EtapaAnexoRnc;
-  nome: string;
-  caminho: string;
-  tipo_mime: string | null;
-  tamanho_bytes: number | null;
-  enviado_por: string;
-  criado_em: string;
-}
-
-const BUCKET_ANEXOS_RNC = "rnc-anexos";
-export const TAMANHO_MAXIMO_ANEXO_BYTES = 10 * 1024 * 1024;
-export const ACEITA_ANEXOS_RNC = "image/*,.pdf,.doc,.docx,.xls,.xlsx";
-
-/** Nome seguro para o caminho no storage (sem acentos/espaços/caracteres especiais). */
-export function nomeSeguroArquivo(nome: string): string {
-  return nome
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9._-]+/g, "_")
-    .slice(-80);
-}
-
-/** Envia os arquivos para o storage privado e registra cada um em rnc_anexos. Devolve quantos
- * falharam (a RNC em si já foi gravada — o anexo não pode derrubar a abertura/tratativa). */
-export async function enviarAnexosRnc(rncId: string, etapa: EtapaAnexoRnc, arquivos: File[], userId: string): Promise<number> {
-  let falhas = 0;
-  for (const arquivo of arquivos) {
-    if (arquivo.size > TAMANHO_MAXIMO_ANEXO_BYTES) {
-      falhas += 1;
-      continue;
-    }
-    const caminho = `rnc/${rncId}/${crypto.randomUUID()}-${nomeSeguroArquivo(arquivo.name)}`;
-    const { error: erroUpload } = await supabase.storage.from(BUCKET_ANEXOS_RNC).upload(caminho, arquivo, { contentType: arquivo.type || undefined });
-    if (erroUpload) {
-      falhas += 1;
-      continue;
-    }
-    const { error: erroRegistro } = await supabase.from("rnc_anexos").insert({
-      rnc_id: rncId,
-      etapa,
-      nome: arquivo.name,
-      caminho,
-      tipo_mime: arquivo.type || null,
-      tamanho_bytes: arquivo.size,
-      enviado_por: userId,
-    });
-    if (erroRegistro) falhas += 1;
-  }
-  return falhas;
-}
-
-export function useAnexosRnc(rncId: string | undefined) {
-  return useQuery({
-    queryKey: ["rnc", "anexos", rncId],
-    enabled: !!rncId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("rnc_anexos")
-        .select("*")
-        .eq("rnc_id", rncId as string)
-        .order("criado_em", { ascending: true })
-        .overrideTypes<AnexoRnc[], { merge: false }>();
-      if (error) throw error;
-      return data;
-    },
-  });
-}
-
-/** URL temporária (5 min) para abrir/baixar um anexo do bucket privado. */
-export async function urlAnexoRnc(caminho: string): Promise<string> {
-  const { data, error } = await supabase.storage.from(BUCKET_ANEXOS_RNC).createSignedUrl(caminho, 300);
-  if (error || !data) throw error ?? new Error("Não foi possível abrir o anexo.");
-  return data.signedUrl;
-}
-
-/** Status das RNCs vinculadas a um conjunto de monitoramentos (qualquer status, inclusive
- * FECHADA) — usado para mostrar "TRATADO" nos cards e no relatório. */
-export function useRncsDosMonitoramentos(monitoramentoIds: string[]) {
-  const chave = [...monitoramentoIds].sort().join(",");
-  return useQuery({
-    queryKey: ["rnc", "por-monitoramento", chave],
-    enabled: monitoramentoIds.length > 0,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("rnc")
-        .select("id, monitoramento_id, status")
-        .in("monitoramento_id", monitoramentoIds)
-        .overrideTypes<{ id: string; monitoramento_id: string | null; status: StatusRnc }[], { merge: false }>();
-      if (error) throw error;
-      return new Map((data ?? []).filter((r) => r.monitoramento_id).map((r) => [r.monitoramento_id as string, r.status]));
-    },
   });
 }

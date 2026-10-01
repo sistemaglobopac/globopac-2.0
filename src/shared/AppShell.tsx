@@ -9,8 +9,6 @@ import { usePresenceTracking } from "@/modules/gestao/usePresenceTracking";
 import { horaEmManaus } from "@/modules/bordo/api";
 import { GlobalInspectorAlerts } from "@/modules/bordo/GlobalInspectorAlerts";
 import { NIVEL_ACESSO_BADGE } from "@/modules/gestao/api";
-import { useRncsAbertas } from "@/modules/rnc/api";
-import { AlertaRncGestor } from "@/modules/rnc/AlertaRncGestor";
 
 interface ItemMenu {
   rota: string;
@@ -52,7 +50,6 @@ const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
   VERIFICADOR: [
     { rota: "/verificacao", rotulo: "Painel de Verificação" },
     { rota: "/rnc", rotulo: "Revisão de RNC" },
-    { rota: "/gestao/cargas-aves", rotulo: "Cargas e Veículos" },
     { rota: "/sif/liberar", rotulo: "Painel de Arquivo" },
   ],
   INSPECAO_FEDERAL: [{ rota: "/auditoria", rotulo: "Auditoria" }],
@@ -73,7 +70,6 @@ const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
     { rota: "/pcm", rotulo: "Ordens de Serviço" },
     { rota: "/pcm/nova", rotulo: "Nova OS" },
     { rota: "/templates", rotulo: "Construtor de Fichas" },
-    { rota: "/gestao/cargas-aves", rotulo: "Cargas e Veículos" },
     { rota: "/admin/setores", rotulo: "Gestão de Setores" },
     { rota: "/sif/liberar", rotulo: "Painel de Arquivo" },
     { rota: "/auditoria", rotulo: "Auditoria" },
@@ -170,18 +166,6 @@ function CabecalhoGlobal({
  * `onNavegar` fecha o drawer ao escolher uma rota — sem isso o menu ficaria aberto cobrindo a
  * tela depois do usuário navegar, já que o drawer é controlado por estado, não pela rota. */
 function MenuLateral({ itens, onNavegar }: { itens: ItemMenu[]; onNavegar?: () => void }) {
-  const perfil = useSessionStore((s) => s.perfil);
-  const nivel = perfil?.nivelAcesso;
-  // Notificação de RNC no menu: o Gestor de Setor vê quantas RNCs esperam a resposta dele; o
-  // Verificador, quantas respostas esperam o julgamento dele. (RLS já restringe ao que cada um enxerga.)
-  const { data: rncs } = useRncsAbertas({ habilitado: nivel === "GESTOR_SETOR" || nivel === "VERIFICADOR" });
-  const paraResponder = (rncs ?? []).filter((r) => r.status !== "TRATADA").length;
-  const paraJulgar = (rncs ?? []).filter((r) => r.status === "TRATADA").length;
-  const contagem = (rota: string): number => {
-    if (nivel === "GESTOR_SETOR" && rota === "/rnc") return paraResponder;
-    if (nivel === "VERIFICADOR" && (rota === "/rnc" || rota === "/verificacao")) return paraJulgar;
-    return 0;
-  };
   return (
     <>
       <div className="p-4">
@@ -200,18 +184,7 @@ function MenuLateral({ itens, onNavegar }: { itens: ItemMenu[]; onNavegar?: () =
               )
             }
           >
-            <span className="flex items-center justify-between gap-2">
-              {item.rotulo}
-              {contagem(item.rota) > 0 && (
-                <span
-                  className="rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-bold leading-none text-destructive-foreground"
-                  aria-label={`${contagem(item.rota)} RNC(s) aguardando`}
-                  title="RNC(s) aguardando sua ação"
-                >
-                  {contagem(item.rota)}
-                </span>
-              )}
-            </span>
+            {item.rotulo}
           </NavLink>
         ))}
       </nav>
@@ -270,7 +243,6 @@ export function AppShell() {
         </main>
       </div>
       <GlobalInspectorAlerts />
-      <AlertaRncGestor />
     </div>
   );
 }

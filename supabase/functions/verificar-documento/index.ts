@@ -40,22 +40,7 @@ interface ItemTrilha {
   tipo: string;
   nome: string;
   criado_em: string;
-  // tsr_base64: token RFC 3161 (não é dado sensível — serve justamente para o auditor verificar
-  // o carimbo por conta própria, com openssl ou freetsa.org). Só presente quando já emitido.
-  carimbo: { emitido_em: string | null; tsa: string | null; tsr_base64: string } | null;
-}
-
-interface Comparacao {
-  registrado: string;
-  atual: string;
-  assinado_em: string;
-}
-
-interface Ficha {
-  protocolo: string;
-  documento: string;
-  setor: string;
-  criado_em: string;
+  carimbo: { emitido_em: string | null; tsa: string | null } | null;
 }
 
 Deno.serve(async (req) => {
@@ -120,8 +105,6 @@ Deno.serve(async (req) => {
         descricao: "descricao" in resultado ? resultado.descricao : undefined,
         trilha: resultado.trilha,
         integridade: resultado.integridade,
-        ficha: "ficha" in resultado ? resultado.ficha : undefined,
-        comparacao: "comparacao" in resultado ? resultado.comparacao : undefined,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
@@ -139,8 +122,6 @@ async function buscarMonitoramentoParaVerificacao(
   liberado: boolean;
   trilha: ItemTrilha[];
   integridade: "IDENTICO" | "VERSAO_ANTERIOR" | null;
-  ficha: Ficha;
-  comparacao: Comparacao | null;
 } | null> {
   // Nota: sem .overrideTypes() aqui — a versão do postgrest-js resolvida pelo Deno para
   // @supabase/supabase-js@2.45.4 (pinada) é mais antiga que a que o frontend resolve via npm
@@ -173,63 +154,20 @@ async function buscarMonitoramentoParaVerificacao(
     nome: nomePorId.get(a.user_id as string) ?? "Desconhecido",
     criado_em: a.criado_em as string,
     carimbo: a.tsr_base64
-      ? {
-          emitido_em: a.tsa_emitido_em as string | null,
-          tsa: a.tsa_utilizada as string | null,
-          tsr_base64: a.tsr_base64 as string,
-        }
+      ? { emitido_em: a.tsa_emitido_em as string | null, tsa: a.tsa_utilizada as string | null }
       : null,
   }));
 
   // Nunca fabrica um selo/hash quando não há nenhuma assinatura real (débito da v1: "hash
   // falso" a partir de um prefixo de UUID) — sem assinatura, integridade fica null.
   let integridade: "IDENTICO" | "VERSAO_ANTERIOR" | null = null;
-  let comparacao: Comparacao | null = null;
   if (assinaturas && assinaturas.length > 0) {
-    // A assinatura parcial (pesagem inicial) prova o horário da fase 1, mas o conteúdo mudou na
-    // finalização — a integridade é conferida contra a última assinatura NÃO parcial.
-    const completas = assinaturas.filter((a) => a.tipo !== "INSPETOR_PARCIAL");
-    const ultima = completas[completas.length - 1] ?? assinaturas[assinaturas.length - 1];
+    const ultima = assinaturas[assinaturas.length - 1];
     const hashRecalculado = await sha256Hex(conteudoAssinavelMonitoramento(m));
     integridade = ultima.hash_documento === hashRecalculado ? "IDENTICO" : "VERSAO_ANTERIOR";
-    comparacao = {
-      registrado: ultima.hash_documento as string,
-      atual: hashRecalculado,
-      assinado_em: ultima.criado_em as string,
-    };
   }
 
-  const { data: template } = await adminClient
-    .from("fichas_templates")
-    .select("nome")
-    .eq("id", m.ficha_template_id)
-    .maybeSingle();
-
-  // Mesmo formato do protocolo impresso no relatório (RelatorioMonitoramento.tsx): dia local de
-  // Manaus + primeiro bloco do UUID.
-  const diaLocal = new Date(m.criado_em)
-    .toLocaleDateString("en-CA", { timeZone: "America/Manaus" })
-    .replaceAll("-", "");
-  const ficha: Ficha = {
-    protocolo: `GS-${diaLocal}-${m.id.split("-")[0].toUpperCase()}`,
-    documento: (template?.nome as string | undefined) ?? "Ficha de Monitoramento",
-    setor: m.setor,
-    criado_em: m.criado_em,
-  };
-
-  // Regra do portal para monitoramentos: basta a assinatura do VERIFICADOR (ou já ter sido
-  // liberado ao SIF) — antes exigia só liberado_sif, e o auditor não conseguia conferir nada
-  // entre a verificação e a liberação em lote.
-  const verificado = (assinaturas ?? []).some((a) => a.tipo === "VERIFICADOR");
-
-  return {
-    tipo: "monitoramento",
-    liberado: (m.liberado_sif as boolean) || verificado,
-    trilha,
-    integridade,
-    ficha,
-    comparacao,
-  };
+  return { tipo: "monitoramento", liberado: m.liberado_sif as boolean, trilha, integridade };
 }
 
 interface OsParaHash {
@@ -285,11 +223,7 @@ async function buscarOsParaVerificacao(
     nome: nomePorId.get(a.user_id as string) ?? "Desconhecido",
     criado_em: a.criado_em as string,
     carimbo: a.tsr_base64
-      ? {
-          emitido_em: a.tsa_emitido_em as string | null,
-          tsa: a.tsa_utilizada as string | null,
-          tsr_base64: a.tsr_base64 as string,
-        }
+      ? { emitido_em: a.tsa_emitido_em as string | null, tsa: a.tsa_utilizada as string | null }
       : null,
   }));
 

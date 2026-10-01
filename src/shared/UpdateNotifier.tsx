@@ -33,7 +33,7 @@ export function UpdateNotifier() {
   if (!novaVersaoDisponivel) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 flex flex-wrap items-center gap-3 sm:left-auto sm:max-w-md rounded-lg border bg-white px-4 py-3 shadow-lg">
+    <div className="fixed bottom-4 right-4 z-50 flex items-center gap-3 rounded-lg border bg-white px-4 py-3 shadow-lg">
       <p className="text-sm text-foreground">Nova versão disponível.</p>
       <Button size="sm" onClick={() => window.location.reload()}>
         <RefreshCw className="h-4 w-4" />

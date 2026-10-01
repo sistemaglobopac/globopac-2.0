@@ -47,18 +47,9 @@ export type CampoTemplate =
   | { chave: string; tipo: "chiller_partes"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
   | { chave: string; tipo: "mini_chillers"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
   | { chave: string; tipo: "lavagem_final"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
-  // valorMaximo (opcional) só altera o <limite> impresso na MENSAGEM de desvio; o status do campo
-  // usa os limites fixos da norma (8% / 6%).
-  | { chave: string; tipo: "absorcao_agua"; obrigatorio: boolean; label?: string; valorMaximo?: number; dependeDe?: DependeDe }
-  | { chave: string; tipo: "dripping_test"; obrigatorio: boolean; label?: string; valorMaximo?: number; dependeDe?: DependeDe }
-  | { chave: string; tipo: "parada_equipamento"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
-  | { chave: string; tipo: "ocorrencia_pragas"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
-  | { chave: string; tipo: "recepcao_aves"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
-  | { chave: string; tipo: "espera_aves"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
-  | { chave: string; tipo: "pendura_aves"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
-  | { chave: string; tipo: "eletronarcose_aves"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
-  | { chave: string; tipo: "caixas_vazias"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
-  | { chave: string; tipo: "peso_caixa"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe };
+  | { chave: string; tipo: "absorcao_agua"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
+  | { chave: string; tipo: "dripping_test"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
+  | { chave: string; tipo: "parada_equipamento"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe };
 
 const dependeDeSchema = z.object({ campo: z.string().min(1), valor: z.string() }).optional();
 
@@ -192,7 +183,6 @@ export const campoTemplateSchema: z.ZodType<CampoTemplate> = z.discriminatedUnio
     tipo: z.literal("absorcao_agua"),
     obrigatorio: z.boolean(),
     label: z.string().optional(),
-    valorMaximo: z.number().optional(),
     dependeDe: dependeDeSchema,
   }),
   z.object({
@@ -200,61 +190,11 @@ export const campoTemplateSchema: z.ZodType<CampoTemplate> = z.discriminatedUnio
     tipo: z.literal("dripping_test"),
     obrigatorio: z.boolean(),
     label: z.string().optional(),
-    valorMaximo: z.number().optional(),
     dependeDe: dependeDeSchema,
   }),
   z.object({
     chave: z.string().min(1),
     tipo: z.literal("parada_equipamento"),
-    obrigatorio: z.boolean(),
-    label: z.string().optional(),
-    dependeDe: dependeDeSchema,
-  }),
-  z.object({
-    chave: z.string().min(1),
-    tipo: z.literal("ocorrencia_pragas"),
-    obrigatorio: z.boolean(),
-    label: z.string().optional(),
-    dependeDe: dependeDeSchema,
-  }),
-  z.object({
-    chave: z.string().min(1),
-    tipo: z.literal("recepcao_aves"),
-    obrigatorio: z.boolean(),
-    label: z.string().optional(),
-    dependeDe: dependeDeSchema,
-  }),
-  z.object({
-    chave: z.string().min(1),
-    tipo: z.literal("espera_aves"),
-    obrigatorio: z.boolean(),
-    label: z.string().optional(),
-    dependeDe: dependeDeSchema,
-  }),
-  z.object({
-    chave: z.string().min(1),
-    tipo: z.literal("pendura_aves"),
-    obrigatorio: z.boolean(),
-    label: z.string().optional(),
-    dependeDe: dependeDeSchema,
-  }),
-  z.object({
-    chave: z.string().min(1),
-    tipo: z.literal("eletronarcose_aves"),
-    obrigatorio: z.boolean(),
-    label: z.string().optional(),
-    dependeDe: dependeDeSchema,
-  }),
-  z.object({
-    chave: z.string().min(1),
-    tipo: z.literal("caixas_vazias"),
-    obrigatorio: z.boolean(),
-    label: z.string().optional(),
-    dependeDe: dependeDeSchema,
-  }),
-  z.object({
-    chave: z.string().min(1),
-    tipo: z.literal("peso_caixa"),
     obrigatorio: z.boolean(),
     label: z.string().optional(),
     dependeDe: dependeDeSchema,
@@ -321,54 +261,10 @@ export function zodFromSchemaCampos(campos: CampoTemplate[]): z.ZodEffects<z.Zod
       case "chiller_partes":
       case "mini_chillers":
       case "lavagem_final":
-      case "parada_equipamento":
-      case "ocorrencia_pragas":
-      case "pendura_aves":
-      case "eletronarcose_aves":
-      case "caixas_vazias":
-      case "peso_caixa":
-        fieldSchema = z.unknown();
-        break;
-      // Recepção de aves: obrigatória, a carga (GTA) precisa estar escolhida; o restante (horários,
-      // veículo, condições) é conferido na tela antes de assinar.
-      case "recepcao_aves":
-        fieldSchema =
-          campo.obrigatorio && !campo.dependeDe
-            ? z
-                .object(
-                  { cargaId: z.string().min(1, "Selecione a GTA da carga") },
-                  { required_error: "Campo obrigatório", invalid_type_error: "Campo obrigatório" }
-                )
-                .passthrough()
-            : z.unknown();
-        break;
-      // Área de espera: obrigatória, ao menos um box com carga; o restante (comportamento,
-      // temperatura, equipamentos) é conferido na tela antes de assinar.
-      case "espera_aves":
-        fieldSchema =
-          campo.obrigatorio && !campo.dependeDe
-            ? z
-                .object(
-                  { boxes: z.array(z.unknown()).min(1, "Informe ao menos um box") },
-                  { required_error: "Campo obrigatório", invalid_type_error: "Campo obrigatório" }
-                )
-                .passthrough()
-            : z.unknown();
-        break;
-      // Absorção de água e Dripping Test são obrigatórios como qualquer outro campo: o objeto
-      // emitido pelo widget não pode faltar ao assinar. Com `dependeDe` (campo oculto vira "") ou
-      // não obrigatório, aceita qualquer valor (a obrigatoriedade condicional fica no superRefine).
       case "absorcao_agua":
       case "dripping_test":
-        fieldSchema =
-          campo.obrigatorio && !campo.dependeDe
-            ? z
-                .object(
-                  { items: z.array(z.unknown()).min(1, "Campo obrigatório") },
-                  { required_error: "Campo obrigatório", invalid_type_error: "Campo obrigatório" }
-                )
-                .passthrough()
-            : z.unknown();
+      case "parada_equipamento":
+        fieldSchema = z.unknown();
         break;
     }
 
@@ -405,14 +301,7 @@ export function valoresIniciaisDe(campos: CampoTemplate[]): Record<string, unkno
       campo.tipo === "lavagem_final" ||
       campo.tipo === "absorcao_agua" ||
       campo.tipo === "dripping_test" ||
-      campo.tipo === "parada_equipamento" ||
-      campo.tipo === "ocorrencia_pragas" ||
-      campo.tipo === "recepcao_aves" ||
-      campo.tipo === "espera_aves" ||
-      campo.tipo === "pendura_aves" ||
-      campo.tipo === "eletronarcose_aves" ||
-      campo.tipo === "caixas_vazias" ||
-      campo.tipo === "peso_caixa"
+      campo.tipo === "parada_equipamento"
     )
       valores[campo.chave] = null;
     else valores[campo.chave] = "";

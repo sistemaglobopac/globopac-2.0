@@ -1,10 +1,9 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Eye, FolderClosed, Lock, ShieldCheck, Unlock } from "lucide-react";
+import { ChevronDown, ChevronUp, FolderClosed, Lock, ShieldCheck, Unlock } from "lucide-react";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import type { AppointmentDisplay, DossieVerificacao } from "../utils/recordGrouping";
 import { ensureLocalTime } from "../utils/tempo";
-import type { StatusRnc } from "@/modules/rnc/api";
 import { AuditRecordCard } from "./AuditRecordCard";
 
 interface DossieVerificacaoCardProps {
@@ -20,7 +19,6 @@ interface DossieVerificacaoCardProps {
   codigoPorTemplateId: Map<string, string>;
   usersMap: Map<string, string>;
   isAdmin: boolean;
-  rncPorMonitoramento?: Map<string, StatusRnc>;
   onEncerrarTurno: (dossie: DossieVerificacao) => void;
   onEncerrarTurnoItem: (item: AppointmentDisplay) => void;
 }
@@ -45,13 +43,11 @@ export function DossieVerificacaoCard({
   codigoPorTemplateId,
   usersMap,
   isAdmin,
-  rncPorMonitoramento,
   onEncerrarTurno,
   onEncerrarTurnoItem,
 }: DossieVerificacaoCardProps) {
   const [apuracoesAbertas, setApuracoesAbertas] = useState(false);
-  const selecionaveis = dossie.idsSelecionaveis;
-  const todasSelecionadas = selecionaveis.length > 0 && selecionaveis.every((id) => selectedIds.has(id));
+  const todasSelecionadas = dossie.ids.every((id) => selectedIds.has(id));
   const primeiroItem = dossie.items.at(0);
   const ultimoItem = dossie.items.at(-1);
   const primeiraHora = primeiroItem ? ensureLocalTime(primeiroItem.appt.criado_em).time : "—";
@@ -60,16 +56,16 @@ export function DossieVerificacaoCard({
 
   return (
     <div
-      className={`glass-panel rounded-xl border border-white/70 p-4 shadow-sm transition-shadow hover:shadow-md`}
+      className={`glass-panel rounded-xl border border-white/70 p-4 shadow-sm transition-shadow hover:shadow-md ${dossie.bloqueado ? "opacity-80" : ""}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          {selecionaveis.length > 0 && (
+          {!dossie.bloqueado && (
             <input
               type="checkbox"
               className="mt-1 h-4 w-4"
               checked={todasSelecionadas}
-              onChange={() => toggleGroupSelection(selecionaveis)}
+              onChange={() => toggleGroupSelection(dossie.ids)}
               aria-label="Selecionar todo o dossiê"
             />
           )}
@@ -83,12 +79,10 @@ export function DossieVerificacaoCard({
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
               <Badge variant="secondary">{dossie.items.length} Monitoramentos</Badge>
-              {!dossie.verificado && (
-                <Badge variant={dossie.bloqueado ? "warning" : "success"}>
-                  {dossie.bloqueado && <Lock className="mr-1 h-3 w-3" />}
-                  {dossie.bloqueado ? "Turno em Aberto" : "Turno Finalizado"}
-                </Badge>
-              )}
+              <Badge variant={dossie.bloqueado ? "warning" : "success"}>
+                {dossie.bloqueado && <Lock className="mr-1 h-3 w-3" />}
+                {dossie.bloqueado ? "Turno em Aberto" : "Turno Finalizado"}
+              </Badge>
             </div>
             <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
               <Badge variant="outline">{dossie.pac}</Badge>
@@ -105,20 +99,10 @@ export function DossieVerificacaoCard({
               Encerrar Turno (Admin)
             </Button>
           )}
-          {dossie.verificado ? (
-            <>
-              <Badge className="border-transparent bg-lime text-primary">VERIFICADO</Badge>
-              <Button type="button" size="sm" variant="outline" onClick={() => onVerDossie(dossie)}>
-                <Eye className="h-3.5 w-3.5" />
-                Ver
-              </Button>
-            </>
-          ) : (
-            <Button type="button" size="sm" variant={dossie.bloqueado ? "outline" : "default"} onClick={() => onVerDossie(dossie)}>
-              {dossie.bloqueado ? <Eye className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5" />}
-              {dossie.bloqueado ? "Prévia" : "Verificar"}
-            </Button>
-          )}
+          <Button type="button" size="sm" disabled={dossie.bloqueado} onClick={() => onVerDossie(dossie)}>
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Verificar
+          </Button>
           <Button type="button" size="sm" variant="ghost" onClick={() => setApuracoesAbertas((atual) => !atual)}>
             Apurações
             {apuracoesAbertas ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
@@ -143,7 +127,6 @@ export function DossieVerificacaoCard({
               usersMap={usersMap}
               blockedIds={dossie.bloqueado ? new Set(dossie.ids) : new Set()}
               isAdmin={isAdmin}
-              rncStatus={rncPorMonitoramento?.get(item.id)}
               onEncerrarTurno={onEncerrarTurnoItem}
             />
           ))}

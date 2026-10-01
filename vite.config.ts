@@ -70,6 +70,9 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./tests/setup.ts"],
+    // Valores de teste: os testes nao falam com a rede, so precisam que o cliente do Supabase seja
+    // criado (src/lib/supabase.ts exige as duas variaveis). Assim o CI roda sem .env.local.
+    env: { VITE_SUPABASE_URL: "http://127.0.0.1:54321", VITE_SUPABASE_ANON_KEY: "placeholder-somente-para-testes" },
     include: ["tests/unit/**/*.test.ts", "tests/component/**/*.test.tsx"],
   },
 });

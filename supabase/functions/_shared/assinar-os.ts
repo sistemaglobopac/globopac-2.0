@@ -4,7 +4,6 @@
 // _shared/assinar.ts (uma implementação, nunca duas divergentes).
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { conteudoAssinavelOs, sha256Hex } from "./hash.ts";
-import { carimbarAgora } from "./carimbo-imediato.ts";
 
 /** Tabela de transições da máquina de estados da OS (ADR 0012) — nunca if/else disperso.
  * `colunaResponsavel` é preenchida com o user_id de quem assina; `deStatus: null` marca a
@@ -121,14 +120,13 @@ export async function assinarEtapaOs(
  * final. Não passa pela tabela de transições: não muda `status`, só documenta a liberação. */
 export async function assinarLiberacaoOs(
   adminClient: SupabaseClient,
-  params: { osId: string; userId: string; os: OsCompleta; aguardarCarimbo?: boolean }
+  params: { osId: string; userId: string; os: OsCompleta }
 ): Promise<ResultadoAssinaturaOs> {
   const resultado = await gravarAssinaturaOs(adminClient, {
     osId: params.osId,
     userId: params.userId,
     tipo: "LIBERACAO_DIARIA",
     os: params.os,
-    aguardarCarimbo: params.aguardarCarimbo,
   });
   if (!resultado.ok) return resultado;
   return { ...resultado, os: params.os };
@@ -136,7 +134,7 @@ export async function assinarLiberacaoOs(
 
 async function gravarAssinaturaOs(
   adminClient: SupabaseClient,
-  params: { osId: string; userId: string; tipo: string; os: OsCompleta; aguardarCarimbo?: boolean }
+  params: { osId: string; userId: string; tipo: string; os: OsCompleta }
 ): Promise<ResultadoAssinaturaOs> {
   const hashDocumento = await sha256Hex(conteudoAssinavelOs(params.os));
 
@@ -156,11 +154,11 @@ async function gravarAssinaturaOs(
     return { ok: false, status: 500, mensagem: "falha ao gravar assinatura da etapa" };
   }
 
-  const { data: itemFila, error: filaError } = await adminClient
-    .from("fila_carimbo_tempo")
-    .insert({ assinatura_id: assinatura.id, tipo_assinatura: "os", status: "pendente" })
-    .select("id")
-    .single();
+  const { error: filaError } = await adminClient.from("fila_carimbo_tempo").insert({
+    assinatura_id: assinatura.id,
+    tipo_assinatura: "os",
+    status: "pendente",
+  });
   if (filaError) {
     console.log(
       JSON.stringify({
@@ -170,10 +168,6 @@ async function gravarAssinaturaOs(
         erro: filaError.message,
       })
     );
-  }
-
-  if (!filaError && itemFila) {
-    await carimbarAgora(adminClient, itemFila.id as string, { aguardar: params.aguardarCarimbo ?? true });
   }
 
   return { ok: true, id: assinatura.id, hash_documento: hashDocumento, criado_em: assinatura.criado_em, os: params.os };

@@ -16,7 +16,6 @@ import {
   ShieldAlert,
   Timer,
   TrendingUp,
-  Truck,
   Users,
   Wrench,
   type LucideIcon,
@@ -295,10 +294,9 @@ function AbaHome({ irPara }: { irPara: (aba: AbaGestao) => void }) {
           <BotaoFerramenta icon={ClipboardPlus} categoria="Ferramenta" titulo="Criar Fichas" indice={1} onClick={() => irPara("fichas_builder")} />
           <BotaoFerramenta icon={Megaphone} categoria="Comunicação" titulo="Comunicados" indice={2} onClick={() => irPara("comunicados")} />
           <BotaoFerramenta icon={Timer} categoria="Jornada" titulo="Folhas de Pausa" indice={3} onClick={() => setModalAberto("folhas")} />
-          <BotaoFerramenta icon={Bug} categoria="Módulo Externo" titulo="Controle Pragas" indice={4} onClick={() => navigate("/gestao/pragas")} />
+          <BotaoFerramenta icon={Bug} categoria="Módulo Externo" titulo="Controle Pragas" indice={4} onClick={() => irPara("controle_pragas")} />
           <BotaoFerramenta icon={BarChart3} categoria="Análise" titulo="Dashboard BI" indice={5} onClick={() => irPara("dashboard_bi")} />
           <BotaoFerramenta icon={TrendingUp} categoria="Gestão" titulo="Melhoria Contínua" indice={6} onClick={() => navigate("/melhoria-continua")} />
-          <BotaoFerramenta icon={Truck} categoria="Bem-Estar Animal" titulo="Cargas e Veículos" indice={7} onClick={() => navigate("/gestao/cargas-aves")} />
         </div>
       </section>
 

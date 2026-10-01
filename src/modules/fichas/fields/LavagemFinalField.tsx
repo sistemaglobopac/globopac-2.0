@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, Info, Lock } from "lucide-react";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
-import { formatHidrometro, formatMaskedValue, LIMIAR_IMPLAUSIVEL, parseHidrometro } from "./hidrometro";
-import { apurar, avesNoChuveiro, detalheDesvio, META_L_CARCACA } from "./calculosSpr";
-import { AvisoImplausivel, AvisoPrimeiroDoDia, CampoBloqueado, LogicaCalculo, TOOLTIP_HIDR_ANTERIOR } from "./componentesSpr";
-import type { ChillerCarcacasValor, LavagemFinalValor } from "./tiposCompostos";
+import { formatHidrometro, formatMaskedValue, LIMIAR_IMPLAUSIVEL, parseHidrometro, parseNumeroHidrometro } from "./hidrometro";
+import type { ChillerCarcacasValor, LavagemFinalValor, TanqueHidrometro } from "./tiposCompostos";
+
+const META_L_CARCACA = 1.5;
 
 interface LavagemFinalFieldProps {
   value: LavagemFinalValor | undefined;
@@ -15,16 +15,23 @@ interface LavagemFinalFieldProps {
   carcacasAtual: ChillerCarcacasValor | undefined;
 }
 
-/** Vazão do Chuveiro Final de Lavagem de Carcaças — SEM gelo. Base: total de aves BRUTO e
- * carcaças totalmente condenadas vêm bloqueados, ao vivo, do SPR Carcaças da mesma ficha; as
- * carcaças parcialmente condenadas são digitadas AQUI (não vêm do SPR Carcaças). Meta: 1,5
- * L/carcaça. */
+function apuracao(chuveiro: TanqueHidrometro, totalAves: number): number | null {
+  const prev = parseNumeroHidrometro(chuveiro.prev);
+  const cur = parseNumeroHidrometro(chuveiro.cur);
+  if (cur === 0) return 0;
+  const aguaUsada = (cur - prev) * 1000;
+  if (totalAves === 0) return null;
+  return aguaUsada / totalAves;
+}
+
+/** Vazão do Chuveiro Final de Lavagem de Carcaças — porte do v1 (FinalWashField.jsx). Base
+ * (Total de Aves e Carcaças Totalmente Condenadas) herdada ao vivo do SPR Carcaças da mesma
+ * ficha; Carcaças Parcialmente Condenadas apuradas aqui mesmo. Meta: 1,5 L/carcaça. */
 export function LavagemFinalField({ value, onChange, disabled, prevAppointment, carcacasAtual }: LavagemFinalFieldProps) {
   const [condenacoesParciais, setCondenacoesParciais] = useState(value?.condenacoesParciais ?? "");
-  const [chuveiro, setChuveiro] = useState<{ prev: string; cur: string }>({
-    prev: value?.chuveiro.prev ?? prevAppointment?.chuveiro.cur ?? "",
-    cur: value?.chuveiro.cur ?? "",
-  });
+  const [chuveiro, setChuveiro] = useState<TanqueHidrometro>(
+    value?.chuveiro ?? { prev: prevAppointment?.chuveiro.cur ?? "", cur: "", ice: "0" }
+  );
   const [prevTravado, setPrevTravado] = useState(!!(value?.chuveiro.prev || prevAppointment?.chuveiro.cur));
 
   useEffect(() => {
@@ -36,11 +43,10 @@ export function LavagemFinalField({ value, onChange, disabled, prevAppointment, 
   const totalAvesBruto = carcacasAtual?.totalAvesBruto ?? 0;
   const condenasTotalSPR = parseFloat(carcacasAtual?.condenasTotal ?? "") || 0;
   const condenacoesParciaisNum = parseFloat(condenacoesParciais) || 0;
-  const totalAves = avesNoChuveiro(totalAvesBruto, condenasTotalSPR, condenacoesParciaisNum);
-  // Só bloqueia fora do 1º monitoramento do dia.
+  const totalAves = Math.max(0, totalAvesBruto - (condenasTotalSPR + condenacoesParciaisNum));
   const avesIndisponivel = prevTravado && !totalAvesBruto;
 
-  const valorApurado = apurar(chuveiro.prev, chuveiro.cur, 0, totalAves); // sem gelo
+  const valorApurado = apuracao(chuveiro, totalAves);
   const hasCurData = !!chuveiro.cur;
   const confChuveiro = !chuveiro.cur ? true : totalAves === 0 ? true : (valorApurado ?? 0) >= META_L_CARCACA;
   const isConforme = !hasCurData || confChuveiro;
@@ -51,7 +57,7 @@ export function LavagemFinalField({ value, onChange, disabled, prevAppointment, 
   useEffect(() => {
     const detalhes: string[] = [];
     if (!confChuveiro && totalAves > 0) {
-      detalhes.push(detalheDesvio("Chuveiro Final", valorApurado ?? 0, META_L_CARCACA, "L/carcaça"));
+      detalhes.push(`Chuveiro Final (Apurado: ${(valorApurado ?? 0).toFixed(3)}L/carcaça | Meta: ${META_L_CARCACA.toFixed(3)}L/carcaça)`);
     }
     onChange({
       chuveiro,
@@ -126,17 +132,21 @@ export function LavagemFinalField({ value, onChange, disabled, prevAppointment, 
         <div className="space-y-3 rounded-md border border-primary/20 bg-primary/5 p-4">
           <h4 className="text-sm font-bold text-primary">Base de Cálculo — Aves no Chuveiro Final</h4>
           <div className="flex flex-wrap items-end gap-4 rounded-md border bg-background p-3">
-            <CampoBloqueado rotulo="Total de Aves" valor={totalAvesBruto.toLocaleString("pt-BR")} />
-            <CampoBloqueado rotulo="Carcaças Totalmente Condenadas" valor={condenasTotalSPR.toLocaleString("pt-BR")} />
+            <div className="min-w-[140px] flex-1">
+              <Label className="flex items-center gap-1 text-xs text-muted-foreground">
+                Total de Aves (SPR Carcaças) <Lock className="h-3 w-3" />
+              </Label>
+              <p className="py-1 text-lg font-black">{totalAvesBruto.toLocaleString("pt-BR")}</p>
+            </div>
+            <div className="min-w-[140px] flex-1">
+              <Label className="flex items-center gap-1 text-xs text-muted-foreground">
+                Carcaças Totalmente Condenadas (SPR Carcaças) <Lock className="h-3 w-3" />
+              </Label>
+              <p className="py-1 text-lg font-black">{condenasTotalSPR.toLocaleString("pt-BR")}</p>
+            </div>
             <div className="min-w-[140px] flex-1 space-y-1">
               <Label className="text-xs text-muted-foreground">Carcaças Parcialmente Condenadas (Un)</Label>
-              <Input
-                inputMode="numeric"
-                disabled={disabled}
-                value={condenacoesParciais}
-                onChange={(e) => setCondenacoesParciais(e.target.value.replace(/\D/g, ""))}
-                placeholder="Ex: 30"
-              />
+              <Input type="number" disabled={disabled} value={condenacoesParciais} onChange={(e) => setCondenacoesParciais(e.target.value)} placeholder="Ex: 30" />
             </div>
           </div>
           {totalAvesBruto > 0 && (
@@ -148,13 +158,19 @@ export function LavagemFinalField({ value, onChange, disabled, prevAppointment, 
           )}
         </div>
       ) : (
-        <AvisoPrimeiroDoDia />
+        <div className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 p-3 text-sm">
+          <Info className="h-4 w-4 shrink-0 text-primary" />
+          <span>
+            <strong>Primeiro monitoramento do dia:</strong> informe apenas a leitura atual do hidrômetro. Volume processado e apuração de vazão
+            começam no próximo monitoramento.
+          </span>
+        </div>
       )}
 
       <div className="overflow-hidden rounded-lg border-2" style={{ borderColor: naoConforme ? "#dc2626" : "hsl(var(--primary) / 0.25)" }}>
-        <div className="flex flex-wrap gap-2 items-center justify-between bg-primary px-3 py-2 text-sm font-black text-primary-foreground">
+        <div className="flex items-center justify-between bg-primary px-3 py-2 text-sm font-black text-primary-foreground">
           CHUVEIRO FINAL
-          {totalAves > 0 && <span className="text-xs opacity-90">Meta: {formatMaskedValue(META_L_CARCACA.toFixed(3))} L/carcaça</span>}
+          {totalAves > 0 && <span className="text-xs opacity-90">Meta: {META_L_CARCACA.toFixed(3)} L/carcaça</span>}
         </div>
         <div className="space-y-3 p-4">
           <div className={`grid gap-3 ${!prevTravado ? "grid-cols-1" : "sm:grid-cols-2"}`}>
@@ -163,7 +179,7 @@ export function LavagemFinalField({ value, onChange, disabled, prevAppointment, 
                 <Label className="flex items-center gap-1 text-xs text-muted-foreground">
                   Hidr. Anterior (m³) <Lock className="h-3 w-3" />
                 </Label>
-                <Input disabled readOnly title={TOOLTIP_HIDR_ANTERIOR} value={formatHidrometro(chuveiro.prev)} className="font-mono" placeholder="Ex: 3718,72" />
+                <Input disabled value={formatHidrometro(chuveiro.prev)} className="font-mono" placeholder="Ex: 3718,72" readOnly />
               </div>
             )}
             <div className="space-y-1">
@@ -185,7 +201,7 @@ export function LavagemFinalField({ value, onChange, disabled, prevAppointment, 
               borderColor: !temResultado ? undefined : naoConforme ? "#dc2626" : "#059669",
             }}
           >
-            <div className="flex flex-wrap gap-2 items-center justify-between">
+            <div className="flex items-center justify-between">
               <span className="text-xs font-bold" style={{ color: !temResultado ? undefined : naoConforme ? "#dc2626" : "#059669" }}>
                 VAZÃO APURADA
               </span>
@@ -193,20 +209,17 @@ export function LavagemFinalField({ value, onChange, disabled, prevAppointment, 
                 {temResultado ? `${formatMaskedValue((valorApurado ?? 0).toFixed(3))} L/carcaça` : "—"}
               </span>
             </div>
-            {naoConforme && temResultado && (
-              <p className="mt-1 text-xs font-bold text-destructive">ABAIXO DO MÍNIMO ({formatMaskedValue(META_L_CARCACA.toFixed(3))} L/carcaça)</p>
-            )}
+            {naoConforme && temResultado && <p className="mt-1 text-xs font-bold text-destructive">ABAIXO DO MÍNIMO ({META_L_CARCACA.toFixed(3)} L/carcaça)</p>}
           </div>
 
-          {implausivel && <AvisoImplausivel apurado={valorApurado ?? 0} meta={META_L_CARCACA} />}
+          {implausivel && (
+            <div className="flex items-start gap-2 rounded-md border border-warning bg-warning/10 p-2 text-xs font-medium text-warning-foreground">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>Valor {((valorApurado ?? 0) / META_L_CARCACA).toFixed(0)}x acima da meta — confira a leitura do hidrômetro.</span>
+            </div>
+          )}
         </div>
       </div>
-
-      <LogicaCalculo titulo="Chuveiro Final">
-        <li>Aves no Chuveiro Final = total de aves bruto (SPR Carcaças) − (carcaças totalmente condenadas (SPR Carcaças) + carcaças parcialmente condenadas informadas aqui).</li>
-        <li>Água usada (L) = (Hidr. Atual − Hidr. Anterior) × 1000. Não há gelo neste ponto.</li>
-        <li>Vazão apurada (L/carcaça) = água usada ÷ Aves no Chuveiro Final. Meta fixa: maior ou igual a 1,5 L/carcaça.</li>
-      </LogicaCalculo>
     </div>
   );
 }

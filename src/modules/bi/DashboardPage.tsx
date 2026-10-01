@@ -3,7 +3,6 @@ import { useMonitoramentosResumo, useOsResumo, useRncResumo, type MonitoramentoR
 import { baixarCsv, linhasParaCsv } from "@/lib/csv";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
-import { rotuloSituacao, situacaoDe } from "@/shared/situacaoConformidade";
 
 // Cores literais do design system GloboPac v1.0 (mesmos valores de tailwind.config.ts) —
 // recharts não consome classes Tailwind, só valores de cor diretos.
@@ -63,9 +62,8 @@ export function DashboardPage() {
   const { data: rncs, isLoading: carregandoRnc } = useRncResumo();
   const { data: osList, isLoading: carregandoOs } = useOsResumo();
 
-  const conformes = (monitoramentos ?? []).filter((m) => situacaoDe(m) === "CONFORME").length;
-  const tratados = (monitoramentos ?? []).filter((m) => situacaoDe(m) === "TRATADO").length;
-  const naoConformes = (monitoramentos ?? []).filter((m) => situacaoDe(m) === "NAO_CONFORME").length;
+  const conformes = (monitoramentos ?? []).filter((m) => m.conformidade === true).length;
+  const naoConformes = (monitoramentos ?? []).filter((m) => m.conformidade === false).length;
   const pendentesVerificacao = (monitoramentos ?? []).filter((m) => m.conformidade === null).length;
 
   const rncsAbertas = (rncs ?? []).filter((r) => r.status !== "FECHADA").length;
@@ -79,17 +77,17 @@ export function DashboardPage() {
   const osPorStatus = contarPorChave(osList ?? [], (os) => os.status);
 
   function exportarMonitoramentos() {
-    const csv = linhasParaCsv<MonitoramentoResumo & { situacao: string }>(
+    const csv = linhasParaCsv<MonitoramentoResumo>(
       [
         { chave: "id", rotulo: "ID" },
         { chave: "setor", rotulo: "Setor" },
-        { chave: "situacao", rotulo: "Situação" },
+        { chave: "conformidade", rotulo: "Conforme" },
         { chave: "criado_em", rotulo: "Criado em" },
         { chave: "verificado_em", rotulo: "Verificado em" },
         { chave: "liberado_sif", rotulo: "Liberado ao SIF" },
         { chave: "liberado_em", rotulo: "Liberado em" },
       ],
-      (monitoramentos ?? []).map((m) => ({ ...m, situacao: rotuloSituacao(m) }))
+      monitoramentos ?? []
     );
     baixarCsv(`monitoramentos-${new Date().toISOString().slice(0, 10)}.csv`, csv);
   }
@@ -151,7 +149,6 @@ export function DashboardPage() {
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <CartaoKpi titulo="Total" valor={monitoramentos?.length ?? 0} />
           <CartaoKpi titulo="Conformes" valor={conformes} />
-          <CartaoKpi titulo="Tratados (RNC procedente)" valor={tratados} />
           <CartaoKpi titulo="Não conformes" valor={naoConformes} />
           <CartaoKpi titulo="Pendentes verificação" valor={pendentesVerificacao} />
         </div>

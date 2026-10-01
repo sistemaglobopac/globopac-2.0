@@ -10,9 +10,6 @@ import { UpdateNotifier } from "@/shared/UpdateNotifier";
 import { NovaFichaPage } from "@/modules/fichas/NovaFichaPage";
 import { PainelVerificacao } from "@/modules/fichas/PainelVerificacao";
 import { VerificarFichaPage } from "@/modules/fichas/VerificarFichaPage";
-import { RelatorioPragasMensalPage } from "@/modules/fichas/RelatorioPragasMensalPage";
-import { CargasAvesPage } from "@/modules/recepcao/CargasAvesPage";
-import { FinalizarAbsorcaoPage } from "@/modules/fichas/FinalizarAbsorcaoPage";
 import { ConstrutorFichasPage } from "@/modules/fichas/ConstrutorFichasPage";
 import { SetoresPage } from "@/modules/admin/SetoresPage";
 import { CarimbosPendentesPage } from "@/modules/carimbos/CarimbosPendentesPage";
@@ -76,14 +73,6 @@ function AppRoutes() {
           }
         />
         <Route
-          path="/fichas/continuar/:id"
-          element={
-            <ProtectedRoute perfisPermitidos={["INSPETOR_QUALIDADE", "ADMIN_MASTER"]}>
-              <FinalizarAbsorcaoPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
           path="/nova-rnc"
           element={
             <ProtectedRoute perfisPermitidos={["INSPETOR_QUALIDADE", "ADMIN_MASTER"]}>
@@ -104,22 +93,6 @@ function AppRoutes() {
           element={
             <ProtectedRoute perfisPermitidos={["VERIFICADOR", "ADMIN_MASTER"]}>
               <VerificarFichaPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/gestao/pragas"
-          element={
-            <ProtectedRoute perfisPermitidos={["VERIFICADOR", "ADMIN_MASTER"]}>
-              <RelatorioPragasMensalPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/gestao/cargas-aves"
-          element={
-            <ProtectedRoute perfisPermitidos={["VERIFICADOR", "ADMIN_MASTER"]}>
-              <CargasAvesPage />
             </ProtectedRoute>
           }
         />

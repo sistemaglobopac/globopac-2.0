@@ -96,7 +96,7 @@ export function SetoresPage() {
         <CardContent className="space-y-4">
           {mensagem && (
             <div
-              className={`flex flex-wrap items-center justify-between gap-3 rounded-md border p-3 text-sm ${
+              className={`flex items-center justify-between gap-3 rounded-md border p-3 text-sm ${
                 mensagem.tipo === "success" ? "border-success bg-success/10 text-foreground" : "border-destructive bg-destructive/10 text-destructive"
               }`}
             >
@@ -159,8 +159,8 @@ export function SetoresPage() {
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[calc(100dvh-2rem)] overflow-y-auto w-full max-w-md rounded-xl border bg-background shadow-2xl">
-            <div className="flex flex-wrap gap-2 items-center justify-between border-b p-4">
+          <div className="w-full max-w-md rounded-xl border bg-background shadow-2xl">
+            <div className="flex items-center justify-between border-b p-4">
               <h2 className="text-lg font-semibold">{editandoOriginal ? "Editar Setor" : "Novo Setor"}</h2>
               <button type="button" onClick={fecharModal} className="text-muted-foreground hover:text-foreground" aria-label="Fechar">
                 <X className="h-5 w-5" />

@@ -11,35 +11,17 @@ import { MiniChillersField } from "./fields/MiniChillersField";
 import { AbsorcaoAguaField } from "./fields/AbsorcaoAguaField";
 import { DrippingTestField } from "./fields/DrippingTestField";
 import { ParadaEquipamentoField } from "./fields/ParadaEquipamentoField";
-import { OcorrenciaPragasField } from "./fields/OcorrenciaPragasField";
-import { RecepcaoAvesField } from "./fields/RecepcaoAvesField";
-import { EsperaAvesField } from "./fields/EsperaAvesField";
-import { PenduraAvesField } from "./fields/PenduraAvesField";
-import { EletronarcoseAvesField } from "./fields/EletronarcoseAvesField";
-import { CaixasVaziasField } from "./fields/CaixasVaziasField";
-import { PesoCaixaField } from "./fields/PesoCaixaField";
 import type {
   AbsorcaoAguaValor,
   ChillerCarcacasValor,
   ChillerPartesValor,
   DrippingTestValor,
-  EsperaAvesValor,
   LavagemFinalValor,
   MiniChillersValor,
-  CaixasVaziasValor,
-  OcorrenciaPragasValor,
-  PenduraAvesValor,
-  EletronarcoseAvesValor,
-  PesoCaixaValor,
-  RecepcaoAvesValor,
   ParadaEquipamentoValor,
 } from "./fields/tiposCompostos";
 
 interface DynamicFieldProps {
-  /** Só para `absorcao_agua`: "INICIAL" mostra apenas lacre + peso inicial (1ª etapa). */
-  faseAbsorcao?: "INICIAL" | "FINAL";
-  /** Só para `dripping_test`: chamado depois de "Salvar 1ª etapa do teste" (ex.: voltar à lista). */
-  aoSalvarPrimeiraEtapaDripping?: () => void;
   campo: CampoTemplate;
   register: UseFormRegister<FieldValues>;
   errors: FieldErrors;
@@ -58,7 +40,7 @@ interface DynamicFieldProps {
 /** Renderiza um campo de formulário a partir da definição declarativa de schema_campos —
  * o mesmo dado que gera o Zod de validação (src/shared/schema-campos.ts), garantindo que
  * UI e validação nunca divirjam (seção 7.1 do PROMPT MESTRE). */
-export function DynamicField({ campo, register, errors, control, prevAppointment, carcacasAtual, faseAbsorcao, aoSalvarPrimeiraEtapaDripping }: DynamicFieldProps) {
+export function DynamicField({ campo, register, errors, control, prevAppointment, carcacasAtual }: DynamicFieldProps) {
   const erro = errors[campo.chave]?.message as string | undefined;
 
   return (
@@ -160,9 +142,7 @@ export function DynamicField({ campo, register, errors, control, prevAppointment
         <Controller
           name={campo.chave}
           control={control}
-          render={({ field }) => (
-            <AbsorcaoAguaField value={field.value as AbsorcaoAguaValor | undefined} onChange={field.onChange} fase={faseAbsorcao} />
-          )}
+          render={({ field }) => <AbsorcaoAguaField value={field.value as AbsorcaoAguaValor | undefined} onChange={field.onChange} />}
         />
       )}
 
@@ -170,13 +150,7 @@ export function DynamicField({ campo, register, errors, control, prevAppointment
         <Controller
           name={campo.chave}
           control={control}
-          render={({ field }) => (
-            <DrippingTestField
-              value={field.value as DrippingTestValor | undefined}
-              onChange={field.onChange}
-              aoSalvarPrimeiraEtapa={aoSalvarPrimeiraEtapaDripping}
-            />
-          )}
+          render={({ field }) => <DrippingTestField value={field.value as DrippingTestValor | undefined} onChange={field.onChange} />}
         />
       )}
 
@@ -185,62 +159,6 @@ export function DynamicField({ campo, register, errors, control, prevAppointment
           name={campo.chave}
           control={control}
           render={({ field }) => <ParadaEquipamentoField value={field.value as ParadaEquipamentoValor | undefined} onChange={field.onChange} />}
-        />
-      )}
-
-      {campo.tipo === "ocorrencia_pragas" && (
-        <Controller
-          name={campo.chave}
-          control={control}
-          render={({ field }) => <OcorrenciaPragasField value={field.value as OcorrenciaPragasValor | undefined} onChange={field.onChange} />}
-        />
-      )}
-
-      {campo.tipo === "recepcao_aves" && (
-        <Controller
-          name={campo.chave}
-          control={control}
-          render={({ field }) => <RecepcaoAvesField value={field.value as RecepcaoAvesValor | undefined} onChange={field.onChange} />}
-        />
-      )}
-
-      {campo.tipo === "espera_aves" && (
-        <Controller
-          name={campo.chave}
-          control={control}
-          render={({ field }) => <EsperaAvesField value={field.value as EsperaAvesValor | undefined} onChange={field.onChange} />}
-        />
-      )}
-
-      {campo.tipo === "pendura_aves" && (
-        <Controller
-          name={campo.chave}
-          control={control}
-          render={({ field }) => <PenduraAvesField value={field.value as PenduraAvesValor | undefined} onChange={field.onChange} />}
-        />
-      )}
-
-      {campo.tipo === "eletronarcose_aves" && (
-        <Controller
-          name={campo.chave}
-          control={control}
-          render={({ field }) => <EletronarcoseAvesField value={field.value as EletronarcoseAvesValor | undefined} onChange={field.onChange} />}
-        />
-      )}
-
-      {campo.tipo === "peso_caixa" && (
-        <Controller
-          name={campo.chave}
-          control={control}
-          render={({ field }) => <PesoCaixaField value={field.value as PesoCaixaValor | undefined} onChange={field.onChange} />}
-        />
-      )}
-
-      {campo.tipo === "caixas_vazias" && (
-        <Controller
-          name={campo.chave}
-          control={control}
-          render={({ field }) => <CaixasVaziasField value={field.value as CaixasVaziasValor | undefined} onChange={field.onChange} />}
         />
       )}
 

@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import type { SituacaoConformidade } from "@/shared/situacaoConformidade";
 
 const TRINTA_DIAS_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -8,7 +7,6 @@ export interface MonitoramentoResumo {
   id: string;
   setor: string;
   conformidade: boolean | null;
-  situacao_conformidade: SituacaoConformidade | null;
   criado_em: string;
   verificado_em: string | null;
   liberado_sif: boolean;
@@ -24,9 +22,8 @@ export function useMonitoramentosResumo() {
       const desde = new Date(Date.now() - TRINTA_DIAS_MS).toISOString();
       const { data, error } = await supabase
         .from("monitoramentos")
-        .select("id, setor, conformidade, situacao_conformidade, criado_em, verificado_em, liberado_sif, liberado_em")
+        .select("id, setor, conformidade, criado_em, verificado_em, liberado_sif, liberado_em")
         .gte("criado_em", desde)
-        .neq("status_ficha", "EM_ANDAMENTO")
         .order("criado_em", { ascending: false })
         .overrideTypes<MonitoramentoResumo[], { merge: false }>();
       if (error) throw error;

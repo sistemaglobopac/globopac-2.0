@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { temNaoConformidade } from "@/modules/fichas/utils/desviosEspeciais";
 import { supabase } from "@/lib/supabase";
 import type { StatusRnc } from "@/modules/rnc/api";
 
@@ -15,7 +14,7 @@ export function horaEmManaus(referencia: Date): number {
 
 export function turnoDoDia(referencia: Date): "1º Turno" | "2º Turno" {
   const hora = horaEmManaus(referencia);
-  return hora >= 4 && hora < 17 ? "1º Turno" : "2º Turno";
+  return hora >= 3 && hora <= 16 ? "1º Turno" : "2º Turno";
 }
 
 export function inicioDoDiaManaus(referencia: Date): Date {
@@ -35,8 +34,7 @@ export interface TurnoHoje {
 }
 
 /** turnos_inspetores não tem coluna de data — "hoje" é o último turno cujo início caiu dentro
- * do dia corrente (America/Manaus), ou um turno ainda ABERTO iniciado antes da meia-noite (o 2º
- * turno, que começa às 17h, atravessa a virada e só é encerrado às 04h). Sem correspondente na v1 pedida (que lia isso de
+ * do dia corrente (America/Manaus). Sem correspondente na v1 pedida (que lia isso de
  * localStorage, escrito por um fluxo que nunca existiu neste repo) — o Painel de Bordo é quem
  * agora cria/fecha a linha, então o banco é a fonte de verdade, não o navegador. */
 export function useTurnoHoje(userId: string | undefined) {
@@ -48,13 +46,12 @@ export function useTurnoHoje(userId: string | undefined) {
         .from("turnos_inspetores")
         .select("id, inicio, fim")
         .eq("user_id", userId as string)
-        .gte("inicio", new Date(inicioDoDiaManaus(new Date()).getTime() - 24 * 60 * 60 * 1000).toISOString())
+        .gte("inicio", inicioDoDiaManaus(new Date()).toISOString())
         .order("inicio", { ascending: false })
         .limit(1)
         .maybeSingle()
         .overrideTypes<TurnoHoje | null, { merge: false }>();
       if (error) throw error;
-      if (data && data.fim !== null && new Date(data.inicio) < inicioDoDiaManaus(new Date())) return null;
       return data;
     },
   });
@@ -175,7 +172,6 @@ export interface MonitoramentoHoje {
   id: string;
   ficha_template_id: string;
   criado_em: string;
-  setor?: string;
 }
 
 export const PAUSAS_CONFIG: Record<TipoPausa, { label: string; desc: string; limiteMin: number }> = {
@@ -187,52 +183,6 @@ export const PAUSAS_CONFIG: Record<TipoPausa, { label: string; desc: string; lim
 export interface FichaAtrasada {
   ficha: FichaAtivaResumo;
   motivo: string;
-  /** Minutos além da hora de fazer o monitoramento (já descontada a tolerância) — só quando há um
-   * apontamento anterior que define a hora devida. */
-  atrasoMin?: number;
-  /** Hora (ISO) em que o monitoramento deveria ter sido feito. */
-  devidoEm?: string;
-}
-
-/** Tolerância após a hora de fazer o monitoramento: só depois de 10 minutos o alerta sonoro toca e o
- * card pulsante aparece. */
-export const TOLERANCIA_ATRASO_MIN = 10;
-
-/** Link que abre a ficha direto no setor certo (NovaFichaPage lê ?ficha=&setor=). */
-export function urlNovaFicha(ficha: Pick<FichaAtivaResumo, "id" | "locais_aplicacao">, userSetores: string[]): string {
-  const setor = ficha.locais_aplicacao?.find((s) => userSetores.includes(s)) ?? userSetores[0] ?? "";
-  return `/fichas/nova?ficha=${ficha.id}&setor=${encodeURIComponent(setor)}`;
-}
-
-export interface ResumoFichasSetor {
-  setor: string;
-  /** Fichas de monitoramento existentes (ativas) para o setor. */
-  total: number;
-  /** Dessas, quantas já foram iniciadas (ao menos 1 monitoramento) neste turno. */
-  iniciadas: number;
-  /** ids das fichas já iniciadas neste turno. */
-  idsIniciadas: string[];
-}
-
-/** Card "Fichas Ativas": por setor do inspetor, quantas fichas existem e quantas já foram iniciadas
- * NESTE turno (monitoramento criado a partir do início do turno — inclui os em andamento). */
-export function resumoFichasPorSetor(
-  fichasAplicaveis: FichaAtivaResumo[],
-  monitoramentosHoje: { ficha_template_id: string; criado_em: string; setor?: string }[],
-  userSetores: string[],
-  turnoInicio: Date
-): ResumoFichasSetor[] {
-  const doTurno = monitoramentosHoje.filter((m) => new Date(m.criado_em).getTime() >= turnoInicio.getTime());
-  return userSetores
-    .map((setor) => {
-      const fichas = fichasAplicaveis.filter((f) => f.locais_aplicacao?.includes(setor));
-      // Sem `setor` no monitoramento (dado antigo em cache), vale qualquer setor do inspetor.
-      const idsIniciadas = fichas
-        .filter((f) => doTurno.some((m) => m.ficha_template_id === f.id && (m.setor === undefined || m.setor === setor)))
-        .map((f) => f.id);
-      return { setor, total: fichas.length, iniciadas: idsIniciadas.length, idsIniciadas };
-    })
-    .filter((r) => r.total > 0);
 }
 
 export function fichasAplicaveisAoInspetor(fichasAtivas: FichaAtivaResumo[], userSetores: string[]): FichaAtivaResumo[] {
@@ -241,7 +191,7 @@ export function fichasAplicaveisAoInspetor(fichasAtivas: FichaAtivaResumo[], use
 
 /** Ficha "atrasada": recorrente, aplicável ao inspetor, e sem apontamento neste turno depois de
  * 2h de turno iniciado, OU cujo último apontamento do dia já passou de
- * tempo_entre_apontamentos_min + 10 minutos de tolerância (Painel de Bordo, seção 8). Compartilhada entre o
+ * tempo_entre_apontamentos_min + 5 minutos (Painel de Bordo, seção 8). Compartilhada entre o
  * próprio Painel de Bordo (KPI) e o GlobalInspectorAlerts (alerta cross-página) — uma única
  * implementação, nunca duas fórmulas de atraso divergentes. */
 export function calcularFichasAtrasadas(
@@ -270,16 +220,9 @@ export function calcularFichasAtrasadas(
       continue;
     }
     if (ficha.tempo_entre_apontamentos_min != null) {
-      const devidoMs = ultimo.getTime() + ficha.tempo_entre_apontamentos_min * 60 * 1000;
-      const limiteMs = devidoMs + TOLERANCIA_ATRASO_MIN * 60 * 1000;
-      if (agora.getTime() > limiteMs) {
-        const atrasoMin = Math.floor((agora.getTime() - devidoMs) / 60000);
-        atrasadas.push({
-          ficha,
-          motivo: `Monitoramento atrasado há ${atrasoMin} min`,
-          atrasoMin,
-          devidoEm: new Date(devidoMs).toISOString(),
-        });
+      const limiteMs = (ficha.tempo_entre_apontamentos_min + 5) * 60 * 1000;
+      if (agora.getTime() - ultimo.getTime() > limiteMs) {
+        atrasadas.push({ ficha, motivo: "Último apontamento atrasado" });
       }
     }
   }
@@ -337,7 +280,7 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
       ] = await Promise.all([
         supabase
           .from("monitoramentos")
-          .select("id, ficha_template_id, criado_em, setor")
+          .select("id, ficha_template_id, criado_em")
           .eq("user_id", userId as string)
           .in("setor", userSetores)
           .gte("criado_em", inicioDoDiaManaus(new Date()).toISOString())
@@ -369,11 +312,7 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
       if (erroRecentes) throw erroRecentes;
       if (erroFichas) throw erroFichas;
 
-      // NC decidida pelo Verificador (conformidade=false) OU já apontada no preenchimento assinado
-      // (conformidade ainda null) — o inspetor deve emitir a RNC assim que assina, sem esperar.
-      const desviosCandidatos = (recentes ?? []).filter(
-        (m) => m.conformidade === false || (m.conformidade === null && temNaoConformidade(m.dados_dinamicos))
-      );
+      const desviosCandidatos = (recentes ?? []).filter((m) => m.conformidade === false);
       const idsDesvios = desviosCandidatos.map((m) => m.id);
 
       const { data: rncsVinculadas, error: erroRnc } =

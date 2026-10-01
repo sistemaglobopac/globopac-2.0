@@ -66,8 +66,6 @@ interface MonitoramentoRow {
   setor: string;
   dados_dinamicos: Record<string, unknown>;
   conformidade: boolean | null;
-  /** CONFORME / NAO_CONFORME / TRATADO (RNC procedente e fechada) — mantida por trigger, fora do hash. */
-  situacao_conformidade: "CONFORME" | "NAO_CONFORME" | "TRATADO" | null;
   verificado_por: string | null;
   verificado_em: string | null;
   liberado_sif: boolean;
@@ -124,8 +122,6 @@ interface TurnoInspetorRow {
   inicio: string;
   fim: string | null;
   criado_em: string;
-  /** true quando o fim foi gravado pelo encerramento automático (22:00 / 04:00). */
-  encerrado_automaticamente: boolean;
 }
 
 interface PausaInspetorRow {

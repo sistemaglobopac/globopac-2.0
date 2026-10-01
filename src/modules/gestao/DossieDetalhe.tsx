@@ -1,7 +1,6 @@
 import { ChevronLeft } from "lucide-react";
 import { DadosColetados } from "@/modules/fichas/components/DadosColetadosFicha";
 import { useDossieMonitoramento } from "./api";
-import { rotuloSituacao, situacaoDe } from "@/shared/situacaoConformidade";
 
 /** Documento de auditoria de um monitoramento, aberto de dentro dos modais de "Monitoramentos
  * em Andamento" e "RNCs Pendentes" (seção "cada item é clicável e abre o dossiê completo... com
@@ -34,10 +33,10 @@ export function DossieDetalhe({ monitoramentoId, onVoltar }: { monitoramentoId: 
             <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold">
               <span
                 className={`rounded-full px-2.5 py-1 ${
-                  situacaoDe(dossie) === "NAO_CONFORME" ? "bg-destructive/10 text-destructive" : "bg-lime text-primary"
+                  dossie.conformidade === false ? "bg-destructive/10 text-destructive" : "bg-lime text-primary"
                 }`}
               >
-                {rotuloSituacao(dossie)}
+                {dossie.conformidade === false ? "Não conforme" : dossie.conformidade === true ? "Conforme" : "Aguardando verificação"}
               </span>
               {dossie.liberado_sif && (
                 <span className="rounded-full bg-surface-dark px-2.5 py-1 text-lime">Liberado ao SIF</span>

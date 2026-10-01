@@ -9,10 +9,23 @@
 import { createClient } from "@supabase/supabase-js";
 import { corsHeadersAutenticado } from "../_shared/cors.ts";
 import { decodificarPayloadJwt } from "../_shared/jwt.ts";
-import { processarItemCarimbo, type ItemFilaCarimbo } from "../_shared/carimbo-processador.ts";
-import { lerPoliticaRetryCarimbo } from "../_shared/tsa-config.ts";
+import { solicitarCarimboRFC3161 } from "../_shared/rfc3161.ts";
+import { calcularProximaTentativa, lerPoliticaRetryCarimbo } from "../_shared/tsa-config.ts";
 
 const TAMANHO_LOTE = 20;
+
+const TABELA_POR_TIPO: Record<string, { tabela: string; colunaHash: string }> = {
+  ficha: { tabela: "assinaturas_eletronicas", colunaHash: "hash_documento" },
+  os: { tabela: "assinaturas_os_eletronicas", colunaHash: "hash_documento" },
+  lote: { tabela: "lote_liberacao_sif", colunaHash: "hash_agregador" },
+  relatorio_os: { tabela: "manutencao_relatorios_sif", colunaHash: "hash_agregador" },
+};
+
+function bytesParaHexPostgres(bytes: Uint8Array): string {
+  let hex = "\\x";
+  for (const b of bytes) hex += b.toString(16).padStart(2, "0");
+  return hex;
+}
 
 Deno.serve(async (req) => {
   const correlationId = crypto.randomUUID();
@@ -58,9 +71,87 @@ Deno.serve(async (req) => {
 
   for (const item of pendentes ?? []) {
     processados++;
-    const resultado = await processarItemCarimbo(adminClient, item as ItemFilaCarimbo, politica);
-    if (resultado === "concluido") concluidos++;
-    else if (resultado === "falhou") falharam++;
+    const destino = TABELA_POR_TIPO[item.tipo_assinatura];
+    if (!destino) {
+      log("error", "tipo_assinatura_desconhecido", { item });
+      continue;
+    }
+
+    const { data: origem, error: erroOrigem } = await adminClient
+      .from(destino.tabela)
+      .select(destino.colunaHash)
+      .eq("id", item.assinatura_id)
+      .single();
+
+    if (erroOrigem || !origem) {
+      log("error", "registro_origem_nao_encontrado", { itemId: item.id, erro: erroOrigem?.message });
+      continue;
+    }
+    const hashDocumento = (origem as unknown as Record<string, string>)[destino.colunaHash];
+
+    const tentadasAntes: string[] = item.tsa_tentadas ?? [];
+    let sucesso: { tsrBase64: string; genTime: Date; cadeiaCertificadosDer: Uint8Array; tsaNome: string } | null =
+      null;
+    const errosDesteRound: string[] = [];
+    const novasTentadas = new Set(tentadasAntes);
+
+    for (const tsa of politica.tsas) {
+      const resultado = await solicitarCarimboRFC3161(tsa.url, hashDocumento);
+      novasTentadas.add(tsa.nome);
+      if (resultado.ok) {
+        sucesso = { ...resultado, tsaNome: tsa.nome };
+        break;
+      }
+      errosDesteRound.push(`${tsa.nome}: ${resultado.erro}`);
+    }
+
+    if (sucesso) {
+      const { error: erroUpdate } = await adminClient
+        .from(destino.tabela)
+        .update({
+          tsr_base64: sucesso.tsrBase64,
+          tsa_emitido_em: sucesso.genTime.toISOString(),
+          tsa_utilizada: sucesso.tsaNome,
+          cadeia_certificados_tsa: bytesParaHexPostgres(sucesso.cadeiaCertificadosDer),
+        })
+        .eq("id", item.assinatura_id);
+
+      if (erroUpdate) {
+        log("error", "gravar_carimbo_falhou", { itemId: item.id, erro: erroUpdate.message });
+        continue;
+      }
+
+      await adminClient
+        .from("fila_carimbo_tempo")
+        .update({ status: "concluido", tsa_tentadas: Array.from(novasTentadas) })
+        .eq("id", item.id);
+
+      concluidos++;
+      log("info", "carimbo_concluido", { itemId: item.id, tsa: sucesso.tsaNome });
+    } else {
+      const tentativas = item.tentativas + 1;
+      const definitivo = tentativas >= politica.maxTentativas;
+      await adminClient
+        .from("fila_carimbo_tempo")
+        .update({
+          status: definitivo ? "falhou_definitivo" : "pendente",
+          tentativas,
+          tsa_tentadas: Array.from(novasTentadas),
+          ultimo_erro: errosDesteRound.join(" | "),
+          proxima_tentativa_em: definitivo
+            ? null
+            : calcularProximaTentativa(tentativas, politica.backoffBaseSegundos).toISOString(),
+        })
+        .eq("id", item.id);
+
+      falharam++;
+      log(definitivo ? "error" : "info", "carimbo_falhou_rodada", {
+        itemId: item.id,
+        tentativas,
+        definitivo,
+        erros: errosDesteRound,
+      });
+    }
   }
 
   return new Response(

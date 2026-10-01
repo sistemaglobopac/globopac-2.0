@@ -4,7 +4,6 @@ import { inicioDoDiaManaus } from "@/modules/bordo/api";
 import type { NivelAcesso } from "@/lib/database.types";
 import { type Rnc } from "@/modules/rnc/api";
 import type { CampoTemplate } from "@/shared/schema-campos";
-import type { SituacaoConformidade } from "@/shared/situacaoConformidade";
 
 // ---------------------------------------------------------------------------------------
 // Perfil / nível de acesso — rótulos e classes do badge (seção "Aba admin" do Painel de
@@ -337,7 +336,6 @@ export interface MonitoramentoHojeResumo {
   user_id: string;
   criado_em: string;
   conformidade: boolean | null;
-  situacao_conformidade: SituacaoConformidade | null;
 }
 
 export function useMonitoramentosHoje() {
@@ -398,7 +396,7 @@ export function useMonitoramentosHojeDetalhado() {
       const [{ data: hoje, error: erroHoje }, { data: fichas, error: erroFichas }] = await Promise.all([
         supabase
           .from("monitoramentos")
-          .select("id, setor, ficha_template_id, user_id, criado_em, conformidade, situacao_conformidade")
+          .select("id, setor, ficha_template_id, user_id, criado_em, conformidade")
           .gte("criado_em", desde)
           .order("criado_em", { ascending: false })
           .overrideTypes<MonitoramentoHojeResumo[], { merge: false }>(),
@@ -526,7 +524,6 @@ export interface DossieMonitoramento {
   setor: string;
   criado_em: string;
   conformidade: boolean | null;
-  situacao_conformidade: SituacaoConformidade | null;
   verificado_em: string | null;
   liberado_sif: boolean;
   dados_dinamicos: Record<string, unknown>;
@@ -548,7 +545,7 @@ export function useDossieMonitoramento(monitoramentoId: string | null) {
     queryFn: async (): Promise<DossieMonitoramento> => {
       const { data: m, error } = await supabase
         .from("monitoramentos")
-        .select("id, setor, criado_em, conformidade, situacao_conformidade, verificado_em, liberado_sif, dados_dinamicos, ficha_template_id, user_id, verificado_por")
+        .select("id, setor, criado_em, conformidade, verificado_em, liberado_sif, dados_dinamicos, ficha_template_id, user_id, verificado_por")
         .eq("id", monitoramentoId as string)
         .single()
         .overrideTypes<
@@ -557,7 +554,6 @@ export function useDossieMonitoramento(monitoramentoId: string | null) {
             setor: string;
             criado_em: string;
             conformidade: boolean | null;
-            situacao_conformidade: SituacaoConformidade | null;
             verificado_em: string | null;
             liberado_sif: boolean;
             dados_dinamicos: Record<string, unknown>;
@@ -588,7 +584,6 @@ export function useDossieMonitoramento(monitoramentoId: string | null) {
         setor: m.setor,
         criado_em: m.criado_em,
         conformidade: m.conformidade,
-        situacao_conformidade: m.situacao_conformidade,
         verificado_em: m.verificado_em,
         liberado_sif: m.liberado_sif,
         dados_dinamicos: m.dados_dinamicos,

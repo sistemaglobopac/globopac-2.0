@@ -3,21 +3,10 @@ import { AlertTriangle, CheckCircle2, Info, Lock, Plus, Trash2 } from "lucide-re
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
-import { formatHidrometro, formatMaskedValue, LIMIAR_IMPLAUSIVEL, parseHidrometro } from "./hidrometro";
-import {
-  apurar,
-  avesNoPeriodo,
-  detalheDesvio,
-  exibirPesoVivo,
-  GELO_PADRAO_CARCACAS,
-  mascararPesoVivo,
-  metaTanqueCarcacas,
-  pesoMedioCarcaca as calcularPesoMedioCarcaca,
-  totalAvesBruto,
-  type ChaveTanqueCarcacas as ChaveTanque,
-} from "./calculosSpr";
-import { AvisoImplausivel, AvisoPrimeiroDoDia, LogicaCalculo, TOOLTIP_HIDR_ANTERIOR } from "./componentesSpr";
+import { formatHidrometro, formatMaskedValue, LIMIAR_IMPLAUSIVEL, parseHidrometro, parseNumeroHidrometro } from "./hidrometro";
 import type { CargaProcessada, ChillerCarcacasValor, TanqueHidrometro } from "./tiposCompostos";
+
+type ChaveTanque = "preChiller" | "chiller1" | "chiller2";
 
 const CONFIG_TANQUE: Record<ChaveTanque, { nome: string; cor: string }> = {
   preChiller: { nome: "Pré-chiller", cor: "#002060" },
@@ -25,33 +14,58 @@ const CONFIG_TANQUE: Record<ChaveTanque, { nome: string; cor: string }> = {
   chiller2: { nome: "Chiller 02 (Último)", cor: "#002060" },
 };
 
-// Gelo padrão (kg) por tanque ao abrir um monitoramento: cada tanque físico tem o seu (ver
-// GELO_PADRAO_CARCACAS em calculosSpr.ts) — nunca um valor único para os três.
-function tanqueVazio(tanque: ChaveTanque, prev: string): TanqueHidrometro {
-  return { prev, cur: "", ice: GELO_PADRAO_CARCACAS[tanque] };
+/** Meta legal de renovação (L/carcaça) por tanque, em função do peso médio da carcaça —
+ * portado literalmente de ChillerField.jsx (v1). Não é um limiar inventado por este projeto. */
+function metaTanque(tanque: ChaveTanque, pesoCarcaca: number): number {
+  if (pesoCarcaca === 0) return 0;
+  if (tanque === "preChiller") return pesoCarcaca <= 2.5 ? 1.5 : pesoCarcaca <= 5.0 ? 1.7 : 2.2;
+  if (tanque === "chiller1") return pesoCarcaca <= 2.5 ? 1.1 : pesoCarcaca <= 5.0 ? 1.6 : 2.1;
+  return pesoCarcaca <= 2.5 ? 1.0 : pesoCarcaca <= 5.0 ? 1.5 : 2.0;
 }
 
-/** Só dígitos (aves e condenas são números inteiros). */
-const somenteInteiro = (valor: string) => valor.replace(/\D/g, "");
+function apuracaoTanque(tanque: TanqueHidrometro, totalAvesPeriodo: number): number | null {
+  const prev = parseNumeroHidrometro(tanque.prev);
+  const cur = parseNumeroHidrometro(tanque.cur);
+  const gelo = parseNumeroHidrometro(tanque.ice);
+  if (cur === 0) return 0;
+  const aguaUsada = (cur - prev) * 1000 + gelo;
+  if (totalAvesPeriodo === 0) return null;
+  return aguaUsada / totalAvesPeriodo;
+}
+
+// Gelo padrão (kg) por tanque ao abrir um monitoramento — portado literalmente de
+// ChillerField.jsx (v1). São os valores calibrados de cada tanque físico desta planta, não
+// um placeholder: por isso diferem entre si (Chiller 01 é maior que o Pré-chiller, que por
+// sua vez é maior que o Chiller 02) em vez de um único valor genérico para os três.
+const GELO_PADRAO: Record<ChaveTanque, string> = {
+  preChiller: "1995",
+  chiller1: "2394",
+  chiller2: "1596",
+};
+
+function tanqueVazio(tanque: ChaveTanque, prev: string): TanqueHidrometro {
+  return { prev, cur: "", ice: GELO_PADRAO[tanque] };
+}
 
 interface ChillerCarcacasFieldProps {
   value: ChillerCarcacasValor | undefined;
   onChange: (valor: ChillerCarcacasValor) => void;
   disabled?: boolean;
-  /** dados_dinamicos[chave] do monitoramento mais recente de HOJE (mesma ficha, setor e turno) —
-   * a leitura "atual" de lá vira a leitura "anterior" (travada) deste apontamento. */
+  /** dados_dinamicos[chave] do monitoramento mais recente de HOJE desta ficha+setor — a
+   * leitura "atual" de lá vira a leitura "anterior" (travada) deste apontamento. */
   prevAppointment?: ChillerCarcacasValor;
 }
 
-/** Renovação da Água do SPR Carcaças. Aves no período = cargas − condenas; peso médio da
- * carcaça = média ponderada do peso vivo × 0,84; meta por tanque em função desse peso. O widget
- * só EXIBE o desvio — quem decide `monitoramentos.conformidade` continua sendo o Verificador
- * (segregação de funções, `trg_segregacao_funcoes`). Todas as contas ficam em calculosSpr.ts. */
+/** Renovação da Água do SPR Carcaças — porte do v1 (ChillerField.jsx) para o catálogo
+ * `chiller_carcacas` do Construtor de Fichas. Mesma lógica de cálculo (metas por faixa de
+ * peso, aves no período = cargas − condenas, apuração L/carcaça); só o vínculo com
+ * conformidade/RNC muda: aqui o widget só EXIBE o desvio (badge, alerta) — quem decide
+ * `monitoramentos.conformidade` continua sendo o Verificador depois, como já funciona no
+ * resto do v2 (segregação de funções, `trg_segregacao_funcoes`). */
 export function ChillerCarcacasField({ value, onChange, disabled, prevAppointment }: ChillerCarcacasFieldProps) {
   const [cargas, setCargas] = useState<CargaProcessada[]>(value?.cargas ?? [{ id: crypto.randomUUID(), quantity: "", avgLiveWeight: "" }]);
   const [condenasParcial, setCondenasParcial] = useState(value?.condenasParcial ?? "");
-  // Registros antigos só têm o campo `condenas`: ele entra como "totalmente condenadas".
-  const [condenasTotal, setCondenasTotal] = useState(value?.condenasTotal ?? value?.condenas ?? "");
+  const [condenasTotal, setCondenasTotal] = useState(value?.condenasTotal ?? "");
   const [tanques, setTanques] = useState({
     preChiller: value?.tanques.preChiller ?? tanqueVazio("preChiller", prevAppointment?.tanques.preChiller.cur ?? ""),
     chiller1: value?.tanques.chiller1 ?? tanqueVazio("chiller1", prevAppointment?.tanques.chiller1.cur ?? ""),
@@ -63,8 +77,9 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
     chiller2: !!(value?.tanques.chiller2.prev || prevAppointment?.tanques.chiller2.cur),
   });
 
-  // Primeiro monitoramento do dia (nenhum tanque tem leitura anterior para herdar): só a leitura
-  // atual, que vira a base do próximo monitoramento comparar.
+  // Primeiro monitoramento do dia (nenhum tanque tem leitura anterior para herdar): não faz
+  // sentido pedir cargas processadas, leitura anterior nem gelo — só a leitura atual, que
+  // vira a base para o próximo monitoramento comparar.
   const isPrimeiroDoDia = !prevTravado.preChiller && !prevTravado.chiller1 && !prevTravado.chiller2;
 
   // Atualiza leitura anterior quando prevAppointment chega depois (fetch assíncrono).
@@ -82,28 +97,28 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
     }));
   }, [prevAppointment]);
 
-  const totalAves = totalAvesBruto(cargas);
-  const pesoMedioCarcaca = calcularPesoMedioCarcaca(cargas); // já com o rendimento fixo de 84%
+  const totalAves = cargas.reduce((soma, c) => soma + (parseFloat(c.quantity) || 0), 0);
+  const totalPesoAves = cargas.reduce((soma, c) => soma + (parseFloat(c.quantity) || 0) * (parseFloat(c.avgLiveWeight) || 0), 0);
+  const pesoMedioVivo = totalAves > 0 ? totalPesoAves / totalAves : 0;
+  const pesoMedioCarcaca = pesoMedioVivo * 0.84; // Rendimento padrão de 84%
 
   const totalCondenasParcial = parseFloat(condenasParcial) || 0;
   const totalCondenasTotalNum = parseFloat(condenasTotal) || 0;
   const totalCondenas = totalCondenasParcial + totalCondenasTotalNum;
-  const totalAvesPeriodo = avesNoPeriodo(totalAves, totalCondenasParcial, totalCondenasTotalNum);
+  const totalAvesPeriodo = Math.max(0, totalAves - totalCondenas);
 
   const metas: Record<ChaveTanque, number> = {
-    preChiller: metaTanqueCarcacas("preChiller", pesoMedioCarcaca),
-    chiller1: metaTanqueCarcacas("chiller1", pesoMedioCarcaca),
-    chiller2: metaTanqueCarcacas("chiller2", pesoMedioCarcaca),
+    preChiller: metaTanque("preChiller", pesoMedioCarcaca),
+    chiller1: metaTanque("chiller1", pesoMedioCarcaca),
+    chiller2: metaTanque("chiller2", pesoMedioCarcaca),
   };
   const apurado: Record<ChaveTanque, number | null> = {
-    preChiller: apurar(tanques.preChiller.prev, tanques.preChiller.cur, tanques.preChiller.ice, totalAvesPeriodo),
-    chiller1: apurar(tanques.chiller1.prev, tanques.chiller1.cur, tanques.chiller1.ice, totalAvesPeriodo),
-    chiller2: apurar(tanques.chiller2.prev, tanques.chiller2.cur, tanques.chiller2.ice, totalAvesPeriodo),
+    preChiller: apuracaoTanque(tanques.preChiller, totalAvesPeriodo),
+    chiller1: apuracaoTanque(tanques.chiller1, totalAvesPeriodo),
+    chiller2: apuracaoTanque(tanques.chiller2, totalAvesPeriodo),
   };
 
   const hasCurData = !!(tanques.preChiller.cur || tanques.chiller1.cur || tanques.chiller2.cur);
-  // Tanque sem leitura atual, ou sem base de cálculo, é tratado como conforme; igual à meta
-  // também é conforme (apurado >= meta).
   const conformeTanque = (chave: ChaveTanque) =>
     !tanques[chave].cur ? true : totalAvesPeriodo === 0 ? true : (apurado[chave] ?? 0) >= metas[chave];
   const confPreChiller = conformeTanque("preChiller");
@@ -113,9 +128,15 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
 
   useEffect(() => {
     const detalhes: string[] = [];
-    if (!confPreChiller && totalAvesPeriodo > 0) detalhes.push(detalheDesvio("Pré-chiller", apurado.preChiller ?? 0, metas.preChiller, "L/c"));
-    if (!confChiller1 && totalAvesPeriodo > 0) detalhes.push(detalheDesvio("Chiller 01", apurado.chiller1 ?? 0, metas.chiller1, "L/c"));
-    if (!confChiller2 && totalAvesPeriodo > 0) detalhes.push(detalheDesvio("Chiller 02", apurado.chiller2 ?? 0, metas.chiller2, "L/c"));
+    if (!confPreChiller && totalAvesPeriodo > 0) {
+      detalhes.push(`Pré-chiller (Apurado: ${(apurado.preChiller ?? 0).toFixed(3)}L/c | Meta: ${metas.preChiller.toFixed(3)}L/c)`);
+    }
+    if (!confChiller1 && totalAvesPeriodo > 0) {
+      detalhes.push(`Chiller 01 (Apurado: ${(apurado.chiller1 ?? 0).toFixed(3)}L/c | Meta: ${metas.chiller1.toFixed(3)}L/c)`);
+    }
+    if (!confChiller2 && totalAvesPeriodo > 0) {
+      detalhes.push(`Chiller 02 (Apurado: ${(apurado.chiller2 ?? 0).toFixed(3)}L/c | Meta: ${metas.chiller2.toFixed(3)}L/c)`);
+    }
 
     onChange({
       cargas,
@@ -155,12 +176,12 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
 
     return (
       <div key={chave} className="overflow-hidden rounded-lg border-2" style={{ borderColor: naoConforme ? "#dc2626" : `${cor}40` }}>
-        <div className="flex flex-wrap gap-2 items-center justify-between px-3 py-2 text-sm font-black text-white" style={{ background: cor }}>
+        <div className="flex items-center justify-between px-3 py-2 text-sm font-black text-white" style={{ background: cor }}>
           {CONFIG_TANQUE[chave].nome.toUpperCase()}
           {totalAves > 0 && <span className="text-xs opacity-90">Meta: {formatMaskedValue(meta.toFixed(3))} L/c</span>}
         </div>
         <div className="space-y-3 p-4">
-          <div className="grid grid-cols-1 gap-3">
+          <div className={`grid gap-3 ${isPrimeiroDoDia ? "grid-cols-1" : "sm:grid-cols-2"}`}>
             {!isPrimeiroDoDia && (
               <div className="space-y-1">
                 <Label className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -168,7 +189,7 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
                 </Label>
                 <Input
                   disabled={disabled || prevTravado[chave]}
-                  title={prevTravado[chave] ? TOOLTIP_HIDR_ANTERIOR : undefined}
+                  title={prevTravado[chave] ? "Herdado do monitoramento anterior — não pode ser alterado" : undefined}
                   value={formatHidrometro(tanque.prev)}
                   onChange={(e) => alterarTanque(chave, "prev", parseHidrometro(e.target.value))}
                   className="font-mono"
@@ -187,7 +208,7 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
               />
             </div>
             {!isPrimeiroDoDia && (
-              <div className="space-y-1">
+              <div className="space-y-1 sm:col-span-2">
                 <Label className="text-xs text-muted-foreground">Gelo Adicionado (kg)</Label>
                 <Input
                   disabled={disabled}
@@ -207,7 +228,7 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
               borderColor: !temResultado ? undefined : naoConforme ? "#dc2626" : "#059669",
             }}
           >
-            <div className="flex flex-wrap gap-2 items-center justify-between">
+            <div className="flex items-center justify-between">
               <span className="text-xs font-bold" style={{ color: !temResultado ? undefined : naoConforme ? "#dc2626" : "#059669" }}>
                 RENOVAÇÃO APURADA
               </span>
@@ -220,7 +241,14 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
             )}
           </div>
 
-          {implausivel && <AvisoImplausivel apurado={valorApurado ?? 0} meta={meta} />}
+          {implausivel && (
+            <div className="flex items-start gap-2 rounded-md border border-warning bg-warning/10 p-2 text-xs font-medium text-warning-foreground">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                Valor {((valorApurado ?? 0) / meta).toFixed(0)}x acima da meta — confira a leitura do hidrômetro antes de assinar.
+              </span>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -258,8 +286,7 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
             </div>
             <div>
               <p className="text-xs font-bold text-muted-foreground">Média Carcaça (Est.)</p>
-              <p className="text-lg font-black">{formatMaskedValue(pesoMedioCarcaca.toFixed(3))} kg</p>
-              <p className="max-w-[210px] text-xs text-muted-foreground">carcaças = aves abatidas com 16% de perda de peso (despojos do abate)</p>
+              <p className="text-lg font-black">{pesoMedioCarcaca.toFixed(3)} kg</p>
             </div>
           </div>
         )}
@@ -279,7 +306,7 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
 
       {!isPrimeiroDoDia ? (
         <div className="space-y-3 rounded-md border border-primary/20 bg-primary/5 p-4">
-          <div className="flex flex-wrap gap-2 items-center justify-between">
+          <div className="flex items-center justify-between">
             <h4 className="text-sm font-bold text-primary">Cargas Processadas no Período</h4>
             <Button type="button" size="sm" variant="outline" onClick={adicionarCarga} disabled={disabled}>
               <Plus className="h-3.5 w-3.5" /> Adicionar Lote
@@ -293,10 +320,10 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
                 <div className="flex-1 space-y-1">
                   <Label className="text-xs text-muted-foreground">Aves (un)</Label>
                   <Input
-                    inputMode="numeric"
+                    type="number"
                     disabled={disabled}
                     value={carga.quantity}
-                    onChange={(e) => alterarCarga(carga.id, "quantity", somenteInteiro(e.target.value))}
+                    onChange={(e) => alterarCarga(carga.id, "quantity", e.target.value)}
                     placeholder="Ex: 4500"
                   />
                 </div>
@@ -304,10 +331,9 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
                   <Label className="text-xs text-muted-foreground">Peso Vivo (kg)</Label>
                   <Input
                     className="font-mono"
-                    inputMode="numeric"
                     disabled={disabled}
-                    value={exibirPesoVivo(carga.avgLiveWeight)}
-                    onChange={(e) => alterarCarga(carga.id, "avgLiveWeight", mascararPesoVivo(e.target.value))}
+                    value={carga.avgLiveWeight}
+                    onChange={(e) => alterarCarga(carga.id, "avgLiveWeight", e.target.value)}
                     placeholder="Ex: 2,850"
                   />
                 </div>
@@ -323,11 +349,11 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
           <div className="grid grid-cols-1 gap-3 border-t border-dashed pt-3 sm:grid-cols-2">
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Carcaças Parcialmente Aproveitadas</Label>
-              <Input inputMode="numeric" disabled={disabled} value={condenasParcial} onChange={(e) => setCondenasParcial(somenteInteiro(e.target.value))} placeholder="Ex: 40" />
+              <Input type="number" disabled={disabled} value={condenasParcial} onChange={(e) => setCondenasParcial(e.target.value)} placeholder="Ex: 40" />
             </div>
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Carcaças Totalmente Condenadas</Label>
-              <Input inputMode="numeric" disabled={disabled} value={condenasTotal} onChange={(e) => setCondenasTotal(somenteInteiro(e.target.value))} placeholder="Ex: 80" />
+              <Input type="number" disabled={disabled} value={condenasTotal} onChange={(e) => setCondenasTotal(e.target.value)} placeholder="Ex: 80" />
             </div>
           </div>
           {totalAves > 0 && (
@@ -338,27 +364,20 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
           )}
         </div>
       ) : (
-        <AvisoPrimeiroDoDia />
+        <div className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 p-3 text-sm">
+          <Info className="h-4 w-4 shrink-0 text-primary" />
+          <span>
+            <strong>Primeiro monitoramento do dia:</strong> informe apenas a leitura atual de cada hidrômetro. Cargas processadas e apuração de vazão
+            começam no próximo monitoramento.
+          </span>
+        </div>
       )}
 
-      <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(260px,1fr))]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {renderTanque("preChiller")}
         {renderTanque("chiller1")}
         {renderTanque("chiller2")}
       </div>
-
-      <LogicaCalculo titulo="SPR Carcaças">
-        <li>
-          Curva das metas (L/carcaça) para o peso médio de carcaça atual
-          {pesoMedioCarcaca > 0 ? ` (${formatMaskedValue(pesoMedioCarcaca.toFixed(3))} kg)` : ""}: Pré-chiller {formatMaskedValue(metas.preChiller.toFixed(3)) || "—"} →
-          Chiller 01 {formatMaskedValue(metas.chiller1.toFixed(3)) || "—"} → Chiller 02 {formatMaskedValue(metas.chiller2.toFixed(3)) || "—"}.
-        </li>
-        <li>Aves no Período = Σ aves das cargas − (carcaças parcialmente aproveitadas + totalmente condenadas).</li>
-        <li>Peso médio da carcaça = média ponderada do peso vivo × 0,84 (rendimento fixo de 84%).</li>
-        <li>Água usada (L) = (Hidr. Atual − Hidr. Anterior) × 1000 + Gelo Adicionado.</li>
-        <li>Renovação apurada (L/ave) = água usada ÷ Aves no Período. Conforme quando a renovação apurada é maior ou igual à meta.</li>
-        <li>Metas por faixa de peso da carcaça (≤ 2,5 kg / ≤ 5,0 kg / &gt; 5,0 kg): Pré-chiller 1,5 / 1,7 / 2,2 · Chiller 01 1,1 / 1,6 / 2,1 · Chiller 02 1,0 / 1,5 / 2,0.</li>
-      </LogicaCalculo>
     </div>
   );
 }

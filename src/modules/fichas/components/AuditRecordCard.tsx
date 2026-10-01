@@ -1,9 +1,8 @@
-import { Eye, Lock, Printer, ShieldAlert, ShieldCheck, Unlock } from "lucide-react";
+import { Lock, Printer, ShieldAlert, ShieldCheck, Unlock } from "lucide-react";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { ensureLocalTime } from "../utils/tempo";
 import type { AppointmentDisplay } from "../utils/recordGrouping";
-import type { StatusRnc } from "@/modules/rnc/api";
 
 const STATUS_ROTULO: Record<AppointmentDisplay["status"], string> = {
   aguardando: "Aguardando verificação",
@@ -39,8 +38,6 @@ export interface AuditRecordCardProps {
   usersMap: Map<string, string>;
   blockedIds: Set<string>;
   isAdmin: boolean;
-  /** Status da RNC vinculada a este monitoramento (se houver). RNC FECHADA = desvio procedente e tratado. */
-  rncStatus?: StatusRnc;
   onEncerrarTurno: (item: AppointmentDisplay) => void;
 }
 
@@ -58,7 +55,6 @@ export function AuditRecordCard({
   usersMap,
   blockedIds,
   isAdmin,
-  rncStatus,
   onEncerrarTurno,
 }: AuditRecordCardProps) {
   const { appt } = item;
@@ -73,9 +69,9 @@ export function AuditRecordCard({
   return (
     <div
       data-testid={`registro-verificacao-${item.id}`}
-      className={`glass-panel space-y-2 rounded-lg border border-white/70 border-l-4 p-4 shadow-sm ${STATUS_BORDA[item.status]}`}
+      className={`glass-panel space-y-2 rounded-lg border border-white/70 border-l-4 p-4 shadow-sm ${STATUS_BORDA[item.status]} ${bloqueado ? "opacity-70" : ""}`}
     >
-      <div className="flex flex-wrap items-start justify-between gap-2">
+      <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
           {selecionavel && (
             <input
@@ -98,11 +94,7 @@ export function AuditRecordCard({
             </div>
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-1.5">
-          {rncStatus === "FECHADA" && <Badge className="border-transparent bg-lime text-primary">TRATADO</Badge>}
-          {rncStatus && rncStatus !== "FECHADA" && <Badge variant="warning">RNC em andamento</Badge>}
-          {item.status !== "verificado" && <Badge variant={STATUS_VARIANT[item.status]}>{STATUS_ROTULO[item.status]}</Badge>}
-        </div>
+        <Badge variant={STATUS_VARIANT[item.status]}>{STATUS_ROTULO[item.status]}</Badge>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
@@ -126,21 +118,10 @@ export function AuditRecordCard({
             <Printer className="h-3.5 w-3.5" />
             Imprimir
           </Button>
-          {item.status === "verificado" ? (
-            <>
-              <Badge className="border-transparent bg-lime text-primary">VERIFICADO</Badge>
-              <Button type="button" size="sm" variant="outline" onClick={() => onPreview(item)}>
-                <Eye className="h-3.5 w-3.5" />
-                Ver
-              </Button>
-            </>
-          ) : (
-            // Turno em aberto: só prévia (a tela de verificação esconde as ações até o turno fechar).
-            <Button type="button" size="sm" variant={bloqueado ? "outline" : "default"} onClick={() => onPreview(item)}>
-              {bloqueado ? <Eye className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5" />}
-              {bloqueado ? "Prévia" : "Verificar"}
-            </Button>
-          )}
+          <Button type="button" size="sm" disabled={bloqueado} onClick={() => onPreview(item)}>
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Verificar
+          </Button>
         </div>
       </div>
 

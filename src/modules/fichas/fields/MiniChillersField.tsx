@@ -2,10 +2,32 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, Info, Lock } from "lucide-react";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
-import { formatHidrometro, formatMaskedValue, LIMIAR_IMPLAUSIVEL, parseHidrometro } from "./hidrometro";
-import { apurar, detalheDesvio, GELO_PADRAO_MIUDOS, META_L_KG, pesosMiudosPorCarcaca, type ChaveMiudo } from "./calculosSpr";
-import { AvisoImplausivel, AvisoPrimeiroDoDia, CampoBloqueado, LogicaCalculo, TOOLTIP_HIDR_ANTERIOR } from "./componentesSpr";
+import { formatHidrometro, formatMaskedValue, LIMIAR_IMPLAUSIVEL, parseHidrometro, parseNumeroHidrometro } from "./hidrometro";
 import type { ChillerCarcacasValor, MiniChillersValor, TanqueHidrometro } from "./tiposCompostos";
+
+type ChaveMiudo = "coracao" | "moela" | "figado" | "cabeca" | "pes";
+
+/** Tabela de pesos (kg) por faixa de peso médio de carcaça — portada literalmente do v1
+ * (MiniChillersField.jsx). Não é um limiar inventado por este projeto. */
+const TABELA_PESO: { maxCarcaca: number; coracao: number; moela: number; figado: number; cabeca: number; pes: number }[] = [
+  { maxCarcaca: 1.199, coracao: 0.006, moela: 0.023, figado: 0.03, cabeca: 0.037, pes: 0.065 },
+  { maxCarcaca: 1.599, coracao: 0.007, moela: 0.025, figado: 0.032, cabeca: 0.039, pes: 0.066 },
+  { maxCarcaca: 1.799, coracao: 0.007, moela: 0.028, figado: 0.034, cabeca: 0.04, pes: 0.068 },
+  { maxCarcaca: 1.899, coracao: 0.008, moela: 0.028, figado: 0.035, cabeca: 0.044, pes: 0.07 },
+  { maxCarcaca: 2.1, coracao: 0.01, moela: 0.028, figado: 0.035, cabeca: 0.048, pes: 0.07 },
+  { maxCarcaca: 2.25, coracao: 0.01, moela: 0.03, figado: 0.036, cabeca: 0.05, pes: 0.075 },
+  { maxCarcaca: 2.35, coracao: 0.011, moela: 0.03, figado: 0.038, cabeca: 0.051, pes: 0.077 },
+  { maxCarcaca: 2.45, coracao: 0.011, moela: 0.031, figado: 0.039, cabeca: 0.053, pes: 0.082 },
+  { maxCarcaca: 2.75, coracao: 0.011, moela: 0.032, figado: 0.041, cabeca: 0.054, pes: 0.084 },
+  { maxCarcaca: Infinity, coracao: 0.012, moela: 0.033, figado: 0.042, cabeca: 0.058, pes: 0.097 },
+];
+
+function pesosPorCarcaca(pesoCarcaca: number) {
+  for (const linha of TABELA_PESO) {
+    if (pesoCarcaca <= linha.maxCarcaca) return linha;
+  }
+  return TABELA_PESO[TABELA_PESO.length - 1]!;
+}
 
 const CONFIG_PARTE: Record<ChaveMiudo, { nome: string; cor: string }> = {
   coracao: { nome: "Coração", cor: "#dc2626" },
@@ -15,8 +37,21 @@ const CONFIG_PARTE: Record<ChaveMiudo, { nome: string; cor: string }> = {
   pes: { nome: "Pés", cor: "#059669" },
 };
 
+const META_L_KG = 1.5;
+
 function tanqueVazio(prev: string): TanqueHidrometro {
-  return { prev, cur: "", ice: GELO_PADRAO_MIUDOS };
+  return { prev, cur: "", ice: "332" };
+}
+
+function apuracao(tanque: TanqueHidrometro, numAves: number, pesoCarcaca: number, pesoUnitario: number): number | null {
+  const prev = parseNumeroHidrometro(tanque.prev);
+  const cur = parseNumeroHidrometro(tanque.cur);
+  const gelo = parseNumeroHidrometro(tanque.ice);
+  if (cur === 0) return 0;
+  if (numAves === 0 || pesoCarcaca === 0) return null;
+  const aguaUsadaLitros = (cur - prev) * 1000 + gelo;
+  const kgProduto = numAves * pesoUnitario;
+  return aguaUsadaLitros / kgProduto;
 }
 
 interface MiniChillersFieldProps {
@@ -27,9 +62,9 @@ interface MiniChillersFieldProps {
   carcacasAtual: ChillerCarcacasValor | undefined;
 }
 
-/** Renovação da Água dos Mini-Chillers de Miúdos (coração, moela, fígado, cabeça, pés). Aves no
- * período e peso médio de carcaça vêm BLOQUEADOS, ao vivo, do SPR Carcaças da mesma ficha; o peso
- * unitário de cada miúdo vem da Tabela DE-PARA (calculosSpr.ts). Meta: 1,5 L/kg em cada tanque. */
+/** Renovação da Água dos Mini-Chillers de Miúdos — porte do v1 (MiniChillersField.jsx). Aves
+ * no período e peso médio de carcaça herdados ao vivo do SPR Carcaças da mesma ficha; peso
+ * unitário de cada miúdo vem da Tabela DE-PARA. Meta: 1,5 L/kg em cada um dos 5 miúdos. */
 export function MiniChillersField({ value, onChange, disabled, prevAppointment, carcacasAtual }: MiniChillersFieldProps) {
   const [tanques, setTanques] = useState({
     coracao: value?.tanques.coracao ?? tanqueVazio(prevAppointment?.tanques.coracao.cur ?? ""),
@@ -67,19 +102,16 @@ export function MiniChillersField({ value, onChange, disabled, prevAppointment, 
 
   const numAves = carcacasAtual?.totalAves ?? 0;
   const pesoCarcaca = carcacasAtual?.pesoMedioCarcaca ?? 0;
-  const pesos = pesosMiudosPorCarcaca(pesoCarcaca);
-  // Bloqueios (2 alertas independentes) só fora do 1º monitoramento do dia.
+  const pesos = pesosPorCarcaca(pesoCarcaca);
   const avesIndisponivel = !isPrimeiroDoDia && !numAves;
   const pesoMiudoIndisponivel = !isPrimeiroDoDia && !pesoCarcaca;
 
-  const apuradoDe = (chave: ChaveMiudo) =>
-    apurar(tanques[chave].prev, tanques[chave].cur, tanques[chave].ice, pesoCarcaca === 0 ? 0 : numAves * pesos[chave]);
   const apurado: Record<ChaveMiudo, number | null> = {
-    coracao: apuradoDe("coracao"),
-    moela: apuradoDe("moela"),
-    figado: apuradoDe("figado"),
-    cabeca: apuradoDe("cabeca"),
-    pes: apuradoDe("pes"),
+    coracao: apuracao(tanques.coracao, numAves, pesoCarcaca, pesos.coracao),
+    moela: apuracao(tanques.moela, numAves, pesoCarcaca, pesos.moela),
+    figado: apuracao(tanques.figado, numAves, pesoCarcaca, pesos.figado),
+    cabeca: apuracao(tanques.cabeca, numAves, pesoCarcaca, pesos.cabeca),
+    pes: apuracao(tanques.pes, numAves, pesoCarcaca, pesos.pes),
   };
   const hasCurData = Object.values(tanques).some((t) => !!t.cur);
   const conformeParte = (chave: ChaveMiudo) => {
@@ -97,9 +129,10 @@ export function MiniChillersField({ value, onChange, disabled, prevAppointment, 
   const isConforme = !hasCurData || Object.values(conf).every(Boolean);
 
   useEffect(() => {
+    const rotulos: Record<ChaveMiudo, string> = { coracao: "Coração", moela: "Moela", figado: "Fígado", cabeca: "Cabeça", pes: "Pés" };
     const detalhes: string[] = [];
     (Object.keys(conf) as ChaveMiudo[]).forEach((chave) => {
-      if (!conf[chave] && numAves > 0) detalhes.push(detalheDesvio(CONFIG_PARTE[chave].nome, apurado[chave] ?? 0, META_L_KG, "L/kg"));
+      if (!conf[chave] && numAves > 0) detalhes.push(`${rotulos[chave]} (Apurado: ${(apurado[chave] ?? 0).toFixed(3)}L/kg | Meta: ${META_L_KG}L/kg)`);
     });
 
     onChange({
@@ -130,12 +163,12 @@ export function MiniChillersField({ value, onChange, disabled, prevAppointment, 
 
     return (
       <div key={chave} className="overflow-hidden rounded-lg border-2" style={{ borderColor: naoConforme ? "#dc2626" : `${cor}40` }}>
-        <div className="flex flex-wrap gap-2 items-center justify-between px-3 py-2 text-sm font-black text-white" style={{ background: cor }}>
+        <div className="flex items-center justify-between px-3 py-2 text-sm font-black text-white" style={{ background: cor }}>
           {nome.toUpperCase()}
-          {numAves > 0 && <span className="text-xs opacity-90">Meta: {formatMaskedValue(META_L_KG.toFixed(3))} L/kg</span>}
+          {numAves > 0 && <span className="text-xs opacity-90">Meta: {META_L_KG.toFixed(3)} L/kg</span>}
         </div>
         <div className="space-y-3 p-4">
-          <div className="grid grid-cols-1 gap-3">
+          <div className={`grid gap-3 ${isPrimeiroDoDia ? "grid-cols-1" : "sm:grid-cols-2"}`}>
             {!isPrimeiroDoDia && (
               <div className="space-y-1">
                 <Label className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -143,7 +176,6 @@ export function MiniChillersField({ value, onChange, disabled, prevAppointment, 
                 </Label>
                 <Input
                   disabled={disabled || prevTravado[chave]}
-                  title={prevTravado[chave] ? TOOLTIP_HIDR_ANTERIOR : undefined}
                   value={formatHidrometro(tanque.prev)}
                   onChange={(e) => alterarTanque(chave, "prev", parseHidrometro(e.target.value))}
                   className="font-mono"
@@ -162,7 +194,7 @@ export function MiniChillersField({ value, onChange, disabled, prevAppointment, 
               />
             </div>
             {!isPrimeiroDoDia && (
-              <div className="space-y-1">
+              <div className="space-y-1 sm:col-span-2">
                 <Label className="text-xs text-muted-foreground">Gelo Adicionado (kg)</Label>
                 <Input
                   disabled={disabled}
@@ -182,7 +214,7 @@ export function MiniChillersField({ value, onChange, disabled, prevAppointment, 
               borderColor: !temResultado ? undefined : naoConforme ? "#dc2626" : "#059669",
             }}
           >
-            <div className="flex flex-wrap gap-2 items-center justify-between">
+            <div className="flex items-center justify-between">
               <span className="text-xs font-bold" style={{ color: !temResultado ? undefined : naoConforme ? "#dc2626" : "#059669" }}>
                 VAZÃO APURADA
               </span>
@@ -197,7 +229,12 @@ export function MiniChillersField({ value, onChange, disabled, prevAppointment, 
             )}
           </div>
 
-          {implausivel && <AvisoImplausivel apurado={valorApurado ?? 0} meta={META_L_KG} />}
+          {implausivel && (
+            <div className="flex items-start gap-2 rounded-md border border-warning bg-warning/10 p-2 text-xs font-medium text-warning-foreground">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>Valor {((valorApurado ?? 0) / META_L_KG).toFixed(0)}x acima da meta — confira a leitura do hidrômetro.</span>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -223,6 +260,20 @@ export function MiniChillersField({ value, onChange, disabled, prevAppointment, 
               </>
             )}
           </p>
+        </div>
+        <div className="flex gap-6 text-right">
+          {numAves > 0 && (
+            <div>
+              <p className="text-xs font-bold text-muted-foreground">Aves no Período</p>
+              <p className="text-lg font-black">{numAves.toLocaleString("pt-BR")} aves</p>
+            </div>
+          )}
+          {pesoCarcaca > 0 && (
+            <div>
+              <p className="text-xs font-bold text-muted-foreground">Peso Médio (Est.)</p>
+              <p className="text-lg font-black">{pesoCarcaca.toFixed(3)} kg</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -252,36 +303,18 @@ export function MiniChillersField({ value, onChange, disabled, prevAppointment, 
           </div>
         </div>
       )}
-
-      {isPrimeiroDoDia ? (
-        <AvisoPrimeiroDoDia />
-      ) : (
-        <div className="space-y-3 rounded-md border border-primary/20 bg-primary/5 p-4">
-          <h4 className="text-sm font-bold text-primary">Base de Cálculo — Aves e Peso da Carcaça</h4>
-          <div className="flex flex-wrap items-end gap-4 rounded-md border bg-background p-3">
-            <CampoBloqueado rotulo="Aves no Período" valor={`${numAves.toLocaleString("pt-BR")} aves`} />
-            <CampoBloqueado rotulo="Peso Médio de Carcaça" valor={`${formatMaskedValue(pesoCarcaca.toFixed(3)) || "0,000"} kg`} />
-          </div>
-          {numAves > 0 && pesoCarcaca > 0 && (
-            <p className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Info className="h-3.5 w-3.5 shrink-0 text-primary" />
-              Aves no período e peso médio de carcaça usados ao vivo do "Renovação da Água do SPR Carcaças" desta mesma ficha.
-            </p>
-          )}
+      {isPrimeiroDoDia && (
+        <div className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 p-3 text-sm">
+          <Info className="h-4 w-4 shrink-0 text-primary" />
+          <span>
+            <strong>Primeiro monitoramento do dia:</strong> informe apenas a leitura atual de cada hidrômetro.
+          </span>
         </div>
       )}
 
-      <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(260px,1fr))]">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {(Object.keys(CONFIG_PARTE) as ChaveMiudo[]).map(renderParte)}
       </div>
-
-      <LogicaCalculo titulo="Mini-Chillers">
-        <li>Aves no Período e peso médio de carcaça vêm do SPR Carcaças desta mesma ficha.</li>
-        <li>Peso do miúdo por carcaça (kg/un) = Tabela DE-PARA, pela faixa do peso médio de carcaça (coração, moela, fígado, cabeça e pés).</li>
-        <li>Produto processado (kg) = Aves no Período × peso do miúdo por carcaça.</li>
-        <li>Água usada (L) = (Hidr. Atual − Hidr. Anterior) × 1000 + Gelo Adicionado.</li>
-        <li>Vazão apurada (L/kg) = água usada ÷ produto processado. Meta fixa: maior ou igual a 1,5 L/kg em cada mini-chiller.</li>
-      </LogicaCalculo>
     </div>
   );
 }

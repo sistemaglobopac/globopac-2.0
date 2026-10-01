@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import { MonitoramentosEmAndamento } from "@/modules/fichas/components/MonitoramentosEmAndamento";
 import { useNavigate } from "react-router-dom";
 import {
   Eye,
   AlertTriangle,
-  BellRing,
   AlertOctagon,
   ClipboardList,
   Wrench,
@@ -38,9 +36,6 @@ import {
   PAUSAS_CONFIG,
   fichasAplicaveisAoInspetor,
   calcularFichasAtrasadas,
-  resumoFichasPorSetor,
-  urlNovaFicha,
-  inicioDoDiaManaus,
   type TipoPausa,
   type FichaAtivaResumo,
   type FichaAtrasada,
@@ -221,14 +216,6 @@ export function PainelBordo() {
 
   const turnoCalculado = turnoDoDia(turnoHoje ? new Date(turnoHoje.inicio) : agora);
   const fichasAplicaveis = fichasAplicaveisAoInspetor(kpis?.fichasAtivas ?? [], userSetores);
-  // Card "Fichas Ativas": por setor, quantas fichas existem e quantas já foram iniciadas neste turno.
-  const resumoSetores = resumoFichasPorSetor(
-    fichasAplicaveis,
-    kpis?.monitoramentosHoje ?? [],
-    userSetores,
-    turnoHoje ? new Date(turnoHoje.inicio) : inicioDoDiaManaus(agora)
-  );
-  const fichasIniciadasNoTurno = new Set(resumoSetores.flatMap((r) => r.idsIniciadas));
   const fichasAtrasadas = turnoHoje ? calcularFichasAtrasadas(fichasAplicaveis, kpis?.monitoramentosHoje ?? [], new Date(turnoHoje.inicio), agora) : [];
   const desviosComRnc = (kpis?.desviosAtivos ?? []).filter((d) => d.rnc !== null);
   const bloqueadoPorPausa = pausaAtiva != null;
@@ -352,7 +339,7 @@ export function PainelBordo() {
 
       {mensagem && (
         <div
-          className={`flex flex-wrap items-center justify-between gap-3 rounded-md border p-3 text-sm ${
+          className={`flex items-center justify-between gap-3 rounded-md border p-3 text-sm ${
             mensagem.tipo === "success" ? "border-success bg-success/10 text-foreground" : "border-destructive bg-destructive/10 text-destructive"
           }`}
         >
@@ -363,37 +350,6 @@ export function PainelBordo() {
         </div>
       )}
 
-      {fichasAtrasadas.length > 0 && (
-        <section className="space-y-2 rounded-xl border-2 border-destructive bg-destructive/5 p-4" data-testid="cards-atrasados">
-          <h2 className="flex items-center gap-2 text-sm font-black uppercase tracking-wider text-destructive">
-            <BellRing className="h-4 w-4 animate-bounce" /> Monitoramentos em atraso ({fichasAtrasadas.length})
-          </h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {fichasAtrasadas.map((a) => (
-              <button
-                key={a.ficha.id}
-                type="button"
-                data-testid={`card-atrasado-${a.ficha.id}`}
-                disabled={bloqueadoPorPausa}
-                onClick={() => navigate(urlNovaFicha(a.ficha, userSetores))}
-                className="animate-pulse rounded-lg border-2 border-destructive bg-destructive p-4 text-left text-destructive-foreground shadow-lg transition-transform hover:scale-[1.02] disabled:opacity-60"
-              >
-                <span className="flex items-center gap-2 text-xs font-black uppercase tracking-wider">
-                  <AlertTriangle className="h-4 w-4" /> Em atraso — toque para abrir
-                </span>
-                <span className="mt-1 block text-base font-bold leading-tight">{a.ficha.nome}</span>
-                <span className="block text-xs opacity-90">
-                  {a.ficha.codigo} · {a.motivo}
-                  {a.devidoEm && <> · devido às {formatarHoraManaus(a.devidoEm)}</>}
-                </span>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <MonitoramentosEmAndamento />
-
       {kpis && kpis.adendosPendentes.length > 0 && (
         <div className="space-y-3 rounded-xl border border-warning bg-warning/10 p-4">
           <div className="flex items-center gap-2 font-semibold text-warning">
@@ -402,7 +358,7 @@ export function PainelBordo() {
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             {kpis.adendosPendentes.map((adendo) => (
-              <div key={adendo.id} className="flex flex-wrap gap-2 items-center justify-between rounded-lg border bg-background p-3">
+              <div key={adendo.id} className="flex items-center justify-between rounded-lg border bg-background p-3">
                 <div>
                   <p className="font-medium">{kpis.nomesFicha.get(adendo.monitoramentoId)?.nome ?? "Monitoramento"}</p>
                   <p className="text-xs text-muted-foreground">Solicitado por {adendo.verificadorName}</p>
@@ -443,7 +399,7 @@ export function PainelBordo() {
 
       {isManutencaoInspector && activeBordoTab === "os" ? (
         <div className="space-y-4 rounded-xl border p-5">
-          <div className="flex flex-wrap gap-2 items-center justify-between">
+          <div className="flex items-center justify-between">
             <h2 className="text-lg font-medium">Ordens de Serviço de Manutenção</h2>
             <Button type="button" onClick={() => navigate("/pcm/nova")} disabled={bloqueadoPorPausa}>
               <Hammer className="h-4 w-4" />
@@ -506,20 +462,6 @@ export function PainelBordo() {
               valor={fichasAplicaveis.length}
               tom="neutro"
               onClick={() => abrirTileKpi("fichasAtivas", fichasAplicaveis.length)}
-              detalhe={
-                <span data-testid="fichas-ativas-detalhe" className="mt-2 block space-y-0.5 text-xs">
-                  <span className="block font-semibold text-foreground">
-                    {fichasIniciadasNoTurno.size} de {fichasAplicaveis.length} iniciadas neste turno
-                  </span>
-                  {resumoSetores.length > 1 &&
-                    resumoSetores.map((r) => (
-                      <span key={r.setor} className="block text-muted-foreground">
-                        {r.setor}: {r.iniciadas} de {r.total}
-                      </span>
-                    ))}
-                  {resumoSetores.length === 1 && <span className="block text-muted-foreground">Setor {resumoSetores[0]!.setor}</span>}
-                </span>
-              }
             />
             <KpiTile
               titulo="Fichas Atrasadas"
@@ -808,11 +750,6 @@ export function PainelBordo() {
           fichasAplicaveis={fichasAplicaveis}
           fichasAtrasadas={fichasAtrasadas}
           desviosComRnc={desviosComRnc}
-          fichasIniciadasNoTurno={fichasIniciadasNoTurno}
-          onAbrirFicha={(ficha) => {
-            setCategoriaKpiModal(null);
-            navigate(urlNovaFicha(ficha, userSetores));
-          }}
           onFechar={() => setCategoriaKpiModal(null)}
         />
       )}
@@ -889,15 +826,12 @@ function KpiTile({
   valor,
   tom,
   onClick,
-  detalhe,
 }: {
   titulo: string;
   tag: string;
   valor: number;
   tom: keyof typeof TOM_KPI;
   onClick: () => void;
-  /** Linhas extras abaixo do título (ex.: quantas fichas já foram iniciadas). */
-  detalhe?: React.ReactNode;
 }) {
   return (
     <button
@@ -908,7 +842,6 @@ function KpiTile({
       <span className="rounded-full bg-surface-strong px-2 py-0.5 text-[10px] font-semibold uppercase text-muted-foreground">{tag}</span>
       <p className={`mt-3 font-mono text-3xl font-medium ${TOM_KPI[tom]}`}>{valor}</p>
       <p className="text-sm text-muted-foreground">{titulo}</p>
-      {detalhe}
     </button>
   );
 }
@@ -1015,7 +948,7 @@ function ModalBase({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[calc(100dvh-2rem)] overflow-y-auto w-full max-w-md rounded-xl border bg-background shadow-2xl">
+      <div className="w-full max-w-md rounded-xl border bg-background shadow-2xl">
         <div className={`flex items-center justify-between rounded-t-xl px-4 py-3 text-white ${corHeaderClasse}`}>
           <span className="flex items-center gap-2 font-semibold">
             {icone}
@@ -1050,7 +983,7 @@ function ModalConfirmacao({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[calc(100dvh-2rem)] overflow-y-auto w-full max-w-sm space-y-4 rounded-xl border bg-background p-6 text-center shadow-2xl">
+      <div className="w-full max-w-sm space-y-4 rounded-xl border bg-background p-6 text-center shadow-2xl">
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">{icone}</div>
         <h3 className="text-lg font-semibold">{titulo}</h3>
         <p className="text-sm text-muted-foreground">{mensagem}</p>
@@ -1073,8 +1006,6 @@ function ModalListaKpi({
   fichasAplicaveis,
   fichasAtrasadas,
   desviosComRnc,
-  fichasIniciadasNoTurno,
-  onAbrirFicha,
   onFechar,
 }: {
   categoria: CategoriaKpi;
@@ -1082,8 +1013,6 @@ function ModalListaKpi({
   fichasAplicaveis: FichaAtivaResumo[];
   fichasAtrasadas: FichaAtrasada[];
   desviosComRnc: DesvioAtivo[];
-  fichasIniciadasNoTurno: Set<string>;
-  onAbrirFicha: (ficha: FichaAtivaResumo) => void;
   onFechar: () => void;
 }) {
   const TITULOS: Record<CategoriaKpi, string> = {
@@ -1097,7 +1026,7 @@ function ModalListaKpi({
   if (categoria === "monitoramentos") {
     itens = kpis.monitoramentosHoje.map((m) => `${formatarHoraManaus(m.criado_em)} - ${kpis.nomesFicha.get(m.ficha_template_id)?.nome ?? "Ficha"}`);
   } else if (categoria === "fichasAtivas") {
-    itens = fichasAplicaveis.map((f) => `${f.codigo} - ${f.nome} — ${fichasIniciadasNoTurno.has(f.id) ? "iniciada neste turno" : "ainda não iniciada"}`);
+    itens = fichasAplicaveis.map((f) => `${f.codigo} - ${f.nome}`);
   } else if (categoria === "fichasAtrasadas") {
     itens = fichasAtrasadas.map((a) => `${a.ficha.codigo} - ${a.ficha.nome} (${a.motivo})`);
   } else {
@@ -1106,32 +1035,10 @@ function ModalListaKpi({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[calc(100dvh-2rem)] overflow-y-auto w-full max-w-md rounded-xl border bg-background shadow-2xl">
+      <div className="w-full max-w-md rounded-xl border bg-background shadow-2xl">
         <div className="rounded-t-xl bg-primary px-4 py-3 text-center text-primary-foreground">
           <p className="font-semibold">{TITULOS[categoria]}</p>
         </div>
-        {categoria === "fichasAtrasadas" ? (
-          <ul className="max-h-80 space-y-2 overflow-y-auto p-4 text-sm" data-testid="lista-fichas-atrasadas">
-            {fichasAtrasadas.map((a) => (
-              <li key={a.ficha.id}>
-                <button
-                  type="button"
-                  onClick={() => onAbrirFicha(a.ficha)}
-                  className="flex w-full items-start gap-3 rounded-lg border-2 border-destructive bg-destructive/10 p-3 text-left transition-colors hover:bg-destructive/20"
-                >
-                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
-                  <span className="min-w-0">
-                    <span className="block font-bold text-destructive">Ficha em atraso — clique para preencher</span>
-                    <span className="block font-medium text-ink">
-                      {a.ficha.codigo} - {a.ficha.nome}
-                    </span>
-                    <span className="block text-xs text-muted-foreground">{a.motivo}</span>
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : (
         <ul className="max-h-80 space-y-1 overflow-y-auto p-4 text-sm">
           {itens.map((texto, i) => (
             <li key={i} className="border-b py-1.5 last:border-b-0">
@@ -1139,7 +1046,6 @@ function ModalListaKpi({
             </li>
           ))}
         </ul>
-        )}
         <div className="border-t p-3 text-center">
           <Button type="button" variant="outline" onClick={onFechar}>
             Fechar

@@ -1,16 +1,7 @@
-import { useMemo, useState } from "react";
-import { Eye } from "lucide-react";
-import { turnoDoDia } from "@/modules/bordo/api";
-import { useFichasTemplatesTodas } from "@/modules/fichas/api";
-import { RelatorioModal } from "@/modules/fichas/components/relatorio/RelatorioModal";
-import { agruparPorDossie, setoresDoGrupo, tipoPorTemplate } from "@/modules/fichas/utils/recordGrouping";
-import { ensureLocalTime } from "@/modules/fichas/utils/tempo";
-import { Button } from "@/shared/ui/button";
 import { useMonitoramentosLiberados } from "./api";
 import { useOsLiberadas } from "@/modules/pcm/api";
 import { Badge } from "@/shared/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
-import { situacaoDe } from "@/shared/situacaoConformidade";
 
 /** Painel de auditoria da INSPECAO_FEDERAL (seção 4, 7.3 e 7.4) — somente leitura, só
  * enxerga o que já foi liberado ao SIF (monitoramentos e, a partir da Fase 5, OS de
@@ -19,12 +10,6 @@ import { situacaoDe } from "@/shared/situacaoConformidade";
 export function AuditoriaFederalPage() {
   const { data: liberados, isLoading } = useMonitoramentosLiberados();
   const { data: osLiberadas, isLoading: isLoadingOs } = useOsLiberadas();
-  const { data: templates } = useFichasTemplatesTodas();
-  const [relatorioIds, setRelatorioIds] = useState<string[] | null>(null);
-  // Um relatório consolidado por tipo de ficha + turno: o auditor vê o dia inteiro do tipo.
-  const tipoDaFicha = useMemo(() => tipoPorTemplate(new Map((templates ?? []).map((t) => [t.id, t.codigo]))), [templates]);
-  const nomePorTemplateId = useMemo(() => new Map((templates ?? []).map((t) => [t.id, t.nome])), [templates]);
-  const grupos = useMemo(() => agruparPorDossie(liberados ?? [], tipoDaFicha), [liberados, tipoDaFicha]);
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
@@ -36,37 +21,21 @@ export function AuditoriaFederalPage() {
           <p className="text-muted-foreground">Nenhum documento liberado ainda.</p>
         )}
 
-        {grupos.map(({ chave, items }) => {
-          const primeiro = items[0]!;
-          const ids = items.map((m) => m.id);
-          const desvios = items.filter((m) => situacaoDe(m) === "NAO_CONFORME").length;
-          const tratados = items.filter((m) => situacaoDe(m) === "TRATADO").length;
-          const ultimaVerificacao = items.map((m) => m.verificado_em).filter(Boolean).sort().at(-1);
-          return (
-            <Card key={chave}>
-              <CardHeader className="flex flex-wrap-row items-center justify-between gap-3 space-y-0 pb-2">
-                <CardTitle className="text-base">
-                  <Badge variant="outline">{setoresDoGrupo(items)}</Badge>{" "}
-                  <Badge variant={desvios === 0 ? "success" : "destructive"}>
-                    {desvios === 0 ? (tratados > 0 ? "Tratado" : "Conforme") : `${desvios} não conforme(s)`}
-                  </Badge>{" "}
-                  <Badge variant="secondary">{items.length} monitoramento(s)</Badge>
-                </CardTitle>
-                <Button type="button" size="sm" variant="outline" onClick={() => setRelatorioIds(ids)}>
-                  <Eye className="h-3.5 w-3.5" />
-                  Ver Relatório
-                </Button>
-              </CardHeader>
-              <CardContent className="text-sm text-muted-foreground">
-                <p className="font-medium text-foreground">{nomePorTemplateId.get(primeiro.ficha_template_id) ?? "Ficha"}</p>
-                <p>
-                  {turnoDoDia(new Date(primeiro.criado_em))} · {ensureLocalTime(primeiro.criado_em).datePt} · Verificado em{" "}
-                  {ultimaVerificacao ? new Date(ultimaVerificacao).toLocaleString("pt-BR") : "—"}
-                </p>
-              </CardContent>
-            </Card>
-          );
-        })}
+        {liberados?.map((m) => (
+          <Card key={m.id}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">
+                <Badge variant="outline">{m.setor}</Badge>{" "}
+                <Badge variant={m.conformidade ? "success" : "destructive"}>
+                  {m.conformidade ? "Conforme" : "Não conforme"}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              Verificado em {m.verificado_em ? new Date(m.verificado_em).toLocaleString("pt-BR") : "—"}
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       <div className="space-y-4">
@@ -91,8 +60,6 @@ export function AuditoriaFederalPage() {
           </Card>
         ))}
       </div>
-
-      {relatorioIds && <RelatorioModal ids={relatorioIds} onFechar={() => setRelatorioIds(null)} />}
     </div>
   );
 }

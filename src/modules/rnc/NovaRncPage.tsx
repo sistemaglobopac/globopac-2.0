@@ -5,10 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { useSessionStore } from "@/store/session";
 import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/api";
 import { supabase } from "@/lib/supabase";
-import { desviosEspeciais } from "@/modules/fichas/utils/desviosEspeciais";
-import type { CampoTemplate } from "@/shared/schema-campos";
-import { enviarAnexosRnc, useAbrirRnc, type SeveridadeRnc } from "./api";
-import { SeletorAnexos } from "./AnexosRnc";
+import { useAbrirRnc, type SeveridadeRnc } from "./api";
 import { Button } from "@/shared/ui/button";
 import { Label } from "@/shared/ui/label";
 import { Select } from "@/shared/ui/select";
@@ -27,24 +24,21 @@ function useFichaDoMonitoramento(monitoramentoId: string | null) {
     queryFn: async () => {
       const { data: monitoramento, error: erroMonitoramento } = await supabase
         .from("monitoramentos")
-        .select("setor, ficha_template_id, dados_dinamicos")
+        .select("setor, ficha_template_id")
         .eq("id", monitoramentoId as string)
         .single()
-        .overrideTypes<{ setor: string; ficha_template_id: string; dados_dinamicos: Record<string, unknown> }, { merge: false }>();
+        .overrideTypes<{ setor: string; ficha_template_id: string }, { merge: false }>();
       if (erroMonitoramento) throw erroMonitoramento;
 
       const { data: ficha, error: erroFicha } = await supabase
         .from("fichas_templates")
-        .select("nome, schema_campos")
+        .select("nome")
         .eq("id", monitoramento.ficha_template_id)
         .single()
-        .overrideTypes<{ nome: string; schema_campos: CampoTemplate[] }, { merge: false }>();
+        .overrideTypes<{ nome: string }, { merge: false }>();
       if (erroFicha) throw erroFicha;
 
-      // O que estava não conforme no monitoramento (vazão abaixo da meta, absorção/dripping…): viaja
-      // com a RNC para quem a recebe já saber do que se trata.
-      const naoConformidades = desviosEspeciais(ficha.schema_campos ?? [], monitoramento.dados_dinamicos ?? {});
-      return { setor: monitoramento.setor, fichaNome: ficha.nome, naoConformidades };
+      return { setor: monitoramento.setor, fichaNome: ficha.nome };
     },
   });
 }
@@ -67,28 +61,15 @@ export function NovaRncPage() {
   const [setor, setSetor] = useState(setoresDoUsuario[0] ?? "");
   const [severidade, setSeveridade] = useState<SeveridadeRnc>("MEDIA");
   const [descricao, setDescricao] = useState("");
-  const [acaoImediata, setAcaoImediata] = useState("");
-  const [fotos, setFotos] = useState<File[]>([]);
   const [mensagem, setMensagem] = useState<{ tipo: "success" | "error"; texto: string } | null>(null);
 
   useEffect(() => {
-    if (!vinculo) return;
-    setSetor(vinculo.setor);
-    // Pré-preenche a descrição com a não conformidade do monitoramento (o inspetor pode complementar).
-    setDescricao((atual) => {
-      if (atual) return atual;
-      const linhas = [`Ficha: ${vinculo.fichaNome}`];
-      if (vinculo.naoConformidades.length > 0) linhas.push("Não conformidade do monitoramento:", ...vinculo.naoConformidades.map((n) => `- ${n}`));
-      return linhas.join("\n");
-    });
+    if (vinculo) setSetor(vinculo.setor);
   }, [vinculo]);
-
-  // O inspetor indica o setor ONDE a não conformidade ocorre — qualquer setor cadastrado, não só os dele.
-  const setoresParaEscolher = (masterSetores ?? []).length > 0 ? (masterSetores as string[]) : setoresDoUsuario;
 
   useEffect(() => {
     if (vinculo) return;
-    setSetor((atual) => (atual && setoresParaEscolher.includes(atual) ? atual : (setoresDoUsuario[0] ?? setoresParaEscolher[0] ?? "")));
+    setSetor((atual) => (atual && setoresDoUsuario.includes(atual) ? atual : (setoresDoUsuario[0] ?? "")));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [perfil, masterSetores]);
 
@@ -99,27 +80,17 @@ export function NovaRncPage() {
       setMensagem({ tipo: "error", texto: "Descreva o desvio antes de abrir a RNC." });
       return;
     }
-    if (!acaoImediata.trim()) {
-      setMensagem({ tipo: "error", texto: "Informe a ação imediata tomada antes de abrir a RNC." });
-      return;
-    }
 
     try {
-      const criada = await abrirRnc.mutateAsync({
+      await abrirRnc.mutateAsync({
         monitoramentoId: monitoramentoVinculo,
         descricao: descricao.trim(),
-        acaoImediata: acaoImediata.trim(),
         setor,
         severidade,
         abertoPor: perfil.id,
       });
-      let falhasFoto = 0;
-      if (fotos.length > 0) falhasFoto = await enviarAnexosRnc(criada.id, "ABERTURA", fotos, perfil.id);
-      setMensagem({
-        tipo: falhasFoto > 0 ? "error" : "success",
-        texto: falhasFoto > 0 ? `RNC aberta, mas ${falhasFoto} foto(s) não foram enviadas. Anexe de novo pela tela da RNC.` : "RNC aberta com sucesso.",
-      });
-      setTimeout(() => navigate("/painel"), falhasFoto > 0 ? 3500 : 1200);
+      setMensagem({ tipo: "success", texto: "RNC aberta com sucesso." });
+      setTimeout(() => navigate("/painel"), 1200);
     } catch (erro) {
       setMensagem({ tipo: "error", texto: erro instanceof Error ? erro.message : "Falha ao abrir a RNC." });
     }
@@ -155,9 +126,9 @@ export function NovaRncPage() {
 
           <form onSubmit={handleAbrirRnc} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="setorRnc">Setor onde ocorre a não conformidade</Label>
-              <Select id="setorRnc" value={setor} onChange={(e) => setSetor(e.target.value)} disabled={Boolean(vinculo)}>
-                {setoresParaEscolher.map((s) => (
+              <Label htmlFor="setorRnc">Setor</Label>
+              <Select id="setorRnc" value={setor} onChange={(e) => setSetor(e.target.value)} disabled={setoresDoUsuario.length <= 1}>
+                {setoresDoUsuario.map((s) => (
                   <option key={s} value={s}>
                     {s}
                   </option>
@@ -184,22 +155,6 @@ export function NovaRncPage() {
                 placeholder="Descreva o que foi observado…"
                 value={descricao}
                 onChange={(e) => setDescricao(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Foto da não conformidade (opcional)</Label>
-              <SeletorAnexos rotulo="Tirar/anexar foto" arquivos={fotos} onChange={setFotos} apenasImagens disabled={abrirRnc.isPending} testId="foto-nc" />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="acaoImediataRnc">Ação Imediata (obrigatório)</Label>
-              <Textarea
-                id="acaoImediataRnc"
-                required
-                placeholder="Descreva o que foi feito imediatamente para conter o desvio…"
-                value={acaoImediata}
-                onChange={(e) => setAcaoImediata(e.target.value)}
               />
             </div>
 
