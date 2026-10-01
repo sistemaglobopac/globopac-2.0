@@ -10,7 +10,7 @@ import {
   FAIXA_VOLTAGEM_V,
   foraDaFaixa,
   LIMITE_CONTENCAO_MAX_S,
-  LIMITE_POSTURA_ESTACAO_MAX_MIN,
+  LIMITE_POSTURA_ESTACAO_MAX_S,
   LIMITE_SAIDA_SANGRIA_MAX_S,
   LIMITE_SANGRIA_MIN_S,
   lerNumero,
@@ -50,7 +50,7 @@ export function EletronarcoseAvesField({ value, onChange, disabled }: Eletronarc
   const contencao = lerNumero(v.contencaoS);
   const saida = lerNumero(v.saidaSangriaS);
   const sangria = lerNumero(v.sangriaS);
-  const postura = lerNumero(v.posturaEstacaoMin);
+  const postura = lerNumero(v.posturaEstacaoS);
 
   return (
     <div className="space-y-5 rounded-lg border p-4" data-testid="eletronarcose-aves">
@@ -101,7 +101,7 @@ export function EletronarcoseAvesField({ value, onChange, disabled }: Eletronarc
           {SINAIS_INSENSIBILIZACAO.map((sinal) => (
             <Escolha key={sinal.chave} id={sinal.chave} rotulo={sinal.rotulo} simConforme={sinal.simConforme} valor={v[sinal.chave]} onChange={(b) => atualizar({ [sinal.chave]: b })} />
           ))}
-          <Numero id="postura" rotulo="Tempo para restabelecer a postura de estação (min)" dica={`máx. ${LIMITE_POSTURA_ESTACAO_MAX_MIN} min`} nc={postura !== null && postura > LIMITE_POSTURA_ESTACAO_MAX_MIN} valor={v.posturaEstacaoMin} onChange={(t) => atualizar({ posturaEstacaoMin: t })} />
+          <Numero id="postura" rotulo="Tempo para restabelecer a postura de estação (s)" dica={`máx. ${LIMITE_POSTURA_ESTACAO_MAX_S} s`} nc={postura !== null && postura > LIMITE_POSTURA_ESTACAO_MAX_S} valor={v.posturaEstacaoS} onChange={(t) => atualizar({ posturaEstacaoS: t })} />
         </div>
       </fieldset>
 

@@ -268,8 +268,11 @@ export interface EletronarcoseAvesValor {
   asasAfastadas: boolean | null;
   respiracaoRitmica: boolean | null;
   tremores: boolean | null;
-  /** Tempo para restabelecer a postura de estação, em MINUTOS (máx. 60). */
-  posturaEstacaoMin: string;
+  /** Tempo para restabelecer a postura de estação, em SEGUNDOS (máx. 60). */
+  posturaEstacaoS: string;
+  /** LEGADO: registros assinados em 01/10/2026 gravaram este tempo em minutos por engano de unidade.
+   * Só é lido para exibir esses registros como foram gravados; o preenchimento novo usa posturaEstacaoS. */
+  posturaEstacaoMin?: string;
   /** Ocorrência e ação corretiva — obrigatória quando há desvio. */
   descricaoDesvio: string;
   conformidade: boolean;

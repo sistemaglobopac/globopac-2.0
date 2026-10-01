@@ -660,7 +660,13 @@ export function EletronarcoseAvesRelatorio({ valor, titulo = "Bem-Estar Animal �
         <Item rotulo="Contenção até a cuba (máx. 60 s)"><strong className={valor.contencaoS && n(valor.contencaoS) > 60 ? "text-destructive" : ""}>{num(valor.contencaoS, "s")}</strong></Item>
         <Item rotulo="Saída da cuba até sangria (máx. 12 s)"><strong className={valor.saidaSangriaS && n(valor.saidaSangriaS) > 12 ? "text-destructive" : ""}>{num(valor.saidaSangriaS, "s")}</strong></Item>
         <Item rotulo="Sangria (mín. 180 s)"><strong className={valor.sangriaS && n(valor.sangriaS) < 180 ? "text-destructive" : ""}>{num(valor.sangriaS, "s")}</strong></Item>
-        <Item rotulo="Postura de estação (máx. 60 min)"><strong className={valor.posturaEstacaoMin && n(valor.posturaEstacaoMin) > 60 ? "text-destructive" : ""}>{num(valor.posturaEstacaoMin, "min")}</strong></Item>
+        <Item rotulo={valor.posturaEstacaoS === undefined && valor.posturaEstacaoMin ? "Postura de estação (registrado em minutos)" : "Postura de estação (máx. 60 s)"}>
+          {valor.posturaEstacaoS === undefined && valor.posturaEstacaoMin ? (
+            <strong>{num(valor.posturaEstacaoMin, "min")}</strong>
+          ) : (
+            <strong className={valor.posturaEstacaoS && n(valor.posturaEstacaoS) > 60 ? "text-destructive" : ""}>{num(valor.posturaEstacaoS, "s")}</strong>
+          )}
+        </Item>
         <Item rotulo="Pré-choque"><strong className={ruim(valor.preChoque)}>{sim(valor.preChoque)}</strong></Item>
         <Item rotulo="Aves sem sangrar"><strong className={ruim(valor.avesSemSangrar)}>{sim(valor.avesSemSangrar)}</strong></Item>
         <Item rotulo="Vocalização"><strong className={ruim(valor.vocalizacao)}>{sim(valor.vocalizacao)}</strong></Item>

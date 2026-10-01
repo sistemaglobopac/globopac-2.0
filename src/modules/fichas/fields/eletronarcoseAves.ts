@@ -17,8 +17,8 @@ export function foraDaFaixa(n: number | null, f: { min: number; max: number }): 
 export const LIMITE_CONTENCAO_MAX_S = 60;
 /** Saída da cuba até a sangria: no máximo 12 s. */
 export const LIMITE_SAIDA_SANGRIA_MAX_S = 12;
-/** Restabelecimento da postura de estação: no máximo 60 minutos. */
-export const LIMITE_POSTURA_ESTACAO_MAX_MIN = 60;
+/** Restabelecimento da postura de estação: no máximo 60 segundos. */
+export const LIMITE_POSTURA_ESTACAO_MAX_S = 60;
 /** Tempo de sangria: no mínimo 3 minutos (180 s). */
 export const LIMITE_SANGRIA_MIN_S = 180;
 
@@ -49,7 +49,7 @@ export function eletronarcoseVazia(): EletronarcoseAvesValor {
     asasAfastadas: null,
     respiracaoRitmica: null,
     tremores: null,
-    posturaEstacaoMin: "",
+    posturaEstacaoS: "",
     descricaoDesvio: "",
     conformidade: true,
     detalhesRNC: null,
@@ -76,8 +76,8 @@ export function motivosDesvioEletronarcose(v: EletronarcoseAvesValor): string[] 
     const n = lerNumero(texto);
     if (foraDaFaixa(n, f)) m.push(`${nome} de ${s(n as number)} ${un} (faixa ${f.min} a ${f.max} ${un.replace(" por ave", "")})`);
   }
-  const postura = lerNumero(v.posturaEstacaoMin);
-  if (postura !== null && postura > LIMITE_POSTURA_ESTACAO_MAX_MIN) m.push(`Restabelecimento da postura de estação em ${s(postura)} min (máximo ${LIMITE_POSTURA_ESTACAO_MAX_MIN} min)`);
+  const postura = lerNumero(v.posturaEstacaoS);
+  if (postura !== null && postura > LIMITE_POSTURA_ESTACAO_MAX_S) m.push(`Restabelecimento da postura de estação em ${s(postura)} s (máximo ${LIMITE_POSTURA_ESTACAO_MAX_S} s)`);
   const contencao = lerNumero(v.contencaoS);
   if (contencao !== null && contencao > LIMITE_CONTENCAO_MAX_S) m.push(`Contenção da pendura até a cuba de ${s(contencao)} s (máximo ${LIMITE_CONTENCAO_MAX_S} s)`);
   const saida = lerNumero(v.saidaSangriaS);
@@ -124,7 +124,7 @@ export function motivosBloqueioEletronarcose(v: EletronarcoseAvesValor | undefin
     [v.tempoCubaS, "o tempo dentro da cuba de insensibilização (s)"],
     [v.saidaSangriaS, "o tempo da saída da cuba até a sangria (s)"],
     [v.sangriaS, "o tempo de sangria (s)"],
-    [v.posturaEstacaoMin, "o tempo para restabelecer a postura de estação (min)"],
+    [v.posturaEstacaoS, "o tempo para restabelecer a postura de estação (s)"],
   ];
   for (const [valor, nome] of numeros) if (lerNumero(valor) === null) m.push(`${p}: informe ${nome}.`);
   if (v.preChoque === null) m.push(`${p}: informe se as aves estão recebendo pré-choque.`);

@@ -22,7 +22,7 @@ function completo(p: Partial<EletronarcoseAvesValor> = {}): EletronarcoseAvesVal
     asasAfastadas: false,
     respiracaoRitmica: false,
     tremores: true,
-    posturaEstacaoMin: "30",
+    posturaEstacaoS: "30",
     ...p,
   };
 }
@@ -60,15 +60,15 @@ describe("eletronarcose — bem-estar animal", () => {
     [{ asasAfastadas: true }, "Asas afastadas"],
     [{ respiracaoRitmica: true }, "Respiração rítmica"],
     [{ tremores: false }, "Ausência de tremores"],
-    [{ posturaEstacaoMin: "61" }, "postura de estação"],
+    [{ posturaEstacaoS: "61" }, "postura de estação"],
   ])("%j reprova", (parcial, trecho) => {
     const a = avaliarEletronarcose(completo(parcial as Partial<EletronarcoseAvesValor>));
     expect(a.conformidade).toBe(false);
     expect(a.motivos.join(" ").toLowerCase()).toContain(trecho.toLowerCase());
   });
 
-  it("postura de estação aceita exatamente 60 min", () => {
-    expect(avaliarEletronarcose(completo({ posturaEstacaoMin: "60" })).conformidade).toBe(true);
+  it("postura de estação aceita exatamente 60 s", () => {
+    expect(avaliarEletronarcose(completo({ posturaEstacaoS: "60" })).conformidade).toBe(true);
   });
 
   it("tempos sem limite não reprovam sozinhos", () => {
