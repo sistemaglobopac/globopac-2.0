@@ -210,7 +210,35 @@ canvas {
      largura útil, não é um "encolher imagem"). Consolidados (vários registros) fluem em
      quantas folhas precisarem, sem escala, para não ficarem ilegíveis. */
   .print-page.print-fit-one-page {
-    zoom: 0.7;
+    /* Antes: zoom 0.7 (tudo a 70%) — com textos de 7 a 10px o relatório saía com letras de ~5px,
+       ilegíveis. Agora imprime em escala 100% e flui em quantas folhas precisar. */
+    zoom: 1;
+  }
+
+  /* Letras do relatório impresso: os componentes usam tamanhos minúsculos (text-[7px] a
+     text-[11px], inclusive os print:text-[Npx]). O atributo [class*="..."] casa tanto "text-[8px]"
+     quanto "print:text-[8px]", então esta é a única escala do papel: mínimo ~8,5pt (11px). */
+  #relatorio-impressao [class*="text-[7px]"],
+  #relatorio-impressao [class*="text-[8px]"] {
+    font-size: 11px !important;
+    line-height: 1.35 !important;
+  }
+  #relatorio-impressao [class*="text-[9px]"],
+  #relatorio-impressao [class*="text-[10px]"] {
+    font-size: 12px !important;
+    line-height: 1.35 !important;
+  }
+  #relatorio-impressao [class*="text-[11px]"],
+  #relatorio-impressao [class*="text-xs"] {
+    font-size: 13px !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Cartões e tabelas não se partem no meio de uma folha. */
+  #relatorio-impressao .rounded-lg,
+  #relatorio-impressao tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
   @page {

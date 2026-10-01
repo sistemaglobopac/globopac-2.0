@@ -15,3 +15,11 @@ export async function erroDeFuncao(error: unknown): Promise<Error> {
   const mensagem = (error as { message?: unknown } | null)?.message;
   return new Error(typeof mensagem === "string" ? mensagem : String(error));
 }
+
+/** Status HTTP da resposta de uma Edge Function com erro (undefined se não houver resposta). */
+export function statusDeFuncao(error: unknown): number | undefined {
+  const status = ((error as { context?: unknown } | null)?.context as { status?: unknown } | undefined)?.status;
+  return typeof status === "number" ? status : undefined;
+}
+
+export const MENSAGEM_SESSAO_EXPIRADA = "Sua sessão expirou. Saia do sistema e entre novamente para continuar.";

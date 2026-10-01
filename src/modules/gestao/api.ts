@@ -1,4 +1,4 @@
-import { erroDeFuncao } from "@/lib/erroFuncao";
+import { erroDeFuncao, MENSAGEM_SESSAO_EXPIRADA, statusDeFuncao } from "@/lib/erroFuncao";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { inicioDoDiaManaus } from "@/modules/bordo/api";
@@ -108,18 +108,26 @@ export function useCriarUsuarioGestao() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: CriarUsuarioInput) => {
-      const { data, error } = await supabase.functions.invoke("criar-usuario", {
-        body: {
-          nome_completo: input.nomeCompleto,
-          nome_usuario: input.nomeUsuario,
-          matricula: input.matricula,
-          senha: input.senha,
-          nivel_acesso: input.nivelAcesso,
-          setores_permitidos: input.setoresPermitidos,
-          email_alerta: input.emailAlerta,
-          configuracoes_extras: JSON.stringify(input.configuracoesExtras),
-        },
-      });
+      const chamar = () =>
+        supabase.functions.invoke("criar-usuario", {
+          body: {
+            nome_completo: input.nomeCompleto,
+            nome_usuario: input.nomeUsuario,
+            matricula: input.matricula,
+            senha: input.senha,
+            nivel_acesso: input.nivelAcesso,
+            setores_permitidos: input.setoresPermitidos,
+            email_alerta: input.emailAlerta,
+            configuracoes_extras: JSON.stringify(input.configuracoesExtras),
+          },
+        });
+      let { data, error } = await chamar();
+      // 401 = o token da sessão venceu/foi invalidado: renova a sessão e tenta uma vez de novo.
+      if (error && statusDeFuncao(error) === 401) {
+        const renovada = await supabase.auth.refreshSession();
+        if (!renovada.error) ({ data, error } = await chamar());
+        if (error && statusDeFuncao(error) === 401) throw new Error(MENSAGEM_SESSAO_EXPIRADA);
+      }
       if (error) throw await erroDeFuncao(error);
       return data as { id: string; reativado?: boolean };
     },
@@ -171,6 +179,24 @@ export function useAtualizarConfigExtras() {
         .update({ configuracoes_extras: JSON.stringify(mesclado) })
         .eq("id", input.id);
       if (error) throw error;
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["perfis_usuarios"] }),
+  });
+}
+
+/** Exclusão DEFINITIVA (Edge Function excluir-colaborador): só funciona para quem nunca deixou
+ * histórico; a função devolve o motivo claro quando recusa. */
+export function useExcluirColaboradorDefinitivo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      let { error } = await supabase.functions.invoke("excluir-colaborador", { body: { id } });
+      if (error && statusDeFuncao(error) === 401) {
+        const renovada = await supabase.auth.refreshSession();
+        if (!renovada.error) ({ error } = await supabase.functions.invoke("excluir-colaborador", { body: { id } }));
+        if (error && statusDeFuncao(error) === 401) throw new Error(MENSAGEM_SESSAO_EXPIRADA);
+      }
+      if (error) throw await erroDeFuncao(error);
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["perfis_usuarios"] }),
   });

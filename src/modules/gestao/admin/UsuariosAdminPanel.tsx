@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Edit, KeyRound, Plus, Trash2, Users } from "lucide-react";
+import { Edit, KeyRound, Plus, Trash2, UserX, Users } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { useSessionStore } from "@/store/session";
 import { useAppDialog } from "../dialogSystem";
-import { NIVEL_ACESSO_BADGE, NIVEL_ACESSO_ROTULO, type PerfilGestao, parseConfigExtras, usePerfisGestao, useDesligarUsuarioGestao } from "../api";
+import { NIVEL_ACESSO_BADGE, NIVEL_ACESSO_ROTULO, type PerfilGestao, parseConfigExtras, usePerfisGestao, useDesligarUsuarioGestao, useExcluirColaboradorDefinitivo } from "../api";
 import { FormUsuarioModal } from "./FormUsuarioModal";
 import { ModalRedefinirSenha } from "./ModalRedefinirSenha";
+import { ModalAssinaturaSenha } from "@/shared/ModalAssinaturaSenha";
 
 const SETOR_LIVRE = "Todos";
 
@@ -46,6 +47,8 @@ export function UsuariosAdminPanel() {
   const dialog = useAppDialog();
   const { data: perfis, isLoading } = usePerfisGestao();
   const desligar = useDesligarUsuarioGestao();
+  const excluirDefinitivo = useExcluirColaboradorDefinitivo();
+  const [excluindoDe, setExcluindoDe] = useState<PerfilGestao | null>(null);
 
   const [modalForm, setModalForm] = useState<"fechado" | "novo" | PerfilGestao>("fechado");
   const [modalSenhaDe, setModalSenhaDe] = useState<PerfilGestao | null>(null);
@@ -133,9 +136,22 @@ export function UsuariosAdminPanel() {
                         disabled={ehVoceMesmo || !p.ativo}
                         aria-label={`Excluir ${p.nome_completo}`}
                         className="border-destructive/30 text-destructive hover:bg-destructive/10"
+                        title="Desligar (o cadastro e o histórico são mantidos)"
                         onClick={() => confirmarDesligar(p)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={ehVoceMesmo}
+                        aria-label={`Excluir definitivamente ${p.nome_completo}`}
+                        title="Excluir definitivamente (só quem nunca deixou histórico)"
+                        className="border-destructive/30 text-destructive hover:bg-destructive/10"
+                        onClick={() => setExcluindoDe(p)}
+                      >
+                        <UserX className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </td>
@@ -152,6 +168,21 @@ export function UsuariosAdminPanel() {
           </tbody>
         </table>
       </div>
+
+      {excluindoDe && (
+        <ModalAssinaturaSenha
+          titulo="Excluir definitivamente"
+          descricao={`Apagar de vez o cadastro de "${excluindoDe.nome_completo}"? Só é possível se ele nunca registrou nem assinou nada. Se tiver histórico, a exclusão é recusada (o nome precisa continuar nos relatórios) e você deve usar "Desligar". Confirme sua senha para continuar.`}
+          textoConfirmar="Excluir definitivamente"
+          onAssinar={async () => {
+            await excluirDefinitivo.mutateAsync(excluindoDe.id);
+            setExcluindoDe(null);
+            dialog.sucesso("Cadastro excluído definitivamente.");
+          }}
+          onCancelar={() => setExcluindoDe(null)}
+          testId="modal-excluir-colaborador"
+        />
+      )}
 
       {modalForm !== "fechado" && (
         <FormUsuarioModal usuario={modalForm === "novo" ? null : modalForm} onClose={() => setModalForm("fechado")} />
