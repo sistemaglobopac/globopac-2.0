@@ -62,12 +62,12 @@ test("ciclo completo de OS: abrir, avançar todas as etapas, liberar ao SIF, ver
   await page.goto(`/verificar?id=${osCriada!.id}`);
   await expect(page.getByText("Trilha de assinaturas")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(marcador)).toBeVisible();
-  await expect(page.getByText("ABERTURA", { exact: true })).toBeVisible();
-  await expect(page.getByText("AUTORIZACAO", { exact: true })).toBeVisible();
-  await expect(page.getByText("PROGRAMACAO", { exact: true })).toBeVisible();
-  await expect(page.getByText("EXECUCAO", { exact: true })).toBeVisible();
-  await expect(page.getByText("VALIDACAO", { exact: true })).toBeVisible();
-  await expect(page.getByText("LIBERACAO_DIARIA", { exact: true })).toBeVisible();
+  await expect(page.getByText("ABERTURA", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("AUTORIZACAO", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("PROGRAMACAO", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("EXECUCAO", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("VALIDACAO", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("LIBERACAO_DIARIA", { exact: true }).first()).toBeVisible();
   await expect(page.getByText(/IDÊNTICO ao original assinado/)).toBeVisible();
 
   await login(page, "1005", "121072");
