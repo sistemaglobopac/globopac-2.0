@@ -433,7 +433,7 @@ export function useMonitoramentosHojeDetalhado() {
             if (registrosSetor.length === 0) {
               atrasados.push({ fichaTemplateId: ficha.id, codigo: ficha.codigo, nome: ficha.nome, setor, motivo: "Apontamento diário ainda não realizado hoje" });
             }
-          } else if (ficha.tempo_entre_apontamentos_min && registrosSetor.length > 0) {
+          } else if (ficha.tempo_entre_apontamentos_min != null && ficha.tempo_entre_apontamentos_min > 0 && registrosSetor.length > 0) {
             const ultimo = registrosSetor.reduce((max, m) => Math.max(max, new Date(m.criado_em).getTime()), 0);
             if (agora - ultimo > ficha.tempo_entre_apontamentos_min * 60_000) {
               atrasados.push({

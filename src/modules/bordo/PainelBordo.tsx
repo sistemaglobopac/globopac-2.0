@@ -229,7 +229,7 @@ export function PainelBordo() {
     turnoHoje ? new Date(turnoHoje.inicio) : inicioDoDiaManaus(agora)
   );
   const fichasIniciadasNoTurno = new Set(resumoSetores.flatMap((r) => r.idsIniciadas));
-  const fichasAtrasadas = turnoHoje ? calcularFichasAtrasadas(fichasAplicaveis, kpis?.monitoramentosHoje ?? [], new Date(turnoHoje.inicio), agora) : [];
+  const fichasAtrasadas = turnoHoje ? calcularFichasAtrasadas(fichasAplicaveis, kpis?.monitoramentosHoje ?? [], agora) : [];
   const desviosComRnc = (kpis?.desviosAtivos ?? []).filter((d) => d.rnc !== null);
   const bloqueadoPorPausa = pausaAtiva != null;
 

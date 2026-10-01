@@ -239,15 +239,15 @@ export function fichasAplicaveisAoInspetor(fichasAtivas: FichaAtivaResumo[], use
   return fichasAtivas.filter((f) => f.locais_aplicacao?.some((s) => userSetores.includes(s)));
 }
 
-/** Ficha "atrasada": recorrente, aplicável ao inspetor, e sem apontamento neste turno depois de
- * 2h de turno iniciado, OU cujo último apontamento do dia já passou de
- * tempo_entre_apontamentos_min + 10 minutos de tolerância (Painel de Bordo, seção 8). Compartilhada entre o
+/** Ficha "atrasada": recorrente, aplicável ao inspetor, cujo último apontamento do dia já passou de
+ * tempo_entre_apontamentos_min + 10 minutos de tolerância (Painel de Bordo, seção 8). O aviso só
+ * existe a partir do PRIMEIRO monitoramento realizado (sem apontamento não há hora devida) e fichas
+ * com intervalo 0 (ou sem intervalo) nunca geram aviso de atraso. Compartilhada entre o
  * próprio Painel de Bordo (KPI) e o GlobalInspectorAlerts (alerta cross-página) — uma única
  * implementação, nunca duas fórmulas de atraso divergentes. */
 export function calcularFichasAtrasadas(
   fichasAplicaveis: FichaAtivaResumo[],
   monitoramentosHoje: { ficha_template_id: string; criado_em: string }[],
-  turnoInicio: Date,
   agora: Date
 ): FichaAtrasada[] {
   const ultimoPorFicha = new Map<string, Date>();
@@ -257,19 +257,15 @@ export function calcularFichasAtrasadas(
     if (!atual || criado > atual) ultimoPorFicha.set(m.ficha_template_id, criado);
   }
 
-  const duasHorasMs = 2 * 60 * 60 * 1000;
   const atrasadas: FichaAtrasada[] = [];
 
   for (const ficha of fichasAplicaveis) {
     if (ficha.tipo_apontamento !== "Recorrente") continue;
     const ultimo = ultimoPorFicha.get(ficha.id);
-    if (!ultimo) {
-      if (agora.getTime() - turnoInicio.getTime() > duasHorasMs) {
-        atrasadas.push({ ficha, motivo: "Sem nenhum apontamento neste turno" });
-      }
-      continue;
-    }
-    if (ficha.tempo_entre_apontamentos_min != null) {
+    // Sem monitoramento realizado ainda: não há hora devida, logo não há aviso de atraso.
+    if (!ultimo) continue;
+    // Intervalo 0 (ou ausente): sem aviso de atraso.
+    if (ficha.tempo_entre_apontamentos_min != null && ficha.tempo_entre_apontamentos_min > 0) {
       const devidoMs = ultimo.getTime() + ficha.tempo_entre_apontamentos_min * 60 * 1000;
       const limiteMs = devidoMs + TOLERANCIA_ATRASO_MIN * 60 * 1000;
       if (agora.getTime() > limiteMs) {

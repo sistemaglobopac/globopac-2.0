@@ -11,7 +11,6 @@ const ficha = (id: string, tipo: FichaAtivaResumo["tipo_apontamento"] = "Recorre
 });
 
 describe("atraso de monitoramento: alerta só 10 minutos depois da hora devida", () => {
-  const turnoInicio = new Date("2026-09-30T10:00:00Z");
   const ultimo = [{ ficha_template_id: "a", criado_em: "2026-09-30T11:00:00Z" }]; // devido às 12:00Z (60 min depois)
 
   it("a tolerância é de 10 minutos", () => {
@@ -19,18 +18,26 @@ describe("atraso de monitoramento: alerta só 10 minutos depois da hora devida",
   });
 
   it("até 10 min depois da hora devida ainda não está atrasado; passando disso, sim", () => {
-    expect(calcularFichasAtrasadas([ficha("a")], ultimo, turnoInicio, new Date("2026-09-30T12:10:00Z"))).toHaveLength(0); // +10 exatos
-    const atrasadas = calcularFichasAtrasadas([ficha("a")], ultimo, turnoInicio, new Date("2026-09-30T12:11:00Z"));
+    expect(calcularFichasAtrasadas([ficha("a")], ultimo, new Date("2026-09-30T12:10:00Z"))).toHaveLength(0); // +10 exatos
+    const atrasadas = calcularFichasAtrasadas([ficha("a")], ultimo, new Date("2026-09-30T12:11:00Z"));
     expect(atrasadas).toHaveLength(1);
     expect(atrasadas[0]!.atrasoMin).toBe(11);
     expect(atrasadas[0]!.motivo).toBe("Monitoramento atrasado há 11 min");
     expect(atrasadas[0]!.devidoEm).toBe("2026-09-30T12:00:00.000Z");
   });
 
-  it("ficha de demanda nunca atrasa; sem apontamento usa a regra das 2h do turno", () => {
-    expect(calcularFichasAtrasadas([ficha("a", "Demanda")], ultimo, turnoInicio, new Date("2026-09-30T20:00:00Z"))).toHaveLength(0);
-    expect(calcularFichasAtrasadas([ficha("b")], [], turnoInicio, new Date("2026-09-30T11:59:00Z"))).toHaveLength(0);
-    expect(calcularFichasAtrasadas([ficha("b")], [], turnoInicio, new Date("2026-09-30T12:01:00Z"))).toHaveLength(1);
+  it("ficha de demanda nunca atrasa", () => {
+    expect(calcularFichasAtrasadas([ficha("a", "Demanda")], ultimo, new Date("2026-09-30T20:00:00Z"))).toHaveLength(0);
+  });
+
+  it("sem nenhum monitoramento realizado não há aviso de atraso (só a partir do primeiro)", () => {
+    expect(calcularFichasAtrasadas([ficha("b")], [], new Date("2026-09-30T12:01:00Z"))).toHaveLength(0);
+    expect(calcularFichasAtrasadas([ficha("b")], [], new Date("2026-09-30T23:59:00Z"))).toHaveLength(0);
+  });
+
+  it("intervalo 0 (ou ausente) nunca gera aviso de atraso", () => {
+    expect(calcularFichasAtrasadas([ficha("a", "Recorrente", 0)], ultimo, new Date("2026-09-30T23:59:00Z"))).toHaveLength(0);
+    expect(calcularFichasAtrasadas([ficha("a", "Recorrente", null)], ultimo, new Date("2026-09-30T23:59:00Z"))).toHaveLength(0);
   });
 
   it("urlNovaFicha abre a ficha no setor do inspetor", () => {

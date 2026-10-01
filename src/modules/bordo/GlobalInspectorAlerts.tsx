@@ -84,7 +84,7 @@ export function GlobalInspectorAlerts() {
   const fichasAtrasadas: FichaAtrasada[] = useMemo(() => {
     if (!kpis || !turnoAtivo || !turnoHoje) return [];
     const aplicaveis = fichasAplicaveisAoInspetor(kpis.fichasAtivas, userSetores);
-    return calcularFichasAtrasadas(aplicaveis, kpis.monitoramentosHoje, new Date(turnoHoje.inicio), agora).filter(
+    return calcularFichasAtrasadas(aplicaveis, kpis.monitoramentosHoje, agora).filter(
       (f) => !dismissed.has(`ficha_${f.ficha.id}`)
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
