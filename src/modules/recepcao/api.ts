@@ -1,0 +1,120 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
+
+export interface CargaAves {
+  id: string;
+  data_abate: string;
+  integrado: string;
+  aviario: string;
+  nucleo: string;
+  gta: string;
+  qtd_aves: number;
+}
+
+export interface VeiculoTransporte {
+  id: string;
+  placa: string;
+  descricao: string | null;
+}
+
+export type NovaCargaAves = Omit<CargaAves, "id">;
+
+const COLUNAS_CARGA = "id, data_abate, integrado, aviario, nucleo, gta, qtd_aves";
+
+/** Placa em maiúsculas, sem espaços (ABC1D23 / ABC-1234). */
+export function normalizarPlaca(placa: string): string {
+  return placa.toUpperCase().replace(/[^A-Z0-9-]/g, "");
+}
+
+/** Cargas programadas para um dia (YYYY-MM-DD), na ordem de cadastro. */
+export function useCargasDoDia(dataAbate: string | undefined) {
+  return useQuery({
+    queryKey: ["cargas-aves", dataAbate],
+    enabled: !!dataAbate,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("cargas_aves")
+        .select(COLUNAS_CARGA)
+        .eq("data_abate", dataAbate!)
+        .order("criado_em")
+        .overrideTypes<CargaAves[], { merge: false }>();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useCriarCargas() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (cargas: NovaCargaAves[]) => {
+      const { error } = await supabase.from("cargas_aves").insert(cargas);
+      if (error) {
+        if (error.code === "23505") throw new Error("Já existe uma carga com essa GTA para a data de abate informada.");
+        throw error;
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["cargas-aves"] }),
+  });
+}
+
+export function useExcluirCarga() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("cargas_aves").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["cargas-aves"] }),
+  });
+}
+
+export function useVeiculos() {
+  return useQuery({
+    queryKey: ["veiculos-transporte"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("veiculos_transporte")
+        .select("id, placa, descricao")
+        .eq("ativo", true)
+        .order("placa")
+        .overrideTypes<VeiculoTransporte[], { merge: false }>();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useCriarVeiculo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: { placa: string; descricao?: string }) => {
+      const placa = normalizarPlaca(v.placa);
+      if (placa.length < 7) throw new Error("Informe a placa completa (ex.: ABC1D23).");
+      const { data, error } = await supabase
+        .from("veiculos_transporte")
+        .insert({ placa, descricao: v.descricao?.trim() || null })
+        .select("id, placa, descricao")
+        .single()
+        .overrideTypes<VeiculoTransporte, { merge: false }>();
+      if (error) {
+        if (error.code === "23505") throw new Error(`A placa ${placa} já está cadastrada.`);
+        throw error;
+      }
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["veiculos-transporte"] }),
+  });
+}
+
+export function useExcluirVeiculo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      // Inativa em vez de apagar: monitoramentos antigos guardam o id do veículo.
+      const { error } = await supabase.from("veiculos_transporte").update({ ativo: false }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["veiculos-transporte"] }),
+  });
+}

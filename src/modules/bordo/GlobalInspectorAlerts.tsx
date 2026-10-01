@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AlertTriangle, BellRing, Clock } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSessionStore } from "@/store/session";
@@ -10,6 +11,7 @@ import {
   PAUSAS_CONFIG,
   calcularFichasAtrasadas,
   fichasAplicaveisAoInspetor,
+  urlNovaFicha,
   useKpisTurno,
   usePausaAtiva,
   useTurnoHoje,
@@ -31,6 +33,7 @@ interface RncCritica {
 export function GlobalInspectorAlerts() {
   const perfil = useSessionStore((s) => s.perfil);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { data: masterSetores } = useSetoresCadastrados();
   const isInspetor = perfil?.nivelAcesso === "INSPETOR_QUALIDADE";
   const userId = isInspetor ? perfil?.id : undefined;
@@ -104,7 +107,22 @@ export function GlobalInspectorAlerts() {
       }));
   }, [kpis, agora, dismissed]);
 
-  const isVisible = Boolean(isInspetor && (pausaEstourada || fichasAtrasadas.length > 0 || rncsCriticas.length > 0));
+  // Monitoramento assinado com não conformidade e ainda SEM RNC (últimas 24h; acima disso já
+  // entra em "RNCs Críticas"): pede a emissão do relatório de não conformidade agora.
+  const ncSemRnc = useMemo(() => {
+    if (!kpis) return [];
+    const vinteQuatroHorasMs = 24 * 60 * 60 * 1000;
+    return kpis.desviosAtivos
+      .filter(
+        (d) =>
+          d.rnc === null &&
+          !dismissed.has(`nc_${d.monitoramentoId}`) &&
+          agora.getTime() - new Date(d.criadoEm).getTime() <= vinteQuatroHorasMs
+      )
+      .map((d) => ({ monitoramentoId: d.monitoramentoId, nomeFicha: kpis.nomesFicha.get(d.fichaTemplateId)?.nome ?? "Ficha" }));
+  }, [kpis, agora, dismissed]);
+
+  const isVisible = Boolean(isInspetor && (pausaEstourada || ncSemRnc.length > 0 || fichasAtrasadas.length > 0 || rncsCriticas.length > 0));
   useAudioAlarm(isVisible && !minimizado);
 
   useEffect(() => {
@@ -119,7 +137,7 @@ export function GlobalInspectorAlerts() {
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border-4 border-destructive bg-background shadow-2xl">
+      <div className="flex max-h-[85dvh] w-full max-w-md flex-col overflow-hidden rounded-2xl border-4 border-destructive bg-background shadow-2xl">
         <div className="flex shrink-0 items-center justify-center gap-2 bg-destructive p-4 text-destructive-foreground">
           <AlertTriangle className="h-6 w-6 animate-pulse" />
           <h2 className="text-lg font-black uppercase tracking-wider">Aviso Importante</h2>
@@ -135,6 +153,42 @@ export function GlobalInspectorAlerts() {
                 <div className="rounded bg-destructive px-3 py-1.5 text-xs font-bold text-destructive-foreground">
                   Encerre a pausa no Painel de Bordo.
                 </div>
+              </div>
+            </div>
+          )}
+
+          {ncSemRnc.length > 0 && (
+            <div data-testid="alerta-nc-sem-rnc">
+              <h3 className="mb-2 flex items-center gap-1 text-[0.7rem] font-black uppercase tracking-wider text-muted-foreground">
+                <AlertTriangle className="h-3.5 w-3.5 text-destructive" /> Monitoramento com não conformidade
+              </h3>
+              <div className="flex flex-col gap-2">
+                {ncSemRnc.map((nc) => (
+                  <div key={nc.monitoramentoId} className="flex flex-col gap-3 rounded border-l-4 border-destructive bg-background p-4 shadow-sm">
+                    <div>
+                      <h4 className="text-sm font-bold text-foreground">{nc.nomeFicha}</h4>
+                      <p className="mt-1 text-sm font-medium text-destructive">
+                        Você tem um monitoramento finalizado com não conformidade. Emita agora um relatório de não conformidade.
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        className="flex-1"
+                        onClick={() => {
+                          dismiss(`nc_${nc.monitoramentoId}`);
+                          navigate(`/nova-rnc?vinculo=${nc.monitoramentoId}`);
+                        }}
+                      >
+                        Emitir relatório agora
+                      </Button>
+                      <Button type="button" variant="outline" onClick={() => dismiss(`nc_${nc.monitoramentoId}`)}>
+                        Depois
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -174,9 +228,22 @@ export function GlobalInspectorAlerts() {
                       <h4 className="mb-1 text-sm font-bold text-foreground">{f.ficha.nome}</h4>
                       <p className="text-[0.7rem] text-muted-foreground">{f.motivo}</p>
                     </div>
-                    <Button type="button" className="w-full" onClick={() => dismiss(`ficha_${f.ficha.id}`)}>
-                      Ciente
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        className="flex-1"
+                        onClick={() => {
+                          dismiss(`ficha_${f.ficha.id}`);
+                          navigate(urlNovaFicha(f.ficha, userSetores));
+                        }}
+                      >
+                        Abrir monitoramento
+                      </Button>
+                      <Button type="button" variant="outline" onClick={() => dismiss(`ficha_${f.ficha.id}`)}>
+                        Ciente
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>

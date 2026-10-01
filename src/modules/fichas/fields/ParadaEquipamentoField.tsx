@@ -58,7 +58,7 @@ export function ParadaEquipamentoField({ value, onChange, disabled }: ParadaEqui
       </div>
 
       {horaParada && horaRetomada && (
-        <div className="flex items-center justify-between rounded-md border border-warning bg-warning/10 p-3">
+        <div className="flex flex-wrap gap-2 items-center justify-between rounded-md border border-warning bg-warning/10 p-3">
           <span className="flex items-center gap-2 font-bold text-warning-foreground">
             <Clock className="h-4 w-4" /> Tempo Total de Inatividade:
           </span>

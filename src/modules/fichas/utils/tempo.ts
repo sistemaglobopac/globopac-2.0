@@ -9,15 +9,15 @@ export interface LocalTime {
   isoLocal: string;
 }
 
-/** O Supabase retorna timestamps como '2026-05-07T21:43:39.021162-04:00' (UTC com offset já
- * embutido no valor). Extrai só a parte YYYY-MM-DDTHH:MM:SS e força como UTC puro (ignora o
- * offset — o valor cru já representa o instante correto em UTC, sem precisar reaplicar o
- * deslocamento), depois projeta para o fuso de Manaus para exibição. */
+/** Projeta um timestamp para o fuso de Manaus (UTC-4). O offset que vem no texto (`Z`,
+ * `+00:00` ou `-04:00`, conforme o fuso da sessão do banco — ver migração
+ * ajusta_timezone_banco_manaus) É respeitado: `new Date()` já resolve o instante correto. Um
+ * texto sem offset é tratado como UTC. (Antes o offset era descartado e o horário local era
+ * lido como UTC, o que deslocava a hora exibida em 4h para trás.) */
 export function ensureLocalTime(dateStr: string): LocalTime {
   try {
-    const match = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})/.exec(dateStr);
-    if (!match) throw new Error(`formato de data inesperado: ${dateStr}`);
-    const comoUtc = new Date(`${match[1]}Z`);
+    const semOffset = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(dateStr);
+    const comoUtc = new Date(semOffset ? `${dateStr}Z` : dateStr);
     if (Number.isNaN(comoUtc.getTime())) throw new Error(`data inválida: ${dateStr}`);
 
     return {

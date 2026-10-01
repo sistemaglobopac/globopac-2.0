@@ -14,6 +14,8 @@ export interface FichaEnfileirada {
   userId: string;
   setor: string;
   dadosDinamicos: Record<string, unknown>;
+  /** Pesagem inicial da absorção (2 fases): grava EM_ANDAMENTO e assina como INSPETOR_PARCIAL. */
+  statusFicha?: "EM_ANDAMENTO";
   capturadoEm: string;
   enfileiradoEm: string;
   status: StatusFilaOffline;

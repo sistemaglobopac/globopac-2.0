@@ -25,6 +25,12 @@ function CartaoRnc({ rnc, onAbrirDossie }: { rnc: Rnc; onAbrirDossie: (monitoram
         <span className="text-muted-foreground">{new Date(rnc.criado_em).toLocaleDateString("pt-BR")}</span>
       </div>
       <p className="text-ink">{rnc.descricao}</p>
+      {rnc.acao_imediata && (
+        <p className="mt-1 text-ink">
+          <span className="font-semibold">Ação imediata do inspetor: </span>
+          {rnc.acao_imediata}
+        </p>
+      )}
     </div>
   );
 
