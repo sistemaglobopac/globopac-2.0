@@ -56,7 +56,8 @@ test("documento liberado aparece com trilha e badge corretos no portal público 
   await expect(checkboxes.first()).toBeVisible({ timeout: 15_000 });
   const total = await checkboxes.count();
   for (let i = 0; i < total; i++) await checkboxes.nth(i).check();
-  await page.getByRole("button", { name: new RegExp(`Liberar selecionados \\(${total}\\)`) }).click();
+  // O botao conta MONITORAMENTOS selecionados; cada checkbox pode ser um grupo (dossie) com varios.
+  await page.getByRole("button", { name: /Liberar selecionados \((?!0\))\d+\)/ }).click();
   await expect(page.getByText(/liberado:/)).toBeVisible({ timeout: 15_000 });
   await logout(page);
 

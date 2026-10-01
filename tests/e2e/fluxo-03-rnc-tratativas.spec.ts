@@ -63,9 +63,13 @@ test("verificador reprova, RNC é criada, gestor de setor trata e verificador re
   const cartaoGestor = page.locator(".rounded-lg.border").filter({ hasText: marcador });
   await expect(cartaoGestor).toBeVisible({ timeout: 15_000 });
 
-  await cartaoGestor.locator("textarea").fill(`Tratativa: ${marcador}`);
-  await cartaoGestor.getByRole("button", { name: "Registrar tratativa" }).click();
-  await expect(cartaoGestor.getByText("Tratada — aguardando revisão do Verificador")).toBeVisible({ timeout: 15_000 });
+  // O Gestor responde com causa do desvio + ação corretiva e assina com a senha (modal único).
+  await cartaoGestor.getByLabel("Causa do desvio").fill(`Causa: ${marcador}`);
+  await cartaoGestor.getByLabel("Ação corretiva").fill(`Tratativa: ${marcador}`);
+  await cartaoGestor.getByRole("button", { name: "Responder e assinar" }).click();
+  await page.getByLabel("Sua senha").fill("121072");
+  await page.getByRole("button", { name: "Confirmar e Assinar" }).click();
+  await expect(cartaoGestor.getByText("Respondida — aguardando julgamento do Verificador")).toBeVisible({ timeout: 15_000 });
   // Gestor de Setor não tem mais o botão de fechamento — só o Verificador revisa.
   await expect(cartaoGestor.getByRole("button", { name: "Fechar RNC" })).toHaveCount(0);
   await logout(page);
@@ -75,7 +79,9 @@ test("verificador reprova, RNC é criada, gestor de setor trata e verificador re
   const cartaoVerificador = page.locator(".rounded-lg.border").filter({ hasText: marcador });
   await expect(cartaoVerificador).toBeVisible({ timeout: 15_000 });
   await expect(cartaoVerificador.getByText(`Tratativa: ${marcador}`)).toBeVisible();
-  await cartaoVerificador.getByRole("button", { name: "Aprovar e Fechar RNC" }).click();
+  await cartaoVerificador.getByRole("button", { name: /Assinar e Fechar/ }).click();
+  await page.getByLabel("Sua senha").fill("121072");
+  await page.getByRole("button", { name: "Confirmar e Assinar" }).click();
   await expect(cartaoVerificador).not.toBeVisible({ timeout: 15_000 });
   await logout(page);
 

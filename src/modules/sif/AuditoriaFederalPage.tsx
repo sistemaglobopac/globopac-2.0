@@ -44,7 +44,7 @@ export function AuditoriaFederalPage() {
           const ultimaVerificacao = items.map((m) => m.verificado_em).filter(Boolean).sort().at(-1);
           return (
             <Card key={chave}>
-              <CardHeader className="flex flex-wrap-row items-center justify-between gap-3 space-y-0 pb-2">
+              <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 space-y-0 pb-2">
                 <CardTitle className="text-base">
                   <Badge variant="outline">{setoresDoGrupo(items)}</Badge>{" "}
                   <Badge variant={desvios === 0 ? "success" : "destructive"}>

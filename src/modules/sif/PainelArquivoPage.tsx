@@ -91,7 +91,7 @@ export function PainelArquivoPage() {
         const tratados = items.filter((m) => situacaoDe(m) === "TRATADO").length;
         return (
           <Card key={chave}>
-            <CardHeader className="flex flex-wrap-row items-center justify-between gap-3 space-y-0 pb-2">
+            <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 space-y-0 pb-2">
               <div className="flex items-center gap-3">
                 <input
                   type="checkbox"
