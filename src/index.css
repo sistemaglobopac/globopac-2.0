@@ -217,21 +217,32 @@ canvas {
 
   /* Letras do relatório impresso: os componentes usam tamanhos minúsculos (text-[7px] a
      text-[11px], inclusive os print:text-[Npx]). O atributo [class*="..."] casa tanto "text-[8px]"
-     quanto "print:text-[8px]", então esta é a única escala do papel: mínimo ~8,5pt (11px). */
+     quanto "print:text-[8px]", então esta é a única escala do papel (1px = 0,75pt):
+     rótulos 13px (~10pt), valores 14px (~10,5pt), corpo 15px (~11pt). */
   #relatorio-impressao [class*="text-[7px]"],
   #relatorio-impressao [class*="text-[8px]"] {
-    font-size: 11px !important;
+    font-size: 13px !important;
     line-height: 1.35 !important;
   }
   #relatorio-impressao [class*="text-[9px]"],
   #relatorio-impressao [class*="text-[10px]"] {
-    font-size: 12px !important;
+    font-size: 14px !important;
     line-height: 1.35 !important;
   }
   #relatorio-impressao [class*="text-[11px]"],
-  #relatorio-impressao [class*="text-xs"] {
-    font-size: 13px !important;
+  #relatorio-impressao [class*="text-xs"],
+  #relatorio-impressao [class*="text-sm"] {
+    font-size: 15px !important;
     line-height: 1.4 !important;
+  }
+  #relatorio-impressao [class*="text-base"] {
+    font-size: 16px !important;
+  }
+
+  /* Com letras maiores, grades de 4 e 5 colunas ficam espremidas na folha A4: usa 3. */
+  #relatorio-impressao [class*="print:grid-cols-5"],
+  #relatorio-impressao [class*="print:grid-cols-4"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   }
 
   /* Cartões e tabelas não se partem no meio de uma folha. */
