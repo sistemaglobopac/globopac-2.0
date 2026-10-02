@@ -1,5 +1,6 @@
 import { erroDeFuncao } from "@/lib/erroFuncao";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CAMPOS_AUTOCORRECAO, type AutocorrecaoImediata } from "@/modules/autocorrecao/api";
 import { supabase } from "@/lib/supabase";
 import type { CampoTemplate } from "@/shared/schema-campos";
 import { PRAZO_ONLINE_MS, enfileirarFicha, estaOffline } from "@/lib/offlineQueue";
@@ -690,6 +691,8 @@ export interface DadosRelatorio {
   monitoramentos: MonitoramentoRelatorio[];
   assinaturas: AssinaturaRelatorio[];
   rncs: Rnc[];
+  /** Autocorreções imediatas (alternativa à RNC) dos monitoramentos do relatório. */
+  autocorrecoes: AutocorrecaoImediata[];
   templatesPorId: Map<string, TemplateRelatorio>;
   nomesPorId: Map<string, string>;
 }
@@ -712,6 +715,7 @@ export function useDadosRelatorio(ids: string[]) {
         { data: monitoramentos, error: erroMonitoramentos },
         { data: assinaturas, error: erroAssinaturas },
         { data: rncs, error: erroRncs },
+        { data: autocorrecoes },
       ] = await Promise.all([
         supabase
           .from("monitoramentos")
@@ -725,6 +729,8 @@ export function useDadosRelatorio(ids: string[]) {
           .order("criado_em", { ascending: true })
           .overrideTypes<AssinaturaRelatorio[], { merge: false }>(),
         supabase.from("rnc").select(CAMPOS_RNC_RELATORIO).in("monitoramento_id", ids).overrideTypes<Rnc[], { merge: false }>(),
+        // Sem a tabela (migração ainda não aplicada) o erro é ignorado: só não há autocorreções a mostrar.
+        supabase.from("autocorrecoes_imediatas").select(CAMPOS_AUTOCORRECAO).in("monitoramento_id", ids).overrideTypes<AutocorrecaoImediata[], { merge: false }>(),
       ]);
       if (erroMonitoramentos) throw erroMonitoramentos;
       if (erroAssinaturas) throw erroAssinaturas;
@@ -737,6 +743,7 @@ export function useDadosRelatorio(ids: string[]) {
             ...(monitoramentos ?? []).flatMap((m) => [m.user_id, m.verificado_por]),
             ...(assinaturas ?? []).map((a) => a.user_id),
             ...(rncs ?? []).flatMap((r) => [r.tratado_por, r.revisado_por]),
+            ...(autocorrecoes ?? []).map((c) => c.user_id),
           ].filter((id): id is string => Boolean(id))
         ),
       ];
@@ -760,6 +767,7 @@ export function useDadosRelatorio(ids: string[]) {
         monitoramentos: monitoramentos ?? [],
         assinaturas: assinaturas ?? [],
         rncs: rncs ?? [],
+        autocorrecoes: autocorrecoes ?? [],
         templatesPorId: new Map((templates ?? []).map((t) => [t.id, t])),
         nomesPorId: new Map((perfis ?? []).map((p) => [p.id, p.nome_completo])),
       };

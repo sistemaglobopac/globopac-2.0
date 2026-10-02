@@ -41,6 +41,8 @@ export interface AuditRecordCardProps {
   isAdmin: boolean;
   /** Status da RNC vinculada a este monitoramento (se houver). RNC FECHADA = desvio procedente e tratado. */
   rncStatus?: StatusRnc;
+  /** Monitoramento com autocorreção imediata do inspetor (alternativa à RNC). */
+  autocorrigido?: boolean;
   onEncerrarTurno: (item: AppointmentDisplay) => void;
 }
 
@@ -59,6 +61,7 @@ export function AuditRecordCard({
   blockedIds,
   isAdmin,
   rncStatus,
+  autocorrigido,
   onEncerrarTurno,
 }: AuditRecordCardProps) {
   const { appt } = item;
@@ -99,6 +102,7 @@ export function AuditRecordCard({
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-1.5">
+          {autocorrigido && <Badge className="border-transparent bg-lime text-primary">AUTOCORRIGIDO</Badge>}
           {rncStatus === "FECHADA" && <Badge className="border-transparent bg-lime text-primary">TRATADO</Badge>}
           {rncStatus && rncStatus !== "FECHADA" && <Badge variant="warning">RNC em andamento</Badge>}
           {item.status !== "verificado" && <Badge variant={STATUS_VARIANT[item.status]}>{STATUS_ROTULO[item.status]}</Badge>}

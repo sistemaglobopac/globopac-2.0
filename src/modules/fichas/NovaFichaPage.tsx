@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase";
 import { useCriarMonitoramento, useTemplatesAtivos, useTurnoFixoDoUsuario, useUltimoRegistroFicha, useUltimosApontamentosHoje, type TemplateAtivo } from "./api";
 import { motivosDeBloqueioSpr } from "./utils/bloqueiosSpr";
 import { desviosEspeciais, temNaoConformidade } from "./utils/desviosEspeciais";
+import { ModalAutocorrecao } from "@/modules/autocorrecao/ModalAutocorrecao";
 import { drippingEmFase1, validarFaseInicial } from "./fields/calculosAbsorcao";
 import type { AbsorcaoAguaValor, DrippingTestValor } from "./fields/tiposCompostos";
 import { MonitoramentosEmAndamento } from "./components/MonitoramentosEmAndamento";
@@ -297,6 +298,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, setor, pe
   // Monitoramento JÁ assinado com não conformidade: avisa na hora para emitir a RNC (vale para qualquer
   // perfil e não depende de turno aberto nem do painel de bordo carregar).
   const [ncAposAssinar, setNcAposAssinar] = useState<{ id: string; offline: boolean } | null>(null);
+  const [autocorrigindoNc, setAutocorrigindoNc] = useState(false);
   const navigate = useNavigate();
 
   const schema = zodFromSchemaCampos(campos);
@@ -591,16 +593,19 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, setor, pe
                 <AlertTriangle className="h-4 w-4 shrink-0" />
                 Você tem um monitoramento finalizado com não conformidade.
               </p>
-              <p>Emita agora um relatório de não conformidade (RNC).</p>
+              <p>Emita agora um relatório de não conformidade (RNC) ou registre a autocorreção imediata (medida de autocontrole), que restabelece a conformidade.</p>
               {ncAposAssinar.offline && (
                 <p className="text-xs">
-                  Sem conexão: o monitoramento será enviado quando a rede voltar. Emita a RNC pelo Painel de Bordo depois de sincronizar.
+                  Sem conexão: o monitoramento será enviado quando a rede voltar. Emita a RNC ou registre a autocorreção pelo Painel de Bordo depois de sincronizar.
                 </p>
               )}
             </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" className="flex-1" onClick={onVoltar}>
                 Depois
+              </Button>
+              <Button type="button" variant="outline" className="flex-1" disabled={ncAposAssinar.offline} onClick={() => setAutocorrigindoNc(true)}>
+                Autocorreção imediata
               </Button>
               <Button
                 type="button"
@@ -614,6 +619,17 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, setor, pe
             </div>
           </div>
         </ModalAssinatura>
+      )}
+
+      {autocorrigindoNc && ncAposAssinar && (
+        <ModalAutocorrecao
+          monitoramentoId={ncAposAssinar.id}
+          onFechar={() => setAutocorrigindoNc(false)}
+          onRegistrada={() => {
+            setNcAposAssinar(null);
+            setTimeout(onVoltar, 800);
+          }}
+        />
       )}
 
       {dadosPendentes && (

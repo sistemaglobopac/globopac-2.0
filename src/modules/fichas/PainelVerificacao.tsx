@@ -6,6 +6,7 @@ import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/
 import { useRncsAbertas, useRncsDosMonitoramentos } from "@/modules/rnc/api";
 import { CartaoRnc } from "@/modules/rnc/CartaoRnc";
 import { supabase } from "@/lib/supabase";
+import { useAutocorrigidos } from "@/modules/autocorrecao/api";
 import { pacsDoTemplate, useFichasTemplatesTodas, useFilaVerificacao, useUsuariosMap, useVerificarLote } from "./api";
 import { diaTurno, turnosBloqueadosMap, turnosPendentes, encerrarTurnoAdmin } from "./utils/turnoUtils";
 import { groupFichaCards, calcularOrdemDia, type AppointmentDisplay, type MonitoramentoVerificacao, type StatusVerificacao } from "./utils/recordGrouping";
@@ -142,6 +143,7 @@ export function PainelVerificacao() {
   );
 
   const pendingKey = pendingAppointments.map((i) => i.id).join(",");
+  const { data: autocorrigidoIds } = useAutocorrigidos(pendingAppointments.map((i) => i.id));
   // Encerrar o turno não muda a lista de pendentes, só o estado dos turnos — sem este contador
   // o efeito abaixo não reexecutava e o botão "Verificar" ficava travado com o bloqueio antigo.
   const [turnosVersao, setTurnosVersao] = useState(0);
@@ -400,6 +402,7 @@ export function PainelVerificacao() {
             usersMap={usuarios}
             isAdmin={Boolean(isAdmin)}
             rncPorMonitoramento={rncPorMonitoramento}
+            autocorrigidoIds={autocorrigidoIds}
             onEncerrarTurno={(d) =>
               setEncerrarAlvo({ userIds: d.userIds, dia: diaTurno(d.items[0]!.appt.criado_em), nome: d.inspetorNome })
             }
@@ -424,6 +427,7 @@ export function PainelVerificacao() {
             blockedIds={blockedIds}
             isAdmin={Boolean(isAdmin)}
             rncStatus={rncPorMonitoramento?.get(item.id)}
+            autocorrigido={autocorrigidoIds?.has(item.id)}
             onEncerrarTurno={(i) => setEncerrarAlvo({ userIds: [i.appt.user_id], dia: diaTurno(i.appt.criado_em), nome: usuarios.get(i.appt.user_id) ?? "inspetor" })}
           />
         ))}
@@ -450,6 +454,7 @@ export function PainelVerificacao() {
                 usersMap={usuarios}
                 isAdmin={Boolean(isAdmin)}
                 rncPorMonitoramento={rncPorMonitoramento}
+            autocorrigidoIds={autocorrigidoIds}
                 onEncerrarTurno={() => undefined}
                 onEncerrarTurnoItem={() => undefined}
               />
@@ -470,6 +475,7 @@ export function PainelVerificacao() {
                 blockedIds={blockedIds}
                 isAdmin={Boolean(isAdmin)}
                 rncStatus={rncPorMonitoramento?.get(item.id)}
+            autocorrigido={autocorrigidoIds?.has(item.id)}
                 onEncerrarTurno={() => undefined}
               />
             ))}

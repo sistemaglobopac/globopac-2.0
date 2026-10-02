@@ -9,6 +9,7 @@ import { camposNaoConformes, type CampoNaoConforme } from "../../utils/desviosEs
 import { CheckCircle2, AlertTriangle, Clock, Scale, Search, Shield } from "lucide-react";
 import { turnoDoDia } from "@/modules/bordo/api";
 import type { AssinaturaRelatorio, DadosRelatorio, MonitoramentoRelatorio, TemplateRelatorio } from "../../api";
+import type { AutocorrecaoImediata } from "@/modules/autocorrecao/api";
 import type { Rnc } from "@/modules/rnc/api";
 import { ensureLocalTime } from "../../utils/tempo";
 import { computarHashMonitoramento, resumoHash } from "../../utils/hashDocumento";
@@ -68,6 +69,25 @@ function SeloAssinatura({
           {integro !== null && (integro ? " · ÍNTEGRO" : " · VERIFIQUE")}
         </p>
         <p className="text-[7px] leading-none text-muted-foreground">LEI 14.063/2020 · Art. 4º §2º</p>
+      </div>
+    </div>
+  );
+}
+
+function BlocoAutocorrecao({ autocorrecao, nome }: { autocorrecao: AutocorrecaoImediata; nome: string }) {
+  return (
+    <div className="mt-3 overflow-hidden rounded-lg border-2 border-success/40 bg-success/[0.05] print:mt-2 print:break-inside-avoid" data-testid="bloco-autocorrecao">
+      <div className="border-b-2 border-success/30 p-3 text-sm font-bold uppercase tracking-wider text-success print:p-2 print:text-[10px]">
+        Autocorreção imediata — medida de autocontrole (alternativa à RNC)
+      </div>
+      <div className="space-y-1.5 p-3 text-[11px] print:p-2 print:text-[8px]">
+        <p className="text-muted-foreground">Ação imediata executada pelo inspetor:</p>
+        <p className="whitespace-pre-wrap font-semibold text-ink">{autocorrecao.descricao}</p>
+        <p className="text-muted-foreground">
+          Registrada por <strong className="text-ink">{nome}</strong> em{" "}
+          <span className="font-mono">{new Date(autocorrecao.executada_em).toLocaleString("pt-BR", { timeZone: "America/Manaus" })}</span>.
+        </p>
+        <p className="font-bold text-success">A ação imediata do inspetor restabeleceu a conformidade deste monitoramento.</p>
       </div>
     </div>
   );
@@ -198,12 +218,12 @@ interface RegistroUnicoProps {
   hashesAoVivo: Map<string, string>;
 }
 
-type SituacaoRegistro = "conforme" | "tratado" | "nao-conforme" | "desvio-pendente" | "aguardando";
+export type SituacaoRegistro = "conforme" | "tratado" | "autocorrigido" | "nao-conforme" | "desvio-pendente" | "aguardando";
 
 /** `conformidade` da coluna só é preenchida quando o Verificador decide (verificar-monitoramento);
  * antes disso é `null` — NÃO é "não conforme". Enquanto pendente, mostra "Aguardando verificação"
  * (ou "Desvio detectado" se algum widget do próprio registro apontou desvio). */
-function situacaoDoRegistro(record: MonitoramentoRelatorio, rnc?: Rnc): SituacaoRegistro {
+export function situacaoDoRegistro(record: MonitoramentoRelatorio, rnc?: Rnc, autocorrecao?: AutocorrecaoImediata): SituacaoRegistro {
   // RNC procedente (fechada pelo Verificador): o monitoramento não fica "não conforme", fica TRATADO.
   if (rnc?.status === "FECHADA" && record.conformidade !== true) return "tratado";
   if (record.conformidade === true) return "conforme";
@@ -211,12 +231,15 @@ function situacaoDoRegistro(record: MonitoramentoRelatorio, rnc?: Rnc): Situacao
   const temDesvio = Object.values(record.dados_dinamicos).some(
     (v) => v && typeof v === "object" && ((v as { conformidade?: unknown }).conformidade === false || (v as { status?: unknown }).status === "nao-conforme")
   );
-  return temDesvio ? "desvio-pendente" : "aguardando";
+  // Autocorreção imediata do inspetor (alternativa à RNC): a ação restabelece a conformidade do monitoramento.
+  if (temDesvio) return autocorrecao ? "autocorrigido" : "desvio-pendente";
+  return "aguardando";
 }
 
 const ROTULO_SELO: Record<SituacaoRegistro, string> = {
   conforme: "Conforme",
   tratado: "Tratado — RNC procedente e fechada",
+  autocorrigido: "Conforme — autocorreção imediata",
   "nao-conforme": "Não Conforme",
   "desvio-pendente": "Desvio detectado — aguardando verificação",
   aguardando: "Aguardando verificação",
@@ -224,6 +247,7 @@ const ROTULO_SELO: Record<SituacaoRegistro, string> = {
 const CLASSE_SELO: Record<SituacaoRegistro, string> = {
   conforme: "text-success",
   tratado: "text-success",
+  autocorrigido: "text-success",
   "nao-conforme": "text-down",
   "desvio-pendente": "text-warning-foreground",
   aguardando: "text-muted-foreground",
@@ -236,6 +260,7 @@ function RegistroUnico({ record, ordem, template, dados, hashesAoVivo }: Registr
   const hashAoVivo = hashesAoVivo.get(record.id);
   const integro = hashReferencia && hashAoVivo ? hashReferencia === hashAoVivo : null;
   const rnc = dados.rncs.find((r) => r.monitoramento_id === record.id);
+  const autocorrecao = dados.autocorrecoes.find((a) => a.monitoramento_id === record.id);
   const adendos = (record.dados_dinamicos.adendos as AdendoBruto[] | undefined) ?? [];
   const { time } = ensureLocalTime(record.criado_em);
   // Campos "hora" (ex.: "Hora do Monitoramento") já aparecem no cabeçalho deste bloco
@@ -251,8 +276,8 @@ function RegistroUnico({ record, ordem, template, dados, hashesAoVivo }: Registr
           {template?.nome ?? "Ficha de Monitoramento"}
           {ordem ? ` · Apuração ${ordem}` : ""} — {time}
         </span>
-        <span className={`text-right text-[10px] font-black uppercase tracking-wider print:text-[8px] ${CLASSE_SELO[situacaoDoRegistro(record, rnc)]}`}>
-          {ROTULO_SELO[situacaoDoRegistro(record, rnc)]}
+        <span className={`text-right text-[10px] font-black uppercase tracking-wider print:text-[8px] ${CLASSE_SELO[situacaoDoRegistro(record, rnc, autocorrecao)]}`}>
+          {ROTULO_SELO[situacaoDoRegistro(record, rnc, autocorrecao)]}
         </span>
       </div>
 
@@ -265,6 +290,7 @@ function RegistroUnico({ record, ordem, template, dados, hashesAoVivo }: Registr
           camposNc={camposNaoConformes(template?.schema_campos ?? [], record.dados_dinamicos)}
         />
       )}
+      {autocorrecao && <BlocoAutocorrecao autocorrecao={autocorrecao} nome={dados.nomesPorId.get(autocorrecao.user_id) ?? "Inspetor de Qualidade"} />}
       {adendos.length > 0 && <BlocoAdendos adendos={adendos} />}
       {record.aditivo_de && (
         <p className="mt-2 text-[10px] italic text-muted-foreground print:text-[8px]">
@@ -347,10 +373,12 @@ export function RelatorioMonitoramento({ ids, dados }: RelatorioMonitoramentoPro
   const integroPrimario = assinaturaPrimario?.hash_documento && hashAoVivoPrimario ? assinaturaPrimario.hash_documento === hashAoVivoPrimario : null;
 
   const rncDe = (r: MonitoramentoRelatorio) => dados.rncs.find((rnc) => rnc.monitoramento_id === r.id);
-  const situacoes = records.map((r) => situacaoDoRegistro(r, rncDe(r)));
+  const autocorrecaoDe = (r: MonitoramentoRelatorio) => dados.autocorrecoes.find((a) => a.monitoramento_id === r.id);
+  const situacoes = records.map((r) => situacaoDoRegistro(r, rncDe(r), autocorrecaoDe(r)));
   // "Tratado" (RNC procedente fechada) conta como resolvido: o documento não fica não conforme.
-  const todasConformes = situacoes.every((s) => s === "conforme" || s === "tratado");
+  const todasConformes = situacoes.every((s) => s === "conforme" || s === "tratado" || s === "autocorrigido");
   const houveTratado = situacoes.includes("tratado");
+  const houveAutocorrecao = situacoes.includes("autocorrigido");
   // Nenhum registro reprovado, mas ainda há decisão do Verificador pendente (conformidade null).
   const aguardando = !todasConformes && records.every((r) => r.conformidade !== false);
   const desvioPendente = aguardando && situacoes.includes("desvio-pendente");
@@ -443,7 +471,9 @@ export function RelatorioMonitoramento({ ids, dados }: RelatorioMonitoramentoPro
             {todasConformes
               ? houveTratado
                 ? "TRATADO — Desvio identificado, RNC procedente e fechada"
-                : "CONFORME — Todos os Pontos dentro dos Padrões"
+                : houveAutocorrecao
+                  ? "CONFORME — Desvio corrigido por autocorreção imediata do inspetor"
+                  : "CONFORME — Todos os Pontos dentro dos Padrões"
               : aguardando
                 ? desvioPendente
                   ? "AGUARDANDO VERIFICAÇÃO — Desvio detectado no preenchimento"

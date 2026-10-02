@@ -23,6 +23,8 @@ interface DossieVerificacaoCardProps {
   usersMap: Map<string, string>;
   isAdmin: boolean;
   rncPorMonitoramento?: Map<string, StatusRnc>;
+  /** Monitoramentos com autocorrecao imediata do inspetor. */
+  autocorrigidoIds?: Set<string>;
   onEncerrarTurno: (dossie: DossieVerificacao) => void;
   onEncerrarTurnoItem: (item: AppointmentDisplay) => void;
 }
@@ -49,6 +51,7 @@ export function DossieVerificacaoCard({
   usersMap,
   isAdmin,
   rncPorMonitoramento,
+  autocorrigidoIds,
   onEncerrarTurno,
   onEncerrarTurnoItem,
 }: DossieVerificacaoCardProps) {
@@ -151,6 +154,7 @@ export function DossieVerificacaoCard({
               blockedIds={dossie.bloqueado ? new Set(dossie.ids) : new Set()}
               isAdmin={isAdmin}
               rncStatus={rncPorMonitoramento?.get(item.id)}
+              autocorrigido={autocorrigidoIds?.has(item.id)}
               onEncerrarTurno={onEncerrarTurnoItem}
             />
           ))}

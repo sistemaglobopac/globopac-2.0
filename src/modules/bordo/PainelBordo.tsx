@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { MonitoramentosEmAndamento } from "@/modules/fichas/components/MonitoramentosEmAndamento";
+import { ModalAutocorrecao } from "@/modules/autocorrecao/ModalAutocorrecao";
 import { useNavigate } from "react-router-dom";
 import {
   Eye,
@@ -118,6 +119,7 @@ export function PainelBordo() {
   const [showModalParada, setShowModalParada] = useState(false);
   const [categoriaKpiModal, setCategoriaKpiModal] = useState<CategoriaKpi | null>(null);
   const [desvioDetalhe, setDesvioDetalhe] = useState<DesvioAtivo | null>(null);
+  const [autocorrigindo, setAutocorrigindo] = useState<{ monitoramentoId: string; fichaNome: string } | null>(null);
   const [adendoSelecionado, setAdendoSelecionado] = useState<AdendoPendente | null>(null);
 
   const [cronometroMs, setCronometroMs] = useState(0);
@@ -614,6 +616,7 @@ export function PainelBordo() {
                   desvio={desvio}
                   fichaNome={kpis.nomesFicha.get(desvio.fichaTemplateId)?.nome ?? "Ficha"}
                   onSemRnc={() => navigate(`/nova-rnc?vinculo=${desvio.monitoramentoId}`)}
+                  onAutocorrigir={() => setAutocorrigindo({ monitoramentoId: desvio.monitoramentoId, fichaNome: kpis.nomesFicha.get(desvio.fichaTemplateId)?.nome ?? "Ficha" })}
                   onComRnc={() => setDesvioDetalhe(desvio)}
                 />
               ))}
@@ -817,6 +820,14 @@ export function PainelBordo() {
         />
       )}
 
+      {autocorrigindo && (
+        <ModalAutocorrecao
+          monitoramentoId={autocorrigindo.monitoramentoId}
+          fichaNome={autocorrigindo.fichaNome}
+          onFechar={() => setAutocorrigindo(null)}
+        />
+      )}
+
       {desvioDetalhe && (
         <ModalBase
           titulo="Status da RNC"
@@ -917,24 +928,32 @@ function CardDesvio({
   desvio,
   fichaNome,
   onSemRnc,
+  onAutocorrigir,
   onComRnc,
 }: {
   desvio: DesvioAtivo;
   fichaNome: string;
   onSemRnc: () => void;
+  onAutocorrigir: () => void;
   onComRnc: () => void;
 }) {
   if (!desvio.rnc) {
     return (
-      <button type="button" onClick={onSemRnc} className="space-y-2 rounded-lg bg-destructive p-4 text-left text-destructive-foreground shadow">
+      <div className="space-y-2 rounded-lg bg-destructive p-4 text-left text-destructive-foreground shadow" data-testid="card-desvio">
         <span className="inline-block rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold uppercase">Desvio</span>
         <p className="text-xs opacity-80">{formatarHoraManaus(desvio.criadoEm)}</p>
         <p className="line-clamp-2 font-medium">{fichaNome}</p>
-        <p className="flex animate-pulse items-center gap-1.5 font-semibold">
-          <AlertTriangle className="h-4 w-4" />
-          Emitir RNC Vinculada
-        </p>
-      </button>
+        <div className="flex flex-wrap gap-2 pt-1">
+          <button type="button" onClick={onSemRnc} className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-white/20 px-3 py-2 text-sm font-semibold hover:bg-white/30">
+            <AlertTriangle className="h-4 w-4" />
+            Emitir RNC
+          </button>
+          <button type="button" onClick={onAutocorrigir} className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-white px-3 py-2 text-sm font-semibold text-destructive hover:bg-white/90">
+            <ShieldCheck className="h-4 w-4" />
+            Autocorreção imediata
+          </button>
+        </div>
+      </div>
     );
   }
 

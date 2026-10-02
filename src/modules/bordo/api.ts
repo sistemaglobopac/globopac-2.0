@@ -395,6 +395,18 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
 
       const rncPorMonitoramento = new Map((rncsVinculadas ?? []).map((r) => [r.monitoramento_id, r]));
 
+      // Autocorreção imediata (alternativa à RNC): restabelece a conformidade, então o desvio sai da lista de
+      // pendentes. Erro aqui (ex.: migração ainda não aplicada) só significa "nenhuma autocorreção".
+      const { data: autocorrecoes } =
+        idsDesvios.length > 0
+          ? await supabase
+              .from("autocorrecoes_imediatas")
+              .select("monitoramento_id")
+              .in("monitoramento_id", idsDesvios)
+              .overrideTypes<{ monitoramento_id: string }[], { merge: false }>()
+          : { data: [] as { monitoramento_id: string }[] };
+      const autocorrigidos = new Set((autocorrecoes ?? []).map((a) => a.monitoramento_id));
+
       const desviosAtivos: DesvioAtivo[] = desviosCandidatos
         .map((m) => {
           const rnc = rncPorMonitoramento.get(m.id);
@@ -405,7 +417,7 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
             rnc: rnc ? { id: rnc.id, status: rnc.status } : null,
           };
         })
-        .filter((d) => d.rnc === null || d.rnc.status !== "FECHADA");
+        .filter((d) => (d.rnc === null ? !autocorrigidos.has(d.monitoramentoId) : d.rnc.status !== "FECHADA"));
 
       const adendosPendentes: AdendoPendente[] = [];
       for (const m of recentes ?? []) {
