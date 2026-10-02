@@ -8,6 +8,7 @@ import { normalizarPlaca, useCargasDoDia, useCriarVeiculo, useVeiculos, type Car
 import { ensureLocalTime } from "../utils/tempo";
 import {
   avaliarRecepcao,
+  motivosBloqueioRecepcao,
   CONDICOES_ANIMAIS,
   formatarDuracao,
   inconsistenciasDeHorario,
@@ -61,6 +62,8 @@ export function RecepcaoAvesField({ value, onChange, disabled }: RecepcaoAvesFie
   const valor = montarValorRecepcao(v);
   const t = tempos(v);
   const aval = avaliarRecepcao(v);
+  // Sem os dados da carga preenchidos o monitoramento ainda não é "conforme": mostra "aguardando" (igual aos demais).
+  const completo = motivosBloqueioRecepcao(v).length === 0;
   const inconsistencias = inconsistenciasDeHorario(v);
   const jejumAcima = t.jejumMin !== null && t.jejumMin > LIMITE_JEJUM_MAX_H * 60;
 
@@ -103,9 +106,9 @@ export function RecepcaoAvesField({ value, onChange, disabled }: RecepcaoAvesFie
 
   return (
     <div className="space-y-5 rounded-lg border p-4" data-testid="recepcao-aves">
-      <div className={`flex items-center gap-2 rounded-md p-3 text-sm font-black ${aval.conformidade ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>
+      <div className={`flex items-center gap-2 rounded-md p-3 text-sm font-black ${!aval.conformidade ? "bg-destructive/10 text-destructive" : completo ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}>
         {aval.conformidade ? <CheckCircle2 className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
-        {aval.conformidade ? "CONFORME" : "NÃO CONFORME"}
+        {!aval.conformidade ? "NÃO CONFORME" : completo ? "CONFORME" : "AGUARDANDO PREENCHIMENTO"}
         {!aval.conformidade && <span className="ml-2 font-normal">{aval.motivos.join("; ")}</span>}
       </div>
 
