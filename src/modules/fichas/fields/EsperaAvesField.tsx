@@ -4,7 +4,7 @@ import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Select } from "@/shared/ui/select";
-import { useCargasDoDia, useCargasJaMonitoradas, type CargaAves } from "@/modules/recepcao/api";
+import { useCargasDoDia, useCargasRastreabilidade, type CargaAves } from "@/modules/recepcao/api";
 import { ensureLocalTime } from "../utils/tempo";
 import { acaoCorretivaPendente, avaliarEspera, boxesOfegantes, boxVazio, COMPORTAMENTOS_AVES, esperaVazia, montarValorEspera, motivosBloqueioEspera } from "./esperaAves";
 import type { BoxEsperaAves, EsperaAvesValor } from "./tiposCompostos";
@@ -32,8 +32,10 @@ export function EsperaAvesField({ value, onChange, disabled }: EsperaAvesFieldPr
   const [v, setV] = useState<EsperaAvesValor>({ ...esperaVazia(), ...(value ?? {}) });
   const [dataProgramacao, setDataProgramacao] = useState(() => ensureLocalTime(new Date().toISOString()).isoLocal);
   const { data: cargasDoDia } = useCargasDoDia(dataProgramacao);
-  const { data: jaMonitoradas } = useCargasJaMonitoradas("espera");
-  const escolhidas = new Set(v.boxes.map((b) => b.cargaId).filter(Boolean));
+  // A carga sai da lista quando já foi para a pendura (deixou a espera): o início da pendura vem da
+  // Recepção de Aves. Enquanto aguarda no box ela continua na lista, mesmo já monitorada antes.
+  const { data: situacaoCargas } = useCargasRastreabilidade(dataProgramacao);
+  const jaPenduradas = new Set((situacaoCargas ?? []).filter((c) => c.pendura_inicio_em).map((c) => c.carga_id));
 
   const aval = avaliarEspera(v);
   const completo = motivosBloqueioEspera(v).length === 0;
@@ -87,8 +89,9 @@ export function EsperaAvesField({ value, onChange, disabled }: EsperaAvesFieldPr
 
         <div className="space-y-3">
           {v.boxes.map((b, i) => {
-            // Já monitoradas (ou escolhidas em outro box desta ficha) saem da lista; a deste box permanece.
-            const opcoes = (cargasDoDia ?? []).filter((c) => c.id === b.cargaId || (!jaMonitoradas?.has(c.id) && !escolhidas.has(c.id)));
+            // Na área de espera a carga fica no box por horas e é monitorada de novo a cada apuração (e
+            // pode ocupar mais de um box); só some quando já foi para a pendura. A deste box permanece.
+            const opcoes = (cargasDoDia ?? []).filter((c) => c.id === b.cargaId || !jaPenduradas.has(c.id));
             const naLista = opcoes.some((c) => c.id === b.cargaId);
             return (
               <div key={i} className={`space-y-3 rounded-md border p-3 ${b.comportamento === "ofegantes" ? "border-destructive bg-destructive/5" : ""}`} data-testid={`box-${i}`}>
