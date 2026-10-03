@@ -59,7 +59,14 @@ export type CampoTemplate =
   | { chave: string; tipo: "eletronarcose_aves"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
   | { chave: string; tipo: "caixas_vazias"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
   | { chave: string; tipo: "peso_caixa"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
-  | { chave: string; tipo: "rastreabilidade_doa"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe };
+  | { chave: string; tipo: "rastreabilidade_doa"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
+  | { chave: string; tipo: "temperatura_resfriamento"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
+  | { chave: string; tipo: "potabilidade_agua"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
+  | { chave: string; tipo: "aguas_residuais"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
+  | { chave: string; tipo: "ventilacao"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
+  | { chave: string; tipo: "higiene_habitos"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
+  | { chave: string; tipo: "pso"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
+  | { chave: string; tipo: "higiene_operacional"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe };
 
 const dependeDeSchema = z.object({ campo: z.string().min(1), valor: z.string() }).optional();
 
@@ -267,6 +274,55 @@ export const campoTemplateSchema: z.ZodType<CampoTemplate> = z.discriminatedUnio
     label: z.string().optional(),
     dependeDe: dependeDeSchema,
   }),
+  z.object({
+    chave: z.string().min(1),
+    tipo: z.literal("temperatura_resfriamento"),
+    obrigatorio: z.boolean(),
+    label: z.string().optional(),
+    dependeDe: dependeDeSchema,
+  }),
+  z.object({
+    chave: z.string().min(1),
+    tipo: z.literal("potabilidade_agua"),
+    obrigatorio: z.boolean(),
+    label: z.string().optional(),
+    dependeDe: dependeDeSchema,
+  }),
+  z.object({
+    chave: z.string().min(1),
+    tipo: z.literal("aguas_residuais"),
+    obrigatorio: z.boolean(),
+    label: z.string().optional(),
+    dependeDe: dependeDeSchema,
+  }),
+  z.object({
+    chave: z.string().min(1),
+    tipo: z.literal("ventilacao"),
+    obrigatorio: z.boolean(),
+    label: z.string().optional(),
+    dependeDe: dependeDeSchema,
+  }),
+  z.object({
+    chave: z.string().min(1),
+    tipo: z.literal("higiene_habitos"),
+    obrigatorio: z.boolean(),
+    label: z.string().optional(),
+    dependeDe: dependeDeSchema,
+  }),
+  z.object({
+    chave: z.string().min(1),
+    tipo: z.literal("pso"),
+    obrigatorio: z.boolean(),
+    label: z.string().optional(),
+    dependeDe: dependeDeSchema,
+  }),
+  z.object({
+    chave: z.string().min(1),
+    tipo: z.literal("higiene_operacional"),
+    obrigatorio: z.boolean(),
+    label: z.string().optional(),
+    dependeDe: dependeDeSchema,
+  }),
 ]);
 
 export const schemaCamposSchema = z.array(campoTemplateSchema);
@@ -335,6 +391,13 @@ export function zodFromSchemaCampos(campos: CampoTemplate[]): z.ZodEffects<z.Zod
       case "eletronarcose_aves":
       case "caixas_vazias":
       case "peso_caixa":
+      case "temperatura_resfriamento":
+      case "potabilidade_agua":
+      case "aguas_residuais":
+      case "ventilacao":
+      case "higiene_habitos":
+      case "pso":
+      case "higiene_operacional":
         fieldSchema = z.unknown();
         break;
       // Recepção de aves: obrigatória, a carga (GTA) precisa estar escolhida; o restante (horários,
@@ -434,7 +497,14 @@ export function valoresIniciaisDe(campos: CampoTemplate[]): Record<string, unkno
       campo.tipo === "eletronarcose_aves" ||
       campo.tipo === "caixas_vazias" ||
       campo.tipo === "peso_caixa" ||
-      campo.tipo === "rastreabilidade_doa"
+      campo.tipo === "rastreabilidade_doa" ||
+      campo.tipo === "temperatura_resfriamento" ||
+      campo.tipo === "potabilidade_agua" ||
+      campo.tipo === "aguas_residuais" ||
+      campo.tipo === "ventilacao" ||
+      campo.tipo === "higiene_habitos" ||
+      campo.tipo === "pso" ||
+      campo.tipo === "higiene_operacional"
     )
       valores[campo.chave] = null;
     else valores[campo.chave] = "";
