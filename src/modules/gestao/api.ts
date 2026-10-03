@@ -456,6 +456,7 @@ export interface MonitoramentoAtrasado {
   nome: string;
   setor: string;
   motivo: string;
+  ultimoMonitoramentoId: string;
 }
 
 export interface MonitoramentosHojeDetalhado {
@@ -465,12 +466,10 @@ export interface MonitoramentosHojeDetalhado {
   atrasados: MonitoramentoAtrasado[];
 }
 
-/** "Atraso" (seção do KPI "Monitoramentos em Andamento", bloco vermelho do modal): para fichas
- * "Diário" sem nenhum apontamento hoje no setor onde se aplicam; para fichas recorrentes com
- * intervalo configurado, quando o último apontamento do dia passou do intervalo esperado. Sem
- * apontamento algum hoje ainda para uma ficha de intervalo (turno acabou de começar) não é
- * tratado como atraso — não há uma referência de início de turno por setor neste projeto para
- * calcular isso com segurança, então só a regra "Diário" cobre a ausência total. */
+/** KPI "Monitoramentos em Andamento": só os monitoramentos em atraso que já iniciaram no turno —
+ * fichas recorrentes com intervalo configurado, com ao menos um apontamento hoje no setor, cujo
+ * último apontamento passou do intervalo esperado. Fichas sem nenhum apontamento ainda (não
+ * iniciaram) e fichas "Diário" não entram. */
 export function useMonitoramentosHojeDetalhado() {
   return useQuery({
     queryKey: ["monitoramentos", "hoje-detalhado"],
@@ -511,12 +510,10 @@ export function useMonitoramentosHojeDetalhado() {
         const setoresAlvo = ficha.locais_aplicacao.length > 0 ? ficha.locais_aplicacao : Array.from(porSetorMapa.keys());
         for (const setor of setoresAlvo) {
           const registrosSetor = itens.filter((m) => m.setor === setor && m.ficha_template_id === ficha.id);
-          if (ficha.frequencia === "Diário") {
-            if (registrosSetor.length === 0) {
-              atrasados.push({ fichaTemplateId: ficha.id, codigo: ficha.codigo, nome: ficha.nome, setor, motivo: "Apontamento diário ainda não realizado hoje" });
-            }
-          } else if (ficha.tempo_entre_apontamentos_min != null && ficha.tempo_entre_apontamentos_min > 0 && registrosSetor.length > 0) {
-            const ultimo = registrosSetor.reduce((max, m) => Math.max(max, new Date(m.criado_em).getTime()), 0);
+          if (ficha.frequencia === "Diário") continue;
+          if (ficha.tempo_entre_apontamentos_min != null && ficha.tempo_entre_apontamentos_min > 0 && registrosSetor.length > 0) {
+            const ultimoReg = registrosSetor.reduce((max, m) => (new Date(m.criado_em) > new Date(max.criado_em) ? m : max));
+            const ultimo = new Date(ultimoReg.criado_em).getTime();
             if (agora - ultimo > ficha.tempo_entre_apontamentos_min * 60_000) {
               atrasados.push({
                 fichaTemplateId: ficha.id,
@@ -524,6 +521,7 @@ export function useMonitoramentosHojeDetalhado() {
                 nome: ficha.nome,
                 setor,
                 motivo: `Sem apontamento há mais de ${ficha.tempo_entre_apontamentos_min} min`,
+                ultimoMonitoramentoId: ultimoReg.id,
               });
             }
           }

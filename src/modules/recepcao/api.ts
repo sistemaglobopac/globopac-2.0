@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import type { CargaDoa } from "@/modules/fichas/fields/tiposCompostos";
 
 export interface CargaAves {
   id: string;
@@ -67,6 +68,32 @@ export function useCargasRastreabilidade(dataAbate: string | undefined) {
       const { data, error } = await supabase.rpc("cargas_rastreabilidade_do_dia", { p_dia: dataAbate });
       if (error) throw error;
       return (data ?? []) as unknown as CargaRastreabilidade[];
+    },
+  });
+}
+
+/** Ids das cargas que já tiveram o monitoramento feito naquele tipo — saem da lista de seleção. */
+export function useCargasJaMonitoradas(tipo: "recepcao" | "espera" | "peso") {
+  return useQuery({
+    queryKey: ["cargas-ja-monitoradas", tipo],
+    refetchInterval: 30_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("cargas_ja_monitoradas", { p_tipo: tipo });
+      if (error) throw error;
+      return new Set(((data ?? []) as unknown as { carga_id: string }[]).map((r) => r.carga_id));
+    },
+  });
+}
+
+/** Linhas de DOA já gravadas (monitoramentos anteriores do dia), uma por carga, para somar ao relatório. */
+export function useDoaCargasRegistradas(dataAbate: string | undefined) {
+  return useQuery({
+    queryKey: ["doa-cargas-registradas", dataAbate],
+    enabled: !!dataAbate,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("doa_cargas_ja_registradas", { p_dia: dataAbate });
+      if (error) throw error;
+      return ((data ?? []) as unknown as { carga: CargaDoa }[]).map((r) => r.carga);
     },
   });
 }

@@ -32,7 +32,7 @@ import { PainelOsPage } from "@/modules/pcm/PainelOsPage";
 import { SetoresPage } from "@/modules/admin/SetoresPage";
 import { DialogProvider } from "./dialogSystem";
 import { usePresenceStore } from "./presenceStore";
-import { useMonitoramentosHoje, usePausasEmAndamento, useRncsPendentesDetalhado } from "./api";
+import { useMonitoramentosHojeDetalhado, usePausasEmAndamento, useRncsPendentesDetalhado } from "./api";
 import { ModalUsuariosAtivos } from "./modals/ModalUsuariosAtivos";
 import { ModalPausasInspetores } from "./modals/ModalPausasInspetores";
 import { ModalMonitoramentosAndamento } from "./modals/ModalMonitoramentosAndamento";
@@ -243,7 +243,7 @@ function AbaHome({ irPara }: { irPara: (aba: AbaGestao) => void }) {
   const navigate = useNavigate();
   const onlineIds = usePresenceStore((s) => s.onlineIds);
   const { data: pausas } = usePausasEmAndamento();
-  const { data: monitoramentosHoje } = useMonitoramentosHoje();
+  const { data: monitoramentosHoje } = useMonitoramentosHojeDetalhado();
   const { data: rncDetalhado } = useRncsPendentesDetalhado();
   const [modalAberto, setModalAberto] = useState<ModalKpi>(null);
 
@@ -275,8 +275,8 @@ function AbaHome({ irPara }: { irPara: (aba: AbaGestao) => void }) {
           icon={FileText}
           variante="lime"
           rotulo="Monitoramentos em Andamento"
-          valor={monitoramentosHoje?.length ?? 0}
-          subtitulo="Fichas criadas hoje"
+          valor={monitoramentosHoje?.atrasados.length ?? 0}
+          subtitulo="Em atraso neste turno"
           indice={3}
           onClick={() => setModalAberto("monitoramentos")}
         />

@@ -4,7 +4,7 @@ import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Select } from "@/shared/ui/select";
-import { useCargasDoDia, type CargaAves } from "@/modules/recepcao/api";
+import { useCargasDoDia, useCargasJaMonitoradas, type CargaAves } from "@/modules/recepcao/api";
 import { ensureLocalTime } from "../utils/tempo";
 import { acimaDoLimite, avaliarPesoCaixa, cargaPesoVazia, LIMITE_PESO_CAIXA_KG, montarValorPesoCaixa, motivosBloqueioPesoCaixa, pesoCaixaVazio, pesoPorCaixa } from "./pesoCaixa";
 import type { CargaPesoCaixa, PesoCaixaValor } from "./tiposCompostos";
@@ -24,8 +24,10 @@ function rotuloCarga(c: CargaAves): string {
 export function PesoCaixaField({ value, onChange, disabled }: PesoCaixaFieldProps) {
   const [v, setV] = useState<PesoCaixaValor>({ ...pesoCaixaVazio(), ...(value ?? {}) });
   const [dataProgramacao, setDataProgramacao] = useState(() => ensureLocalTime(new Date().toISOString()).isoLocal);
-  const { data: cargas } = useCargasDoDia(dataProgramacao);
+  const { data: cargasDoDia } = useCargasDoDia(dataProgramacao);
+  const { data: jaMonitoradas } = useCargasJaMonitoradas("peso");
   const aval = avaliarPesoCaixa(v);
+  const escolhidas = new Set(v.cargas.map((c) => c.cargaId).filter(Boolean));
   const completo = motivosBloqueioPesoCaixa(v).length === 0;
 
   useEffect(() => {
@@ -38,7 +40,7 @@ export function PesoCaixaField({ value, onChange, disabled }: PesoCaixaFieldProp
   }
 
   function escolherCarga(indice: number, id: string) {
-    const c = (cargas ?? []).find((x) => x.id === id);
+    const c = (cargasDoDia ?? []).find((x) => x.id === id);
     atualizarCarga(
       indice,
       c
@@ -61,10 +63,12 @@ export function PesoCaixaField({ value, onChange, disabled }: PesoCaixaFieldProp
           <Label htmlFor="peso-data">Data da programação</Label>
           <Input id="peso-data" type="date" value={dataProgramacao} onChange={(e) => setDataProgramacao(e.target.value)} />
         </div>
-        {(cargas ?? []).length === 0 && <p className="text-xs text-muted-foreground">Nenhuma carga programada para esta data. Peça ao Administrador/Verificador para cadastrar a GTA.</p>}
+        {(cargasDoDia ?? []).length === 0 && <p className="text-xs text-muted-foreground">Nenhuma carga programada para esta data. Peça ao Administrador/Verificador para cadastrar a GTA.</p>}
 
         {v.cargas.map((c, i) => {
-          const naLista = (cargas ?? []).some((x) => x.id === c.cargaId);
+          // Já monitoradas (ou escolhidas em outra carga desta ficha) saem da lista; a desta linha permanece.
+          const opcoes = (cargasDoDia ?? []).filter((x) => x.id === c.cargaId || (!jaMonitoradas?.has(x.id) && !escolhidas.has(x.id)));
+          const naLista = opcoes.some((x) => x.id === c.cargaId);
           const peso = pesoPorCaixa(c);
           const acima = acimaDoLimite(c);
           return (
@@ -74,7 +78,7 @@ export function PesoCaixaField({ value, onChange, disabled }: PesoCaixaFieldProp
                 <Select id={`peso-gta-${i}`} value={c.cargaId} onChange={(e) => escolherCarga(i, e.target.value)}>
                   <option value="">Selecione a carga…</option>
                   {c.cargaId && !naLista && <option value={c.cargaId}>{`GTA ${c.gta} — ${c.integrado}`}</option>}
-                  {(cargas ?? []).map((x) => (
+                  {opcoes.map((x) => (
                     <option key={x.id} value={x.id}>
                       {rotuloCarga(x)}
                     </option>

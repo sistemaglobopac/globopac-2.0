@@ -4,7 +4,7 @@ import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Select } from "@/shared/ui/select";
-import { useCargasDoDia, type CargaAves } from "@/modules/recepcao/api";
+import { useCargasDoDia, useCargasJaMonitoradas, type CargaAves } from "@/modules/recepcao/api";
 import { ensureLocalTime } from "../utils/tempo";
 import { acaoCorretivaPendente, avaliarEspera, boxesOfegantes, boxVazio, COMPORTAMENTOS_AVES, esperaVazia, montarValorEspera, motivosBloqueioEspera } from "./esperaAves";
 import type { BoxEsperaAves, EsperaAvesValor } from "./tiposCompostos";
@@ -31,7 +31,9 @@ function rotuloCarga(c: CargaAves): string {
 export function EsperaAvesField({ value, onChange, disabled }: EsperaAvesFieldProps) {
   const [v, setV] = useState<EsperaAvesValor>({ ...esperaVazia(), ...(value ?? {}) });
   const [dataProgramacao, setDataProgramacao] = useState(() => ensureLocalTime(new Date().toISOString()).isoLocal);
-  const { data: cargas } = useCargasDoDia(dataProgramacao);
+  const { data: cargasDoDia } = useCargasDoDia(dataProgramacao);
+  const { data: jaMonitoradas } = useCargasJaMonitoradas("espera");
+  const escolhidas = new Set(v.boxes.map((b) => b.cargaId).filter(Boolean));
 
   const aval = avaliarEspera(v);
   const completo = motivosBloqueioEspera(v).length === 0;
@@ -52,7 +54,7 @@ export function EsperaAvesField({ value, onChange, disabled }: EsperaAvesFieldPr
   }
 
   function escolherCarga(indice: number, id: string) {
-    const c = (cargas ?? []).find((x) => x.id === id);
+    const c = (cargasDoDia ?? []).find((x) => x.id === id);
     atualizarBox(
       indice,
       c
@@ -79,13 +81,15 @@ export function EsperaAvesField({ value, onChange, disabled }: EsperaAvesFieldPr
           <Label htmlFor="espera-data">Data da programação</Label>
           <Input id="espera-data" type="date" value={dataProgramacao} onChange={(e) => setDataProgramacao(e.target.value)} />
         </div>
-        {(cargas ?? []).length === 0 && (
+        {(cargasDoDia ?? []).length === 0 && (
           <p className="text-xs text-muted-foreground">Nenhuma carga programada para esta data. Peça ao Administrador/Verificador para cadastrar a GTA.</p>
         )}
 
         <div className="space-y-3">
           {v.boxes.map((b, i) => {
-            const naLista = (cargas ?? []).some((c) => c.id === b.cargaId);
+            // Já monitoradas (ou escolhidas em outro box desta ficha) saem da lista; a deste box permanece.
+            const opcoes = (cargasDoDia ?? []).filter((c) => c.id === b.cargaId || (!jaMonitoradas?.has(c.id) && !escolhidas.has(c.id)));
+            const naLista = opcoes.some((c) => c.id === b.cargaId);
             return (
               <div key={i} className={`space-y-3 rounded-md border p-3 ${b.comportamento === "ofegantes" ? "border-destructive bg-destructive/5" : ""}`} data-testid={`box-${i}`}>
                 <div className="grid gap-3 sm:grid-cols-[6rem_1fr]">
@@ -98,7 +102,7 @@ export function EsperaAvesField({ value, onChange, disabled }: EsperaAvesFieldPr
                     <Select id={`espera-gta-${i}`} value={b.cargaId} onChange={(e) => escolherCarga(i, e.target.value)}>
                       <option value="">Selecione a GTA…</option>
                       {b.cargaId && !naLista && <option value={b.cargaId}>{`GTA ${b.gta} — ${b.integrado}`}</option>}
-                      {(cargas ?? []).map((c) => (
+                      {opcoes.map((c) => (
                         <option key={c.id} value={c.id}>
                           {rotuloCarga(c)}
                         </option>

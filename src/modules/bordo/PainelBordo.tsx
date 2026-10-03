@@ -231,6 +231,7 @@ export function PainelBordo() {
     turnoHoje ? new Date(turnoHoje.inicio) : inicioDoDiaManaus(agora)
   );
   const fichasIniciadasNoTurno = new Set(resumoSetores.flatMap((r) => r.idsIniciadas));
+  const fichasIniciadas = fichasAplicaveis.filter((f) => fichasIniciadasNoTurno.has(f.id));
   const fichasAtrasadas = turnoHoje ? calcularFichasAtrasadas(fichasAplicaveis, kpis?.monitoramentosDoSetorHoje ?? [], agora) : [];
   const desviosComRnc = (kpis?.desviosAtivos ?? []).filter((d) => d.rnc !== null);
   const bloqueadoPorPausa = pausaAtiva != null;
@@ -505,18 +506,18 @@ export function PainelBordo() {
             <KpiTile
               titulo="Fichas Ativas"
               tag="Setor"
-              valor={fichasAplicaveis.length}
+              valor={fichasIniciadas.length}
               tom="neutro"
-              onClick={() => abrirTileKpi("fichasAtivas", fichasAplicaveis.length)}
+              onClick={() => abrirTileKpi("fichasAtivas", fichasIniciadas.length)}
               detalhe={
                 <span data-testid="fichas-ativas-detalhe" className="mt-2 block space-y-0.5 text-xs">
                   <span className="block font-semibold text-foreground">
-                    {fichasIniciadasNoTurno.size} de {fichasAplicaveis.length} iniciadas neste turno
+                    iniciadas neste turno
                   </span>
                   {resumoSetores.length > 1 &&
                     resumoSetores.map((r) => (
                       <span key={r.setor} className="block text-muted-foreground">
-                        {r.setor}: {r.iniciadas} de {r.total}
+                        {r.setor}: {r.iniciadas}
                       </span>
                     ))}
                   {resumoSetores.length === 1 && <span className="block text-muted-foreground">Setor {resumoSetores[0]!.setor}</span>}
@@ -808,10 +809,9 @@ export function PainelBordo() {
         <ModalListaKpi
           categoria={categoriaKpiModal}
           kpis={kpis}
-          fichasAplicaveis={fichasAplicaveis}
+          fichasAplicaveis={fichasIniciadas}
           fichasAtrasadas={fichasAtrasadas}
           desviosComRnc={desviosComRnc}
-          fichasIniciadasNoTurno={fichasIniciadasNoTurno}
           onAbrirFicha={(ficha) => {
             setCategoriaKpiModal(null);
             navigate(urlNovaFicha(ficha, userSetores));
@@ -1092,7 +1092,6 @@ function ModalListaKpi({
   fichasAplicaveis,
   fichasAtrasadas,
   desviosComRnc,
-  fichasIniciadasNoTurno,
   onAbrirFicha,
   onFechar,
 }: {
@@ -1101,7 +1100,6 @@ function ModalListaKpi({
   fichasAplicaveis: FichaAtivaResumo[];
   fichasAtrasadas: FichaAtrasada[];
   desviosComRnc: DesvioAtivo[];
-  fichasIniciadasNoTurno: Set<string>;
   onAbrirFicha: (ficha: FichaAtivaResumo) => void;
   onFechar: () => void;
 }) {
@@ -1116,7 +1114,7 @@ function ModalListaKpi({
   if (categoria === "monitoramentos") {
     itens = kpis.monitoramentosHoje.map((m) => `${formatarHoraManaus(m.criado_em)} - ${kpis.nomesFicha.get(m.ficha_template_id)?.nome ?? "Ficha"}`);
   } else if (categoria === "fichasAtivas") {
-    itens = fichasAplicaveis.map((f) => `${f.codigo} - ${f.nome} — ${fichasIniciadasNoTurno.has(f.id) ? "iniciada neste turno" : "ainda não iniciada"}`);
+    itens = fichasAplicaveis.map((f) => `${f.codigo} - ${f.nome} — iniciada neste turno`);
   } else if (categoria === "fichasAtrasadas") {
     itens = fichasAtrasadas.map((a) => `${a.ficha.codigo} - ${a.ficha.nome} (${a.motivo})`);
   } else {

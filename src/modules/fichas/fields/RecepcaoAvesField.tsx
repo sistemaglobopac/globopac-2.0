@@ -4,7 +4,7 @@ import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Select } from "@/shared/ui/select";
-import { normalizarPlaca, useCargasDoDia, useCriarVeiculo, useVeiculos, type CargaAves } from "@/modules/recepcao/api";
+import { normalizarPlaca, useCargasDoDia, useCargasJaMonitoradas, useCriarVeiculo, useVeiculos, type CargaAves } from "@/modules/recepcao/api";
 import { ensureLocalTime } from "../utils/tempo";
 import {
   avaliarRecepcao,
@@ -55,7 +55,10 @@ export function RecepcaoAvesField({ value, onChange, disabled }: RecepcaoAvesFie
   const [novaPlaca, setNovaPlaca] = useState("");
   const [erroPlaca, setErroPlaca] = useState<string | null>(null);
 
-  const { data: cargas } = useCargasDoDia(dataProgramacao);
+  const { data: cargasDoDia } = useCargasDoDia(dataProgramacao);
+  const { data: jaMonitoradas } = useCargasJaMonitoradas("recepcao");
+  // A carga já monitorada sai da lista; a selecionada nesta ficha (edição/rascunho) permanece.
+  const cargas = (cargasDoDia ?? []).filter((c) => c.id === v.cargaId || !jaMonitoradas?.has(c.id));
   const { data: veiculos } = useVeiculos();
   const criarVeiculo = useCriarVeiculo();
 
@@ -131,7 +134,10 @@ export function RecepcaoAvesField({ value, onChange, disabled }: RecepcaoAvesFie
                 </option>
               ))}
             </Select>
-            {(cargas ?? []).length === 0 && (
+            {(cargasDoDia ?? []).length > 0 && cargas.length === 0 && (
+              <p className="text-xs text-muted-foreground">Todas as cargas desta data já foram monitoradas.</p>
+            )}
+            {(cargasDoDia ?? []).length === 0 && (
               <p className="text-xs text-muted-foreground">Nenhuma carga programada para esta data. Peça ao Administrador/Verificador para cadastrar a GTA.</p>
             )}
           </div>

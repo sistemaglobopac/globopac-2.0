@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, FileWarning } from "lucide-react";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
-import { useCargasRastreabilidade } from "@/modules/recepcao/api";
+import { useCargasRastreabilidade, useDoaCargasRegistradas } from "@/modules/recepcao/api";
 import { ensureLocalTime } from "../utils/tempo";
 import { formatarDataHora } from "./recepcaoAves";
 import { doaVazio, formatarPctDoa, lerContagem, montarCargas, montarValorDoa, motivosBloqueioDoa, type CargaHerdadaDoa, type EntradaDoa } from "./rastreabilidadeDoa";
@@ -25,6 +25,14 @@ export function RastreabilidadeDoaField({ value, onChange, disabled }: Rastreabi
     Object.fromEntries(inicial.current.cargas.map((c) => [c.cargaId, { avesRecebidas: c.avesRecebidas, avesMortas: c.avesMortas }]))
   );
   const { data: rpc, isLoading, isError } = useCargasRastreabilidade(dataAbate);
+  const { data: registradas } = useDoaCargasRegistradas(dataAbate);
+
+  // Cargas já gravadas em monitoramentos anteriores do dia entram no relatório como estão (somente
+  // leitura); as desta própria ficha (edição) continuam editáveis.
+  const anteriores = useMemo(() => {
+    const proprias = new Set(dataAbate === inicial.current.dataAbate ? inicial.current.cargas.map((c) => c.cargaId) : []);
+    return new Map((registradas ?? []).filter((c) => !proprias.has(c.cargaId)).map((c) => [c.cargaId, c]));
+  }, [registradas, dataAbate]);
 
   const herdadas = useMemo<CargaHerdadaDoa[]>(
     () =>
@@ -43,9 +51,11 @@ export function RastreabilidadeDoaField({ value, onChange, disabled }: Rastreabi
 
   const valor = useMemo(() => {
     // Enquanto a consulta não volta (ou offline), mantém as linhas já salvas em vez de zerar.
-    const salvas = dataAbate === inicial.current.dataAbate ? inicial.current.cargas : [];
-    return montarValorDoa(dataAbate, montarCargas(rpc ? herdadas : [], entradas, salvas));
-  }, [rpc, herdadas, entradas, dataAbate]);
+    const salvas = [...(dataAbate === inicial.current.dataAbate ? inicial.current.cargas : []), ...anteriores.values()];
+    const efetivas: Record<string, EntradaDoa> = { ...entradas };
+    for (const c of anteriores.values()) efetivas[c.cargaId] = { avesRecebidas: c.avesRecebidas, avesMortas: c.avesMortas };
+    return montarValorDoa(dataAbate, montarCargas(rpc ? herdadas : [], efetivas, salvas));
+  }, [rpc, herdadas, entradas, dataAbate, anteriores]);
 
   const faltas = motivosBloqueioDoa(valor);
   const completo = faltas.length === 0;
@@ -103,11 +113,11 @@ export function RastreabilidadeDoaField({ value, onChange, disabled }: Rastreabi
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="space-y-1">
                 <Label htmlFor={`doa-recebidas-${c.gta}`}>Aves que vieram na carga</Label>
-                <Input id={`doa-recebidas-${c.gta}`} inputMode="numeric" placeholder={String(c.qtdPrevista)} value={c.avesRecebidas} onChange={(e) => digitar(c.cargaId, { avesRecebidas: apenasDigitos(e.target.value) })} />
+                <Input id={`doa-recebidas-${c.gta}`} inputMode="numeric" disabled={anteriores.has(c.cargaId)} placeholder={String(c.qtdPrevista)} value={c.avesRecebidas} onChange={(e) => digitar(c.cargaId, { avesRecebidas: apenasDigitos(e.target.value) })} />
               </div>
               <div className="space-y-1">
                 <Label htmlFor={`doa-mortas-${c.gta}`}>Aves mortas (DOA)</Label>
-                <Input id={`doa-mortas-${c.gta}`} inputMode="numeric" placeholder="0" value={c.avesMortas} onChange={(e) => digitar(c.cargaId, { avesMortas: apenasDigitos(e.target.value) })} />
+                <Input id={`doa-mortas-${c.gta}`} inputMode="numeric" disabled={anteriores.has(c.cargaId)} placeholder="0" value={c.avesMortas} onChange={(e) => digitar(c.cargaId, { avesMortas: apenasDigitos(e.target.value) })} />
               </div>
               <div className="space-y-1">
                 <Label>% de DOA</Label>
