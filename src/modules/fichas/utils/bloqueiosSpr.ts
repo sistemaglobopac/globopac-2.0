@@ -10,13 +10,18 @@ import { motivosBloqueioPendura } from "../fields/penduraAves";
 import { motivosBloqueioEletronarcose } from "../fields/eletronarcoseAves";
 import { motivosBloqueioPesoCaixa } from "../fields/pesoCaixa";
 import { motivosBloqueioRecepcao } from "../fields/recepcaoAves";
-import type { CaixasVaziasValor, EletronarcoseAvesValor, EsperaAvesValor, OcorrenciaPragasValor, PenduraAvesValor, PesoCaixaValor, RecepcaoAvesValor } from "../fields/tiposCompostos";
+import { motivosBloqueioDoa } from "../fields/rastreabilidadeDoa";
+import type { CaixasVaziasValor, EletronarcoseAvesValor, EsperaAvesValor, OcorrenciaPragasValor, PenduraAvesValor, PesoCaixaValor, RastreabilidadeDoaValor, RecepcaoAvesValor } from "../fields/tiposCompostos";
 
 export function motivosDeBloqueioSpr(campos: CampoTemplate[], dados: Record<string, unknown>): string[] {
   const motivos: string[] = [];
   for (const campo of campos) {
     if (campo.tipo === "recepcao_aves") {
       motivos.push(...motivosBloqueioRecepcao(dados[campo.chave] as RecepcaoAvesValor | undefined));
+      continue;
+    }
+    if (campo.tipo === "rastreabilidade_doa") {
+      motivos.push(...motivosBloqueioDoa(dados[campo.chave] as RastreabilidadeDoaValor | undefined));
       continue;
     }
     if (campo.tipo === "espera_aves") {

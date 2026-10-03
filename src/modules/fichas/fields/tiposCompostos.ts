@@ -279,6 +279,47 @@ export interface EletronarcoseAvesValor {
   detalhesRNC: string | null;
 }
 
+/** Uma carga no monitoramento de Rastreabilidade e Controle de DOA. Os campos herdados vêm da
+ * programação de abate e da recepção de aves; o inspetor digita só aves recebidas e mortas. */
+export interface CargaDoa {
+  cargaId: string;
+  /** Ordem em que a carga começou a ser pendurada no dia (1 = primeira); null = ainda sem pendura. */
+  ordemPendura: number | null;
+  /** `YYYY-MM-DDTHH:mm` (Manaus) — início da pendura, que é o início do abate da carga. */
+  penduraInicioEm: string;
+  placa: string;
+  gta: string;
+  integrado: string;
+  aviario: string;
+  nucleo: string;
+  /** Aves previstas na GTA. */
+  qtdPrevista: number;
+  /** Aves que de fato chegaram na carga (inclui as mortas), como digitado. */
+  avesRecebidas: string;
+  /** Aves mortas na chegada (DOA), como digitado. */
+  avesMortas: string;
+  /** Calculados — gravados para o relatório não depender de recalcular. */
+  doaPct: number | null;
+  /** Recebidas − previstas (negativo = vieram a menos). */
+  saldoDiferenca: number | null;
+  /** Nota de necessidade de documento de correção de saldo, quando aplicável. */
+  notaSaldo: string | null;
+}
+
+/** Rastreabilidade e Controle de DOA (Especial SIF): uma linha por carga do dia. */
+export interface RastreabilidadeDoaValor {
+  /** Dia de abate (YYYY-MM-DD) cujas cargas estão listadas. */
+  dataAbate: string;
+  cargas: CargaDoa[];
+  totalRecebidas: number;
+  totalMortas: number;
+  /** % de DOA do conjunto das cargas informadas. */
+  doaTotalPct: number | null;
+  /** Sem limite normativo: DOA e diferença de saldo são registrados, nunca reprovam sozinhos. */
+  conformidade: boolean;
+  detalhesRNC: string | null;
+}
+
 /** Recepção de Aves / Bem-Estar Animal (Especial SIF): uma carga (GTA) por monitoramento. Datas e
  * horas são `YYYY-MM-DDTHH:mm` no horário de Manaus (formato do input datetime-local). */
 export interface RecepcaoAvesValor {

@@ -44,6 +44,33 @@ export function useCargasDoDia(dataAbate: string | undefined) {
   });
 }
 
+export interface CargaRastreabilidade {
+  carga_id: string;
+  gta: string;
+  integrado: string;
+  aviario: string;
+  nucleo: string;
+  qtd_aves: number;
+  placa: string | null;
+  pendura_inicio_em: string | null;
+  monitoramento_id: string | null;
+}
+
+/** Cargas do dia com veículo e início da pendura herdados da recepção de aves, já em ordem de
+ * pendura (função SECURITY DEFINER: o inspetor do DOA não enxerga o setor da recepção). */
+export function useCargasRastreabilidade(dataAbate: string | undefined) {
+  return useQuery({
+    queryKey: ["cargas-rastreabilidade", dataAbate],
+    enabled: !!dataAbate,
+    refetchInterval: 30_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("cargas_rastreabilidade_do_dia", { p_dia: dataAbate });
+      if (error) throw error;
+      return (data ?? []) as unknown as CargaRastreabilidade[];
+    },
+  });
+}
+
 export function useCriarCargas() {
   const qc = useQueryClient();
   return useMutation({

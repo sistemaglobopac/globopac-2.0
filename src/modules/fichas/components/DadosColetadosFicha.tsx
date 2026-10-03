@@ -20,6 +20,7 @@ import {
   PenduraAvesRelatorio,
   EletronarcoseAvesRelatorio,
   PesoCaixaRelatorio,
+  RastreabilidadeDoaRelatorio,
   RecepcaoAvesRelatorio,
 } from "./relatorio/CamposEspeciaisRelatorio";
 import type {
@@ -36,6 +37,7 @@ import type {
   PenduraAvesValor,
   EletronarcoseAvesValor,
   PesoCaixaValor,
+  RastreabilidadeDoaValor,
   RecepcaoAvesValor,
 } from "../fields/tiposCompostos";
 
@@ -140,6 +142,8 @@ export function DadosColetados({
             return valor ? <PenduraAvesRelatorio key={campo.chave} valor={valor as PenduraAvesValor} titulo={rotulo} /> : null;
           case "peso_caixa":
             return valor ? <PesoCaixaRelatorio key={campo.chave} valor={valor as PesoCaixaValor} titulo={rotulo} /> : null;
+          case "rastreabilidade_doa":
+            return valor ? <RastreabilidadeDoaRelatorio key={campo.chave} valor={valor as RastreabilidadeDoaValor} titulo={rotulo} /> : null;
           case "caixas_vazias":
             return valor ? <CaixasVaziasRelatorio key={campo.chave} valor={valor as CaixasVaziasValor} titulo={rotulo} /> : null;
           case "foto":

@@ -58,6 +58,7 @@ type TipoCampo =
   | "eletronarcose_aves"
   | "caixas_vazias"
   | "peso_caixa"
+  | "rastreabilidade_doa"
   | "assinatura";
 
 const TIPOS_CAMPO: { value: TipoCampo; label: string }[] = [
@@ -83,6 +84,7 @@ const TIPOS_CAMPO: { value: TipoCampo; label: string }[] = [
   { value: "eletronarcose_aves", label: "Bem-Estar Animal — Eletronarcose (Especial SIF)" },
   { value: "caixas_vazias", label: "Caixas de Transporte Vazias antes da Imersão (Especial SIF)" },
   { value: "peso_caixa", label: "Peso Vivo por Caixa de Transporte (Especial SIF)" },
+  { value: "rastreabilidade_doa", label: "Rastreabilidade e Controle de DOA (Especial SIF)" },
   { value: "assinatura", label: "Assinatura Eletrônica (Fim)" },
 ];
 
@@ -223,6 +225,8 @@ function paraCampoTemplate(campo: CampoForm): CampoTemplate {
       return { ...base, tipo: "caixas_vazias" };
     case "peso_caixa":
       return { ...base, tipo: "peso_caixa" };
+    case "rastreabilidade_doa":
+      return { ...base, tipo: "rastreabilidade_doa" };
   }
 }
 

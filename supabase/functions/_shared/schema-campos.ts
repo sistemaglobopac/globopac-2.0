@@ -58,7 +58,8 @@ export type CampoTemplate =
   | { chave: string; tipo: "pendura_aves"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
   | { chave: string; tipo: "eletronarcose_aves"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
   | { chave: string; tipo: "caixas_vazias"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
-  | { chave: string; tipo: "peso_caixa"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe };
+  | { chave: string; tipo: "peso_caixa"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
+  | { chave: string; tipo: "rastreabilidade_doa"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe };
 
 const dependeDeSchema = z.object({ campo: z.string().min(1), valor: z.string() }).optional();
 
@@ -259,6 +260,13 @@ export const campoTemplateSchema: z.ZodType<CampoTemplate> = z.discriminatedUnio
     label: z.string().optional(),
     dependeDe: dependeDeSchema,
   }),
+  z.object({
+    chave: z.string().min(1),
+    tipo: z.literal("rastreabilidade_doa"),
+    obrigatorio: z.boolean(),
+    label: z.string().optional(),
+    dependeDe: dependeDeSchema,
+  }),
 ]);
 
 export const schemaCamposSchema = z.array(campoTemplateSchema);
@@ -355,6 +363,19 @@ export function zodFromSchemaCampos(campos: CampoTemplate[]): z.ZodEffects<z.Zod
                 .passthrough()
             : z.unknown();
         break;
+      // Rastreabilidade de DOA: obrigatória, ao menos uma carga listada; aves recebidas/mortas são
+      // conferidas na tela antes de assinar.
+      case "rastreabilidade_doa":
+        fieldSchema =
+          campo.obrigatorio && !campo.dependeDe
+            ? z
+                .object(
+                  { cargas: z.array(z.unknown()).min(1, "Nenhuma carga com pendura iniciada") },
+                  { required_error: "Campo obrigatório", invalid_type_error: "Campo obrigatório" }
+                )
+                .passthrough()
+            : z.unknown();
+        break;
       // Absorção de água e Dripping Test são obrigatórios como qualquer outro campo: o objeto
       // emitido pelo widget não pode faltar ao assinar. Com `dependeDe` (campo oculto vira "") ou
       // não obrigatório, aceita qualquer valor (a obrigatoriedade condicional fica no superRefine).
@@ -412,7 +433,8 @@ export function valoresIniciaisDe(campos: CampoTemplate[]): Record<string, unkno
       campo.tipo === "pendura_aves" ||
       campo.tipo === "eletronarcose_aves" ||
       campo.tipo === "caixas_vazias" ||
-      campo.tipo === "peso_caixa"
+      campo.tipo === "peso_caixa" ||
+      campo.tipo === "rastreabilidade_doa"
     )
       valores[campo.chave] = null;
     else valores[campo.chave] = "";

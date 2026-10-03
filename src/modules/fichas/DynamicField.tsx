@@ -18,6 +18,7 @@ import { PenduraAvesField } from "./fields/PenduraAvesField";
 import { EletronarcoseAvesField } from "./fields/EletronarcoseAvesField";
 import { CaixasVaziasField } from "./fields/CaixasVaziasField";
 import { PesoCaixaField } from "./fields/PesoCaixaField";
+import { RastreabilidadeDoaField } from "./fields/RastreabilidadeDoaField";
 import type {
   AbsorcaoAguaValor,
   ChillerCarcacasValor,
@@ -31,6 +32,7 @@ import type {
   PenduraAvesValor,
   EletronarcoseAvesValor,
   PesoCaixaValor,
+  RastreabilidadeDoaValor,
   RecepcaoAvesValor,
   ParadaEquipamentoValor,
 } from "./fields/tiposCompostos";
@@ -233,6 +235,14 @@ export function DynamicField({ campo, register, errors, control, prevAppointment
           name={campo.chave}
           control={control}
           render={({ field }) => <PesoCaixaField value={field.value as PesoCaixaValor | undefined} onChange={field.onChange} />}
+        />
+      )}
+
+      {campo.tipo === "rastreabilidade_doa" && (
+        <Controller
+          name={campo.chave}
+          control={control}
+          render={({ field }) => <RastreabilidadeDoaField value={field.value as RastreabilidadeDoaValor | undefined} onChange={field.onChange} />}
         />
       )}
 

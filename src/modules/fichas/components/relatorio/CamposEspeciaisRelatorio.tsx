@@ -20,12 +20,14 @@ import type {
   ParadaEquipamentoValor,
   PenduraAvesValor,
   PesoCaixaValor,
+  RastreabilidadeDoaValor,
   RecepcaoAvesValor,
   TanqueHidrometro,
 } from "@/modules/fichas/fields/tiposCompostos";
 import { formatMaskedValue } from "@/modules/fichas/fields/hidrometro";
 import { pragasPresentes, rotuloDaPraga } from "@/modules/fichas/fields/pragas";
 import { COMPORTAMENTOS_AVES } from "@/modules/fichas/fields/esperaAves";
+import { formatarPctDoa } from "@/modules/fichas/fields/rastreabilidadeDoa";
 import { CONDICOES_ANIMAIS, formatarDataHora, formatarDuracao, LIMITE_JEJUM_MAX_H } from "@/modules/fichas/fields/recepcaoAves";
 import {
   apuracaoCarcacas,
@@ -577,6 +579,69 @@ export function PesoCaixaRelatorio({ valor, titulo = "Peso Vivo por Caixa de Tra
         </tbody>
       </table>
       {valor.conformidade === false && valor.detalhesRNC && <p className="text-[10px] font-semibold text-destructive print:text-[8px]">{valor.detalhesRNC}</p>}
+    </div>
+  );
+}
+
+export function RastreabilidadeDoaRelatorio({ valor, titulo = "Rastreabilidade e Controle de DOA" }: { valor: RastreabilidadeDoaValor; titulo?: string }) {
+  const cargas = valor.cargas ?? [];
+  const comNota = cargas.filter((c) => c.notaSaldo);
+  return (
+    <div className="col-span-full space-y-2 rounded-lg border border-hairline bg-gray-50 p-3 print:p-2" data-testid="relatorio-rastreabilidade-doa">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] font-black uppercase tracking-wider text-primary print:text-[9px]">{titulo}</span>
+        <span className="text-[10px] font-black print:text-[8px]">DOA do dia: {formatarPctDoa(valor.doaTotalPct)}</span>
+      </div>
+      <table className="max-sm:block max-sm:overflow-x-auto w-full text-[10px] print:text-[8px]">
+        <thead>
+          <tr className="text-left text-muted-foreground">
+            <th className="pr-2 font-normal">Ordem</th>
+            <th className="pr-2 font-normal">Início do abate</th>
+            <th className="pr-2 font-normal">Veículo</th>
+            <th className="pr-2 font-normal">GTA</th>
+            <th className="pr-2 font-normal">Integrado / Aviário</th>
+            <th className="pr-2 font-normal">Previstas</th>
+            <th className="pr-2 font-normal">Recebidas</th>
+            <th className="pr-2 font-normal">Mortas</th>
+            <th className="font-normal">% DOA</th>
+          </tr>
+        </thead>
+        <tbody>
+          {cargas.map((c) => (
+            <tr key={c.cargaId} className={c.notaSaldo ? "bg-amber-500/10" : ""}>
+              <td className="pr-2 font-bold">{c.ordemPendura ?? "—"}</td>
+              <td className="pr-2">{formatarDataHora(c.penduraInicioEm)}</td>
+              <td className="pr-2">{c.placa || "—"}</td>
+              <td className="pr-2">{c.gta || "—"}</td>
+              <td className="pr-2">
+                {c.integrado}
+                {c.aviario ? ` / ${c.aviario}` : ""}
+                {c.nucleo ? ` / ${c.nucleo}` : ""}
+              </td>
+              <td className="pr-2">{c.qtdPrevista.toLocaleString("pt-BR")}</td>
+              <td className="pr-2">{c.avesRecebidas || "—"}</td>
+              <td className="pr-2">{c.avesMortas || "—"}</td>
+              <td className="font-black">{formatarPctDoa(c.doaPct)}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="border-t font-black">
+            <td colSpan={6} className="pr-2 pt-1 text-right">Total</td>
+            <td className="pr-2 pt-1">{valor.totalRecebidas.toLocaleString("pt-BR")}</td>
+            <td className="pr-2 pt-1">{valor.totalMortas.toLocaleString("pt-BR")}</td>
+            <td className="pt-1">{formatarPctDoa(valor.doaTotalPct)}</td>
+          </tr>
+        </tfoot>
+      </table>
+      {comNota.length > 0 && (
+        <div className="space-y-1 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-[10px] font-semibold print:p-1 print:text-[8px]">
+          <p className="font-black uppercase tracking-wider">Correção de saldo necessária</p>
+          {comNota.map((c) => (
+            <p key={c.cargaId}>GTA {c.gta}: {c.notaSaldo}</p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
