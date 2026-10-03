@@ -592,7 +592,9 @@ interface AdendoBruto {
   status: "pending_monitor" | "completed";
   notes: string;
   verificadorName: string;
-  corrections: Record<string, { old: unknown; new: unknown }>;
+  corrections: Record<string, { old: unknown; new: unknown; rotulo?: string }>;
+  /** Inspetor dono do monitoramento: é quem vê e assina o adendo no Painel de Bordo. */
+  monitorId?: string;
   criadoEm: string;
 }
 
@@ -606,6 +608,7 @@ export function useAbrirAdendo() {
     mutationFn: async (input: {
       monitoramentoId: string;
       campo: string;
+      rotulo?: string;
       valorAntigo: unknown;
       valorNovo: unknown;
       notes: string;
@@ -613,19 +616,20 @@ export function useAbrirAdendo() {
     }) => {
       const { data: original, error: erroOriginal } = await supabase
         .from("monitoramentos")
-        .select("dados_dinamicos")
+        .select("dados_dinamicos, user_id")
         .eq("id", input.monitoramentoId)
         .single()
-        .overrideTypes<{ dados_dinamicos: Record<string, unknown> }, { merge: false }>();
+        .overrideTypes<{ dados_dinamicos: Record<string, unknown>; user_id: string }, { merge: false }>();
       if (erroOriginal) throw erroOriginal;
 
       const dadosOriginais = original.dados_dinamicos as { adendos?: AdendoBruto[] } & Record<string, unknown>;
       const novoAdendo: AdendoBruto = {
         id: crypto.randomUUID(),
         status: "pending_monitor",
+        monitorId: original.user_id,
         notes: input.notes,
         verificadorName: input.verificadorNome,
-        corrections: { [input.campo]: { old: input.valorAntigo, new: input.valorNovo } },
+        corrections: { [input.campo]: { old: input.valorAntigo, new: input.valorNovo, rotulo: input.rotulo } },
         criadoEm: new Date().toISOString(),
       };
       const novosDados: Record<string, unknown> = {

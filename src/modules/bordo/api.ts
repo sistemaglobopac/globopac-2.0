@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { temNaoConformidade } from "@/modules/fichas/utils/desviosEspeciais";
+import { aplicarNoCaminho } from "@/modules/fichas/utils/adendoCampos";
 import { supabase } from "@/lib/supabase";
 import type { StatusRnc } from "@/modules/rnc/api";
 
@@ -296,7 +297,7 @@ interface AdendoBruto {
   monitorId: string;
   verificadorName?: string;
   notes?: string;
-  corrections?: Record<string, { old: unknown; new: unknown }>;
+  corrections?: Record<string, { old: unknown; new: unknown; rotulo?: string }>;
 }
 
 export interface AdendoPendente {
@@ -304,7 +305,7 @@ export interface AdendoPendente {
   monitoramentoId: string;
   verificadorName: string;
   notes: string;
-  corrections: Record<string, { old: unknown; new: unknown }>;
+  corrections: Record<string, { old: unknown; new: unknown; rotulo?: string }>;
 }
 
 export interface KpisTurno {
@@ -484,7 +485,7 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
 export function useAssinarAdendo() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { monitoramentoId: string; adendoId: string; corrections: Record<string, { old: unknown; new: unknown }> }) => {
+    mutationFn: async (input: { monitoramentoId: string; adendoId: string; corrections: Record<string, { old: unknown; new: unknown; rotulo?: string }> }) => {
       const { data: original, error: erroOriginal } = await supabase
         .from("monitoramentos")
         .select("ficha_template_id, versao_template, user_id, setor, dados_dinamicos")
@@ -503,8 +504,9 @@ export function useAssinarAdendo() {
       );
 
       const novosDados: Record<string, unknown> = { ...dadosOriginais, adendos: novosAdendos };
-      for (const [campo, correcao] of Object.entries(input.corrections)) {
-        novosDados[campo] = correcao.new;
+      let dadosCorrigidos: Record<string, unknown> = novosDados;
+      for (const [caminho, correcao] of Object.entries(input.corrections)) {
+        dadosCorrigidos = aplicarNoCaminho(dadosCorrigidos, caminho, correcao.new);
       }
 
       const { error: erroInsert } = await supabase.from("monitoramentos").insert({
@@ -512,7 +514,7 @@ export function useAssinarAdendo() {
         versao_template: original.versao_template,
         user_id: original.user_id,
         setor: original.setor,
-        dados_dinamicos: novosDados,
+        dados_dinamicos: dadosCorrigidos,
         aditivo_de: input.monitoramentoId,
       });
       if (erroInsert) throw erroInsert;

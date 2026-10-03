@@ -29,7 +29,7 @@ interface AdendoBruto {
   status: "pending_monitor" | "completed";
   notes: string;
   verificadorName: string;
-  corrections: Record<string, { old: unknown; new: unknown }>;
+  corrections: Record<string, { old: unknown; new: unknown; rotulo?: string }>;
   criadoEm?: string;
   timestamp?: string;
   monitorSignedAt?: string;
@@ -187,7 +187,7 @@ function BlocoAdendos({ adendos }: { adendos: AdendoBruto[] }) {
               <div className="mt-2 rounded border border-hairline bg-white p-2">
                 {Object.entries(ad.corrections).map(([campo, correcao]) => (
                   <div key={campo} className="flex items-center gap-2 border-b border-hairline/60 py-1 text-[10px] print:text-[8px]">
-                    <span className="font-bold capitalize text-muted-foreground">{campo.replace(/_/g, " ")}:</span>
+                    <span className="font-bold text-muted-foreground">{correcao.rotulo ?? campo.replace(/_/g, " ")}:</span>
                     <span className="text-down line-through">{String(correcao.old)}</span>
                     <span className="text-muted-foreground">→</span>
                     <span className="font-bold text-success">{String(correcao.new)}</span>

@@ -870,7 +870,7 @@ export function PainelBordo() {
               <div className="space-y-1 text-sm">
                 {Object.entries(adendoSelecionado.corrections).map(([campo, correcao]) => (
                   <div key={campo} className="flex items-center gap-2">
-                    <span className="font-medium">{campo}:</span>
+                    <span className="font-medium">{correcao.rotulo ?? campo}:</span>
                     <span className="text-destructive line-through">{String(correcao.old)}</span>
                     <span>→</span>
                     <span className="font-bold text-success">{String(correcao.new)}</span>

@@ -6,6 +6,7 @@ import { useAbrirAdendo, useDadosRelatorio, useVerificarMonitoramento, type Moni
 import { turnosBloqueadosMap } from "./utils/turnoUtils";
 import { RelatorioMonitoramento } from "./components/relatorio/RelatorioMonitoramento";
 import { ensureLocalTime } from "./utils/tempo";
+import { alvosDoCampo } from "./utils/adendoCampos";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { ModalAssinaturaSenha } from "@/shared/ModalAssinaturaSenha";
@@ -307,7 +308,7 @@ function PainelRejeitar({ pendentes, onCancelar, onConcluido, onErro }: PainelAc
 }
 
 interface PainelAdendoProps extends PainelAcaoProps {
-  dados: { templatesPorId: Map<string, { schema_campos: { chave: string; label?: string }[] }> };
+  dados: { templatesPorId: Map<string, { schema_campos: { chave: string; label?: string; tipo?: string }[] }> };
   verificadorNome: string;
 }
 
@@ -315,19 +316,30 @@ function PainelAdendo({ pendentes, dados, verificadorNome, onCancelar, onConclui
   const abrirAdendo = useAbrirAdendo();
   const [registroId, setRegistroId] = useState(pendentes.length === 1 ? pendentes[0]!.id : "");
   const [campo, setCampo] = useState("");
+  const [alvoCaminho, setAlvoCaminho] = useState("");
   const [valorNovo, setValorNovo] = useState("");
   const [nota, setNota] = useState("");
 
   const registro = pendentes.find((p) => p.id === registroId);
-  const campos = registro ? dados.templatesPorId.get(registro.ficha_template_id)?.schema_campos ?? [] : [];
+  const campos = useMemo(
+    () => (registro ? dados.templatesPorId.get(registro.ficha_template_id)?.schema_campos ?? [] : []).filter((c) => c.tipo !== "hora"),
+    [registro, dados.templatesPorId]
+  );
+  // Campos compostos (DOA, Peso por Caixa...) detalham item e dado; os simples têm um único alvo.
+  const alvos = useMemo(() => {
+    const def = campos.find((c) => c.chave === campo);
+    return registro && def ? alvosDoCampo(def, registro.dados_dinamicos[def.chave]) : [];
+  }, [campos, campo, registro]);
+  const alvo = alvos.find((a) => a.caminho === alvoCaminho) ?? (alvos.length === 1 ? alvos[0] : undefined);
 
   async function confirmar() {
-    if (!registro || !campo || !nota.trim()) return;
+    if (!registro || !alvo || !nota.trim()) return;
     try {
       await abrirAdendo.mutateAsync({
         monitoramentoId: registro.id,
-        campo,
-        valorAntigo: registro.dados_dinamicos[campo],
+        campo: alvo.caminho,
+        rotulo: alvo.rotulo,
+        valorAntigo: alvo.valorAtual ?? "",
         valorNovo,
         notes: nota,
         verificadorNome,
@@ -343,7 +355,7 @@ function PainelAdendo({ pendentes, dados, verificadorNome, onCancelar, onConclui
       {pendentes.length > 1 && (
         <div className="space-y-2">
           <Label>Registro a corrigir</Label>
-          <Select value={registroId} onChange={(e) => { setRegistroId(e.target.value); setCampo(""); }}>
+          <Select value={registroId} onChange={(e) => { setRegistroId(e.target.value); setCampo(""); setAlvoCaminho(""); }}>
             <option value="">Selecione…</option>
             {pendentes.map((p, indice) => (
               <option key={p.id} value={p.id}>
@@ -355,7 +367,7 @@ function PainelAdendo({ pendentes, dados, verificadorNome, onCancelar, onConclui
       )}
       <div className="space-y-2">
         <Label>Campo a corrigir</Label>
-        <Select value={campo} onChange={(e) => setCampo(e.target.value)} disabled={!registro}>
+        <Select value={campo} onChange={(e) => { setCampo(e.target.value); setAlvoCaminho(""); }} disabled={!registro}>
           <option value="">Selecione…</option>
           {campos.map((c) => (
             <option key={c.chave} value={c.chave}>
@@ -363,6 +375,20 @@ function PainelAdendo({ pendentes, dados, verificadorNome, onCancelar, onConclui
             </option>
           ))}
         </Select>
+        {alvos.length > 1 && (
+          <>
+            <Label>Item e dado a corrigir</Label>
+            <Select value={alvo?.caminho ?? ""} onChange={(e) => setAlvoCaminho(e.target.value)}>
+              <option value="">Selecione…</option>
+              {alvos.map((a) => (
+                <option key={a.caminho} value={a.caminho}>
+                  {a.rotulo.split(" › ").slice(1).join(" › ")}
+                  {a.valorAtual !== undefined && a.valorAtual !== null && a.valorAtual !== "" ? ` (atual: ${String(a.valorAtual)})` : " (vazio)"}
+                </option>
+              ))}
+            </Select>
+          </>
+        )}
         <Label>Novo valor</Label>
         <Input value={valorNovo} onChange={(e) => setValorNovo(e.target.value)} disabled={!registro} />
         <Label>Observação</Label>
@@ -372,7 +398,7 @@ function PainelAdendo({ pendentes, dados, verificadorNome, onCancelar, onConclui
         <Button type="button" variant="outline" className="flex-1" onClick={onCancelar} disabled={abrirAdendo.isPending}>
           Cancelar
         </Button>
-        <Button type="button" className="flex-1" disabled={abrirAdendo.isPending || !registro || !campo || !nota.trim()} onClick={confirmar}>
+        <Button type="button" className="flex-1" disabled={abrirAdendo.isPending || !registro || !alvo || !nota.trim()} onClick={confirmar}>
           {abrirAdendo.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {abrirAdendo.isPending ? "Enviando…" : "Enviar Adendo"}
         </Button>
