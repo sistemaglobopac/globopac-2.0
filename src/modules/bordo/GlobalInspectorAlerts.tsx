@@ -75,6 +75,17 @@ export function GlobalInspectorAlerts() {
     };
   }, [userId, queryClient]);
 
+  // O relógio acima só avança a cada 15s: agenda uma virada exata no fim da pausa (curta, almoço ou
+  // jantar) para o alarme tocar na hora em que o tempo acaba, não até 15s depois.
+  useEffect(() => {
+    if (!pausaAtiva) return;
+    const fimMs = new Date(pausaAtiva.hora_inicio).getTime() + PAUSAS_CONFIG[pausaAtiva.tipo_pausa].limiteMin * 60_000;
+    const restante = fimMs - Date.now();
+    if (restante <= 0) return;
+    const id = setTimeout(() => setAgora(new Date()), restante + 50);
+    return () => clearTimeout(id);
+  }, [pausaAtiva]);
+
   const pausaEstourada = useMemo(() => {
     if (!pausaAtiva) return null;
     const limiteMs = PAUSAS_CONFIG[pausaAtiva.tipo_pausa].limiteMin * 60_000;

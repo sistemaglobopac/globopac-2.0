@@ -451,7 +451,27 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
         for (const f of fichasFaltantes ?? []) nomesFicha.set(f.id, { codigo: f.codigo, nome: f.nome });
       }
 
-      return { monitoramentosHoje: monitoramentosHoje ?? [], monitoramentosDoSetorHoje: monitoramentosDoSetor ?? [], fichasAtivas: fichasAtivas ?? [], desviosAtivos, adendosPendentes, nomesFicha };
+      // Ficha reeditada ganha um template novo com o MESMO código: o monitoramento antigo aponta para a
+      // versão inativa. Para contagem de iniciadas/atrasos, ele vale para a versão ativa do mesmo código.
+      const idsNaoAtivos = Array.from(
+        new Set([...(monitoramentosHoje ?? []), ...(monitoramentosDoSetor ?? [])].map((m) => m.ficha_template_id))
+      ).filter((id) => !(fichasAtivas ?? []).some((f) => f.id === id));
+      const versaoAtivaPorTemplate = new Map<string, string>();
+      if (idsNaoAtivos.length > 0) {
+        const { data: antigos } = await supabase
+          .from("fichas_templates")
+          .select("id, codigo")
+          .in("id", idsNaoAtivos)
+          .overrideTypes<{ id: string; codigo: string }[], { merge: false }>();
+        for (const antigo of antigos ?? []) {
+          const ativa = (fichasAtivas ?? []).find((f) => f.codigo === antigo.codigo);
+          if (ativa) versaoAtivaPorTemplate.set(antigo.id, ativa.id);
+        }
+      }
+      const normalizar = (lista: MonitoramentoHoje[] | null) =>
+        (lista ?? []).map((m) => (versaoAtivaPorTemplate.has(m.ficha_template_id) ? { ...m, ficha_template_id: versaoAtivaPorTemplate.get(m.ficha_template_id)! } : m));
+
+      return { monitoramentosHoje: normalizar(monitoramentosHoje), monitoramentosDoSetorHoje: normalizar(monitoramentosDoSetor), fichasAtivas: fichasAtivas ?? [], desviosAtivos, adendosPendentes, nomesFicha };
     },
   });
 }

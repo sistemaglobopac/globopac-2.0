@@ -45,6 +45,7 @@ import {
   type TipoPausa,
   type FichaAtivaResumo,
   type FichaAtrasada,
+  type MonitoramentoHoje,
   type DesvioAtivo,
   type AdendoPendente,
 } from "./api";
@@ -231,6 +232,11 @@ export function PainelBordo() {
     turnoHoje ? new Date(turnoHoje.inicio) : inicioDoDiaManaus(agora)
   );
   const fichasIniciadasNoTurno = new Set(resumoSetores.flatMap((r) => r.idsIniciadas));
+  // Card "Monitoramentos": tudo o que foi feito NESTE turno nos setores do inspetor, inclusive por quem cobriu o almoço.
+  const inicioTurno = turnoHoje ? new Date(turnoHoje.inicio) : inicioDoDiaManaus(agora);
+  const monitoramentosTurno = (kpis?.monitoramentosDoSetorHoje ?? [])
+    .filter((m) => new Date(m.criado_em).getTime() >= inicioTurno.getTime())
+    .sort((a, b) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime());
   const fichasIniciadas = fichasAplicaveis.filter((f) => fichasIniciadasNoTurno.has(f.id));
   const fichasAtrasadas = turnoHoje ? calcularFichasAtrasadas(fichasAplicaveis, kpis?.monitoramentosDoSetorHoje ?? [], agora) : [];
   const desviosComRnc = (kpis?.desviosAtivos ?? []).filter((d) => d.rnc !== null);
@@ -499,9 +505,9 @@ export function PainelBordo() {
             <KpiTile
               titulo="Monitoramentos"
               tag="Turno"
-              valor={kpis?.monitoramentosHoje.length ?? 0}
+              valor={monitoramentosTurno.length}
               tom="primary"
-              onClick={() => abrirTileKpi("monitoramentos", kpis?.monitoramentosHoje.length ?? 0)}
+              onClick={() => abrirTileKpi("monitoramentos", monitoramentosTurno.length)}
             />
             <KpiTile
               titulo="Fichas Ativas"
@@ -809,6 +815,7 @@ export function PainelBordo() {
         <ModalListaKpi
           categoria={categoriaKpiModal}
           kpis={kpis}
+          monitoramentosTurno={monitoramentosTurno}
           fichasAplicaveis={fichasIniciadas}
           fichasAtrasadas={fichasAtrasadas}
           desviosComRnc={desviosComRnc}
@@ -1089,6 +1096,7 @@ function ModalConfirmacao({
 function ModalListaKpi({
   categoria,
   kpis,
+  monitoramentosTurno,
   fichasAplicaveis,
   fichasAtrasadas,
   desviosComRnc,
@@ -1097,6 +1105,7 @@ function ModalListaKpi({
 }: {
   categoria: CategoriaKpi;
   kpis: NonNullable<ReturnType<typeof useKpisTurno>["data"]>;
+  monitoramentosTurno: MonitoramentoHoje[];
   fichasAplicaveis: FichaAtivaResumo[];
   fichasAtrasadas: FichaAtrasada[];
   desviosComRnc: DesvioAtivo[];
@@ -1104,7 +1113,7 @@ function ModalListaKpi({
   onFechar: () => void;
 }) {
   const TITULOS: Record<CategoriaKpi, string> = {
-    monitoramentos: "Monitoramentos de Hoje",
+    monitoramentos: "Monitoramentos do Turno",
     fichasAtivas: "Fichas Ativas",
     fichasAtrasadas: "Fichas Atrasadas",
     rnc: "RNC em Tratativa",
@@ -1112,7 +1121,7 @@ function ModalListaKpi({
 
   let itens: string[] = [];
   if (categoria === "monitoramentos") {
-    itens = kpis.monitoramentosHoje.map((m) => `${formatarHoraManaus(m.criado_em)} - ${kpis.nomesFicha.get(m.ficha_template_id)?.nome ?? "Ficha"}`);
+    itens = monitoramentosTurno.map((m) => `${formatarHoraManaus(m.criado_em)} - ${kpis.nomesFicha.get(m.ficha_template_id)?.nome ?? "Ficha"}`);
   } else if (categoria === "fichasAtivas") {
     itens = fichasAplicaveis.map((f) => `${f.codigo} - ${f.nome} — iniciada neste turno`);
   } else if (categoria === "fichasAtrasadas") {

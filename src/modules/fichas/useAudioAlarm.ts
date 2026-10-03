@@ -39,11 +39,20 @@ export function useAudioAlarm(isActive: boolean) {
       for (let i = 0; i < BIPES_POR_RAJADA; i += 1) bipe(t0 + i * 0.15);
     };
 
+    // Se o navegador deixou o áudio suspenso (política de autoplay), o primeiro toque/tecla libera.
+    const liberar = () => {
+      if (audioCtx && audioCtx.state === "suspended") void audioCtx.resume();
+    };
+    window.addEventListener("pointerdown", liberar);
+    window.addEventListener("keydown", liberar);
+
     iniciar();
     rajada();
     const timer = setInterval(rajada, INTERVALO_RAJADA_MS);
 
     return () => {
+      window.removeEventListener("pointerdown", liberar);
+      window.removeEventListener("keydown", liberar);
       clearInterval(timer);
       if (audioCtx && audioCtx.state !== "closed") void audioCtx.close();
     };
