@@ -5,6 +5,7 @@
 // dentro do próprio valor no momento do apontamento; o relatório só exibe as leituras brutas
 // e esse veredito já persistido, nunca reproduz a fórmula (evita duas implementações da mesma
 // regra de negócio divergindo entre si).
+import { useCargasRastreabilidade } from "@/modules/recepcao/api";
 import { absorcaoLinhaDripping, acimaDoLimite, formatarPercentual, LIMITE_DRIPPING, percentualIndividualAbsorcao } from "../../fields/calculosAbsorcao";
 import type {
   AbsorcaoAguaValor,
@@ -584,7 +585,11 @@ export function PesoCaixaRelatorio({ valor, titulo = "Peso Vivo por Caixa de Tra
 }
 
 export function RastreabilidadeDoaRelatorio({ valor, titulo = "Rastreabilidade e Controle de DOA" }: { valor: RastreabilidadeDoaValor; titulo?: string }) {
-  const cargas = valor.cargas ?? [];
+  // Peso médio vem do monitoramento de Densidade nas Caixas, que pode ser feito DEPOIS desta apuração:
+  // se não ficou gravado, completa na exibição com o herdado atual (sem alterar o registro assinado).
+  const { data: herdadas } = useCargasRastreabilidade(valor.dataAbate);
+  const pesoHerdado = new Map((herdadas ?? []).map((h) => [h.carga_id, h.peso_medio_kg ?? ""]));
+  const cargas = (valor.cargas ?? []).map((c) => ({ ...c, pesoMedioKg: c.pesoMedioKg || pesoHerdado.get(c.cargaId) || "" }));
   const comNota = cargas.filter((c) => c.notaSaldo);
   return (
     <div className="col-span-full space-y-2 rounded-lg border border-hairline bg-gray-50 p-3 print:p-2" data-testid="relatorio-rastreabilidade-doa">
