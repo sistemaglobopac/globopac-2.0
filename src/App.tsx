@@ -12,6 +12,7 @@ import { PainelVerificacao } from "@/modules/fichas/PainelVerificacao";
 import { VerificarFichaPage } from "@/modules/fichas/VerificarFichaPage";
 import { RelatorioPragasMensalPage } from "@/modules/fichas/RelatorioPragasMensalPage";
 import { CargasAvesPage } from "@/modules/recepcao/CargasAvesPage";
+import { ComunicadosPage } from "@/modules/comunicados/ComunicadosPage";
 import { FinalizarAbsorcaoPage } from "@/modules/fichas/FinalizarAbsorcaoPage";
 import { ConstrutorFichasPage } from "@/modules/fichas/ConstrutorFichasPage";
 import { SetoresPage } from "@/modules/admin/SetoresPage";
@@ -113,6 +114,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute perfisPermitidos={["VERIFICADOR", "ADMIN_MASTER"]}>
               <RelatorioPragasMensalPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/comunicados"
+          element={
+            <ProtectedRoute perfisPermitidos={["VERIFICADOR", "ADMIN_MASTER"]}>
+              <ComunicadosPage />
             </ProtectedRoute>
           }
         />

@@ -106,15 +106,33 @@ export function VerificarFichaPage() {
                 </div>
               </div>
             ) : bloqueado ? (
-              <div className="flex items-start gap-3 rounded-lg border border-warning bg-warning/10 p-4">
-                <Lock className="mt-0.5 h-5 w-5 shrink-0 text-warning-foreground" />
-                <div>
-                  <p className="font-semibold text-ink">Turno do inspetor ainda em aberto</p>
-                  <p className="text-sm text-muted-foreground">
-                    O inspetor responsável ainda não finalizou o turno no Painel de Bordo — o dia ainda pode receber novas apurações
-                    desta ficha. Você está vendo uma prévia: a verificação fica disponível assim que o turno for encerrado.
-                  </p>
+              <div className="space-y-4">
+                <div className="flex items-start gap-3 rounded-lg border border-warning bg-warning/10 p-4">
+                  <Lock className="mt-0.5 h-5 w-5 shrink-0 text-warning-foreground" />
+                  <div>
+                    <p className="font-semibold text-ink">Turno do inspetor ainda em aberto</p>
+                    <p className="text-sm text-muted-foreground">
+                      O inspetor responsável ainda não finalizou o turno no Painel de Bordo — o dia ainda pode receber novas apurações
+                      desta ficha. A verificação fica disponível assim que o turno for encerrado, mas você já pode solicitar a inclusão
+                      de adendos.
+                    </p>
+                  </div>
                 </div>
+                {acao === "adendo" ? (
+                  <PainelAdendo
+                    pendentes={pendentes}
+                    dados={dados}
+                    verificadorNome={perfil.nomeCompleto}
+                    onCancelar={() => setAcao(null)}
+                    onConcluido={voltarComMensagem}
+                    onErro={setMensagemErro}
+                  />
+                ) : (
+                  <Button type="button" variant="outline" onClick={() => setAcao("adendo")}>
+                    <PenLine className="h-4 w-4" />
+                    Incluir Adendo
+                  </Button>
+                )}
               </div>
             ) : (
               <>

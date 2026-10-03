@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { usePresenceTracking } from "@/modules/gestao/usePresenceTracking";
 import { horaEmManaus } from "@/modules/bordo/api";
 import { GlobalInspectorAlerts } from "@/modules/bordo/GlobalInspectorAlerts";
+import { AlertaComunicado } from "@/modules/comunicados/AlertaComunicado";
 import { NIVEL_ACESSO_BADGE } from "@/modules/gestao/api";
 import { useRncsAbertas } from "@/modules/rnc/api";
 import { AlertaRncGestor } from "@/modules/rnc/AlertaRncGestor";
@@ -53,6 +54,7 @@ const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
   VERIFICADOR: [
     { rota: "/verificacao", rotulo: "Painel de Verificação" },
     { rota: "/rnc", rotulo: "Revisão de RNC" },
+    { rota: "/comunicados", rotulo: "Comunicados" },
     { rota: "/gestao/cargas-aves", rotulo: "Cargas e Veículos" },
     { rota: "/trocar-setor", rotulo: "Trocar Setor / Cobertura" },
     { rota: "/sif/liberar", rotulo: "Painel de Arquivo" },
@@ -271,6 +273,7 @@ export function AppShell() {
         </main>
       </div>
       <GlobalInspectorAlerts />
+      <AlertaComunicado />
       <AlertaRncGestor />
     </div>
   );
