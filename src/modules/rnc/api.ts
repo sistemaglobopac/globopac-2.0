@@ -171,6 +171,26 @@ export function useRevisarRnc() {
   });
 }
 
+/** A ficha de monitoramento de origem da RNC já foi verificada? Se sim, a RNC NÃO pode ser reaberta
+ * (o banco também recusa: trg_rnc_bloqueia_reabertura_verificada). `undefined` enquanto carrega ou
+ * quando a RNC não tem monitoramento de origem. */
+export function useMonitoramentoVerificado(monitoramentoId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["monitoramentos", "verificado", monitoramentoId],
+    enabled: !!monitoramentoId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("monitoramentos")
+        .select("verificado_por")
+        .eq("id", monitoramentoId as string)
+        .maybeSingle()
+        .overrideTypes<{ verificado_por: string | null } | null, { merge: false }>();
+      if (error) throw error;
+      return data ? data.verificado_por !== null : undefined;
+    },
+  });
+}
+
 /** Reabertura (seção 7.2, "Novo") de uma RNC já FECHADA: cria uma NOVA linha referenciando a
  * anterior — nunca sobrescreve a tratativa original. Continua restrita a ADMIN_MASTER: é uma
  * ação distinta e mais sensível do que a revisão de rotina (TRATADA → FECHADA/DEVOLVIDA, essa

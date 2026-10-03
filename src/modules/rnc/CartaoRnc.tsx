@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { type Rnc, enviarAnexosRnc, estaAtrasada, useReabrirRnc, useRevisarRnc, useTratarRnc } from "./api";
+import { type Rnc, enviarAnexosRnc, estaAtrasada, useMonitoramentoVerificado, useReabrirRnc, useRevisarRnc, useTratarRnc } from "./api";
 import { useSessionStore } from "@/store/session";
 import { Button } from "@/shared/ui/button";
 import { Badge } from "@/shared/ui/badge";
@@ -55,6 +55,9 @@ export function CartaoRnc({ rnc, podeTratar, podeRevisar, podeReabrir }: { rnc: 
   const tratar = useTratarRnc();
   const revisar = useRevisarRnc();
   const reabrir = useReabrirRnc();
+  // RNC de ficha já verificada não pode ser reaberta; enquanto não se sabe, o botão não aparece.
+  const { data: fichaVerificada, isLoading: carregandoVerificacao } = useMonitoramentoVerificado(rnc.status === "FECHADA" ? rnc.monitoramento_id : null);
+  const reaberturaPermitida = rnc.monitoramento_id ? !carregandoVerificacao && fichaVerificada === false : true;
 
   const atrasada = estaAtrasada(rnc);
   const emTratativa = rnc.status === "ABERTA" || rnc.status === "EM_TRATATIVA" || rnc.status === "REABERTA" || rnc.status === "DEVOLVIDA";
@@ -237,7 +240,7 @@ export function CartaoRnc({ rnc, podeTratar, podeRevisar, podeReabrir }: { rnc: 
           </div>
         )}
 
-        {rnc.status === "FECHADA" && podeReabrir && (
+        {rnc.status === "FECHADA" && podeReabrir && reaberturaPermitida && (
           <div className="space-y-2 border-t pt-3">
             {!reabrindo ? (
               <Button size="sm" variant="outline" onClick={() => setReabrindo(true)}>
