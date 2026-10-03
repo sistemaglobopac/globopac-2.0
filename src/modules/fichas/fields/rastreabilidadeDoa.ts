@@ -12,6 +12,8 @@ export interface CargaHerdadaDoa {
   nucleo: string;
   qtdPrevista: number;
   placa: string;
+  /** Peso médio das aves (kg), herdado do monitoramento de Peso por Caixa. */
+  pesoMedioKg?: string;
   /** `YYYY-MM-DDTHH:mm`; vazio = recepção ainda não registrou a pendura desta carga. */
   penduraInicioEm: string;
 }
@@ -92,6 +94,7 @@ export function montarCargas(herdadas: CargaHerdadaDoa[], entradas: Record<strin
         ordemPendura: ordem.get(h.cargaId) ?? null,
         penduraInicioEm: h.penduraInicioEm,
         placa: h.placa,
+        pesoMedioKg: h.pesoMedioKg ?? "",
         gta: h.gta,
         integrado: h.integrado,
         aviario: h.aviario,

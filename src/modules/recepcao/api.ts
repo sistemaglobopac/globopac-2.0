@@ -55,6 +55,7 @@ export interface CargaRastreabilidade {
   placa: string | null;
   pendura_inicio_em: string | null;
   monitoramento_id: string | null;
+  peso_medio_kg: string | null;
 }
 
 /** Cargas do dia com veículo e início da pendura herdados da recepção de aves, já em ordem de

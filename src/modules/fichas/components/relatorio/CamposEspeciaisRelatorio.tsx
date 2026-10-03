@@ -600,6 +600,7 @@ export function RastreabilidadeDoaRelatorio({ valor, titulo = "Rastreabilidade e
             <th className="pr-2 font-normal">Veículo</th>
             <th className="pr-2 font-normal">GTA</th>
             <th className="pr-2 font-normal">Integrado / Aviário</th>
+            <th className="pr-2 font-normal">Peso médio (kg)</th>
             <th className="pr-2 font-normal">Previstas</th>
             <th className="pr-2 font-normal">Recebidas</th>
             <th className="pr-2 font-normal">Mortas</th>
@@ -618,6 +619,7 @@ export function RastreabilidadeDoaRelatorio({ valor, titulo = "Rastreabilidade e
                 {c.aviario ? ` / ${c.aviario}` : ""}
                 {c.nucleo ? ` / ${c.nucleo}` : ""}
               </td>
+              <td className="pr-2">{c.pesoMedioKg || "—"}</td>
               <td className="pr-2">{c.qtdPrevista.toLocaleString("pt-BR")}</td>
               <td className="pr-2">{c.avesRecebidas || "—"}</td>
               <td className="pr-2">{c.avesMortas || "—"}</td>
@@ -627,7 +629,7 @@ export function RastreabilidadeDoaRelatorio({ valor, titulo = "Rastreabilidade e
         </tbody>
         <tfoot>
           <tr className="border-t font-black">
-            <td colSpan={6} className="pr-2 pt-1 text-right">Total</td>
+            <td colSpan={7} className="pr-2 pt-1 text-right">Total</td>
             <td className="pr-2 pt-1">{valor.totalRecebidas.toLocaleString("pt-BR")}</td>
             <td className="pr-2 pt-1">{valor.totalMortas.toLocaleString("pt-BR")}</td>
             <td className="pt-1">{formatarPctDoa(valor.doaTotalPct)}</td>

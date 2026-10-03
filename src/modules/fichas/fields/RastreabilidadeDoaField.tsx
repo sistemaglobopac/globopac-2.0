@@ -44,6 +44,7 @@ export function RastreabilidadeDoaField({ value, onChange, disabled }: Rastreabi
         nucleo: c.nucleo,
         qtdPrevista: c.qtd_aves,
         placa: c.placa ?? "",
+        pesoMedioKg: c.peso_medio_kg ?? "",
         penduraInicioEm: c.pendura_inicio_em ?? "",
       })),
     [rpc]
@@ -105,9 +106,10 @@ export function RastreabilidadeDoaField({ value, onChange, disabled }: Rastreabi
                 {c.nucleo ? ` · Núcleo ${c.nucleo}` : ""}
               </span>
             </div>
-            <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
               <div><span className="text-muted-foreground">Início do abate (pendura)</span><br /><strong>{formatarDataHora(c.penduraInicioEm)}</strong></div>
               <div><span className="text-muted-foreground">Veículo</span><br /><strong>{c.placa || "—"}</strong></div>
+              <div><span className="text-muted-foreground">Peso médio (kg)</span><br /><strong>{c.pesoMedioKg || "—"}</strong></div>
               <div><span className="text-muted-foreground">Aves previstas na GTA</span><br /><strong>{c.qtdPrevista.toLocaleString("pt-BR")}</strong></div>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">

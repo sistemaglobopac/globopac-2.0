@@ -288,6 +288,8 @@ export interface CargaDoa {
   /** `YYYY-MM-DDTHH:mm` (Manaus) — início da pendura, que é o início do abate da carga. */
   penduraInicioEm: string;
   placa: string;
+  /** Peso médio das aves (kg) herdado do monitoramento de Peso por Caixa; vazio = ainda não informado. */
+  pesoMedioKg?: string;
   gta: string;
   integrado: string;
   aviario: string;
