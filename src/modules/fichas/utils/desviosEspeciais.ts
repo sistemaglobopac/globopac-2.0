@@ -27,7 +27,7 @@ function limiteConfigurado(campo: CampoTemplate): number | undefined {
 }
 
 // Widgets que gravam `conformidade` + `detalhesRNC` no próprio valor (vazão de água e recepção de aves).
-const TIPOS_VAZAO = ["chiller_carcacas", "chiller_partes", "mini_chillers", "lavagem_final", "recepcao_aves", "espera_aves", "pendura_aves", "eletronarcose_aves", "caixas_vazias", "peso_caixa"];
+const TIPOS_VAZAO = ["chiller_carcacas", "chiller_partes", "mini_chillers", "lavagem_final", "recepcao_aves", "espera_aves", "pendura_aves", "eletronarcose_aves", "caixas_vazias", "peso_caixa", "temperatura_resfriamento", "potabilidade_agua", "aguas_residuais", "ventilacao", "higiene_habitos", "pso", "higiene_operacional"];
 
 /** Desvios que tornam a ficha NÃO CONFORME já no preenchimento: absorção/dripping fora do limite,
  * vazão de água abaixo da meta (o widget grava `conformidade: false` + `detalhesRNC`). Ocorrência
@@ -50,6 +50,12 @@ export function desviosEspeciais(campos: CampoTemplate[], dados: Record<string, 
             ? `O campo "${campo.label ?? campo.chave}" está não conforme: ${bruto.detalhesRNC ?? "desvio de bem-estar animal na sala de pendura"}.`
             : campo.tipo === "eletronarcose_aves"
             ? `O campo "${campo.label ?? campo.chave}" está não conforme: ${bruto.detalhesRNC ?? "desvio de bem-estar animal na eletronarcose"}.`
+            : campo.tipo === "aguas_residuais" || campo.tipo === "ventilacao" || campo.tipo === "higiene_habitos" || campo.tipo === "pso" || campo.tipo === "higiene_operacional"
+            ? `O campo "${campo.label ?? campo.chave}" está não conforme: ${bruto.detalhesRNC ?? "item não conforme"}.`
+            : campo.tipo === "potabilidade_agua"
+            ? `O campo "${campo.label ?? campo.chave}" está não conforme: ${bruto.detalhesRNC ?? "pH ou cloro fora do limite"}.`
+            : campo.tipo === "temperatura_resfriamento"
+            ? `O campo "${campo.label ?? campo.chave}" está não conforme: ${bruto.detalhesRNC ?? "temperatura acima do limite"}.`
             : campo.tipo === "espera_aves"
             ? `O campo "${campo.label ?? campo.chave}" está não conforme: ${bruto.detalhesRNC ?? "desvio de bem-estar animal na área de espera"}.`
             : `O campo "${campo.label ?? campo.chave}" está fora da meta: ${bruto.detalhesRNC ?? "vazão abaixo do mínimo"}.`

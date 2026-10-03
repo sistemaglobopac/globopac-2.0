@@ -21,6 +21,9 @@ import {
   EletronarcoseAvesRelatorio,
   PesoCaixaRelatorio,
   RastreabilidadeDoaRelatorio,
+  TemperaturaResfriamentoRelatorio,
+  PotabilidadeAguaRelatorio,
+  ChecklistConformidadeRelatorio,
   RecepcaoAvesRelatorio,
 } from "./relatorio/CamposEspeciaisRelatorio";
 import type {
@@ -38,6 +41,9 @@ import type {
   EletronarcoseAvesValor,
   PesoCaixaValor,
   RastreabilidadeDoaValor,
+  TemperaturaResfriamentoValor,
+  PotabilidadeAguaValor,
+  ChecklistConformidadeValor,
   RecepcaoAvesValor,
 } from "../fields/tiposCompostos";
 
@@ -144,6 +150,16 @@ export function DadosColetados({
             return valor ? <PesoCaixaRelatorio key={campo.chave} valor={valor as PesoCaixaValor} titulo={rotulo} /> : null;
           case "rastreabilidade_doa":
             return valor ? <RastreabilidadeDoaRelatorio key={campo.chave} valor={valor as RastreabilidadeDoaValor} titulo={rotulo} /> : null;
+          case "temperatura_resfriamento":
+            return valor ? <TemperaturaResfriamentoRelatorio key={campo.chave} valor={valor as TemperaturaResfriamentoValor} titulo={rotulo} /> : null;
+          case "potabilidade_agua":
+            return valor ? <PotabilidadeAguaRelatorio key={campo.chave} valor={valor as PotabilidadeAguaValor} titulo={rotulo} /> : null;
+          case "aguas_residuais":
+          case "ventilacao":
+          case "higiene_habitos":
+          case "pso":
+          case "higiene_operacional":
+            return valor ? <ChecklistConformidadeRelatorio key={campo.chave} tipo={campo.tipo} valor={valor as ChecklistConformidadeValor} titulo={rotulo} /> : null;
           case "caixas_vazias":
             return valor ? <CaixasVaziasRelatorio key={campo.chave} valor={valor as CaixasVaziasValor} titulo={rotulo} /> : null;
           case "foto":

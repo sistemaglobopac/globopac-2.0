@@ -59,6 +59,13 @@ type TipoCampo =
   | "caixas_vazias"
   | "peso_caixa"
   | "rastreabilidade_doa"
+  | "temperatura_resfriamento"
+  | "potabilidade_agua"
+  | "aguas_residuais"
+  | "ventilacao"
+  | "higiene_habitos"
+  | "pso"
+  | "higiene_operacional"
   | "assinatura";
 
 const TIPOS_CAMPO: { value: TipoCampo; label: string }[] = [
@@ -85,6 +92,13 @@ const TIPOS_CAMPO: { value: TipoCampo; label: string }[] = [
   { value: "caixas_vazias", label: "Caixas de Transporte Vazias antes da Imersão (Especial SIF)" },
   { value: "peso_caixa", label: "Peso Vivo por Caixa de Transporte (Especial SIF)" },
   { value: "rastreabilidade_doa", label: "Rastreabilidade e Controle de DOA (Especial SIF)" },
+  { value: "temperatura_resfriamento", label: "Temperaturas do Pré-resfriamento: água e produtos (Especial SIF)" },
+  { value: "aguas_residuais", label: "Monitoramento de Águas Residuais (Especial SIF)" },
+  { value: "ventilacao", label: "Monitoramento de Ventilação (Especial SIF)" },
+  { value: "higiene_habitos", label: "Higiene e Hábitos Higiênicos dos Colaboradores (Especial SIF)" },
+  { value: "pso", label: "Procedimentos Sanitários Operacionais: PSO 25, 26 e 28 (Especial SIF)" },
+  { value: "higiene_operacional", label: "Higiene Operacional das Salas de Pré-resfriamento (Especial SIF)" },
+  { value: "potabilidade_agua", label: "Potabilidade da Água: pH e Cloro dos Sistemas de Pré-resfriamento (Especial SIF)" },
   { value: "assinatura", label: "Assinatura Eletrônica (Fim)" },
 ];
 
@@ -227,6 +241,20 @@ function paraCampoTemplate(campo: CampoForm): CampoTemplate {
       return { ...base, tipo: "peso_caixa" };
     case "rastreabilidade_doa":
       return { ...base, tipo: "rastreabilidade_doa" };
+    case "temperatura_resfriamento":
+      return { ...base, tipo: "temperatura_resfriamento" };
+    case "potabilidade_agua":
+      return { ...base, tipo: "potabilidade_agua" };
+    case "aguas_residuais":
+      return { ...base, tipo: "aguas_residuais" };
+    case "ventilacao":
+      return { ...base, tipo: "ventilacao" };
+    case "higiene_habitos":
+      return { ...base, tipo: "higiene_habitos" };
+    case "pso":
+      return { ...base, tipo: "pso" };
+    case "higiene_operacional":
+      return { ...base, tipo: "higiene_operacional" };
   }
 }
 

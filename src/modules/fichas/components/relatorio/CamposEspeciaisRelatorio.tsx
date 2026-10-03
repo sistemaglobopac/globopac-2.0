@@ -22,6 +22,9 @@ import type {
   PenduraAvesValor,
   PesoCaixaValor,
   RastreabilidadeDoaValor,
+  TemperaturaResfriamentoValor,
+  PotabilidadeAguaValor,
+  ChecklistConformidadeValor,
   RecepcaoAvesValor,
   TanqueHidrometro,
 } from "@/modules/fichas/fields/tiposCompostos";
@@ -29,6 +32,9 @@ import { formatMaskedValue } from "@/modules/fichas/fields/hidrometro";
 import { pragasPresentes, rotuloDaPraga } from "@/modules/fichas/fields/pragas";
 import { COMPORTAMENTOS_AVES } from "@/modules/fichas/fields/esperaAves";
 import { formatarPctDoa } from "@/modules/fichas/fields/rastreabilidadeDoa";
+import { CHECKLISTS, respostaNaoConforme, rotuloResposta, salasDoChecklist, type TipoChecklist } from "@/modules/fichas/fields/checklistConformidade";
+import { cloroForaDoLimite, lerMedida, phForaDoLimite, rotuloTanque, SISTEMAS_POTABILIDADE } from "@/modules/fichas/fields/potabilidadeAgua";
+import { LIMITE_AGUA_C, LIMITE_AMBIENTE_C, LIMITE_PRODUTO_C, lerTemperatura, PONTOS_AGUA, PONTOS_AMBIENTE, PRODUTOS } from "@/modules/fichas/fields/temperaturaResfriamento";
 import { CONDICOES_ANIMAIS, formatarDataHora, formatarDuracao, LIMITE_JEJUM_MAX_H } from "@/modules/fichas/fields/recepcaoAves";
 import {
   apuracaoCarcacas,
@@ -805,6 +811,175 @@ export function RecepcaoAvesRelatorio({ valor, titulo = "Recepção de Aves / Be
       {valor.conformidade === false && valor.detalhesRNC && (
         <p className="text-[10px] font-semibold text-destructive print:text-[8px]">{valor.detalhesRNC}</p>
       )}
+    </div>
+  );
+}
+
+const fmtTemp = (texto: string | undefined) => {
+  const t = lerTemperatura(texto);
+  return t === null ? "—" : `${t.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ºC`;
+};
+
+export function TemperaturaResfriamentoRelatorio({
+  valor,
+  titulo = "Temperaturas dos Sistemas de Pré-resfriamento",
+}: {
+  valor: TemperaturaResfriamentoValor;
+  titulo?: string;
+}) {
+  const acima = (texto: string | undefined, limite: number | null) => {
+    const t = lerTemperatura(texto);
+    return limite !== null && t !== null && t > limite;
+  };
+  return (
+    <div className="col-span-full space-y-2 rounded-lg border border-hairline bg-gray-50 p-3 print:p-2" data-testid="relatorio-temperatura-resfriamento">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] font-black uppercase tracking-wider text-primary print:text-[9px]">{titulo}</span>
+        <SeloConformidade conforme={valor.conformidade !== false} />
+      </div>
+
+      <p className="text-[10px] font-bold uppercase text-muted-foreground print:text-[8px]">Temperatura da água</p>
+      <table className="w-full text-[10px] print:text-[8px]">
+        <tbody>
+          {PONTOS_AGUA.map((p) => {
+            const texto = valor.agua?.[p.chave];
+            const nc = acima(texto, LIMITE_AGUA_C[p.chave]);
+            return (
+              <tr key={p.chave}>
+                <td className="pr-2">{p.rotulo}</td>
+                <td className={nc ? "font-black text-destructive" : "font-black"}>{fmtTemp(texto)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      <p className="text-[10px] font-bold uppercase text-muted-foreground print:text-[8px]">Temperatura ambiente</p>
+      <table className="w-full text-[10px] print:text-[8px]">
+        <tbody>
+          {PONTOS_AMBIENTE.map((p) => {
+            const texto = valor.ambiente?.[p.chave];
+            const nc = acima(texto, LIMITE_AMBIENTE_C[p.chave]);
+            return (
+              <tr key={p.chave}>
+                <td className="pr-2">{p.rotulo}</td>
+                <td className={nc ? "font-black text-destructive" : "font-black"}>{fmtTemp(texto)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      <p className="text-[10px] font-bold uppercase text-muted-foreground print:text-[8px]">Temperatura dos produtos na saída</p>
+      <table className="w-full text-[10px] print:text-[8px]">
+        <thead>
+          <tr className="text-left text-muted-foreground">
+            <th className="pr-2 font-normal">Produto</th>
+            <th className="pr-2 font-normal">Amostra 01</th>
+            <th className="font-normal">Amostra 02</th>
+          </tr>
+        </thead>
+        <tbody>
+          {PRODUTOS.map((p) => {
+            const a = valor.produtos?.[p.chave];
+            const limite = LIMITE_PRODUTO_C[p.chave];
+            return (
+              <tr key={p.chave}>
+                <td className="pr-2">{p.chave === "parte" && valor.tipoParte ? `${p.rotulo} (${valor.tipoParte})` : p.rotulo}</td>
+                <td className={acima(a?.amostra1, limite) ? "pr-2 font-black text-destructive" : "pr-2 font-black"}>{fmtTemp(a?.amostra1)}</td>
+                <td className={acima(a?.amostra2, limite) ? "font-black text-destructive" : "font-black"}>{fmtTemp(a?.amostra2)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {valor.conformidade === false && valor.detalhesRNC && <p className="text-[10px] font-semibold text-destructive print:text-[8px]">{valor.detalhesRNC}</p>}
+    </div>
+  );
+}
+
+export function PotabilidadeAguaRelatorio({
+  valor,
+  titulo = "Potabilidade da Água dos Sistemas de Pré-resfriamento",
+}: {
+  valor: PotabilidadeAguaValor;
+  titulo?: string;
+}) {
+  const fmt = (texto: string | undefined) => {
+    const n = lerMedida(texto);
+    return n === null ? "—" : n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+  };
+  return (
+    <div className="col-span-full space-y-2 rounded-lg border border-hairline bg-gray-50 p-3 print:p-2" data-testid="relatorio-potabilidade-agua">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] font-black uppercase tracking-wider text-primary print:text-[9px]">{titulo}</span>
+        <SeloConformidade conforme={valor.conformidade !== false} />
+      </div>
+      <table className="w-full text-[10px] print:text-[8px]">
+        <thead>
+          <tr className="text-left text-muted-foreground">
+            <th className="pr-2 font-normal">Sistema</th>
+            <th className="pr-2 font-normal">Tanque testado</th>
+            <th className="pr-2 font-normal">pH</th>
+            <th className="font-normal">Cloro (ppm)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {SISTEMAS_POTABILIDADE.map((s) => {
+            const t = valor.sistemas?.[s.chave];
+            return (
+              <tr key={s.chave}>
+                <td className="pr-2">{s.rotulo.replace("Pré-resfriamento de ", "")}</td>
+                <td className="pr-2">{t ? rotuloTanque(s.chave, t.tanque) : "—"}</td>
+                <td className={phForaDoLimite(lerMedida(t?.ph)) ? "pr-2 font-black text-destructive" : "pr-2 font-black"}>{fmt(t?.ph)}</td>
+                <td className={cloroForaDoLimite(lerMedida(t?.cloro)) ? "font-black text-destructive" : "font-black"}>{fmt(t?.cloro)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {valor.conformidade === false && valor.detalhesRNC && <p className="text-[10px] font-semibold text-destructive print:text-[8px]">{valor.detalhesRNC}</p>}
+    </div>
+  );
+}
+
+export function ChecklistConformidadeRelatorio({ tipo, valor, titulo }: { tipo: TipoChecklist; valor: ChecklistConformidadeValor; titulo?: string }) {
+  const def = CHECKLISTS[tipo];
+  return (
+    <div className="col-span-full space-y-2 rounded-lg border border-hairline bg-gray-50 p-3 print:p-2" data-testid={`relatorio-checklist-${tipo}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] font-black uppercase tracking-wider text-primary print:text-[9px]">{titulo ?? def.titulo}</span>
+        <SeloConformidade conforme={valor.conformidade !== false} />
+      </div>
+      <table className="w-full text-[10px] print:text-[8px]">
+        <thead>
+          <tr className="text-left text-muted-foreground">
+            <th className="pr-2 font-normal">Item</th>
+            {salasDoChecklist(tipo).map((sala) => (
+              <th key={sala.chave} className="pr-2 font-normal">
+                {sala.chave === "geral" ? "Resposta" : `Sala de ${sala.curto}`}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {def.itens.map((item) => (
+            <tr key={item.chave}>
+              <td className="pr-2">{item.rotulo}</td>
+              {salasDoChecklist(tipo).map((sala) => {
+                const resposta = valor.salas?.[sala.chave]?.[item.chave];
+                return (
+                  <td key={sala.chave} className={respostaNaoConforme(item.modo, resposta) ? "pr-2 font-black text-destructive" : "pr-2 font-black"}>
+                    {rotuloResposta(item.modo, resposta)}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {valor.observacao?.trim() && <p className="text-[10px] italic text-ink print:text-[8px]">Observações: {valor.observacao}</p>}
+      {valor.conformidade === false && valor.detalhesRNC && <p className="text-[10px] font-semibold text-destructive print:text-[8px]">{valor.detalhesRNC}</p>}
     </div>
   );
 }

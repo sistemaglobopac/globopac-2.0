@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   apurar,
+  loteDeCarga,
+  pesoMedioVivo,
+  pesoVivoDeHerdado,
   avesNoChuveiro,
   avesNoPeriodo,
   detalheDesvio,
@@ -120,5 +123,26 @@ describe("Máscara do peso vivo e texto da RNC", () => {
 
   it("detalhe de desvio no formato pedido", () => {
     expect(detalheDesvio("Pré-chiller", 1.2346, 1.5, "L/c")).toBe("Pré-chiller (Apurado: 1.235L/c | Meta: 1.500L/c)");
+  });
+});
+
+describe("herança de cargas do Bem-Estar Animal", () => {
+  it("converte o peso médio do Bem-Estar para o formato do lote", () => {
+    expect(pesoVivoDeHerdado("2,904")).toBe("2.904");
+    expect(pesoVivoDeHerdado("3")).toBe("3.000");
+    expect(pesoVivoDeHerdado(null)).toBe("");
+    expect(pesoVivoDeHerdado("abc")).toBe("");
+  });
+
+  it("lote herdado traz aves da GTA, peso e a identificação da carga", () => {
+    const lote = loteDeCarga({ carga_id: "c1", gta: "46017", qtd_aves: 3078, peso_medio_kg: "2,904" }, "l1");
+    expect(lote).toEqual({ id: "l1", quantity: "3078", avgLiveWeight: "2.904", cargaId: "c1", gta: "46017" });
+    expect(loteDeCarga({ carga_id: "c2", gta: "46019", qtd_aves: 100, peso_medio_kg: null }, "l2").avgLiveWeight).toBe("");
+  });
+
+  it("o lote herdado entra no cálculo ponderado como um lote digitado", () => {
+    const l1 = loteDeCarga({ carga_id: "c1", gta: "1", qtd_aves: 1000, peso_medio_kg: "3,000" }, "a");
+    const l2 = loteDeCarga({ carga_id: "c2", gta: "2", qtd_aves: 3000, peso_medio_kg: "2,000" }, "b");
+    expect(pesoMedioVivo([l1, l2])).toBeCloseTo(2.25, 5);
   });
 });

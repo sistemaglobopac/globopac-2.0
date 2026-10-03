@@ -74,7 +74,7 @@ export function useCargasRastreabilidade(dataAbate: string | undefined) {
 }
 
 /** Ids das cargas que já tiveram o monitoramento feito naquele tipo — saem da lista de seleção. */
-export function useCargasJaMonitoradas(tipo: "recepcao" | "espera" | "peso") {
+export function useCargasJaMonitoradas(tipo: "recepcao" | "espera" | "peso" | "spr") {
   return useQuery({
     queryKey: ["cargas-ja-monitoradas", tipo],
     refetchInterval: 30_000,

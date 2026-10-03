@@ -19,6 +19,9 @@ import { EletronarcoseAvesField } from "./fields/EletronarcoseAvesField";
 import { CaixasVaziasField } from "./fields/CaixasVaziasField";
 import { PesoCaixaField } from "./fields/PesoCaixaField";
 import { RastreabilidadeDoaField } from "./fields/RastreabilidadeDoaField";
+import { TemperaturaResfriamentoField } from "./fields/TemperaturaResfriamentoField";
+import { PotabilidadeAguaField } from "./fields/PotabilidadeAguaField";
+import { ChecklistConformidadeField } from "./fields/ChecklistConformidadeField";
 import type {
   AbsorcaoAguaValor,
   ChillerCarcacasValor,
@@ -33,6 +36,9 @@ import type {
   EletronarcoseAvesValor,
   PesoCaixaValor,
   RastreabilidadeDoaValor,
+  TemperaturaResfriamentoValor,
+  PotabilidadeAguaValor,
+  ChecklistConformidadeValor,
   RecepcaoAvesValor,
   ParadaEquipamentoValor,
 } from "./fields/tiposCompostos";
@@ -243,6 +249,38 @@ export function DynamicField({ campo, register, errors, control, prevAppointment
           name={campo.chave}
           control={control}
           render={({ field }) => <RastreabilidadeDoaField value={field.value as RastreabilidadeDoaValor | undefined} onChange={field.onChange} />}
+        />
+      )}
+
+      {campo.tipo === "temperatura_resfriamento" && (
+        <Controller
+          name={campo.chave}
+          control={control}
+          render={({ field }) => <TemperaturaResfriamentoField value={field.value as TemperaturaResfriamentoValor | undefined} onChange={field.onChange} />}
+        />
+      )}
+
+      {campo.tipo === "potabilidade_agua" && (
+        <Controller
+          name={campo.chave}
+          control={control}
+          render={({ field }) => (
+            <PotabilidadeAguaField
+              value={field.value as PotabilidadeAguaValor | undefined}
+              onChange={field.onChange}
+              prevAppointment={prevAppointment?.[campo.chave] as PotabilidadeAguaValor | undefined}
+            />
+          )}
+        />
+      )}
+
+      {(campo.tipo === "aguas_residuais" || campo.tipo === "ventilacao" || campo.tipo === "higiene_habitos" || campo.tipo === "pso" || campo.tipo === "higiene_operacional") && (
+        <Controller
+          name={campo.chave}
+          control={control}
+          render={({ field }) => (
+            <ChecklistConformidadeField tipo={campo.tipo} value={field.value as ChecklistConformidadeValor | undefined} onChange={field.onChange} />
+          )}
         />
       )}
 

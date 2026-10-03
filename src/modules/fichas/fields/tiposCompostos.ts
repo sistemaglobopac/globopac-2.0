@@ -18,6 +18,9 @@ export interface CargaProcessada {
   id: string;
   quantity: string;
   avgLiveWeight: string;
+  /** Carga (GTA) herdada do Bem-Estar Animal; ausente em lotes digitados à mão. */
+  cargaId?: string;
+  gta?: string;
 }
 
 export interface ChillerCarcacasValor {
@@ -348,6 +351,68 @@ export interface RecepcaoAvesValor {
   dietaHidricaMin: number | null;
   viagemMin: number | null;
   esperaMin: number | null;
+  conformidade: boolean;
+  detalhesRNC: string | null;
+}
+
+export type ChaveAguaResfriamento =
+  | "preChiller"
+  | "chiller1"
+  | "chiller2"
+  | "chillerPartes1"
+  | "chillerPartes2"
+  | "miniFigado"
+  | "miniMoela"
+  | "miniCabeca"
+  | "miniCoracao"
+  | "miniPes";
+
+export type ChaveAmbienteResfriamento = "salaCarcacas" | "salaMiudos";
+
+export type ChaveProdutoResfriamento = "carcaca" | "parte" | "figado" | "moela" | "cabeca" | "coracao" | "pes";
+
+/** Duas amostras de temperatura (ºC, como digitado) de um produto. */
+export interface AmostrasProduto {
+  amostra1: string;
+  amostra2: string;
+}
+
+/** Temperaturas dos Sistemas de Pré-resfriamento (Especial SIF): água de cada tanque e duas
+ * amostras de cada produto na saída dos sistemas. */
+export interface TemperaturaResfriamentoValor {
+  agua: Record<ChaveAguaResfriamento, string>;
+  /** Temperatura ambiente das salas de pré-resfriamento (ºC, como digitado). */
+  ambiente: Record<ChaveAmbienteResfriamento, string>;
+  produtos: Record<ChaveProdutoResfriamento, AmostrasProduto>;
+  /** Qual parte foi aferida: Filé de peito, Asa ou Coxa e Sobrecoxa. */
+  tipoParte: string;
+  conformidade: boolean;
+  detalhesRNC: string | null;
+}
+
+export type ChaveSistemaPotabilidade = "carcacas" | "partes" | "miudos";
+
+/** Teste de um tanque: qual tanque foi testado (rodízio) e o pH e o cloro (ppm) como digitados. */
+export interface TesteTanque {
+  tanque: string;
+  ph: string;
+  cloro: string;
+}
+
+/** Potabilidade da Água (Especial SIF): um tanque testado em cada um dos 3 sistemas de pré-resfriamento. */
+export interface PotabilidadeAguaValor {
+  sistemas: Record<ChaveSistemaPotabilidade, TesteTanque>;
+  conformidade: boolean;
+  detalhesRNC: string | null;
+}
+
+export type ChaveSalaChecklist = "carcacas" | "miudos" | "geral";
+
+/** Checklist de conformidade (Águas Residuais e Ventilação) das salas de pré-resfriamento de
+ * Carcaças e de Miúdos: resposta de cada item (por chave) em cada sala. */
+export interface ChecklistConformidadeValor {
+  salas: Record<ChaveSalaChecklist, Record<string, string>>;
+  observacao: string;
   conformidade: boolean;
   detalhesRNC: string | null;
 }

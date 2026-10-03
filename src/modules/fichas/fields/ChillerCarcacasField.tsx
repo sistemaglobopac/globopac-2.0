@@ -1,14 +1,17 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, Info, Lock, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, DownloadCloud, Info, Lock, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
+import { useCargasJaMonitoradas, useCargasRastreabilidade } from "@/modules/recepcao/api";
+import { ensureLocalTime } from "../utils/tempo";
 import { formatHidrometro, formatMaskedValue, LIMIAR_IMPLAUSIVEL, parseHidrometro } from "./hidrometro";
 import {
   apurar,
   avesNoPeriodo,
   detalheDesvio,
   exibirPesoVivo,
+  loteDeCarga,
   GELO_PADRAO_CARCACAS,
   mascararPesoVivo,
   metaTanqueCarcacas,
@@ -62,6 +65,21 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
     chiller1: !!(value?.tanques.chiller1.prev || prevAppointment?.tanques.chiller1.cur),
     chiller2: !!(value?.tanques.chiller2.prev || prevAppointment?.tanques.chiller2.cur),
   });
+
+  // Herança do Bem-Estar Animal: cargas do dia com a pendura iniciada, que ainda não entraram em
+  // nenhuma apuração do SPR (nem nesta), com aves da GTA e peso médio da densidade das caixas.
+  const [herdarAberto, setHerdarAberto] = useState(false);
+  const { data: cargasDoDia } = useCargasRastreabilidade(ensureLocalTime(new Date().toISOString()).isoLocal);
+  const { data: jaUsadas } = useCargasJaMonitoradas("spr");
+  const usadasNestaFicha = new Set(cargas.map((c) => c.cargaId).filter(Boolean));
+  const disponiveis = (cargasDoDia ?? []).filter((c) => c.pendura_inicio_em && !jaUsadas?.has(c.carga_id) && !usadasNestaFicha.has(c.carga_id));
+
+  function herdarCargas(escolhidas: typeof disponiveis) {
+    if (escolhidas.length === 0) return;
+    const novos = escolhidas.map((c) => loteDeCarga(c, crypto.randomUUID()));
+    // O lote em branco inicial dá lugar às cargas herdadas.
+    setCargas((atual) => [...atual.filter((c) => c.cargaId || c.quantity || c.avgLiveWeight), ...novos]);
+  }
 
   // Primeiro monitoramento do dia (nenhum tanque tem leitura anterior para herdar): só a leitura
   // atual, que vira a base do próximo monitoramento comparar.
@@ -286,15 +304,47 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
             </Button>
           </div>
 
+          <div className="space-y-2 rounded-md border border-dashed border-primary/40 bg-background p-3" data-testid="herdar-cargas">
+            <Button type="button" size="sm" variant="outline" disabled={disabled} onClick={() => setHerdarAberto((a) => !a)}>
+              <DownloadCloud className="h-3.5 w-3.5" /> Herdar cargas do Bem-Estar Animal ({disponiveis.length})
+            </Button>
+            {herdarAberto && (
+              <div className="space-y-1">
+                {disponiveis.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Nenhuma carga nova com a pendura iniciada (as já usadas em apurações do SPR não aparecem).</p>
+                )}
+                {disponiveis.map((c) => (
+                  <div key={c.carga_id} className="flex flex-wrap items-center justify-between gap-2 rounded border p-2 text-xs">
+                    <span>
+                      <strong>GTA {c.gta}</strong> · {c.qtd_aves.toLocaleString("pt-BR")} aves ·{" "}
+                      {c.peso_medio_kg ? `peso ${c.peso_medio_kg} kg` : <em className="text-warning-foreground">sem peso (densidade das caixas ainda não feita)</em>}
+                    </span>
+                    <Button type="button" size="sm" variant="outline" onClick={() => herdarCargas([c])}>
+                      <Plus className="h-3.5 w-3.5" /> Adicionar
+                    </Button>
+                  </div>
+                ))}
+                {disponiveis.length > 1 && (
+                  <Button type="button" size="sm" onClick={() => herdarCargas(disponiveis)}>
+                    Adicionar todas
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="space-y-2">
             {cargas.map((carga, indice) => (
               <div key={carga.id} className="flex flex-col gap-3 rounded-md border bg-background p-3 sm:flex-row sm:items-end">
-                <span className="text-xs font-black text-muted-foreground sm:min-w-[60px]">LOTE {indice + 1}</span>
+                <span className="text-xs font-black text-muted-foreground sm:min-w-[60px]">
+                  LOTE {indice + 1}
+                  {carga.gta && <span className="block font-normal">GTA {carga.gta}</span>}
+                </span>
                 <div className="flex-1 space-y-1">
                   <Label className="text-xs text-muted-foreground">Aves (un)</Label>
                   <Input
                     inputMode="numeric"
-                    disabled={disabled}
+                    disabled={disabled || !!(carga.cargaId && carga.quantity)}
                     value={carga.quantity}
                     onChange={(e) => alterarCarga(carga.id, "quantity", somenteInteiro(e.target.value))}
                     placeholder="Ex: 4500"
@@ -305,7 +355,7 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
                   <Input
                     className="font-mono"
                     inputMode="numeric"
-                    disabled={disabled}
+                    disabled={disabled || !!(carga.cargaId && carga.avgLiveWeight)}
                     value={exibirPesoVivo(carga.avgLiveWeight)}
                     onChange={(e) => alterarCarga(carga.id, "avgLiveWeight", mascararPesoVivo(e.target.value))}
                     placeholder="Ex: 2,850"

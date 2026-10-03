@@ -11,7 +11,10 @@ import { motivosBloqueioEletronarcose } from "../fields/eletronarcoseAves";
 import { motivosBloqueioPesoCaixa } from "../fields/pesoCaixa";
 import { motivosBloqueioRecepcao } from "../fields/recepcaoAves";
 import { motivosBloqueioDoa } from "../fields/rastreabilidadeDoa";
-import type { CaixasVaziasValor, EletronarcoseAvesValor, EsperaAvesValor, OcorrenciaPragasValor, PenduraAvesValor, PesoCaixaValor, RastreabilidadeDoaValor, RecepcaoAvesValor } from "../fields/tiposCompostos";
+import { motivosBloqueioTemperatura } from "../fields/temperaturaResfriamento";
+import { motivosBloqueioPotabilidade } from "../fields/potabilidadeAgua";
+import { motivosBloqueioChecklist } from "../fields/checklistConformidade";
+import type { CaixasVaziasValor, EletronarcoseAvesValor, EsperaAvesValor, OcorrenciaPragasValor, PenduraAvesValor, PesoCaixaValor, RastreabilidadeDoaValor, RecepcaoAvesValor, TemperaturaResfriamentoValor, PotabilidadeAguaValor, ChecklistConformidadeValor } from "../fields/tiposCompostos";
 
 export function motivosDeBloqueioSpr(campos: CampoTemplate[], dados: Record<string, unknown>): string[] {
   const motivos: string[] = [];
@@ -22,6 +25,18 @@ export function motivosDeBloqueioSpr(campos: CampoTemplate[], dados: Record<stri
     }
     if (campo.tipo === "rastreabilidade_doa") {
       motivos.push(...motivosBloqueioDoa(dados[campo.chave] as RastreabilidadeDoaValor | undefined));
+      continue;
+    }
+    if (campo.tipo === "aguas_residuais" || campo.tipo === "ventilacao" || campo.tipo === "higiene_habitos" || campo.tipo === "pso" || campo.tipo === "higiene_operacional") {
+      motivos.push(...motivosBloqueioChecklist(campo.tipo, dados[campo.chave] as ChecklistConformidadeValor | undefined));
+      continue;
+    }
+    if (campo.tipo === "potabilidade_agua") {
+      motivos.push(...motivosBloqueioPotabilidade(dados[campo.chave] as PotabilidadeAguaValor | undefined));
+      continue;
+    }
+    if (campo.tipo === "temperatura_resfriamento") {
+      motivos.push(...motivosBloqueioTemperatura(dados[campo.chave] as TemperaturaResfriamentoValor | undefined));
       continue;
     }
     if (campo.tipo === "espera_aves") {

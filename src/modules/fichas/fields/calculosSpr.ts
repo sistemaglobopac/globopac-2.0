@@ -131,6 +131,18 @@ export function mascararPesoVivo(digitado: string): string {
   return (parseInt(digitos, 10) / 1000).toFixed(3);
 }
 
+/** Peso médio do Bem-Estar Animal ("2,904") no formato armazenado do lote ("2.904"); inválido = "". */
+export function pesoVivoDeHerdado(peso: string | null | undefined): string {
+  const n = Number((peso ?? "").replace(",", "."));
+  return Number.isFinite(n) && n > 0 ? n.toFixed(3) : "";
+}
+
+/** Lote herdado de uma carga do Bem-Estar Animal: aves = aves da GTA, peso vivo = peso médio do
+ * monitoramento de densidade das caixas (vazio se a carga ainda não passou por ele). */
+export function loteDeCarga(c: { carga_id: string; gta: string; qtd_aves: number; peso_medio_kg: string | null }, id: string) {
+  return { id, quantity: String(c.qtd_aves), avgLiveWeight: pesoVivoDeHerdado(c.peso_medio_kg), cargaId: c.carga_id, gta: c.gta };
+}
+
 export function exibirPesoVivo(armazenado: string): string {
   return armazenado.replace(".", ",");
 }
