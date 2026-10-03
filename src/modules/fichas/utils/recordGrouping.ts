@@ -70,13 +70,13 @@ export function calcularOrdemDia(items: MonitoramentoVerificacao[]): Map<string,
  * diferentes entram juntos). NÃO separa por inspetor: quando um inspetor cobre o almoço do outro, ele
  * dá sequência aos monitoramentos dele (se B fez a 2ª apuração, A faz a 3ª) e tudo sai num único
  * relatório consolidado, em ordem de horário. */
-export function chaveDossie(
-  m: { user_id: string; criado_em: string; ficha_template_id: string },
-  tipoDaFicha: (templateId: string) => string = (id) => id
+export function chaveDossie<T extends { user_id: string; criado_em: string; ficha_template_id: string; setor?: string }>(
+  m: T,
+  tipoDaFicha: (templateId: string) => string = (id) => id,
+  turnoDe: (m: T) => string = (r) => turnoDoDia(new Date(r.criado_em))
 ): string {
   const dia = ensureLocalTime(m.criado_em).isoLocal;
-  const turno = turnoDoDia(new Date(m.criado_em));
-  return `${dia}|${turno}|${tipoDaFicha(m.ficha_template_id)}`;
+  return `${dia}|${turnoDe(m)}|${tipoDaFicha(m.ficha_template_id)}`;
 }
 
 /** Tipo de ficha independente de versão: "RAC-001/006 V2" e "RAC-001/006" são o mesmo tipo (a
@@ -92,13 +92,14 @@ export function setoresDoGrupo(items: { setor: string }[]): string {
 
 /** Agrupa por `chaveDossie`, cada grupo em ordem cronológica. Serve às telas que só têm os
  * campos básicos do monitoramento (Painel de Arquivo, Auditoria Federal). */
-export function agruparPorDossie<T extends { user_id: string; criado_em: string; ficha_template_id: string }>(
+export function agruparPorDossie<T extends { user_id: string; criado_em: string; ficha_template_id: string; setor?: string }>(
   items: T[],
-  tipoDaFicha?: (templateId: string) => string
+  tipoDaFicha?: (templateId: string) => string,
+  turnoDe?: (m: T) => string
 ): { chave: string; items: T[] }[] {
   const grupos = new Map<string, T[]>();
   for (const item of items) {
-    const chave = chaveDossie(item, tipoDaFicha);
+    const chave = chaveDossie(item, tipoDaFicha, turnoDe);
     if (!grupos.has(chave)) grupos.set(chave, []);
     grupos.get(chave)!.push(item);
   }
@@ -117,12 +118,13 @@ export function groupFichaCards(
   blockedIds: Set<string>,
   usersMap: Map<string, string>,
   pacPorTemplateId: Map<string, string>,
-  codigoPorTemplateId: Map<string, string>
+  codigoPorTemplateId: Map<string, string>,
+  turnoDe: (m: MonitoramentoVerificacao) => string = (m) => turnoDoDia(new Date(m.criado_em))
 ): { dossies: DossieVerificacao[]; avulsos: AppointmentDisplay[] } {
   const grupos = new Map<string, DossieVerificacao>();
   for (const item of items) {
     const { appt } = item;
-    const chave = chaveDossie(appt, tipoPorTemplate(codigoPorTemplateId));
+    const chave = chaveDossie(appt, tipoPorTemplate(codigoPorTemplateId), turnoDe);
 
     let grupo = grupos.get(chave);
     if (!grupo) {
@@ -130,7 +132,7 @@ export function groupFichaCards(
         chave,
         userId: appt.user_id,
         userIds: [],
-        turno: turnoDoDia(new Date(appt.criado_em)),
+        turno: turnoDe(appt),
         dia: ensureLocalTime(appt.criado_em).isoLocal,
         pac: pacPorTemplateId.get(appt.ficha_template_id) ?? "—",
         codigo: codigoPorTemplateId.get(appt.ficha_template_id) ?? "",

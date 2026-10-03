@@ -1,6 +1,7 @@
 import { Loader2, Printer, X } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { useDadosRelatorio } from "../../api";
+import { useTurnoDoRegistro } from "../../useTurnoDoRegistro";
 import { imprimirElemento } from "../../utils/printHelper";
 import { RelatorioMonitoramento } from "./RelatorioMonitoramento";
 
@@ -18,6 +19,7 @@ export function RelatorioModal({ ids, grupos, onFechar }: { ids: string[]; grupo
   // `grupos`: vários relatórios consolidados (um por ficha/turno) impressos juntos, cada um numa nova folha.
   const todosIds = grupos ? [...new Set(grupos.flat())] : ids;
   const { data: dados, isLoading, isError } = useDadosRelatorio(todosIds);
+  const turnoDe = useTurnoDoRegistro();
 
   return (
     <div className="relatorio-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-2 sm:p-6">
@@ -53,11 +55,11 @@ export function RelatorioModal({ ids, grupos, onFechar }: { ids: string[]; grupo
               {grupos ? (
                 grupos.map((grupo, i) => (
                   <div key={grupo.join(",")} className={i > 0 ? "quebra-pagina mt-8 print:mt-0" : ""}>
-                    <RelatorioMonitoramento ids={grupo} dados={dados} />
+                    <RelatorioMonitoramento ids={grupo} dados={dados} turnoDe={turnoDe} />
                   </div>
                 ))
               ) : (
-                <RelatorioMonitoramento ids={ids} dados={dados} />
+                <RelatorioMonitoramento ids={ids} dados={dados} turnoDe={turnoDe} />
               )}
             </div>
           )}

@@ -32,6 +32,33 @@ async function turnosAbertosPorDia(porDia: Map<string, Set<string>>): Promise<Se
   return abertos;
 }
 
+export interface TurnoInspetorResolucao {
+  user_id: string;
+  setor: string;
+  inicio: string;
+  fim: string | null;
+}
+
+/** Turno ("1º Turno"/"2º Turno") ao qual um monitoramento pertence: o do turno em que ele foi feito,
+ * não o do relógio. Se o monitoramento foi criado com um turno aberto (inicio <= criação <= fim, ou
+ * ainda sem fim) — do próprio usuário, ou, na falta, de outro inspetor do mesmo setor (caso de quem
+ * continua os monitoramentos do colega, ex.: o admin) — vale o turno em que esse turno foi INICIADO.
+ * Sem nenhum turno cobrindo o registro, cai na regra do relógio (`turnoDoDia`). */
+export function turnoDoRegistro(
+  registro: { user_id: string; setor?: string; criado_em: string },
+  turnos: TurnoInspetorResolucao[]
+): TurnoHeranca {
+  const instante = new Date(registro.criado_em).getTime();
+  const cobrindo = turnos.filter(
+    (t) => new Date(t.inicio).getTime() <= instante && (t.fim === null || new Date(t.fim).getTime() >= instante)
+  );
+  const proprio = cobrindo.filter((t) => t.user_id === registro.user_id);
+  const doSetor = cobrindo.filter((t) => t.setor === registro.setor);
+  const candidatos = proprio.length > 0 ? proprio : doSetor;
+  const escolhido = candidatos.sort((a, b) => new Date(b.inicio).getTime() - new Date(a.inicio).getTime())[0];
+  return turnoParaHeranca(new Date(escolhido ? escolhido.inicio : registro.criado_em));
+}
+
 /** Versão em lote: retorna o Set de IDs de REGISTRO (não de inspetor) cujo autor ainda não
  * fechou o turno do dia daquele registro específico. Nunca trava o fluxo por falha de rede —
  * em caso de erro, libera tudo (Set vazio) e loga um aviso. */

@@ -329,12 +329,14 @@ function RegistroUnico({ record, ordem, template, dados, hashesAoVivo }: Registr
 export interface RelatorioMonitoramentoProps {
   ids: string[];
   dados: DadosRelatorio;
+  /** Turno de cada monitoramento (considera o turno aberto do inspetor); sem ele vale o relógio. */
+  turnoDe?: (m: MonitoramentoRelatorio) => string;
 }
 
 /** Relatório oficial — um único registro OU um dossiê consolidado (vários `ids` do mesmo
  * grupo: mesmo inspetor/dia/turno/PAC/setor, ver DossieVerificacaoCard). Renderizado dentro de
  * #relatorio-impressao pelo RelatorioModal, que é o que de fato vira a página impressa. */
-export function RelatorioMonitoramento({ ids, dados }: RelatorioMonitoramentoProps) {
+export function RelatorioMonitoramento({ ids, dados, turnoDe = (r) => turnoDoDia(new Date(r.criado_em)) }: RelatorioMonitoramentoProps) {
   // Sempre em ordem cronológica: "Apuração 1" é o 1º monitoramento do dia, independentemente da
   // ordem em que os ids chegaram na URL.
   const records = ids
@@ -388,7 +390,7 @@ export function RelatorioMonitoramento({ ids, dados }: RelatorioMonitoramentoPro
     .filter((r): r is Rnc => Boolean(r));
   const todasTratadas = rncsDoGrupo.length > 0 && rncsDoGrupo.every((r) => r.status === "FECHADA");
 
-  const turnos = [...new Set(records.map((r) => turnoDoDia(new Date(r.criado_em))))];
+  const turnos = [...new Set(records.map((r) => turnoDe(r)))];
   const horarios = records.map((r) => ensureLocalTime(r.criado_em).time).sort();
   const horarioDocumento = horarios.length <= 1 ? horarios[0] ?? "—" : `${horarios[0]}–${horarios[horarios.length - 1]}`;
 

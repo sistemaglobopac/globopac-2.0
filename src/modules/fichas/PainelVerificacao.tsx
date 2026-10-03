@@ -9,7 +9,8 @@ import { supabase } from "@/lib/supabase";
 import { useAutocorrigidos } from "@/modules/autocorrecao/api";
 import { idsAdendosConcluidos, temAdendoPendente } from "./utils/adendosPendentes";
 import { pacsDoTemplate, useFichasTemplatesTodas, useFilaVerificacao, useUsuariosMap, useVerificarLote } from "./api";
-import { diaTurno, turnosBloqueadosMap, turnosPendentes, encerrarTurnoAdmin } from "./utils/turnoUtils";
+import { useTurnoDoRegistro } from "./useTurnoDoRegistro";
+import { diaTurno,turnosBloqueadosMap, turnosPendentes, encerrarTurnoAdmin } from "./utils/turnoUtils";
 import { groupFichaCards, calcularOrdemDia, type AppointmentDisplay, type MonitoramentoVerificacao, type StatusVerificacao } from "./utils/recordGrouping";
 import { ensureLocalTime } from "./utils/tempo";
 import { KpiCard } from "./components/KpiCard";
@@ -45,6 +46,7 @@ export function PainelVerificacao() {
   const { data: templates } = useFichasTemplatesTodas();
   const { data: usersMap } = useUsuariosMap();
   const { data: rncsAbertas } = useRncsAbertas();
+  const turnoDe = useTurnoDoRegistro();
 
   const [dateBase, setDateBase] = useState(hojeManaus);
   const [filtroSetor, setFiltroSetor] = useState<string | null>(null);
@@ -159,13 +161,13 @@ export function PainelVerificacao() {
   }, [pendingKey, turnosVersao]);
 
   const { dossies, avulsos } = useMemo(
-    () => groupFichaCards(pendingAppointments, blockedIds, usuarios, pacPorTemplateId, codigoPorTemplateId),
-    [pendingAppointments, blockedIds, usuarios, pacPorTemplateId, codigoPorTemplateId]
+    () => groupFichaCards(pendingAppointments, blockedIds, usuarios, pacPorTemplateId, codigoPorTemplateId, turnoDe),
+    [pendingAppointments, blockedIds, usuarios, pacPorTemplateId, codigoPorTemplateId, turnoDe]
   );
   // Verificados também consolidam: um card VERIFICADO por dossiê (tipo de ficha + turno).
   const { dossies: dossiesVerificados, avulsos: avulsosVerificados } = useMemo(
-    () => groupFichaCards(verifiedToday, new Set(), usuarios, pacPorTemplateId, codigoPorTemplateId),
-    [verifiedToday, usuarios, pacPorTemplateId, codigoPorTemplateId]
+    () => groupFichaCards(verifiedToday, new Set(), usuarios, pacPorTemplateId, codigoPorTemplateId, turnoDe),
+    [verifiedToday, usuarios, pacPorTemplateId, codigoPorTemplateId, turnoDe]
   );
 
   const kpiAguardando = displayItems.filter((i) => i.status === "aguardando").length;

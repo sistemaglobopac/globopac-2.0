@@ -52,6 +52,8 @@ export interface ContextoFiltroArquivo {
   pacsDoTemplate: (templateId: string) => string[];
   /** Tipo da ficha independente de versão. */
   tipoDaFicha: (templateId: string) => string;
+  /** Turno do registro (considera o turno aberto do inspetor); sem ele vale o relógio. */
+  turnoDe?: (m: ItemArquivo) => string;
 }
 
 /** Estado inicial do painel: sem recortes, mostrando a fila "aguardando liberação" (o fluxo de
@@ -71,7 +73,7 @@ export function filtrarArquivo<T extends ItemArquivo>(itens: T[], f: FiltrosArqu
     if (f.ate && dia > f.ate) return false;
     if (f.pac && !ctx.pacsDoTemplate(m.ficha_template_id).includes(f.pac)) return false;
     if (f.setor && m.setor !== f.setor) return false;
-    if (f.turno && turnoDoDia(new Date(m.criado_em)) !== f.turno) return false;
+    if (f.turno && (ctx.turnoDe ? ctx.turnoDe(m) : turnoDoDia(new Date(m.criado_em))) !== f.turno) return false;
     if (f.ficha && ctx.tipoDaFicha(m.ficha_template_id) !== f.ficha) return false;
     if (f.situacao && situacaoDe(m) !== f.situacao) return false;
     if (f.inspetor && m.user_id !== f.inspetor) return false;

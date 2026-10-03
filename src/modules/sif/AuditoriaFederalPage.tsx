@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Eye } from "lucide-react";
-import { turnoDoDia } from "@/modules/bordo/api";
+import { useTurnoDoRegistro } from "@/modules/fichas/useTurnoDoRegistro";
 import { useFichasTemplatesTodas } from "@/modules/fichas/api";
 import { RelatorioModal } from "@/modules/fichas/components/relatorio/RelatorioModal";
 import { agruparPorDossie, setoresDoGrupo, tipoPorTemplate } from "@/modules/fichas/utils/recordGrouping";
@@ -24,7 +24,8 @@ export function AuditoriaFederalPage() {
   // Um relatório consolidado por tipo de ficha + turno: o auditor vê o dia inteiro do tipo.
   const tipoDaFicha = useMemo(() => tipoPorTemplate(new Map((templates ?? []).map((t) => [t.id, t.codigo]))), [templates]);
   const nomePorTemplateId = useMemo(() => new Map((templates ?? []).map((t) => [t.id, t.nome])), [templates]);
-  const grupos = useMemo(() => agruparPorDossie(liberados ?? [], tipoDaFicha), [liberados, tipoDaFicha]);
+  const turnoDe = useTurnoDoRegistro();
+  const grupos = useMemo(() => agruparPorDossie(liberados ?? [], tipoDaFicha, turnoDe), [liberados, tipoDaFicha, turnoDe]);
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
@@ -63,7 +64,7 @@ export function AuditoriaFederalPage() {
               <CardContent className="text-sm text-muted-foreground">
                 <p className="font-medium text-foreground">{nomePorTemplateId.get(primeiro.ficha_template_id) ?? "Ficha"}</p>
                 <p>
-                  {turnoDoDia(new Date(primeiro.criado_em))} · {ensureLocalTime(primeiro.criado_em).datePt} · Verificado em{" "}
+                  {turnoDe(primeiro)} · {ensureLocalTime(primeiro.criado_em).datePt} · Verificado em{" "}
                   {ultimaVerificacao ? new Date(ultimaVerificacao).toLocaleString("pt-BR") : "—"}
                 </p>
               </CardContent>

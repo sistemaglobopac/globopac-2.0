@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Eye, FilterX, ListFilter, Printer } from "lucide-react";
 import { useFichasTemplatesTodas, useUsuariosMap, pacsDoTemplate } from "@/modules/fichas/api";
 import { RelatorioModal } from "@/modules/fichas/components/relatorio/RelatorioModal";
-import { turnoDoDia } from "@/modules/bordo/api";
+import { useTurnoDoRegistro } from "@/modules/fichas/useTurnoDoRegistro";
 import { agruparPorDossie, setoresDoGrupo, tipoPorTemplate } from "@/modules/fichas/utils/recordGrouping";
 import { ensureLocalTime } from "@/modules/fichas/utils/tempo";
 import { useLiberarLoteSif, useMonitoramentosArquivo } from "./api";
@@ -41,7 +41,11 @@ export function PainelArquivoPage() {
   const tipoDaFicha = useMemo(() => tipoPorTemplate(new Map((templates ?? []).map((t) => [t.id, t.codigo]))), [templates]);
   const nomePorTemplateId = useMemo(() => new Map((templates ?? []).map((t) => [t.id, t.nome])), [templates]);
 
-  const ctx = useMemo(() => ({ pacsDoTemplate: (id: string) => pacsPorTemplateId.get(id) ?? [], tipoDaFicha }), [pacsPorTemplateId, tipoDaFicha]);
+  const turnoDe = useTurnoDoRegistro();
+  const ctx = useMemo(
+    () => ({ pacsDoTemplate: (id: string) => pacsPorTemplateId.get(id) ?? [], tipoDaFicha, turnoDe }),
+    [pacsPorTemplateId, tipoDaFicha, turnoDe]
+  );
 
   // Opções dos filtros: só o que existe no arquivo.
   const opcoes = useMemo(() => {
@@ -70,10 +74,10 @@ export function PainelArquivoPage() {
   // dele que ainda não foram liberados. Mais recentes primeiro.
   const grupos = useMemo(
     () =>
-      agruparPorDossie(filtrados, tipoDaFicha).sort(
+      agruparPorDossie(filtrados, tipoDaFicha, turnoDe).sort(
         (a, b) => new Date(b.items[0]!.criado_em).getTime() - new Date(a.items[0]!.criado_em).getTime()
       ),
-    [filtrados, tipoDaFicha]
+    [filtrados, tipoDaFicha, turnoDe]
   );
 
   function definir<K extends keyof FiltrosArquivo>(chave: K, valor: FiltrosArquivo[K]) {
@@ -283,7 +287,7 @@ export function PainelArquivoPage() {
             <CardContent className="text-sm text-muted-foreground">
               <p className="font-medium text-foreground">{nomePorTemplateId.get(primeiro.ficha_template_id) ?? "Ficha"}</p>
               <p>
-                {usuarios?.get(primeiro.user_id) ?? "Inspetor"} · {setoresDoGrupo(items)} · {turnoDoDia(new Date(primeiro.criado_em))} ·{" "}
+                {usuarios?.get(primeiro.user_id) ?? "Inspetor"} · {setoresDoGrupo(items)} · {turnoDe(primeiro)} ·{" "}
                 {ensureLocalTime(primeiro.criado_em).datePt}
               </p>
             </CardContent>

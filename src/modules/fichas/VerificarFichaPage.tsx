@@ -5,6 +5,7 @@ import { useSessionStore } from "@/store/session";
 import { useAbrirAdendo, useDadosRelatorio, useVerificarMonitoramento, type MonitoramentoRelatorio } from "./api";
 import { turnosBloqueadosMap } from "./utils/turnoUtils";
 import { RelatorioMonitoramento } from "./components/relatorio/RelatorioMonitoramento";
+import { useTurnoDoRegistro } from "./useTurnoDoRegistro";
 import { ensureLocalTime } from "./utils/tempo";
 import { alvosDoCampo } from "./utils/adendoCampos";
 import { Button } from "@/shared/ui/button";
@@ -37,6 +38,7 @@ export function VerificarFichaPage() {
   const ids = useMemo(() => (searchParams.get("ids") ?? "").split(",").filter(Boolean), [searchParams]);
 
   const { data: dados, isLoading, isError } = useDadosRelatorio(ids);
+  const turnoDe = useTurnoDoRegistro();
   const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
   const [acao, setAcao] = useState<Acao>(null);
   const [mensagemErro, setMensagemErro] = useState<string | null>(null);
@@ -91,7 +93,7 @@ export function VerificarFichaPage() {
 
       {dados && dados.monitoramentos.length > 0 && (
         <>
-          <RelatorioMonitoramento ids={ids} dados={dados} />
+          <RelatorioMonitoramento ids={ids} dados={dados} turnoDe={turnoDe} />
 
           <div className="mx-auto max-w-4xl rounded-xl border bg-card p-6 shadow-sm">
             {jaVerificado ? (
