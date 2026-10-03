@@ -35,6 +35,7 @@ export function EsperaAvesField({ value, onChange, disabled }: EsperaAvesFieldPr
   // A carga sai da lista quando já foi para a pendura (deixou a espera): o início da pendura vem da
   // Recepção de Aves. Enquanto aguarda no box ela continua na lista, mesmo já monitorada antes.
   const { data: situacaoCargas } = useCargasRastreabilidade(dataProgramacao);
+  const escolhidas = new Set(v.boxes.map((b) => b.cargaId).filter(Boolean));
   const jaPenduradas = new Set((situacaoCargas ?? []).filter((c) => c.pendura_inicio_em).map((c) => c.carga_id));
 
   const aval = avaliarEspera(v);
@@ -89,9 +90,9 @@ export function EsperaAvesField({ value, onChange, disabled }: EsperaAvesFieldPr
 
         <div className="space-y-3">
           {v.boxes.map((b, i) => {
-            // Na área de espera a carga fica no box por horas e é monitorada de novo a cada apuração (e
-            // pode ocupar mais de um box); só some quando já foi para a pendura. A deste box permanece.
-            const opcoes = (cargasDoDia ?? []).filter((c) => c.id === b.cargaId || !jaPenduradas.has(c.id));
+            // A carga fica no box por horas e é monitorada de novo a cada apuração; só some quando já foi
+            // para a pendura. Cada carga fica em UM box: a escolhida em outro box não aparece aqui.
+            const opcoes = (cargasDoDia ?? []).filter((c) => c.id === b.cargaId || (!jaPenduradas.has(c.id) && !escolhidas.has(c.id)));
             const naLista = opcoes.some((c) => c.id === b.cargaId);
             return (
               <div key={i} className={`space-y-3 rounded-md border p-3 ${b.comportamento === "ofegantes" ? "border-destructive bg-destructive/5" : ""}`} data-testid={`box-${i}`}>

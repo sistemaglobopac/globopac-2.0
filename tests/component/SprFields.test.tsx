@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ChillerCarcacasField } from "@/modules/fichas/fields/ChillerCarcacasField";
@@ -12,6 +12,14 @@ import type {
   LavagemFinalValor,
   MiniChillersValor,
 } from "@/modules/fichas/fields/tiposCompostos";
+
+// O SPR Carcaças herda cargas via React Query (consulta ao Supabase): nestes testes não há
+// QueryClientProvider nem rede, então as consultas viram respostas vazias.
+vi.mock("@/modules/recepcao/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/modules/recepcao/api")>()),
+  useCargasRastreabilidade: () => ({ data: [] }),
+  useCargasJaMonitoradas: () => ({ data: new Set<string>() }),
+}));
 
 const t = (prev: string) => ({ prev: "", cur: prev, ice: "0" });
 

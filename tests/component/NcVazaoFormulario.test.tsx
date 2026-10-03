@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useForm, type FieldValues } from "react-hook-form";
@@ -7,6 +7,14 @@ import { DynamicField } from "@/modules/fichas/DynamicField";
 import { desviosEspeciais } from "@/modules/fichas/utils/desviosEspeciais";
 import { valoresIniciaisDe, zodFromSchemaCampos, type CampoTemplate } from "@/shared/schema-campos";
 import type { ChillerCarcacasValor } from "@/modules/fichas/fields/tiposCompostos";
+
+// O SPR Carcaças herda cargas via React Query (consulta ao Supabase): nestes testes não há
+// QueryClientProvider nem rede, então as consultas viram respostas vazias.
+vi.mock("@/modules/recepcao/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/modules/recepcao/api")>()),
+  useCargasRastreabilidade: () => ({ data: [] }),
+  useCargasJaMonitoradas: () => ({ data: new Set<string>() }),
+}));
 
 const campos = [{ chave: "vazao", tipo: "chiller_carcacas", obrigatorio: true, label: "Vazão Carcaças" }] as CampoTemplate[];
 const t = (cur: string) => ({ prev: "", cur, ice: "0" });
