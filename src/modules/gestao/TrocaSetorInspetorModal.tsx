@@ -4,7 +4,7 @@ import { useSetoresCadastrados } from "@/modules/admin/api";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Select } from "@/shared/ui/select";
-import { useAppDialog } from "./dialogSystem";
+import { DialogProvider, useAppDialog } from "./dialogSystem";
 import { ModalShell } from "./ModalShell";
 import { useInspetoresTrocaSetor, useRestaurarSetorInspetor, useTrocarSetorInspetor, type InspetorTrocaSetor } from "./api";
 
@@ -140,23 +140,28 @@ export function ListaTrocaSetor() {
  * o app do inspetor percebe a mudança em ~30 s e atualiza os monitoramentos sem ele sair. */
 export function TrocaSetorInspetorModal({ onClose }: { onClose: () => void }) {
   return (
-    <ModalShell titulo="Trocar Setor / Cobertura" onClose={onClose} largura="max-w-2xl">
-      <ListaTrocaSetor />
-    </ModalShell>
+    // Próprio DialogProvider: o modal também abre no Painel de Verificação, fora do Painel de Gestão.
+    <DialogProvider>
+      <ModalShell titulo="Trocar Setor / Cobertura" onClose={onClose} largura="max-w-2xl">
+        <ListaTrocaSetor />
+      </ModalShell>
+    </DialogProvider>
   );
 }
 
 /** Página "Trocar Setor / Cobertura" (item do menu lateral do Verificador). */
 export function TrocaSetorInspetorPage() {
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold">Trocar Setor / Cobertura</h1>
-        <p className="text-sm text-muted-foreground">Mude o setor de um inspetor ou cubra o almoço de um colega.</p>
+    <DialogProvider>
+      <div className="mx-auto max-w-3xl space-y-4">
+        <div>
+          <h1 className="text-2xl font-semibold">Trocar Setor / Cobertura</h1>
+          <p className="text-sm text-muted-foreground">Mude o setor de um inspetor ou cubra o almoço de um colega.</p>
+        </div>
+        <div className="rounded-2xl border border-hairline bg-card p-4 shadow-sm">
+          <ListaTrocaSetor />
+        </div>
       </div>
-      <div className="rounded-2xl border border-hairline bg-card p-4 shadow-sm">
-        <ListaTrocaSetor />
-      </div>
-    </div>
+    </DialogProvider>
   );
 }

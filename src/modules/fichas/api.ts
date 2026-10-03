@@ -493,12 +493,10 @@ export function useUsuariosMap() {
   return useQuery({
     queryKey: ["perfis_usuarios", "mapa-nomes"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("perfis_usuarios")
-        .select("id, nome_completo")
-        .overrideTypes<UsuarioResumo[], { merge: false }>();
+      // Via função do banco: Verificador/Gestor não leem perfis_usuarios e viam "Inspetor" no lugar do nome.
+      const { data, error } = await supabase.rpc("nomes_usuarios");
       if (error) throw error;
-      return new Map((data ?? []).map((u) => [u.id, u.nome_completo]));
+      return new Map(((data ?? []) as UsuarioResumo[]).map((u) => [u.id, u.nome_completo]));
     },
   });
 }
@@ -509,7 +507,7 @@ export interface FiltrosVerificacao {
 }
 
 const CAMPOS_MONITORAMENTO_VERIFICACAO =
-  "id, ficha_template_id, user_id, setor, dados_dinamicos, conformidade, verificado_por, verificado_em, criado_em, capturado_em";
+  "id, ficha_template_id, user_id, setor, dados_dinamicos, conformidade, verificado_por, verificado_em, criado_em, capturado_em, aditivo_de";
 
 /** Fila de verificação: pendências (verificado_por IS NULL — fila crônica, qualquer dia) +
  * verificados recentes (últimos 500, qualquer dia — a filtragem por dia local/intervalo
@@ -758,11 +756,8 @@ export function useDadosRelatorio(ids: string[]) {
           .select("id, codigo, nome, pac_correspondente, schema_campos")
           .in("id", templateIds)
           .overrideTypes<TemplateRelatorio[], { merge: false }>(),
-        supabase
-          .from("perfis_usuarios")
-          .select("id, nome_completo")
-          .in("id", userIds)
-          .overrideTypes<{ id: string; nome_completo: string }[], { merge: false }>(),
+        // Função do banco: o Verificador não lê perfis_usuarios (RLS) e o selo saía "Usuário do Sistema".
+        supabase.rpc("nomes_usuarios", { p_ids: userIds }),
       ]);
       if (erroTemplates) throw erroTemplates;
       if (erroPerfis) throw erroPerfis;
@@ -773,7 +768,7 @@ export function useDadosRelatorio(ids: string[]) {
         rncs: rncs ?? [],
         autocorrecoes: autocorrecoes ?? [],
         templatesPorId: new Map((templates ?? []).map((t) => [t.id, t])),
-        nomesPorId: new Map((perfis ?? []).map((p) => [p.id, p.nome_completo])),
+        nomesPorId: new Map(((perfis ?? []) as { id: string; nome_completo: string }[]).map((p) => [p.id, p.nome_completo])),
       };
     },
   });

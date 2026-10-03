@@ -14,6 +14,8 @@ export interface MonitoramentoVerificacao {
   verificado_em: string | null;
   criado_em: string;
   capturado_em: string | null;
+  /** Registro original que este aditivo corrige (adendo assinado pelo inspetor). */
+  aditivo_de?: string | null;
 }
 
 export interface AppointmentDisplay {

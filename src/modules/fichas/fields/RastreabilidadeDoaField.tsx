@@ -5,7 +5,7 @@ import { Label } from "@/shared/ui/label";
 import { useCargasRastreabilidade, useDoaCargasRegistradas } from "@/modules/recepcao/api";
 import { ensureLocalTime } from "../utils/tempo";
 import { formatarDataHora } from "./recepcaoAves";
-import { doaVazio, formatarPctDoa, lerContagem, montarCargas, montarValorDoa, motivosBloqueioDoa, type CargaHerdadaDoa, type EntradaDoa } from "./rastreabilidadeDoa";
+import { doaVazio, formatarPctDoa, herdarComRegistradas, lerContagem, montarCargas, montarValorDoa, motivosBloqueioDoa, type CargaHerdadaDoa, type EntradaDoa } from "./rastreabilidadeDoa";
 import type { RastreabilidadeDoaValor } from "./tiposCompostos";
 
 interface RastreabilidadeDoaFieldProps {
@@ -34,21 +34,26 @@ export function RastreabilidadeDoaField({ value, onChange, disabled }: Rastreabi
     return new Map((registradas ?? []).filter((c) => !proprias.has(c.cargaId)).map((c) => [c.cargaId, c]));
   }, [registradas, dataAbate]);
 
-  const herdadas = useMemo<CargaHerdadaDoa[]>(
-    () =>
-      (rpc ?? []).map((c) => ({
-        cargaId: c.carga_id,
-        gta: c.gta,
-        integrado: c.integrado,
-        aviario: c.aviario,
-        nucleo: c.nucleo,
-        qtdPrevista: c.qtd_aves,
-        placa: c.placa ?? "",
-        pesoMedioKg: c.peso_medio_kg ?? "",
-        penduraInicioEm: c.pendura_inicio_em ?? "",
-      })),
-    [rpc]
-  );
+  const herdadas = useMemo<CargaHerdadaDoa[]>(() => {
+    const proprias = new Map((dataAbate === inicial.current.dataAbate ? inicial.current.cargas : []).map((c) => [c.cargaId, c]));
+    return (rpc ?? []).map((c) =>
+      herdarComRegistradas(
+        {
+          cargaId: c.carga_id,
+          gta: c.gta,
+          integrado: c.integrado,
+          aviario: c.aviario,
+          nucleo: c.nucleo,
+          qtdPrevista: c.qtd_aves,
+          placa: c.placa ?? "",
+          pesoMedioKg: c.peso_medio_kg ?? "",
+          penduraInicioEm: c.pendura_inicio_em ?? "",
+        },
+        anteriores.get(c.carga_id),
+        proprias.get(c.carga_id)
+      )
+    );
+  }, [rpc, anteriores, dataAbate]);
 
   const valor = useMemo(() => {
     // Enquanto a consulta não volta (ou offline), mantém as linhas já salvas em vez de zerar.

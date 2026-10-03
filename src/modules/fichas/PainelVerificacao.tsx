@@ -7,6 +7,7 @@ import { useRncsAbertas, useRncsDosMonitoramentos } from "@/modules/rnc/api";
 import { CartaoRnc } from "@/modules/rnc/CartaoRnc";
 import { supabase } from "@/lib/supabase";
 import { useAutocorrigidos } from "@/modules/autocorrecao/api";
+import { idsAdendosConcluidos, temAdendoPendente } from "./utils/adendosPendentes";
 import { pacsDoTemplate, useFichasTemplatesTodas, useFilaVerificacao, useUsuariosMap, useVerificarLote } from "./api";
 import { diaTurno, turnosBloqueadosMap, turnosPendentes, encerrarTurnoAdmin } from "./utils/turnoUtils";
 import { groupFichaCards, calcularOrdemDia, type AppointmentDisplay, type MonitoramentoVerificacao, type StatusVerificacao } from "./utils/recordGrouping";
@@ -24,9 +25,8 @@ import { Select } from "@/shared/ui/select";
 
 const PESO_STATUS: Record<StatusVerificacao, number> = { aguardando: 1, adendo_pendente: 2, verificado: 3 };
 
-function statusDoItem(m: MonitoramentoVerificacao): StatusVerificacao {
-  const adendos = (m.dados_dinamicos as { adendos?: { status: string }[] } | null)?.adendos;
-  if (Array.isArray(adendos) && adendos.some((a) => a.status === "pending_monitor")) return "adendo_pendente";
+function statusDoItem(m: MonitoramentoVerificacao, adendosConcluidos: Set<string>): StatusVerificacao {
+  if (temAdendoPendente(m, adendosConcluidos)) return "adendo_pendente";
   if (m.verificado_por) return "verificado";
   return "aguardando";
 }
@@ -114,10 +114,10 @@ export function PainelVerificacao() {
 
   const brutos = useMemo(() => [...(fila.data?.pendentes ?? []), ...(fila.data?.verificados ?? [])], [fila.data]);
   const ordemDiaMap = useMemo(() => calcularOrdemDia(brutos), [brutos]);
-  const displayItems: AppointmentDisplay[] = useMemo(
-    () => brutos.map((m) => ({ id: m.id, status: statusDoItem(m), appt: m, ordemDia: ordemDiaMap.get(m.id) ?? 1 })),
-    [brutos, ordemDiaMap]
-  );
+  const displayItems: AppointmentDisplay[] = useMemo(() => {
+    const adendosConcluidos = idsAdendosConcluidos(brutos);
+    return brutos.map((m) => ({ id: m.id, status: statusDoItem(m, adendosConcluidos), appt: m, ordemDia: ordemDiaMap.get(m.id) ?? 1 }));
+  }, [brutos, ordemDiaMap]);
 
   const filtrados = useMemo(() => {
     return displayItems.filter((item) => {

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { temNaoConformidade } from "@/modules/fichas/utils/desviosEspeciais";
 import { aplicarNoCaminho } from "@/modules/fichas/utils/adendoCampos";
+import { idsAdendosConcluidos } from "@/modules/fichas/utils/adendosPendentes";
 import { supabase } from "@/lib/supabase";
 import type { StatusRnc } from "@/modules/rnc/api";
 
@@ -351,7 +352,7 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
           .overrideTypes<MonitoramentoHoje[], { merge: false }>(),
         supabase
           .from("monitoramentos")
-          .select("id, ficha_template_id, criado_em, conformidade, dados_dinamicos")
+          .select("id, ficha_template_id, criado_em, conformidade, dados_dinamicos, aditivo_de")
           .eq("user_id", userId as string)
           .order("criado_em", { ascending: false })
           .limit(50)
@@ -362,6 +363,7 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
               criado_em: string;
               conformidade: boolean | null;
               dados_dinamicos: Record<string, unknown>;
+              aditivo_de: string | null;
             }[],
             { merge: false }
           >(),
@@ -421,11 +423,12 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
         .filter((d) => (d.rnc === null ? !autocorrigidos.has(d.monitoramentoId) : d.rnc.status !== "FECHADA"));
 
       const adendosPendentes: AdendoPendente[] = [];
+      const adendosConcluidos = idsAdendosConcluidos(recentes ?? []);
       for (const m of recentes ?? []) {
         const adendos = (m.dados_dinamicos as { adendos?: AdendoBruto[] } | null)?.adendos;
         if (!Array.isArray(adendos)) continue;
         for (const adendo of adendos) {
-          if (adendo.status === "pending_monitor" && adendo.monitorId === userId) {
+          if (adendo.status === "pending_monitor" && adendo.monitorId === userId && !adendosConcluidos.has(adendo.id)) {
             adendosPendentes.push({
               id: adendo.id,
               monitoramentoId: m.id,

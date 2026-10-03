@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   doaPercentual,
   doaVazio,
+  herdarComRegistradas,
   montarCargas,
   montarValorDoa,
   motivosBloqueioDoa,
   notaCorrecaoSaldo,
   type CargaHerdadaDoa,
 } from "@/modules/fichas/fields/rastreabilidadeDoa";
+import type { CargaDoa } from "@/modules/fichas/fields/tiposCompostos";
 import { motivosDeBloqueioSpr } from "@/modules/fichas/utils/bloqueiosSpr";
 import { temNaoConformidade } from "@/modules/fichas/utils/desviosEspeciais";
 import type { CampoTemplate } from "@/shared/schema-campos";
@@ -112,5 +114,23 @@ describe("DOA — bloqueio de assinatura", () => {
   it("DOA e divergência de saldo não tornam o registro não conforme", () => {
     const v = montarValorDoa("2026-10-02", montarCargas([carga("A", "2026-10-02T05:10")], { A: { avesRecebidas: "1200", avesMortas: "300" } }));
     expect(temNaoConformidade({ doa: v })).toBe(false);
+  });
+});
+
+describe("herdarComRegistradas", () => {
+  const fresca = { cargaId: "c1", gta: "G1", integrado: "J", aviario: "1", nucleo: "", qtdPrevista: 1000, placa: "", pesoMedioKg: "", penduraInicioEm: "2026-10-03T05:40" };
+
+  it("carga já gravada (travada) mantém o peso gravado, inclusive o corrigido por adendo", () => {
+    const anterior = { pesoMedioKg: "2,85", placa: "AAA1A11" } as CargaDoa;
+    expect(herdarComRegistradas({ ...fresca, pesoMedioKg: "2,5", placa: "BBB2B22" }, anterior)).toMatchObject({ pesoMedioKg: "2,85", placa: "AAA1A11" });
+  });
+
+  it("carga travada sem peso gravado usa o herdado fresco", () => {
+    expect(herdarComRegistradas({ ...fresca, pesoMedioKg: "2,5" }, { pesoMedioKg: "" } as CargaDoa)).toMatchObject({ pesoMedioKg: "2,5" });
+  });
+
+  it("carga editável usa o herdado fresco e cai no gravado da própria ficha se faltar", () => {
+    expect(herdarComRegistradas({ ...fresca, pesoMedioKg: "2,5" }, undefined, { pesoMedioKg: "2,9" } as CargaDoa).pesoMedioKg).toBe("2,5");
+    expect(herdarComRegistradas(fresca, undefined, { pesoMedioKg: "2,9" } as CargaDoa).pesoMedioKg).toBe("2,9");
   });
 });

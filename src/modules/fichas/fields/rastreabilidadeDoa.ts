@@ -77,6 +77,22 @@ export function calcularCarga<T extends Pick<CargaDoa, "qtdPrevista" | "avesRece
   };
 }
 
+/** Dados herdados de uma carga já gravada em apuração anterior (travada) preferem o que ficou gravado
+ * — inclusive correções feitas por adendo (peso médio, placa) —, e só recorrem ao herdado fresco se o
+ * gravado estiver vazio. Para a carga ainda editável vale o herdado fresco, com o gravado desta
+ * própria ficha como reserva. Assim nenhuma informação já registrada some em apurações seguintes. */
+export function herdarComRegistradas(herdada: CargaHerdadaDoa, anterior?: CargaDoa, propria?: CargaDoa): CargaHerdadaDoa {
+  const escolher = (fresco: string | undefined, gravado: string | undefined, travada: boolean) =>
+    (travada ? gravado || fresco : fresco || gravado) || "";
+  const travada = anterior !== undefined;
+  const gravada = anterior ?? propria;
+  return {
+    ...herdada,
+    placa: escolher(herdada.placa, gravada?.placa, travada),
+    pesoMedioKg: escolher(herdada.pesoMedioKg, gravada?.pesoMedioKg, travada),
+  };
+}
+
 /** Monta as linhas do monitoramento: dados herdados (frescos, da recepção) + o que o inspetor já
  * digitou. Ordem de pendura = ordem crescente de início da pendura. Entram as cargas que já
  * começaram a ser penduradas ou que já têm algo digitado; cargas ainda sem recepção ficam fora.
