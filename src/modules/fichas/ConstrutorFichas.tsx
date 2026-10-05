@@ -255,6 +255,10 @@ function paraCampoTemplate(campo: CampoForm): CampoTemplate {
       return { ...base, tipo: "pso" };
     case "higiene_operacional":
       return { ...base, tipo: "higiene_operacional" };
+    default:
+      // Nunca devolver undefined: JSON.stringify o transforma em null dentro do array e a ficha
+      // ativa ficaria sem campos (tela em branco para o inspetor).
+      return { ...base, tipo: (campo as CampoForm).tipo } as CampoTemplate;
   }
 }
 
@@ -416,6 +420,12 @@ export function ConstrutorFichas({ setoresDisponiveis }: ConstrutorFichasProps) 
     }
     if (!perfil) return;
 
+    const schemaCampos = formData.campos.map(paraCampoTemplate);
+    if (schemaCampos.some((c) => !c)) {
+      setMensagem({ tipo: "error", texto: "Há um campo com tipo inválido. Recarregue a página e tente salvar de novo." });
+      return;
+    }
+
     try {
       await salvar.mutateAsync({
         idAnterior: formData.idAnterior,
@@ -428,7 +438,7 @@ export function ConstrutorFichas({ setoresDisponiveis }: ConstrutorFichasProps) 
         tempoEntreApontamentosMin: formData.tempoEntreApontamentosMin,
         tempoEdicaoMin: formData.tempoEdicaoMin,
         locaisAplicacao: formData.locaisAplicacao,
-        schemaCampos: formData.campos.map(paraCampoTemplate),
+        schemaCampos,
         criadoPor: perfil.id,
       });
       setMensagem({ tipo: "success", texto: "Ficha salva com sucesso." });

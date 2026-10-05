@@ -34,6 +34,8 @@ import {
   useRegistrarPausa,
   useEncerrarPausa,
   useRegistrarParada,
+  useEncerrarFichaDia,
+  useReabrirFichaDia,
   useKpisTurno,
   useAssinarAdendo,
   PAUSAS_CONFIG,
@@ -99,6 +101,8 @@ export function PainelBordo() {
   const { data: turnoHoje } = useTurnoHoje(perfil?.id);
   const iniciarTurno = useIniciarTurno();
   const finalizarTurno = useFinalizarTurno();
+  const encerrarFicha = useEncerrarFichaDia();
+  const reabrirFicha = useReabrirFichaDia();
 
   const pausaQuery = usePausaAtiva(perfil?.id);
   const pausaAtiva = pausaQuery.data;
@@ -238,7 +242,9 @@ export function PainelBordo() {
     .filter((m) => new Date(m.criado_em).getTime() >= inicioTurno.getTime())
     .sort((a, b) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime());
   const fichasIniciadas = fichasAplicaveis.filter((f) => fichasIniciadasNoTurno.has(f.id));
-  const fichasAtrasadas = turnoHoje ? calcularFichasAtrasadas(fichasAplicaveis, kpis?.monitoramentosDoSetorHoje ?? [], agora) : [];
+  const codigosEncerrados = new Set(kpis?.fichasEncerradasHoje ?? []);
+  const fichasEncerradas = fichasAplicaveis.filter((f) => f.encerravel && codigosEncerrados.has(f.codigo));
+  const fichasAtrasadas = turnoHoje ? calcularFichasAtrasadas(fichasAplicaveis, kpis?.monitoramentosDoSetorHoje ?? [], agora, codigosEncerrados) : [];
   const desviosComRnc = (kpis?.desviosAtivos ?? []).filter((d) => d.rnc !== null);
   const bloqueadoPorPausa = pausaAtiva != null;
 
@@ -379,8 +385,8 @@ export function PainelBordo() {
           </h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {fichasAtrasadas.map((a) => (
+              <div key={a.ficha.id} className="flex flex-col gap-2">
               <button
-                key={a.ficha.id}
                 type="button"
                 data-testid={`card-atrasado-${a.ficha.id}`}
                 disabled={bloqueadoPorPausa}
@@ -396,8 +402,37 @@ export function PainelBordo() {
                   {a.devidoEm && <> · devido às {formatarHoraManaus(a.devidoEm)}</>}
                 </span>
               </button>
+              {a.ficha.encerravel && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={bloqueadoPorPausa || encerrarFicha.isPending}
+                  data-testid={`encerrar-abate-${a.ficha.id}`}
+                  onClick={() => encerrarFicha.mutate(a.ficha.codigo)}
+                >
+                  Encerrar abate (sem cargas nos boxes)
+                </Button>
+              )}
+              </div>
             ))}
           </div>
+        </section>
+      )}
+
+      {fichasEncerradas.length > 0 && (
+        <section className="space-y-2 rounded-xl border bg-muted/40 p-4" data-testid="abate-encerrado">
+          <h2 className="text-sm font-black uppercase tracking-wider text-muted-foreground">Abate encerrado hoje</h2>
+          {fichasEncerradas.map((f) => (
+            <div key={f.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+              <span>
+                {f.codigo} · {f.nome} <span className="text-muted-foreground">(sem aviso de atraso)</span>
+              </span>
+              <Button type="button" size="sm" variant="outline" disabled={reabrirFicha.isPending} onClick={() => reabrirFicha.mutate(f.codigo)}>
+                Reabrir abate
+              </Button>
+            </div>
+          ))}
         </section>
       )}
 

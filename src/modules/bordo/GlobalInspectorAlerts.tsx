@@ -12,6 +12,7 @@ import {
   calcularFichasAtrasadas,
   fichasAplicaveisAoInspetor,
   urlNovaFicha,
+  useEncerrarFichaDia,
   useKpisTurno,
   usePausaAtiva,
   useTurnoHoje,
@@ -43,6 +44,7 @@ export function GlobalInspectorAlerts() {
   const { data: pausaAtiva } = usePausaAtiva(userId);
   const turnoAtivo = Boolean(turnoHoje && !turnoHoje.fim);
   const { data: kpis } = useKpisTurno(turnoAtivo ? userId : undefined, userSetores);
+  const encerrarFicha = useEncerrarFichaDia();
 
   const [agora, setAgora] = useState(() => new Date());
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
@@ -61,6 +63,9 @@ export function GlobalInspectorAlerts() {
     const canal = supabase
       .channel("global-inspector-alerts")
       .on("postgres_changes", { event: "*", schema: "public", table: "monitoramentos" }, () => {
+        void queryClient.invalidateQueries({ queryKey: ["painel-bordo", "kpis"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "fichas_encerradas_dia" }, () => {
         void queryClient.invalidateQueries({ queryKey: ["painel-bordo", "kpis"] });
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "rnc" }, () => {
@@ -95,7 +100,7 @@ export function GlobalInspectorAlerts() {
   const fichasAtrasadas: FichaAtrasada[] = useMemo(() => {
     if (!kpis || !turnoAtivo || !turnoHoje) return [];
     const aplicaveis = fichasAplicaveisAoInspetor(kpis.fichasAtivas, userSetores);
-    return calcularFichasAtrasadas(aplicaveis, kpis.monitoramentosDoSetorHoje, agora).filter(
+    return calcularFichasAtrasadas(aplicaveis, kpis.monitoramentosDoSetorHoje, agora, new Set(kpis.fichasEncerradasHoje)).filter(
       (f) => !dismissed.has(`ficha_${f.ficha.id}`)
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -255,6 +260,17 @@ export function GlobalInspectorAlerts() {
                         Ciente
                       </Button>
                     </div>
+                    {f.ficha.encerravel && (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={encerrarFicha.isPending}
+                        data-testid={`encerrar-abate-${f.ficha.id}`}
+                        onClick={() => encerrarFicha.mutate(f.ficha.codigo)}
+                      >
+                        Encerrar abate (sem cargas nos boxes)
+                      </Button>
+                    )}
                   </div>
                 ))}
               </div>

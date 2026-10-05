@@ -30,6 +30,11 @@ export function inicioDoDiaManaus(referencia: Date): Date {
   return new Date(`${dataLocal}T04:00:00.000Z`);
 }
 
+/** Data (AAAA-MM-DD) em America/Manaus — a mesma de fichas_encerradas_dia.dia. */
+export function diaManaus(referencia: Date): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Manaus", year: "numeric", month: "2-digit", day: "2-digit" }).format(referencia);
+}
+
 export interface TurnoHoje {
   id: string;
   inicio: string;
@@ -171,6 +176,9 @@ export interface FichaAtivaResumo {
   tipo_apontamento: "Recorrente" | "Demanda";
   tempo_entre_apontamentos_min: number | null;
   locais_aplicacao: string[];
+  /** Ficha que depende de haver abate (tem o campo de espera das aves): pode ser "encerrada" no fim
+   * do abate para não gerar atraso. Derivado de schema_campos ao carregar os KPIs. */
+  encerravel?: boolean;
 }
 
 export interface MonitoramentoHoje {
@@ -250,7 +258,9 @@ export function fichasAplicaveisAoInspetor(fichasAtivas: FichaAtivaResumo[], use
 export function calcularFichasAtrasadas(
   fichasAplicaveis: FichaAtivaResumo[],
   monitoramentosHoje: { ficha_template_id: string; criado_em: string }[],
-  agora: Date
+  agora: Date,
+  /** Códigos das fichas encerradas hoje ("Encerrar abate"): nunca geram aviso de atraso. */
+  codigosEncerrados: ReadonlySet<string> = new Set()
 ): FichaAtrasada[] {
   const ultimoPorFicha = new Map<string, Date>();
   for (const m of monitoramentosHoje) {
@@ -263,6 +273,7 @@ export function calcularFichasAtrasadas(
 
   for (const ficha of fichasAplicaveis) {
     if (ficha.tipo_apontamento !== "Recorrente") continue;
+    if (codigosEncerrados.has(ficha.codigo)) continue;
     const ultimo = ultimoPorFicha.get(ficha.id);
     // Sem monitoramento realizado ainda: não há hora devida, logo não há aviso de atraso.
     if (!ultimo) continue;
@@ -315,6 +326,8 @@ export interface KpisTurno {
    * sequência dele, então atraso e "fichas iniciadas" olham o setor, não só o que este inspetor fez. */
   monitoramentosDoSetorHoje: MonitoramentoHoje[];
   fichasAtivas: FichaAtivaResumo[];
+  /** Códigos das fichas encerradas hoje com "Encerrar abate". */
+  fichasEncerradasHoje: string[];
   desviosAtivos: DesvioAtivo[];
   adendosPendentes: AdendoPendente[];
   nomesFicha: Map<string, { codigo: string; nome: string }>;
@@ -335,7 +348,8 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
         { data: monitoramentosHoje, error: erroHoje },
         { data: monitoramentosDoSetor, error: erroSetor },
         { data: recentes, error: erroRecentes },
-        { data: fichasAtivas, error: erroFichas },
+        { data: fichasAtivasBrutas, error: erroFichas },
+        { data: encerradas },
       ] = await Promise.all([
         supabase
           .from("monitoramentos")
@@ -369,10 +383,20 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
           >(),
         supabase
           .from("fichas_templates")
-          .select("id, codigo, nome, tipo_apontamento, tempo_entre_apontamentos_min, locais_aplicacao")
+          .select("id, codigo, nome, tipo_apontamento, tempo_entre_apontamentos_min, locais_aplicacao, schema_campos")
           .eq("ativo", true)
-          .overrideTypes<FichaAtivaResumo[], { merge: false }>(),
+          .overrideTypes<(FichaAtivaResumo & { schema_campos: { tipo?: string }[] | null })[], { merge: false }>(),
+        // Erro aqui (ex.: migração ainda não aplicada) só significa "nenhuma ficha encerrada".
+        supabase
+          .from("fichas_encerradas_dia")
+          .select("codigo")
+          .eq("dia", diaManaus(new Date()))
+          .overrideTypes<{ codigo: string }[], { merge: false }>(),
       ]);
+      const fichasAtivas: FichaAtivaResumo[] = (fichasAtivasBrutas ?? []).map(({ schema_campos, ...ficha }) => ({
+        ...ficha,
+        encerravel: Array.isArray(schema_campos) && schema_campos.some((c) => c?.tipo === "espera_aves"),
+      }));
 
       if (erroHoje) throw erroHoje;
       if (erroSetor) throw erroSetor;
@@ -441,7 +465,7 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
       }
 
       const nomesFicha = new Map<string, { codigo: string; nome: string }>();
-      for (const f of fichasAtivas ?? []) nomesFicha.set(f.id, { codigo: f.codigo, nome: f.nome });
+      for (const f of fichasAtivas) nomesFicha.set(f.id, { codigo: f.codigo, nome: f.nome });
       const idsFaltantes = Array.from(
         new Set([...(monitoramentosHoje ?? []).map((m) => m.ficha_template_id), ...desviosAtivos.map((d) => d.fichaTemplateId)])
       ).filter((id) => !nomesFicha.has(id));
@@ -459,7 +483,7 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
       // versão inativa. Para contagem de iniciadas/atrasos, ele vale para a versão ativa do mesmo código.
       const idsNaoAtivos = Array.from(
         new Set([...(monitoramentosHoje ?? []), ...(monitoramentosDoSetor ?? [])].map((m) => m.ficha_template_id))
-      ).filter((id) => !(fichasAtivas ?? []).some((f) => f.id === id));
+      ).filter((id) => !fichasAtivas.some((f) => f.id === id));
       const versaoAtivaPorTemplate = new Map<string, string>();
       if (idsNaoAtivos.length > 0) {
         const { data: antigos } = await supabase
@@ -468,15 +492,40 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
           .in("id", idsNaoAtivos)
           .overrideTypes<{ id: string; codigo: string }[], { merge: false }>();
         for (const antigo of antigos ?? []) {
-          const ativa = (fichasAtivas ?? []).find((f) => f.codigo === antigo.codigo);
+          const ativa = fichasAtivas.find((f) => f.codigo === antigo.codigo);
           if (ativa) versaoAtivaPorTemplate.set(antigo.id, ativa.id);
         }
       }
       const normalizar = (lista: MonitoramentoHoje[] | null) =>
         (lista ?? []).map((m) => (versaoAtivaPorTemplate.has(m.ficha_template_id) ? { ...m, ficha_template_id: versaoAtivaPorTemplate.get(m.ficha_template_id)! } : m));
 
-      return { monitoramentosHoje: normalizar(monitoramentosHoje), monitoramentosDoSetorHoje: normalizar(monitoramentosDoSetor), fichasAtivas: fichasAtivas ?? [], desviosAtivos, adendosPendentes, nomesFicha };
+      return { monitoramentosHoje: normalizar(monitoramentosHoje), monitoramentosDoSetorHoje: normalizar(monitoramentosDoSetor), fichasAtivas, fichasEncerradasHoje: (encerradas ?? []).map((e) => e.codigo), desviosAtivos, adendosPendentes, nomesFicha };
     },
+  });
+}
+
+/** "Encerrar abate": silencia, até o fim do dia, o aviso de atraso de uma ficha que depende de
+ * haver abate (ex.: bem-estar nos boxes de espera). Reabrir desfaz. Vale por código da ficha. */
+export function useEncerrarFichaDia() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (codigo: string) => {
+      const { error } = await supabase.from("fichas_encerradas_dia").insert({ codigo, dia: diaManaus(new Date()) });
+      // 23505: já encerrada por outro inspetor — o resultado é o mesmo.
+      if (error && error.code !== "23505") throw error;
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["painel-bordo", "kpis"] }),
+  });
+}
+
+export function useReabrirFichaDia() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (codigo: string) => {
+      const { error } = await supabase.from("fichas_encerradas_dia").delete().eq("codigo", codigo).eq("dia", diaManaus(new Date()));
+      if (error) throw error;
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["painel-bordo", "kpis"] }),
   });
 }
 
