@@ -34,24 +34,24 @@ interface ChillerPartesFieldProps {
  * BLOQUEADA do SPR Carcaças. */
 export function ChillerPartesField({ value, onChange, disabled, prevAppointment, carcacasAtual }: ChillerPartesFieldProps) {
   const [tanques, setTanques] = useState({
-    chiller1: value?.tanques.chiller1 ?? tanqueVazio(prevAppointment?.tanques.chiller1.cur ?? ""),
-    chiller2: value?.tanques.chiller2 ?? tanqueVazio(prevAppointment?.tanques.chiller2.cur ?? ""),
+    chiller1: value?.tanques?.chiller1 ?? tanqueVazio(prevAppointment?.tanques?.chiller1?.cur ?? ""),
+    chiller2: value?.tanques?.chiller2 ?? tanqueVazio(prevAppointment?.tanques?.chiller2?.cur ?? ""),
   });
   const [prevTravado, setPrevTravado] = useState({
-    chiller1: !!(value?.tanques.chiller1.prev || prevAppointment?.tanques.chiller1.cur),
-    chiller2: !!(value?.tanques.chiller2.prev || prevAppointment?.tanques.chiller2.cur),
+    chiller1: !!(value?.tanques?.chiller1?.prev || prevAppointment?.tanques?.chiller1?.cur),
+    chiller2: !!(value?.tanques?.chiller2?.prev || prevAppointment?.tanques?.chiller2?.cur),
   });
   const isPrimeiroDoDia = !prevTravado.chiller1 && !prevTravado.chiller2;
 
   useEffect(() => {
     if (!prevAppointment) return;
     setTanques((atual) => ({
-      chiller1: { ...atual.chiller1, prev: atual.chiller1.prev || prevAppointment.tanques.chiller1.cur },
-      chiller2: { ...atual.chiller2, prev: atual.chiller2.prev || prevAppointment.tanques.chiller2.cur },
+      chiller1: { ...atual.chiller1, prev: atual.chiller1.prev || prevAppointment?.tanques?.chiller1?.cur },
+      chiller2: { ...atual.chiller2, prev: atual.chiller2.prev || prevAppointment?.tanques?.chiller2?.cur },
     }));
     setPrevTravado((atual) => ({
-      chiller1: atual.chiller1 || !!prevAppointment.tanques.chiller1.cur,
-      chiller2: atual.chiller2 || !!prevAppointment.tanques.chiller2.cur,
+      chiller1: atual.chiller1 || !!prevAppointment?.tanques?.chiller1?.cur,
+      chiller2: atual.chiller2 || !!prevAppointment?.tanques?.chiller2?.cur,
     }));
   }, [prevAppointment]);
 

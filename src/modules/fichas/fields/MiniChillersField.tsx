@@ -32,18 +32,18 @@ interface MiniChillersFieldProps {
  * unitário de cada miúdo vem da Tabela DE-PARA (calculosSpr.ts). Meta: 1,5 L/kg em cada tanque. */
 export function MiniChillersField({ value, onChange, disabled, prevAppointment, carcacasAtual }: MiniChillersFieldProps) {
   const [tanques, setTanques] = useState({
-    coracao: value?.tanques.coracao ?? tanqueVazio(prevAppointment?.tanques.coracao.cur ?? ""),
-    moela: value?.tanques.moela ?? tanqueVazio(prevAppointment?.tanques.moela.cur ?? ""),
-    figado: value?.tanques.figado ?? tanqueVazio(prevAppointment?.tanques.figado.cur ?? ""),
-    cabeca: value?.tanques.cabeca ?? tanqueVazio(prevAppointment?.tanques.cabeca.cur ?? ""),
-    pes: value?.tanques.pes ?? tanqueVazio(prevAppointment?.tanques.pes.cur ?? ""),
+    coracao: value?.tanques?.coracao ?? tanqueVazio(prevAppointment?.tanques?.coracao?.cur ?? ""),
+    moela: value?.tanques?.moela ?? tanqueVazio(prevAppointment?.tanques?.moela?.cur ?? ""),
+    figado: value?.tanques?.figado ?? tanqueVazio(prevAppointment?.tanques?.figado?.cur ?? ""),
+    cabeca: value?.tanques?.cabeca ?? tanqueVazio(prevAppointment?.tanques?.cabeca?.cur ?? ""),
+    pes: value?.tanques?.pes ?? tanqueVazio(prevAppointment?.tanques?.pes?.cur ?? ""),
   });
   const [prevTravado, setPrevTravado] = useState({
-    coracao: !!(value?.tanques.coracao.prev || prevAppointment?.tanques.coracao.cur),
-    moela: !!(value?.tanques.moela.prev || prevAppointment?.tanques.moela.cur),
-    figado: !!(value?.tanques.figado.prev || prevAppointment?.tanques.figado.cur),
-    cabeca: !!(value?.tanques.cabeca.prev || prevAppointment?.tanques.cabeca.cur),
-    pes: !!(value?.tanques.pes.prev || prevAppointment?.tanques.pes.cur),
+    coracao: !!(value?.tanques?.coracao?.prev || prevAppointment?.tanques?.coracao?.cur),
+    moela: !!(value?.tanques?.moela?.prev || prevAppointment?.tanques?.moela?.cur),
+    figado: !!(value?.tanques?.figado?.prev || prevAppointment?.tanques?.figado?.cur),
+    cabeca: !!(value?.tanques?.cabeca?.prev || prevAppointment?.tanques?.cabeca?.cur),
+    pes: !!(value?.tanques?.pes?.prev || prevAppointment?.tanques?.pes?.cur),
   });
   const isPrimeiroDoDia = !Object.values(prevTravado).some(Boolean);
 
@@ -52,14 +52,14 @@ export function MiniChillersField({ value, onChange, disabled, prevAppointment, 
     setTanques((atual) => {
       const novo = { ...atual };
       (Object.keys(novo) as ChaveMiudo[]).forEach((chave) => {
-        novo[chave] = { ...novo[chave], prev: novo[chave].prev || prevAppointment.tanques[chave].cur };
+        novo[chave] = { ...novo[chave], prev: novo[chave].prev || prevAppointment?.tanques?.[chave]?.cur };
       });
       return novo;
     });
     setPrevTravado((atual) => {
       const novo = { ...atual };
       (Object.keys(novo) as ChaveMiudo[]).forEach((chave) => {
-        novo[chave] = novo[chave] || !!prevAppointment.tanques[chave].cur;
+        novo[chave] = novo[chave] || !!prevAppointment?.tanques?.[chave]?.cur;
       });
       return novo;
     });

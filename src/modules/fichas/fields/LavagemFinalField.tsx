@@ -22,15 +22,15 @@ interface LavagemFinalFieldProps {
 export function LavagemFinalField({ value, onChange, disabled, prevAppointment, carcacasAtual }: LavagemFinalFieldProps) {
   const [condenacoesParciais, setCondenacoesParciais] = useState(value?.condenacoesParciais ?? "");
   const [chuveiro, setChuveiro] = useState<{ prev: string; cur: string }>({
-    prev: value?.chuveiro.prev ?? prevAppointment?.chuveiro.cur ?? "",
+    prev: value?.chuveiro?.prev ?? prevAppointment?.chuveiro?.cur ?? "",
     cur: value?.chuveiro.cur ?? "",
   });
-  const [prevTravado, setPrevTravado] = useState(!!(value?.chuveiro.prev || prevAppointment?.chuveiro.cur));
+  const [prevTravado, setPrevTravado] = useState(!!(value?.chuveiro?.prev || prevAppointment?.chuveiro?.cur));
 
   useEffect(() => {
     if (!prevAppointment) return;
-    setChuveiro((atual) => ({ ...atual, prev: atual.prev || prevAppointment.chuveiro.cur }));
-    if (prevAppointment.chuveiro.cur) setPrevTravado(true);
+    setChuveiro((atual) => ({ ...atual, prev: atual.prev || prevAppointment?.chuveiro?.cur }));
+    if (prevAppointment?.chuveiro?.cur) setPrevTravado(true);
   }, [prevAppointment]);
 
   const totalAvesBruto = carcacasAtual?.totalAvesBruto ?? 0;

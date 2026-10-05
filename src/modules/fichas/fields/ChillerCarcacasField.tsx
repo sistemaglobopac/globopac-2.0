@@ -56,23 +56,24 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
   // Registros antigos só têm o campo `condenas`: ele entra como "totalmente condenadas".
   const [condenasTotal, setCondenasTotal] = useState(value?.condenasTotal ?? value?.condenas ?? "");
   const [tanques, setTanques] = useState({
-    preChiller: value?.tanques.preChiller ?? tanqueVazio("preChiller", prevAppointment?.tanques.preChiller.cur ?? ""),
-    chiller1: value?.tanques.chiller1 ?? tanqueVazio("chiller1", prevAppointment?.tanques.chiller1.cur ?? ""),
-    chiller2: value?.tanques.chiller2 ?? tanqueVazio("chiller2", prevAppointment?.tanques.chiller2.cur ?? ""),
+    preChiller: value?.tanques?.preChiller ?? tanqueVazio("preChiller", prevAppointment?.tanques?.preChiller?.cur ?? ""),
+    chiller1: value?.tanques?.chiller1 ?? tanqueVazio("chiller1", prevAppointment?.tanques?.chiller1?.cur ?? ""),
+    chiller2: value?.tanques?.chiller2 ?? tanqueVazio("chiller2", prevAppointment?.tanques?.chiller2?.cur ?? ""),
   });
   const [prevTravado, setPrevTravado] = useState({
-    preChiller: !!(value?.tanques.preChiller.prev || prevAppointment?.tanques.preChiller.cur),
-    chiller1: !!(value?.tanques.chiller1.prev || prevAppointment?.tanques.chiller1.cur),
-    chiller2: !!(value?.tanques.chiller2.prev || prevAppointment?.tanques.chiller2.cur),
+    preChiller: !!(value?.tanques?.preChiller?.prev || prevAppointment?.tanques?.preChiller?.cur),
+    chiller1: !!(value?.tanques?.chiller1?.prev || prevAppointment?.tanques?.chiller1?.cur),
+    chiller2: !!(value?.tanques?.chiller2?.prev || prevAppointment?.tanques?.chiller2?.cur),
   });
 
   // Herança do Bem-Estar Animal: cargas do dia com a pendura iniciada, que ainda não entraram em
-  // nenhuma apuração do SPR (nem nesta), com aves da GTA e peso médio da densidade das caixas.
+  // nenhuma apuração do SPR (nem nesta). Só aparecem cargas que já têm peso médio (densidade das
+  // caixas feita), pois o cálculo da vazão depende dele.
   const [herdarAberto, setHerdarAberto] = useState(false);
   const { data: cargasDoDia } = useCargasRastreabilidade(ensureLocalTime(new Date().toISOString()).isoLocal);
   const { data: jaUsadas } = useCargasJaMonitoradas("spr");
   const usadasNestaFicha = new Set(cargas.map((c) => c.cargaId).filter(Boolean));
-  const disponiveis = (cargasDoDia ?? []).filter((c) => c.pendura_inicio_em && !jaUsadas?.has(c.carga_id) && !usadasNestaFicha.has(c.carga_id));
+  const disponiveis = (cargasDoDia ?? []).filter((c) => c.pendura_inicio_em && !!c.peso_medio_kg && !jaUsadas?.has(c.carga_id) && !usadasNestaFicha.has(c.carga_id));
 
   function herdarCargas(escolhidas: typeof disponiveis) {
     if (escolhidas.length === 0) return;
@@ -89,14 +90,14 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
   useEffect(() => {
     if (!prevAppointment) return;
     setTanques((atual) => ({
-      preChiller: { ...atual.preChiller, prev: atual.preChiller.prev || prevAppointment.tanques.preChiller.cur },
-      chiller1: { ...atual.chiller1, prev: atual.chiller1.prev || prevAppointment.tanques.chiller1.cur },
-      chiller2: { ...atual.chiller2, prev: atual.chiller2.prev || prevAppointment.tanques.chiller2.cur },
+      preChiller: { ...atual.preChiller, prev: atual.preChiller.prev || prevAppointment?.tanques?.preChiller?.cur },
+      chiller1: { ...atual.chiller1, prev: atual.chiller1.prev || prevAppointment?.tanques?.chiller1?.cur },
+      chiller2: { ...atual.chiller2, prev: atual.chiller2.prev || prevAppointment?.tanques?.chiller2?.cur },
     }));
     setPrevTravado((atual) => ({
-      preChiller: atual.preChiller || !!prevAppointment.tanques.preChiller.cur,
-      chiller1: atual.chiller1 || !!prevAppointment.tanques.chiller1.cur,
-      chiller2: atual.chiller2 || !!prevAppointment.tanques.chiller2.cur,
+      preChiller: atual.preChiller || !!prevAppointment?.tanques?.preChiller?.cur,
+      chiller1: atual.chiller1 || !!prevAppointment?.tanques?.chiller1?.cur,
+      chiller2: atual.chiller2 || !!prevAppointment?.tanques?.chiller2?.cur,
     }));
   }, [prevAppointment]);
 
@@ -311,13 +312,13 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
             {herdarAberto && (
               <div className="space-y-1">
                 {disponiveis.length === 0 && (
-                  <p className="text-xs text-muted-foreground">Nenhuma carga nova com a pendura iniciada (as já usadas em apurações do SPR não aparecem).</p>
+                  <p className="text-xs text-muted-foreground">Nenhuma carga nova com a pendura iniciada e o peso já registrado (as já usadas em apurações do SPR não aparecem).</p>
                 )}
                 {disponiveis.map((c) => (
                   <div key={c.carga_id} className="flex flex-wrap items-center justify-between gap-2 rounded border p-2 text-xs">
                     <span>
                       <strong>GTA {c.gta}</strong> · {c.qtd_aves.toLocaleString("pt-BR")} aves ·{" "}
-                      {c.peso_medio_kg ? `peso ${c.peso_medio_kg} kg` : <em className="text-warning-foreground">sem peso (densidade das caixas ainda não feita)</em>}
+                      peso {c.peso_medio_kg} kg
                     </span>
                     <Button type="button" size="sm" variant="outline" onClick={() => herdarCargas([c])}>
                       <Plus className="h-3.5 w-3.5" /> Adicionar
