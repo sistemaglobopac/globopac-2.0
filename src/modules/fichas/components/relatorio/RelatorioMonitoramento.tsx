@@ -74,13 +74,27 @@ function SeloAssinatura({
   );
 }
 
-function BlocoAutocorrecao({ autocorrecao, nome }: { autocorrecao: AutocorrecaoImediata; nome: string }) {
+function BlocoAutocorrecao({ autocorrecao, nome, camposNc }: { autocorrecao: AutocorrecaoImediata; nome: string; camposNc: CampoNaoConforme[] }) {
   return (
     <div className="mt-3 overflow-hidden rounded-lg border-2 border-success/40 bg-success/[0.05] print:mt-2 print:break-inside-avoid" data-testid="bloco-autocorrecao">
       <div className="border-b-2 border-success/30 p-3 text-sm font-bold uppercase tracking-wider text-success print:p-2 print:text-[10px]">
         Autocorreção imediata — medida de autocontrole (alternativa à RNC)
       </div>
       <div className="space-y-1.5 p-3 text-[11px] print:p-2 print:text-[8px]">
+        <p className="text-muted-foreground">Não conformidade corrigida pela ação (campos do monitoramento):</p>
+        {camposNc.length > 0 ? (
+          <ul className="list-disc space-y-0.5 pl-4 font-medium text-ink" data-testid="autocorrecao-referencia">
+            {camposNc.map((c) => (
+              <li key={c.rotulo}>
+                <strong>{c.rotulo}</strong> — {c.detalhe}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="font-medium text-muted-foreground" data-testid="autocorrecao-referencia">
+            Nenhum campo apontado automaticamente no preenchimento — ver a descrição da ação abaixo.
+          </p>
+        )}
         <p className="text-muted-foreground">Ação imediata executada pelo inspetor:</p>
         <p className="whitespace-pre-wrap font-semibold text-ink">{autocorrecao.descricao}</p>
         <p className="text-muted-foreground">
@@ -290,7 +304,7 @@ function RegistroUnico({ record, ordem, template, dados, hashesAoVivo }: Registr
           camposNc={camposNaoConformes(template?.schema_campos ?? [], record.dados_dinamicos)}
         />
       )}
-      {autocorrecao && <BlocoAutocorrecao autocorrecao={autocorrecao} nome={dados.nomesPorId.get(autocorrecao.user_id) ?? "Inspetor de Qualidade"} />}
+      {autocorrecao && <BlocoAutocorrecao autocorrecao={autocorrecao} nome={dados.nomesPorId.get(autocorrecao.user_id) ?? "Inspetor de Qualidade"} camposNc={camposNaoConformes(template?.schema_campos ?? [], record.dados_dinamicos)} />}
       {adendos.length > 0 && <BlocoAdendos adendos={adendos} />}
       {record.aditivo_de && (
         <p className="mt-2 text-[10px] italic text-muted-foreground print:text-[8px]">
