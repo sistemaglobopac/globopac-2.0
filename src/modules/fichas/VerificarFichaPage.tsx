@@ -5,6 +5,7 @@ import { useSessionStore } from "@/store/session";
 import { useAbrirAdendo, useDadosRelatorio, useVerificarMonitoramento, type MonitoramentoRelatorio } from "./api";
 import { turnosBloqueadosMap } from "./utils/turnoUtils";
 import { RelatorioMonitoramento } from "./components/relatorio/RelatorioMonitoramento";
+import { instanteDoRegistro } from "./utils/horaMonitoramento";
 import { useTurnoDoRegistro } from "./useTurnoDoRegistro";
 import { ensureLocalTime } from "./utils/tempo";
 import { alvosDoCampo } from "./utils/adendoCampos";
@@ -46,7 +47,7 @@ export function VerificarFichaPage() {
   useEffect(() => {
     if (!dados) return;
     let cancelado = false;
-    turnosBloqueadosMap(dados.monitoramentos.map((m) => ({ id: m.id, user_id: m.user_id, criado_em: m.criado_em }))).then((set) => {
+    turnosBloqueadosMap(dados.monitoramentos.map((m) => ({ id: m.id, user_id: m.user_id, criado_em: instanteDoRegistro(m) }))).then((set) => {
       if (!cancelado) setBlockedIds(set);
     });
     return () => {
@@ -280,7 +281,7 @@ function PainelRejeitar({ pendentes, onCancelar, onConcluido, onErro }: PainelAc
             {pendentes.map((registro, indice) => (
               <label key={registro.id} className="flex items-center gap-2 text-sm">
                 <input type="checkbox" className="h-4 w-4" checked={selecionados.has(registro.id)} onChange={() => alternar(registro.id)} />
-                Monitoramento {indice + 1} — {ensureLocalTime(registro.criado_em).time}
+                Monitoramento {indice + 1} — {ensureLocalTime(instanteDoRegistro(registro)).time}
               </label>
             ))}
           </div>
@@ -379,7 +380,7 @@ function PainelAdendo({ pendentes, dados, verificadorNome, onCancelar, onConclui
             <option value="">Selecione…</option>
             {pendentes.map((p, indice) => (
               <option key={p.id} value={p.id}>
-                Monitoramento {indice + 1} — {ensureLocalTime(p.criado_em).time}
+                Monitoramento {indice + 1} — {ensureLocalTime(instanteDoRegistro(p)).time}
               </option>
             ))}
           </Select>

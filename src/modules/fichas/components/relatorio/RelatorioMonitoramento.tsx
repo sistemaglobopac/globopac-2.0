@@ -12,6 +12,7 @@ import type { AssinaturaRelatorio, DadosRelatorio, MonitoramentoRelatorio, Templ
 import type { AutocorrecaoImediata } from "@/modules/autocorrecao/api";
 import type { Rnc } from "@/modules/rnc/api";
 import { ensureLocalTime } from "../../utils/tempo";
+import { instanteDoRegistro } from "../../utils/horaMonitoramento";
 import { computarHashMonitoramento, resumoHash } from "../../utils/hashDocumento";
 import { DadosColetados } from "../DadosColetadosFicha";
 
@@ -292,7 +293,7 @@ function RegistroUnico({ record, ordem, template, dados, hashesAoVivo }: Registr
   const continuacao = record.dados_dinamicos.continuacao_de as { criadoEm?: string; motivo?: string } | undefined;
   // Hora em que o monitoramento foi REALIZADO (informada pelo inspetor); registros antigos: criado_em.
   const horaInformada = record.dados_dinamicos.hora_monitoramento as string | undefined;
-  const { time } = ensureLocalTime(horaInformada ?? record.criado_em);
+  const { time } = ensureLocalTime(horaInformada ?? instanteDoRegistro(record));
   // Campos "hora" (ex.: "Hora do Monitoramento") já aparecem no cabeçalho deste bloco
   // ("Monitoramento N — HH:MM") — listá-los de novo em Dados Coletados é redundante e pode
   // divergir do horário real de criação do registro (o campo é digitado/editável pelo
@@ -367,13 +368,13 @@ export interface RelatorioMonitoramentoProps {
 /** Relatório oficial — um único registro OU um dossiê consolidado (vários `ids` do mesmo
  * grupo: mesmo inspetor/dia/turno/PAC/setor, ver DossieVerificacaoCard). Renderizado dentro de
  * #relatorio-impressao pelo RelatorioModal, que é o que de fato vira a página impressa. */
-export function RelatorioMonitoramento({ ids, dados, turnoDe = (r) => turnoDoDia(new Date(r.criado_em)) }: RelatorioMonitoramentoProps) {
+export function RelatorioMonitoramento({ ids, dados, turnoDe = (r) => turnoDoDia(new Date(instanteDoRegistro(r))) }: RelatorioMonitoramentoProps) {
   // Sempre em ordem cronológica: "Apuração 1" é o 1º monitoramento do dia, independentemente da
   // ordem em que os ids chegaram na URL.
   const records = ids
     .map((id) => dados.monitoramentos.find((m) => m.id === id))
     .filter((m): m is MonitoramentoRelatorio => Boolean(m))
-    .sort((a, b) => new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime());
+    .sort((a, b) => new Date(instanteDoRegistro(a)).getTime() - new Date(instanteDoRegistro(b)).getTime());
   const isGrouped = records.length > 1;
   const primary = records[0];
 
@@ -394,7 +395,7 @@ export function RelatorioMonitoramento({ ids, dados, turnoDe = (r) => turnoDoDia
   if (!primary) return null;
 
   const template = dados.templatesPorId.get(primary.ficha_template_id);
-  const diaDocumento = ensureLocalTime(primary.criado_em).datePt;
+  const diaDocumento = ensureLocalTime(instanteDoRegistro(primary)).datePt;
   const hashId = primary.id.split("-")[0]!.toUpperCase();
   const protocolo = `GS-${diaDocumento.split("/").reverse().join("")}-${hashId}${isGrouped ? "-CONSOLIDADO" : ""}`;
   const emitidoEm = new Date().toLocaleString("pt-BR", { timeZone: "America/Manaus" });
@@ -422,7 +423,7 @@ export function RelatorioMonitoramento({ ids, dados, turnoDe = (r) => turnoDoDia
   const todasTratadas = rncsDoGrupo.length > 0 && rncsDoGrupo.every((r) => r.status === "FECHADA");
 
   const turnos = [...new Set(records.map((r) => turnoDe(r)))];
-  const horarios = records.map((r) => ensureLocalTime((r.dados_dinamicos.hora_monitoramento as string | undefined) ?? r.criado_em).time).sort();
+  const horarios = records.map((r) => ensureLocalTime(instanteDoRegistro(r)).time).sort();
   const horarioDocumento = horarios.length <= 1 ? horarios[0] ?? "—" : `${horarios[0]}–${horarios[horarios.length - 1]}`;
 
   return (

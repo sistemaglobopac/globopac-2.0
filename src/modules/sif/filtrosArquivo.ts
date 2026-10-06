@@ -3,6 +3,7 @@
 // não ao SIF) e o usuário recorta por data, PAC, setor, turno, ficha, situação, inspetor e liberação.
 import { turnoDoDia } from "@/modules/bordo/api";
 import { ensureLocalTime } from "@/modules/fichas/utils/tempo";
+import { instanteDoRegistro } from "@/modules/fichas/utils/horaMonitoramento";
 import { situacaoDe, type SituacaoConformidade } from "@/shared/situacaoConformidade";
 
 export type FiltroLiberacao = "todas" | "pendentes" | "liberadas";
@@ -43,6 +44,7 @@ export interface ItemArquivo {
   situacao_conformidade?: SituacaoConformidade | null;
   liberado_sif: boolean;
   criado_em: string;
+  hora_monitoramento?: string | null;
   ficha_template_id: string;
   user_id: string;
 }
@@ -68,12 +70,12 @@ export function filtrosAtivos(f: FiltrosArquivo): number {
 
 export function filtrarArquivo<T extends ItemArquivo>(itens: T[], f: FiltrosArquivo, ctx: ContextoFiltroArquivo): T[] {
   return itens.filter((m) => {
-    const dia = ensureLocalTime(m.criado_em).isoLocal;
+    const dia = ensureLocalTime(instanteDoRegistro(m)).isoLocal;
     if (f.de && dia < f.de) return false;
     if (f.ate && dia > f.ate) return false;
     if (f.pac && !ctx.pacsDoTemplate(m.ficha_template_id).includes(f.pac)) return false;
     if (f.setor && m.setor !== f.setor) return false;
-    if (f.turno && (ctx.turnoDe ? ctx.turnoDe(m) : turnoDoDia(new Date(m.criado_em))) !== f.turno) return false;
+    if (f.turno && (ctx.turnoDe ? ctx.turnoDe(m) : turnoDoDia(new Date(instanteDoRegistro(m)))) !== f.turno) return false;
     if (f.ficha && ctx.tipoDaFicha(m.ficha_template_id) !== f.ficha) return false;
     if (f.situacao && situacaoDe(m) !== f.situacao) return false;
     if (f.inspetor && m.user_id !== f.inspetor) return false;

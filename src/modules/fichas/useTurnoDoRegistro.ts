@@ -29,7 +29,8 @@ export function useTurnoDoRegistro() {
     },
   });
   return useCallback(
-    (m: { user_id: string; setor?: string; criado_em: string }) => turnoDoRegistro(m, data ?? []),
+    (m: { user_id: string; setor?: string; criado_em: string; hora_monitoramento?: string | null; dados_dinamicos?: Record<string, unknown> | null }) =>
+      turnoDoRegistro(m, data ?? []),
     [data]
   );
 }

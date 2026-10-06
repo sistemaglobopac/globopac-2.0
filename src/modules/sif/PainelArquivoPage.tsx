@@ -5,6 +5,7 @@ import { RelatorioModal } from "@/modules/fichas/components/relatorio/RelatorioM
 import { useTurnoDoRegistro } from "@/modules/fichas/useTurnoDoRegistro";
 import { agruparPorDossie, setoresDoGrupo, tipoPorTemplate } from "@/modules/fichas/utils/recordGrouping";
 import { ensureLocalTime } from "@/modules/fichas/utils/tempo";
+import { instanteDoRegistro } from "@/modules/fichas/utils/horaMonitoramento";
 import { useLiberarLoteSif, useMonitoramentosArquivo } from "./api";
 import { FILTROS_ARQUIVO_INICIAIS, filtrarArquivo, filtrosAtivos, type FiltrosArquivo } from "./filtrosArquivo";
 import { Button } from "@/shared/ui/button";
@@ -75,7 +76,7 @@ export function PainelArquivoPage() {
   const grupos = useMemo(
     () =>
       agruparPorDossie(filtrados, tipoDaFicha, turnoDe).sort(
-        (a, b) => new Date(b.items[0]!.criado_em).getTime() - new Date(a.items[0]!.criado_em).getTime()
+        (a, b) => new Date(instanteDoRegistro(b.items[0]!)).getTime() - new Date(instanteDoRegistro(a.items[0]!)).getTime()
       ),
     [filtrados, tipoDaFicha, turnoDe]
   );
@@ -288,7 +289,7 @@ export function PainelArquivoPage() {
               <p className="font-medium text-foreground">{nomePorTemplateId.get(primeiro.ficha_template_id) ?? "Ficha"}</p>
               <p>
                 {usuarios?.get(primeiro.user_id) ?? "Inspetor"} · {setoresDoGrupo(items)} · {turnoDe(primeiro)} ·{" "}
-                {ensureLocalTime(primeiro.criado_em).datePt}
+                {ensureLocalTime(instanteDoRegistro(primeiro)).datePt}
               </p>
             </CardContent>
           </Card>

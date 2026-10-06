@@ -11,6 +11,7 @@ import { idsAdendosConcluidos, temAdendoPendente } from "./utils/adendosPendente
 import { pacsDoTemplate, useFichasTemplatesTodas, useFilaVerificacao, useUsuariosMap, useVerificarLote } from "./api";
 import { useTurnoDoRegistro } from "./useTurnoDoRegistro";
 import { diaTurno,turnosBloqueadosMap, turnosPendentes, encerrarTurnoAdmin } from "./utils/turnoUtils";
+import { instanteDoRegistro } from "./utils/horaMonitoramento";
 import { groupFichaCards, calcularOrdemDia, type AppointmentDisplay, type MonitoramentoVerificacao, type StatusVerificacao } from "./utils/recordGrouping";
 import { ensureLocalTime } from "./utils/tempo";
 import { KpiCard } from "./components/KpiCard";
@@ -136,7 +137,7 @@ export function PainelVerificacao() {
     () =>
       filtrados
         .filter((i) => i.status !== "verificado")
-        .sort((a, b) => PESO_STATUS[a.status] - PESO_STATUS[b.status] || new Date(b.appt.criado_em).getTime() - new Date(a.appt.criado_em).getTime()),
+        .sort((a, b) => PESO_STATUS[a.status] - PESO_STATUS[b.status] || new Date(instanteDoRegistro(b.appt)).getTime() - new Date(instanteDoRegistro(a.appt)).getTime()),
     [filtrados]
   );
   const verifiedToday = useMemo(
@@ -151,7 +152,7 @@ export function PainelVerificacao() {
   const [turnosVersao, setTurnosVersao] = useState(0);
   useEffect(() => {
     let cancelado = false;
-    turnosBloqueadosMap(pendingAppointments.map((i) => ({ id: i.id, user_id: i.appt.user_id, criado_em: i.appt.criado_em }))).then((set) => {
+    turnosBloqueadosMap(pendingAppointments.map((i) => ({ id: i.id, user_id: i.appt.user_id, criado_em: instanteDoRegistro(i.appt) }))).then((set) => {
       if (!cancelado) setBlockedIds(set);
     });
     return () => {
@@ -241,7 +242,7 @@ export function PainelVerificacao() {
 
   async function abrirModalLote() {
     const selecionados = pendingAppointments.filter((i) => selectedIds.has(i.id));
-    const pendentesTurno = await turnosPendentes(selecionados.map((i) => ({ user_id: i.appt.user_id, criado_em: i.appt.criado_em })));
+    const pendentesTurno = await turnosPendentes(selecionados.map((i) => ({ user_id: i.appt.user_id, criado_em: instanteDoRegistro(i.appt) })));
     if (pendentesTurno.length > 0) {
       setMensagem({
         tipo: "error",
@@ -406,10 +407,10 @@ export function PainelVerificacao() {
             rncPorMonitoramento={rncPorMonitoramento}
             autocorrigidoIds={autocorrigidoIds}
             onEncerrarTurno={(d) =>
-              setEncerrarAlvo({ userIds: d.userIds, dia: diaTurno(d.items[0]!.appt.criado_em), nome: d.inspetorNome })
+              setEncerrarAlvo({ userIds: d.userIds, dia: diaTurno(instanteDoRegistro(d.items[0]!.appt)), nome: d.inspetorNome })
             }
             onEncerrarTurnoItem={(i) =>
-              setEncerrarAlvo({ userIds: [i.appt.user_id], dia: diaTurno(i.appt.criado_em), nome: usuarios.get(i.appt.user_id) ?? "inspetor" })
+              setEncerrarAlvo({ userIds: [i.appt.user_id], dia: diaTurno(instanteDoRegistro(i.appt)), nome: usuarios.get(i.appt.user_id) ?? "inspetor" })
             }
           />
         ))}
@@ -430,7 +431,7 @@ export function PainelVerificacao() {
             isAdmin={Boolean(isAdmin)}
             rncStatus={rncPorMonitoramento?.get(item.id)}
             autocorrigido={autocorrigidoIds?.has(item.id)}
-            onEncerrarTurno={(i) => setEncerrarAlvo({ userIds: [i.appt.user_id], dia: diaTurno(i.appt.criado_em), nome: usuarios.get(i.appt.user_id) ?? "inspetor" })}
+            onEncerrarTurno={(i) => setEncerrarAlvo({ userIds: [i.appt.user_id], dia: diaTurno(instanteDoRegistro(i.appt)), nome: usuarios.get(i.appt.user_id) ?? "inspetor" })}
           />
         ))}
       </div>

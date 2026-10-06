@@ -5,6 +5,7 @@ import { useFichasTemplatesTodas } from "@/modules/fichas/api";
 import { RelatorioModal } from "@/modules/fichas/components/relatorio/RelatorioModal";
 import { agruparPorDossie, setoresDoGrupo, tipoPorTemplate } from "@/modules/fichas/utils/recordGrouping";
 import { ensureLocalTime } from "@/modules/fichas/utils/tempo";
+import { instanteDoRegistro } from "@/modules/fichas/utils/horaMonitoramento";
 import { Button } from "@/shared/ui/button";
 import { useMonitoramentosLiberados } from "./api";
 import { useOsLiberadas } from "@/modules/pcm/api";
@@ -64,7 +65,7 @@ export function AuditoriaFederalPage() {
               <CardContent className="text-sm text-muted-foreground">
                 <p className="font-medium text-foreground">{nomePorTemplateId.get(primeiro.ficha_template_id) ?? "Ficha"}</p>
                 <p>
-                  {turnoDe(primeiro)} · {ensureLocalTime(primeiro.criado_em).datePt} · Verificado em{" "}
+                  {turnoDe(primeiro)} · {ensureLocalTime(instanteDoRegistro(primeiro)).datePt} · Verificado em{" "}
                   {ultimaVerificacao ? new Date(ultimaVerificacao).toLocaleString("pt-BR") : "—"}
                 </p>
               </CardContent>

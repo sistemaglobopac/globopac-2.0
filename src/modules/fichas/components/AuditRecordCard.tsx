@@ -1,6 +1,7 @@
 import { Eye, Lock, Printer, ShieldAlert, ShieldCheck, Unlock } from "lucide-react";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
+import { instanteDoRegistro } from "../utils/horaMonitoramento";
 import { ensureLocalTime } from "../utils/tempo";
 import type { AppointmentDisplay } from "../utils/recordGrouping";
 import type { StatusRnc } from "@/modules/rnc/api";
@@ -67,7 +68,7 @@ export function AuditRecordCard({
   const { appt } = item;
   const bloqueado = blockedIds.has(item.id);
   const selecionavel = !bloqueado && !STATUS_SEM_SELECAO.includes(item.status);
-  const { datePt, time } = ensureLocalTime(appt.criado_em);
+  const { datePt, time } = ensureLocalTime(instanteDoRegistro(appt));
   const nomeFicha = nomePorTemplateId.get(appt.ficha_template_id) ?? "Ficha";
   const pac = pacPorTemplateId.get(appt.ficha_template_id) ?? "—";
   const codigo = codigoPorTemplateId.get(appt.ficha_template_id);

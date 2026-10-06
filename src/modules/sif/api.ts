@@ -10,6 +10,8 @@ export interface MonitoramentoVerificado {
   verificado_em: string | null;
   liberado_sif: boolean;
   criado_em: string;
+  /** Hora em que o monitoramento foi realizado (informada pelo inspetor); nula em registros antigos. */
+  hora_monitoramento?: string | null;
   ficha_template_id: string;
   user_id: string;
 }
@@ -23,7 +25,7 @@ export function useMonitoramentosParaLiberar() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("monitoramentos")
-        .select("id, setor, conformidade, situacao_conformidade, verificado_em, liberado_sif, criado_em, ficha_template_id, user_id")
+        .select("id, setor, conformidade, situacao_conformidade, verificado_em, liberado_sif, criado_em, hora_monitoramento, ficha_template_id, user_id")
         .not("verificado_por", "is", null)
         .eq("liberado_sif", false)
         .order("verificado_em", { ascending: true })
@@ -43,7 +45,7 @@ export function useMonitoramentosArquivo() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("monitoramentos")
-        .select("id, setor, conformidade, situacao_conformidade, verificado_em, liberado_sif, criado_em, ficha_template_id, user_id")
+        .select("id, setor, conformidade, situacao_conformidade, verificado_em, liberado_sif, criado_em, hora_monitoramento, ficha_template_id, user_id")
         .not("verificado_por", "is", null)
         .order("criado_em", { ascending: false })
         .limit(3000)
@@ -80,7 +82,7 @@ export function useMonitoramentosLiberados() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("monitoramentos")
-        .select("id, setor, conformidade, situacao_conformidade, verificado_em, liberado_sif, criado_em, ficha_template_id, user_id")
+        .select("id, setor, conformidade, situacao_conformidade, verificado_em, liberado_sif, criado_em, hora_monitoramento, ficha_template_id, user_id")
         .eq("liberado_sif", true)
         .order("liberado_em", { ascending: false })
         .overrideTypes<MonitoramentoVerificado[], { merge: false }>();

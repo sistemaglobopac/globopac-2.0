@@ -596,7 +596,7 @@ export interface FiltrosVerificacao {
 }
 
 const CAMPOS_MONITORAMENTO_VERIFICACAO =
-  "id, ficha_template_id, user_id, setor, dados_dinamicos, conformidade, verificado_por, verificado_em, criado_em, capturado_em, aditivo_de";
+  "id, ficha_template_id, user_id, setor, dados_dinamicos, conformidade, verificado_por, verificado_em, criado_em, hora_monitoramento, capturado_em, aditivo_de";
 
 /** Fila de verificação: pendências (verificado_por IS NULL — fila crônica, qualquer dia) +
  * verificados recentes (últimos 500, qualquer dia — a filtragem por dia local/intervalo
@@ -753,6 +753,8 @@ export interface MonitoramentoRelatorio {
   origem_versao: string;
   aditivo_de: string | null;
   criado_em: string;
+  /** Hora em que o monitoramento foi realizado (informada pelo inspetor); nula em registros antigos. */
+  hora_monitoramento?: string | null;
   capturado_em: string | null;
   /** EM_ANDAMENTO (só pesagem inicial) ou FINALIZADO. Início = criado_em; fim = finalizado_em (servidor). */
   status_ficha: "EM_ANDAMENTO" | "FINALIZADO";
@@ -790,7 +792,7 @@ export interface DadosRelatorio {
 
 const CAMPOS_MONITORAMENTO_RELATORIO =
   "id, ficha_template_id, versao_template, user_id, setor, dados_dinamicos, conformidade, verificado_por, " +
-  "verificado_em, liberado_sif, origem_versao, aditivo_de, criado_em, capturado_em, status_ficha, finalizado_em";
+  "verificado_em, liberado_sif, origem_versao, aditivo_de, criado_em, hora_monitoramento, capturado_em, status_ficha, finalizado_em";
 const CAMPOS_ASSINATURA_RELATORIO = "id, monitoramento_id, user_id, tipo, hash_documento, criado_em, tsa_emitido_em, tsa_utilizada";
 // "*": a RNC ganha colunas (ação imediata, causa, assinatura do gestor…) — um select explícito quebraria o
 // relatório inteiro num banco que ainda não recebeu a migração mais recente.

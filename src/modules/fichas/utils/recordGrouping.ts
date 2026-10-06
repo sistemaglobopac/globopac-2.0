@@ -1,5 +1,6 @@
 import { turnoDoDia } from "@/modules/bordo/api";
 import { ensureLocalTime } from "./tempo";
+import { instanteDoRegistro } from "./horaMonitoramento";
 
 export type StatusVerificacao = "aguardando" | "adendo_pendente" | "verificado";
 
@@ -13,6 +14,8 @@ export interface MonitoramentoVerificacao {
   verificado_por: string | null;
   verificado_em: string | null;
   criado_em: string;
+  /** Hora em que o monitoramento foi realizado (informada pelo inspetor); nula em registros antigos. */
+  hora_monitoramento?: string | null;
   capturado_em: string | null;
   /** Registro original que este aditivo corrige (adendo assinado pelo inspetor). */
   aditivo_de?: string | null;
@@ -52,7 +55,7 @@ export interface DossieVerificacao {
 export function calcularOrdemDia(items: MonitoramentoVerificacao[]): Map<string, number> {
   const porChave = new Map<string, MonitoramentoVerificacao[]>();
   for (const item of items) {
-    const dia = ensureLocalTime(item.criado_em).isoLocal;
+    const dia = ensureLocalTime(instanteDoRegistro(item)).isoLocal;
     const chave = `${dia}-${item.ficha_template_id}`;
     if (!porChave.has(chave)) porChave.set(chave, []);
     porChave.get(chave)!.push(item);
@@ -60,22 +63,31 @@ export function calcularOrdemDia(items: MonitoramentoVerificacao[]): Map<string,
 
   const ordem = new Map<string, number>();
   for (const grupo of porChave.values()) {
-    grupo.sort((a, b) => new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime());
+    grupo.sort((a, b) => new Date(instanteDoRegistro(a)).getTime() - new Date(instanteDoRegistro(b)).getTime());
     grupo.forEach((item, indice) => ordem.set(item.id, indice + 1));
   }
   return ordem;
 }
 
+type ComInstante = {
+  user_id: string;
+  criado_em: string;
+  hora_monitoramento?: string | null;
+  dados_dinamicos?: Record<string, unknown> | null;
+  ficha_template_id: string;
+  setor?: string;
+};
+
 /** Chave do relatório consolidado: dia local + turno + TIPO de ficha (código sem a versão; setores
  * diferentes entram juntos). NÃO separa por inspetor: quando um inspetor cobre o almoço do outro, ele
  * dá sequência aos monitoramentos dele (se B fez a 2ª apuração, A faz a 3ª) e tudo sai num único
  * relatório consolidado, em ordem de horário. */
-export function chaveDossie<T extends { user_id: string; criado_em: string; ficha_template_id: string; setor?: string }>(
+export function chaveDossie<T extends ComInstante>(
   m: T,
   tipoDaFicha: (templateId: string) => string = (id) => id,
-  turnoDe: (m: T) => string = (r) => turnoDoDia(new Date(r.criado_em))
+  turnoDe: (m: T) => string = (r) => turnoDoDia(new Date(instanteDoRegistro(r)))
 ): string {
-  const dia = ensureLocalTime(m.criado_em).isoLocal;
+  const dia = ensureLocalTime(instanteDoRegistro(m)).isoLocal;
   return `${dia}|${turnoDe(m)}|${tipoDaFicha(m.ficha_template_id)}`;
 }
 
@@ -92,7 +104,7 @@ export function setoresDoGrupo(items: { setor: string }[]): string {
 
 /** Agrupa por `chaveDossie`, cada grupo em ordem cronológica. Serve às telas que só têm os
  * campos básicos do monitoramento (Painel de Arquivo, Auditoria Federal). */
-export function agruparPorDossie<T extends { user_id: string; criado_em: string; ficha_template_id: string; setor?: string }>(
+export function agruparPorDossie<T extends ComInstante>(
   items: T[],
   tipoDaFicha?: (templateId: string) => string,
   turnoDe?: (m: T) => string
@@ -105,7 +117,7 @@ export function agruparPorDossie<T extends { user_id: string; criado_em: string;
   }
   return [...grupos.entries()].map(([chave, lista]) => ({
     chave,
-    items: lista.sort((a, b) => new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime()),
+    items: lista.sort((a, b) => new Date(instanteDoRegistro(a)).getTime() - new Date(instanteDoRegistro(b)).getTime()),
   }));
 }
 
@@ -119,7 +131,7 @@ export function groupFichaCards(
   usersMap: Map<string, string>,
   pacPorTemplateId: Map<string, string>,
   codigoPorTemplateId: Map<string, string>,
-  turnoDe: (m: MonitoramentoVerificacao) => string = (m) => turnoDoDia(new Date(m.criado_em))
+  turnoDe: (m: MonitoramentoVerificacao) => string = (m) => turnoDoDia(new Date(instanteDoRegistro(m)))
 ): { dossies: DossieVerificacao[]; avulsos: AppointmentDisplay[] } {
   const grupos = new Map<string, DossieVerificacao>();
   for (const item of items) {
@@ -133,7 +145,7 @@ export function groupFichaCards(
         userId: appt.user_id,
         userIds: [],
         turno: turnoDe(appt),
-        dia: ensureLocalTime(appt.criado_em).isoLocal,
+        dia: ensureLocalTime(instanteDoRegistro(appt)).isoLocal,
         pac: pacPorTemplateId.get(appt.ficha_template_id) ?? "—",
         codigo: codigoPorTemplateId.get(appt.ficha_template_id) ?? "",
         setor: appt.setor,
@@ -158,7 +170,7 @@ export function groupFichaCards(
       avulsos.push(...grupo.items);
       continue;
     }
-    grupo.items.sort((a, b) => new Date(a.appt.criado_em).getTime() - new Date(b.appt.criado_em).getTime());
+    grupo.items.sort((a, b) => new Date(instanteDoRegistro(a.appt)).getTime() - new Date(instanteDoRegistro(b.appt)).getTime());
     grupo.setor = setoresDoGrupo(grupo.items.map((i) => i.appt));
     // Inspetores na ordem em que trabalharam (quem cobre o almoço aparece depois de quem saiu).
     grupo.userIds = [...new Set(grupo.items.map((i) => i.appt.user_id))];
@@ -170,6 +182,6 @@ export function groupFichaCards(
     dossies.push(grupo);
   }
 
-  avulsos.sort((a, b) => new Date(b.appt.criado_em).getTime() - new Date(a.appt.criado_em).getTime());
+  avulsos.sort((a, b) => new Date(instanteDoRegistro(b.appt)).getTime() - new Date(instanteDoRegistro(a.appt)).getTime());
   return { dossies, avulsos };
 }

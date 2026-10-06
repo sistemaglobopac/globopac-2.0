@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { horaEmManaus } from "@/modules/bordo/api";
+import { instanteDoRegistro } from "./horaMonitoramento";
 
 /** Corte de dia em UTC puro (sem ajuste de fuso) — é assim que turnos_inspetores.inicio é
  * comparado ao dia do monitoramento no Painel de Bordo. Não usar o dia ajustado para
@@ -45,10 +46,12 @@ export interface TurnoInspetorResolucao {
  * continua os monitoramentos do colega, ex.: o admin) — vale o turno em que esse turno foi INICIADO.
  * Sem nenhum turno cobrindo o registro, cai na regra do relógio (`turnoDoDia`). */
 export function turnoDoRegistro(
-  registro: { user_id: string; setor?: string; criado_em: string },
+  registro: { user_id: string; setor?: string; criado_em: string; hora_monitoramento?: string | null; dados_dinamicos?: Record<string, unknown> | null },
   turnos: TurnoInspetorResolucao[]
 ): TurnoHeranca {
-  const instante = new Date(registro.criado_em).getTime();
+  // Pelo instante em que o monitoramento foi REALIZADO (uma continuação de ontem é do turno de ontem).
+  const instanteIso = instanteDoRegistro(registro);
+  const instante = new Date(instanteIso).getTime();
   const cobrindo = turnos.filter(
     (t) => new Date(t.inicio).getTime() <= instante && (t.fim === null || new Date(t.fim).getTime() >= instante)
   );
@@ -56,7 +59,7 @@ export function turnoDoRegistro(
   const doSetor = cobrindo.filter((t) => t.setor === registro.setor);
   const candidatos = proprio.length > 0 ? proprio : doSetor;
   const escolhido = candidatos.sort((a, b) => new Date(b.inicio).getTime() - new Date(a.inicio).getTime())[0];
-  return turnoParaHeranca(new Date(escolhido ? escolhido.inicio : registro.criado_em));
+  return turnoParaHeranca(new Date(escolhido ? escolhido.inicio : instanteIso));
 }
 
 /** Versão em lote: retorna o Set de IDs de REGISTRO (não de inspetor) cujo autor ainda não

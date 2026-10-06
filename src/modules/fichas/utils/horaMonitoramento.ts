@@ -18,6 +18,15 @@ export function horaEfetiva(m: { hora_monitoramento?: string | null; criado_em: 
   return m.hora_monitoramento ?? m.criado_em;
 }
 
+/** Instante em que o monitoramento foi REALIZADO, para decidir dia, turno e ordem (painel de verificação, relatório
+ * consolidado, arquivo do SIF): a hora informada pelo inspetor (coluna ou, na falta, o valor assinado em
+ * dados_dinamicos); registros antigos caem em criado_em. Uma continuação de ontem, gravada hoje, fica no consolidado de
+ * ontem. A hora de gravação (criado_em) segue inalterada — ela entra na verificação de integridade do documento. */
+export function instanteDoRegistro(m: { criado_em: string; hora_monitoramento?: string | null; dados_dinamicos?: Record<string, unknown> | null }): string {
+  const noDado = m.dados_dinamicos?.[CHAVE_HORA_MONITORAMENTO];
+  return m.hora_monitoramento ?? (typeof noDado === "string" && noDado ? noDado : null) ?? m.criado_em;
+}
+
 /** "AAAA-MM-DD" + "HH:MM" (digitados no fuso de Manaus) → ISO UTC. null se inválido. */
 export function isoDeManaus(data: string, hora: string): string | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || !/^\d{2}:\d{2}$/.test(hora)) return null;

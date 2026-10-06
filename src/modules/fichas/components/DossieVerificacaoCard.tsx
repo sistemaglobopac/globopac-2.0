@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp, Eye, FolderClosed, Lock, Printer, ShieldCheck, 
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import type { AppointmentDisplay, DossieVerificacao } from "../utils/recordGrouping";
+import { instanteDoRegistro } from "../utils/horaMonitoramento";
 import { ensureLocalTime } from "../utils/tempo";
 import type { StatusRnc } from "@/modules/rnc/api";
 import { AuditRecordCard } from "./AuditRecordCard";
@@ -60,8 +61,8 @@ export function DossieVerificacaoCard({
   const todasSelecionadas = selecionaveis.length > 0 && selecionaveis.every((id) => selectedIds.has(id));
   const primeiroItem = dossie.items.at(0);
   const ultimoItem = dossie.items.at(-1);
-  const primeiraHora = primeiroItem ? ensureLocalTime(primeiroItem.appt.criado_em).time : "—";
-  const ultimaHora = ultimoItem ? ensureLocalTime(ultimoItem.appt.criado_em).time : "—";
+  const primeiraHora = primeiroItem ? ensureLocalTime(instanteDoRegistro(primeiroItem.appt)).time : "—";
+  const ultimaHora = ultimoItem ? ensureLocalTime(instanteDoRegistro(ultimoItem.appt)).time : "—";
   const nomeFicha = primeiroItem ? nomePorTemplateId.get(primeiroItem.appt.ficha_template_id) ?? dossie.codigo : dossie.codigo;
 
   return (
