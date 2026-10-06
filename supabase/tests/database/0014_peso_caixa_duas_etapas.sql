@@ -27,17 +27,19 @@ insert into monitoramentos (id, ficha_template_id, versao_template, user_id, set
    '{"campo":{"cargas":[{"cargaId":"a","gta":"1","avesPorCaixa":"10","pesoMedioKg":"2,8"},{"cargaId":"b","gta":"2","avesPorCaixa":"12","pesoMedioKg":""}],"conformidade":true,"detalhesRNC":null},"aguardando_peso":true}'::jsonb,
    'EM_ANDAMENTO');
 
--- ---- inspetor de OUTRO setor nao completa (a RLS filtra: 0 linhas)
+-- ---- inspetor de OUTRO setor tenta completar: a RLS filtra a linha (0 linhas, sem erro). A conferencia vem
+-- depois, como inspetor B (o inspetor C nem enxerga o registro).
 select set_config('request.jwt.claims', json_build_object('sub', 'e7000000-0000-0000-0000-000000000003', 'role', 'authenticated', 'perfil', 'INSPETOR_QUALIDADE', 'setores_permitidos', array['OUTRO_SETOR'])::text, true);
 set local role authenticated;
-select is(
-  (with u as (update monitoramentos set dados_dinamicos = jsonb_set(dados_dinamicos, '{campo,cargas,1,pesoMedioKg}', '"2,9"') where id = '17000000-0000-0000-0000-000000000001' returning 1) select count(*)::int from u),
-  0, 'inspetor de outro setor nao completa o peso'
-);
+update monitoramentos set dados_dinamicos = jsonb_set(dados_dinamicos, '{campo,cargas,1,pesoMedioKg}', '"2,9"') where id = '17000000-0000-0000-0000-000000000001';
 
 -- ---- inspetor B, do MESMO setor (nao e quem abriu), completa
 select set_config('request.jwt.claims', json_build_object('sub', 'e7000000-0000-0000-0000-000000000002', 'role', 'authenticated', 'perfil', 'INSPETOR_QUALIDADE', 'setores_permitidos', array['BEM_ESTAR'])::text, true);
 
+select is(
+  (select dados_dinamicos #>> '{campo,cargas,1,pesoMedioKg}' from monitoramentos where id = '17000000-0000-0000-0000-000000000001'),
+  '', 'inspetor de outro setor nao completou o peso'
+);
 select throws_ok(
   $$update monitoramentos set dados_dinamicos = jsonb_set(dados_dinamicos, '{campo,cargas,0,avesPorCaixa}', '"99"') where id = '17000000-0000-0000-0000-000000000001'$$,
   'P0001', null, 'dados assinados na etapa 1 (aves por caixa) sao imutaveis'
