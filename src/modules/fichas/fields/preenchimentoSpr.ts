@@ -33,7 +33,12 @@ function motivosTanques(prefixo: string, tanques: Record<string, TanqueHidrometr
   return m;
 }
 
-export function motivosPreenchimentoCarcacas(v: ChillerCarcacasValor | undefined | null): string[] {
+/** Lotes com aves e sem peso vivo (a balança ainda não passou o peso da carga). */
+export function lotesSemPeso(v: ChillerCarcacasValor | undefined | null): ChillerCarcacasValor["cargas"] {
+  return (v?.cargas ?? []).filter((c) => (Number.parseFloat(String(c.quantity).replace(",", ".")) || 0) > 0 && !(Number.parseFloat(String(c.avgLiveWeight).replace(",", ".")) > 0));
+}
+
+export function motivosPreenchimentoCarcacas(v: ChillerCarcacasValor | undefined | null, opcoes: { permitirPesoPendente?: boolean } = {}): string[] {
   const p = "SPR Carcaças";
   const nomes = ["preChiller", "chiller1", "chiller2"];
   if (!v) return [`${p}: preencha o monitoramento.`];
@@ -44,7 +49,8 @@ export function motivosPreenchimentoCarcacas(v: ChillerCarcacasValor | undefined
     if (cargas.length === 0) m.push(`${p}: informe ao menos um lote.`);
     cargas.forEach((c, i) => {
       if (vazio(c.quantity)) m.push(`${p} — Lote ${i + 1}: informe as Aves (un).`);
-      if (vazio(c.avgLiveWeight)) m.push(`${p} — Lote ${i + 1}: informe o Peso Vivo (kg).`);
+      // Etapa 1 (aguardando o peso da balança): o peso vivo do lote pode ficar em branco.
+      if (!opcoes.permitirPesoPendente && vazio(c.avgLiveWeight)) m.push(`${p} — Lote ${i + 1}: informe o Peso Vivo (kg).`);
     });
     if (vazio(v.condenasParcial)) m.push(`${p}: informe as Carcaças Parcialmente Aproveitadas (use 0 se não houve).`);
     if (vazio(v.condenasTotal ?? v.condenas)) m.push(`${p}: informe as Carcaças Totalmente Condenadas (use 0 se não houve).`);

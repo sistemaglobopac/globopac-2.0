@@ -22,6 +22,7 @@ import type { PesoCaixaValor } from "./fields/tiposCompostos";
 import { ensureLocalTime } from "./utils/tempo";
 import { horaEfetiva } from "./utils/horaMonitoramento";
 import type { CampoTemplate } from "@/shared/schema-campos";
+import { CompletarVazaoSpr } from "./CompletarVazaoSpr";
 
 function duracao(minutos: number): string {
   if (minutos < 60) return `${minutos} min`;
@@ -109,6 +110,11 @@ export function CompletarPesoPage() {
         <Loader2 className="h-5 w-5 animate-spin" /> Carregando…
       </div>
     );
+  }
+  // Vazão do SPR aguardando o peso das cargas: tela própria (recalcula os campos com o peso real).
+  const camposDaFicha = (template?.schema_campos ?? []) as CampoTemplate[];
+  if (registro && !campo && aguardaPesoDaBalanca(registro) && camposDaFicha.some((c) => c.tipo === "chiller_carcacas")) {
+    return <CompletarVazaoSpr registro={registro} nomeFicha={template?.nome ?? "Vazão do SPR"} campos={camposDaFicha} />;
   }
   if (!registro || !campo || !original || !valor || !aguardaPesoDaBalanca(registro)) {
     return (

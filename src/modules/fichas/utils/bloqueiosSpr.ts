@@ -67,7 +67,7 @@ export function motivosDeBloqueioSpr(
     }
     // Widgets de vazão: nenhum campo visível pode ficar em branco (valor ausente = tudo em branco).
     if (campo.tipo === "chiller_carcacas") {
-      motivos.push(...motivosPreenchimentoCarcacas(dados[campo.chave] as ChillerCarcacasValor | undefined));
+      motivos.push(...motivosPreenchimentoCarcacas(dados[campo.chave] as ChillerCarcacasValor | undefined, { permitirPesoPendente: opcoes.permitirPesoPendente }));
       continue;
     }
     if (campo.tipo === "chiller_partes") {
@@ -92,7 +92,9 @@ export function motivosDeBloqueioSpr(
     if (campo.tipo === "ocorrencia_pragas") {
       motivos.push(...motivosBloqueioPragas(valor as unknown as OcorrenciaPragasValor));
     }
-    if (campo.tipo === "chiller_partes" && valor.pesoCarcacaIndisponivel === true) {
+    // Etapa 1 (peso das cargas ainda não chegou): Partes e Miúdos esperam o peso médio de carcaça, que só existe
+    // depois que o peso é completado.
+    if (campo.tipo === "chiller_partes" && valor.pesoCarcacaIndisponivel === true && !opcoes.permitirPesoPendente) {
       motivos.push(
         'SPR Partes: preencha primeiro o "Renovação da Água do SPR Carcaças" — o peso médio de carcaça vem de lá e está ausente ou zerado.'
       );
@@ -101,7 +103,7 @@ export function motivosDeBloqueioSpr(
       if (valor.avesIndisponivel === true) {
         motivos.push('SPR Miúdos: preencha primeiro o "Renovação da Água do SPR Carcaças" — as aves no período vêm de lá e estão ausentes ou zeradas.');
       }
-      if (valor.pesoMiudoIndisponivel === true) {
+      if (valor.pesoMiudoIndisponivel === true && !opcoes.permitirPesoPendente) {
         motivos.push(
           'SPR Miúdos: preencha primeiro o "Renovação da Água do SPR Carcaças" — o peso médio de carcaça (Tabela DE-PARA dos miúdos) vem de lá e está ausente ou zerado.'
         );

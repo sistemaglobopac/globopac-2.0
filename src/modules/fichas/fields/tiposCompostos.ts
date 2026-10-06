@@ -21,6 +21,18 @@ export interface CargaProcessada {
   /** Carga (GTA) herdada do Bem-Estar Animal; ausente em lotes digitados à mão. */
   cargaId?: string;
   gta?: string;
+  /** Só parte desta carga entra no período (a outra parte chega no monitoramento seguinte). */
+  parcial?: boolean;
+}
+
+/** Como o período foi calculado pela chegada ao pré-resfriamento (ver chegadaPreResfriamento.ts). `acumulado`
+ * (aves já chegadas, por carga) é a base do monitoramento seguinte. */
+export interface ChegadaRegistrada {
+  corteEm: string;
+  velocidadeAvesH: number;
+  origemVelocidade: "observada" | "nominal";
+  transitoSegundos: number;
+  acumulado: Record<string, number>;
 }
 
 export interface ChillerCarcacasValor {
@@ -41,6 +53,8 @@ export interface ChillerCarcacasValor {
    * mesma ficha (chuveiro final) para recompor a própria base. */
   totalAvesBruto: number;
   pesoMedioCarcaca: number;
+  /** Período calculado pela chegada ao pré-resfriamento; ausente em lotes digitados à mão. */
+  chegada?: ChegadaRegistrada;
   conformidade: boolean;
   detalhesRNC: string | null;
 }

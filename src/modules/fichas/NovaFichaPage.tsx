@@ -15,6 +15,7 @@ import { cargasEmRascunhos, combinarAnterior } from "./utils/rascunhosAnterior";
 import { CHAVE_HORA_MONITORAMENTO, dataManaus, horaManaus, isoDeManaus, validarHoraMonitoramento } from "./utils/horaMonitoramento";
 import { salvarRascunho } from "@/lib/rascunhos";
 import { CHAVE_AGUARDANDO_PESO, cargasSemPeso } from "./fields/pesoCaixa";
+import { lotesSemPeso } from "./fields/preenchimentoSpr";
 import { motivosDeBloqueioSpr } from "./utils/bloqueiosSpr";
 import { desviosEspeciais, temNaoConformidade } from "./utils/desviosEspeciais";
 import { ModalAutocorrecao } from "@/modules/autocorrecao/ModalAutocorrecao";
@@ -384,7 +385,12 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
   // Peso por caixa: a balança pode não ter passado o peso de alguma carga. Nesse caso o botão salva a ETAPA 1
   // (aguardando peso: já vale para a frequência) e o peso é completado depois, em "Monitoramentos em andamento".
   const campoPeso = camposVisiveis.find((c) => c.tipo === "peso_caixa");
-  const pesoPendente = !!campoPeso && cargasSemPeso(valoresForm?.[campoPeso.chave] as PesoCaixaValor | undefined).length > 0;
+  // SPR Carcaças: lote com aves e sem peso vivo (a balança ainda não passou o peso da carga) também fica aguardando.
+  const campoCarcacasForm = camposVisiveis.find((c) => c.tipo === "chiller_carcacas");
+  const pesoPendente =
+    (!!campoPeso && cargasSemPeso(valoresForm?.[campoPeso.chave] as PesoCaixaValor | undefined).length > 0) ||
+    (!!campoCarcacasForm && lotesSemPeso(valoresForm?.[campoCarcacasForm.chave] as ChillerCarcacasValor | undefined).length > 0);
+  const horaMonitoramentoIso = isoDeManaus(horaData, horaHora) ?? undefined;
 
   useEffect(() => {
     for (const campo of campos) {
@@ -751,6 +757,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
                 prevAppointment={registroPrevio?.dados_dinamicos}
                 carcacasAtual={carcacasAtual}
                 diaMonitoramento={horaData}
+                horaMonitoramento={horaMonitoramentoIso}
                 cargasEmRascunho={cargasEmRascunho}
                 faseAbsorcao={campoAbsorcao ? "INICIAL" : undefined}
                 aoSalvarPrimeiraEtapaDripping={onVoltar}

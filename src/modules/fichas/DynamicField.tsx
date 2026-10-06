@@ -66,12 +66,16 @@ interface DynamicFieldProps {
   diaMonitoramento?: string;
   /** Cargas já usadas em rascunhos locais desta ficha (não aparecem no servidor até assinar). */
   cargasEmRascunho?: ReadonlySet<string>;
+  /** Hora do monitoramento (ISO) informada pelo inspetor — base do cálculo das cargas que já chegaram ao pré-resfriamento. */
+  horaMonitoramento?: string;
+  /** Etapa 2 do SPR: trava o que foi assinado na etapa 1; só o peso vivo dos lotes sem peso pode ser completado. */
+  modoCompletarPeso?: boolean;
 }
 
 /** Renderiza um campo de formulário a partir da definição declarativa de schema_campos —
  * o mesmo dado que gera o Zod de validação (src/shared/schema-campos.ts), garantindo que
  * UI e validação nunca divirjam (seção 7.1 do PROMPT MESTRE). */
-export function DynamicField({ campo, register, errors, control, prevAppointment, carcacasAtual, diaMonitoramento, cargasEmRascunho, faseAbsorcao, aoSalvarPrimeiraEtapaDripping }: DynamicFieldProps) {
+export function DynamicField({ campo, register, errors, control, prevAppointment, carcacasAtual, diaMonitoramento, cargasEmRascunho, horaMonitoramento, modoCompletarPeso, faseAbsorcao, aoSalvarPrimeiraEtapaDripping }: DynamicFieldProps) {
   const erro = errors[campo.chave]?.message as string | undefined;
 
   return (
@@ -121,6 +125,8 @@ export function DynamicField({ campo, register, errors, control, prevAppointment
               prevAppointment={prevAppointment?.[campo.chave] as ChillerCarcacasValor | undefined}
               diaMonitoramento={diaMonitoramento}
               cargasEmRascunho={cargasEmRascunho}
+              horaMonitoramento={horaMonitoramento}
+              modoCompletarPeso={modoCompletarPeso}
             />
           )}
         />
@@ -136,6 +142,7 @@ export function DynamicField({ campo, register, errors, control, prevAppointment
               onChange={field.onChange}
               prevAppointment={prevAppointment?.[campo.chave] as ChillerPartesValor | undefined}
               carcacasAtual={carcacasAtual}
+              disabled={modoCompletarPeso}
             />
           )}
         />
@@ -151,6 +158,7 @@ export function DynamicField({ campo, register, errors, control, prevAppointment
               onChange={field.onChange}
               prevAppointment={prevAppointment?.[campo.chave] as LavagemFinalValor | undefined}
               carcacasAtual={carcacasAtual}
+              disabled={modoCompletarPeso}
             />
           )}
         />
@@ -166,6 +174,7 @@ export function DynamicField({ campo, register, errors, control, prevAppointment
               onChange={field.onChange}
               prevAppointment={prevAppointment?.[campo.chave] as MiniChillersValor | undefined}
               carcacasAtual={carcacasAtual}
+              disabled={modoCompletarPeso}
             />
           )}
         />

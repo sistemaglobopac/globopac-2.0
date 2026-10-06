@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, DownloadCloud, Info, Lock, Plus, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, CheckCircle2, Clock, Info, Lock, Plus, Scale, Trash2 } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -11,16 +11,19 @@ import {
   avesNoPeriodo,
   detalheDesvio,
   exibirPesoVivo,
-  loteDeCarga,
   GELO_PADRAO_CARCACAS,
   mascararPesoVivo,
+  numero,
+  pesoVivoDeHerdado,
   metaTanqueCarcacas,
   pesoMedioCarcaca as calcularPesoMedioCarcaca,
   totalAvesBruto,
   type ChaveTanqueCarcacas as ChaveTanque,
 } from "./calculosSpr";
 import { AvisoImplausivel, AvisoPrimeiroDoDia, LogicaCalculo, TOOLTIP_HIDR_ANTERIOR } from "./componentesSpr";
-import type { CargaProcessada, ChillerCarcacasValor, TanqueHidrometro } from "./tiposCompostos";
+import { baseDeCargasJaUsadas, baseParaProximo, calcularPeriodo, type CargaDoDia } from "./cargasDoPeriodo";
+import { vereditoAntecipado, vereditoGeral } from "./vereditoVazao";
+import type { CargaProcessada, ChegadaRegistrada, ChillerCarcacasValor, TanqueHidrometro } from "./tiposCompostos";
 
 const CONFIG_TANQUE: Record<ChaveTanque, { nome: string; cor: string }> = {
   preChiller: { nome: "Pré-chiller", cor: "#002060" },
@@ -48,13 +51,19 @@ interface ChillerCarcacasFieldProps {
   diaMonitoramento?: string;
   /** Cargas já usadas em rascunhos locais desta ficha (ainda não assinados). */
   cargasEmRascunho?: ReadonlySet<string>;
+  /** Hora do monitoramento (ISO) informada pelo inspetor: base do cálculo das cargas que já chegaram ao pré-resfriamento. */
+  horaMonitoramento?: string;
+  /** Etapa 2: o que foi assinado na etapa 1 fica travado; só o peso vivo dos lotes sem peso pode ser completado. */
+  modoCompletarPeso?: boolean;
 }
 
 /** Renovação da Água do SPR Carcaças. Aves no período = cargas − condenas; peso médio da
  * carcaça = média ponderada do peso vivo × 0,84; meta por tanque em função desse peso. O widget
  * só EXIBE o desvio — quem decide `monitoramentos.conformidade` continua sendo o Verificador
  * (segregação de funções, `trg_segregacao_funcoes`). Todas as contas ficam em calculosSpr.ts. */
-export function ChillerCarcacasField({ value, onChange, disabled, prevAppointment, diaMonitoramento, cargasEmRascunho }: ChillerCarcacasFieldProps) {
+export function ChillerCarcacasField({ value, onChange, disabled, prevAppointment, diaMonitoramento, horaMonitoramento, modoCompletarPeso }: ChillerCarcacasFieldProps) {
+  const disabledGeral = disabled || modoCompletarPeso;
+  const [chegada, setChegada] = useState<ChegadaRegistrada | undefined>(value?.chegada);
   const [cargas, setCargas] = useState<CargaProcessada[]>(value?.cargas ?? [{ id: crypto.randomUUID(), quantity: "", avgLiveWeight: "" }]);
   const [condenasParcial, setCondenasParcial] = useState(value?.condenasParcial ?? "");
   // Registros antigos só têm o campo `condenas`: ele entra como "totalmente condenadas".
@@ -70,23 +79,47 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
     chiller2: !!(value?.tanques?.chiller2?.prev || leituraHerdada(prevAppointment?.tanques?.chiller2)),
   });
 
-  // Herança do Bem-Estar Animal: cargas do dia com a pendura iniciada, que ainda não entraram em
-  // nenhuma apuração do SPR (nem nesta). Só aparecem cargas que já têm peso médio (densidade das
-  // caixas feita), pois o cálculo da vazão depende dele.
-  const [herdarAberto, setHerdarAberto] = useState(false);
+  // Cargas do período: calculadas pela CHEGADA ao pré-resfriamento na hora do monitoramento (início da pendura de cada
+  // carga + trânsito deduzido da velocidade da linha; ver chegadaPreResfriamento.ts). Substitui a escolha manual.
   const { data: cargasDoDia } = useCargasRastreabilidade(diaMonitoramento || ensureLocalTime(new Date().toISOString()).isoLocal);
   const { data: jaUsadas } = useCargasJaMonitoradas("spr");
-  const usadasNestaFicha = new Set(cargas.map((c) => c.cargaId).filter(Boolean));
-  const disponiveis = (cargasDoDia ?? []).filter(
-    (c) => c.pendura_inicio_em && !!c.peso_medio_kg && !jaUsadas?.has(c.carga_id) && !cargasEmRascunho?.has(c.carga_id) && !usadasNestaFicha.has(c.carga_id)
-  );
+  const periodo = useMemo(() => {
+    if (!horaMonitoramento || !cargasDoDia) return null;
+    const lista: CargaDoDia[] = cargasDoDia.map((c) => ({ carga_id: c.carga_id, gta: c.gta, qtd_aves: c.qtd_aves, pendura_inicio_em: c.pendura_inicio_em, peso_medio_kg: c.peso_medio_kg }));
+    // Base: o acumulado guardado no monitoramento anterior; sem ele, as cargas já apuradas contam inteiras.
+    const base = prevAppointment?.chegada?.acumulado ?? baseDeCargasJaUsadas(lista, jaUsadas);
+    return calcularPeriodo(lista, new Date(horaMonitoramento), base);
+  }, [horaMonitoramento, cargasDoDia, jaUsadas, prevAppointment]);
 
-  function herdarCargas(escolhidas: typeof disponiveis) {
-    if (escolhidas.length === 0) return;
-    const novos = escolhidas.map((c) => loteDeCarga(c, crypto.randomUUID()));
-    // O lote em branco inicial dá lugar às cargas herdadas.
-    setCargas((atual) => [...atual.filter((c) => c.cargaId || c.quantity || c.avgLiveWeight), ...novos]);
+  function usarCargasCalculadas() {
+    if (!periodo || periodo.lotes.length === 0) return;
+    setCargas(
+      periodo.lotes.map((l) => ({ id: crypto.randomUUID(), quantity: String(l.aves), avgLiveWeight: l.pesoVivo, cargaId: l.cargaId, gta: l.gta, parcial: !l.completa }))
+    );
+    setChegada({
+      corteEm: periodo.chegada.corteEm,
+      velocidadeAvesH: periodo.chegada.velocidadeAvesH,
+      origemVelocidade: periodo.chegada.origemVelocidade,
+      transitoSegundos: periodo.chegada.transitoSegundos,
+      acumulado: baseParaProximo(periodo.chegada),
+    });
   }
+
+  // Etapa 2: o peso da carga chegou da balança → completa sozinho o peso vivo dos lotes que estavam em branco.
+  useEffect(() => {
+    if (!modoCompletarPeso || !cargasDoDia) return;
+    setCargas((atual) => {
+      let mudou = false;
+      const novo = atual.map((c) => {
+        if (c.avgLiveWeight || !c.cargaId) return c;
+        const peso = pesoVivoDeHerdado(cargasDoDia.find((x) => x.carga_id === c.cargaId)?.peso_medio_kg);
+        if (!peso) return c;
+        mudou = true;
+        return { ...c, avgLiveWeight: peso };
+      });
+      return mudou ? novo : atual;
+    });
+  }, [modoCompletarPeso, cargasDoDia]);
 
   // Primeiro monitoramento do dia (nenhum tanque tem leitura anterior para herdar): só a leitura
   // atual, que vira a base do próximo monitoramento comparar.
@@ -108,7 +141,11 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
   }, [prevAppointment]);
 
   const totalAves = totalAvesBruto(cargas);
-  const pesoMedioCarcaca = calcularPesoMedioCarcaca(cargas); // já com o rendimento fixo de 84%
+  // Lote com aves e sem peso vivo: a balança ainda não passou o peso daquela carga. Enquanto isso o peso médio (e a meta) é
+  // desconhecido e a conformidade só pode ser ANTECIPADA (vereditoVazao.ts). Nunca se usa peso estimado.
+  const lotesPendentes = cargas.filter((c) => (parseFloat(c.quantity) || 0) > 0 && numero(c.avgLiveWeight) <= 0);
+  const pesoPendente = lotesPendentes.length > 0;
+  const pesoMedioCarcaca = pesoPendente ? 0 : calcularPesoMedioCarcaca(cargas); // já com o rendimento fixo de 84%
 
   const totalCondenasParcial = parseFloat(condenasParcial) || 0;
   const totalCondenasTotalNum = parseFloat(condenasTotal) || 0;
@@ -134,13 +171,27 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
   const confPreChiller = conformeTanque("preChiller");
   const confChiller1 = conformeTanque("chiller1");
   const confChiller2 = conformeTanque("chiller2");
-  const isConforme = !hasCurData || (confPreChiller && confChiller1 && confChiller2);
+  // Veredito antecipado (peso pendente): só a renovação apurada, comparada com as metas das faixas de peso.
+  const vereditoTanque = (chave: ChaveTanque) => (tanques[chave].cur && totalAvesPeriodo > 0 ? vereditoAntecipado(chave, apurado[chave]) : null);
+  const vereditos = { preChiller: vereditoTanque("preChiller"), chiller1: vereditoTanque("chiller1"), chiller2: vereditoTanque("chiller2") };
+  const veredito = pesoPendente ? vereditoGeral(Object.values(vereditos)) : null;
+  const ncCerto = veredito?.estado === "nao_conforme_certo";
+  const isConforme = pesoPendente ? !ncCerto : !hasCurData || (confPreChiller && confChiller1 && confChiller2);
 
   useEffect(() => {
     const detalhes: string[] = [];
-    if (!confPreChiller && totalAvesPeriodo > 0) detalhes.push(detalheDesvio("Pré-chiller", apurado.preChiller ?? 0, metas.preChiller, "L/c"));
-    if (!confChiller1 && totalAvesPeriodo > 0) detalhes.push(detalheDesvio("Chiller 01", apurado.chiller1 ?? 0, metas.chiller1, "L/c"));
-    if (!confChiller2 && totalAvesPeriodo > 0) detalhes.push(detalheDesvio("Chiller 02", apurado.chiller2 ?? 0, metas.chiller2, "L/c"));
+    if (pesoPendente) {
+      // Não conforme em QUALQUER peso: abaixo da meta da faixa mais branda.
+      const nomes: [ChaveTanque, string][] = [["preChiller", "Pré-chiller"], ["chiller1", "Chiller 01"], ["chiller2", "Chiller 02"]];
+      for (const [chave, nome] of nomes) {
+        const v = vereditos[chave];
+        if (v?.estado === "nao_conforme_certo") detalhes.push(detalheDesvio(nome, apurado[chave] ?? 0, v.metas.ate2_5, "L/c"));
+      }
+    } else {
+      if (!confPreChiller && totalAvesPeriodo > 0) detalhes.push(detalheDesvio("Pré-chiller", apurado.preChiller ?? 0, metas.preChiller, "L/c"));
+      if (!confChiller1 && totalAvesPeriodo > 0) detalhes.push(detalheDesvio("Chiller 01", apurado.chiller1 ?? 0, metas.chiller1, "L/c"));
+      if (!confChiller2 && totalAvesPeriodo > 0) detalhes.push(detalheDesvio("Chiller 02", apurado.chiller2 ?? 0, metas.chiller2, "L/c"));
+    }
 
     onChange({
       cargas,
@@ -150,11 +201,17 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
       totalAves: totalAvesPeriodo,
       totalAvesBruto: totalAves,
       pesoMedioCarcaca,
+      ...(chegada ? { chegada } : {}),
       conformidade: isConforme,
-      detalhesRNC: detalhes.length > 0 ? `Vazão Insuficiente: ${detalhes.join("; ")}` : null,
+      detalhesRNC:
+        detalhes.length > 0
+          ? pesoPendente
+            ? `Vazão Insuficiente em qualquer faixa de peso (peso das cargas ainda não informado): ${detalhes.join("; ")}`
+            : `Vazão Insuficiente: ${detalhes.join("; ")}`
+          : null,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cargas, tanques, condenasParcial, condenasTotal, isConforme]);
+  }, [cargas, tanques, condenasParcial, condenasTotal, isConforme, chegada, pesoPendente]);
 
   function adicionarCarga() {
     setCargas((atual) => [...atual, { id: crypto.randomUUID(), quantity: "", avgLiveWeight: "" }]);
@@ -182,7 +239,9 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
       <div key={chave} className="overflow-hidden rounded-lg border-2" style={{ borderColor: naoConforme ? "#dc2626" : `${cor}40` }}>
         <div className="flex flex-wrap gap-2 items-center justify-between px-3 py-2 text-sm font-black text-white" style={{ background: cor }}>
           {CONFIG_TANQUE[chave].nome.toUpperCase()}
-          {totalAves > 0 && <span className="text-xs opacity-90">Meta: {formatMaskedValue(meta.toFixed(3))} L/c</span>}
+          {totalAves > 0 && (
+            <span className="text-xs opacity-90">{pesoPendente ? "Meta: depende do peso das cargas" : `Meta: ${formatMaskedValue(meta.toFixed(3))} L/c`}</span>
+          )}
         </div>
         <div className="space-y-3 p-4">
           <div className="grid grid-cols-1 gap-3">
@@ -192,7 +251,7 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
                   Hidr. Anterior (m³) {prevTravado[chave] && <Lock className="h-3 w-3" />}
                 </Label>
                 <Input
-                  disabled={disabled || prevTravado[chave]}
+                  disabled={disabledGeral || prevTravado[chave]}
                   title={prevTravado[chave] ? TOOLTIP_HIDR_ANTERIOR : undefined}
                   value={formatHidrometro(tanque.prev)}
                   onChange={(e) => alterarTanque(chave, "prev", parseHidrometro(e.target.value))}
@@ -204,7 +263,7 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Hidr. Atual (m³)</Label>
               <Input
-                disabled={disabled}
+                disabled={disabledGeral}
                 value={formatHidrometro(tanque.cur)}
                 onChange={(e) => alterarTanque(chave, "cur", parseHidrometro(e.target.value))}
                 className="font-mono"
@@ -215,7 +274,7 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Gelo Adicionado (kg)</Label>
                 <Input
-                  disabled={disabled}
+                  disabled={disabledGeral}
                   value={formatHidrometro(tanque.ice)}
                   onChange={(e) => alterarTanque(chave, "ice", parseHidrometro(e.target.value))}
                   className="font-mono"
@@ -256,10 +315,14 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-muted/40 p-4">
         <div>
           <p className="text-xs font-bold uppercase text-muted-foreground">Status de Conformidade</p>
-          <p className={`mt-1 flex items-center gap-2 text-lg font-black ${!hasCurData ? "text-primary" : !isConforme ? "text-destructive" : "text-success"}`}>
+          <p className={`mt-1 flex items-center gap-2 text-lg font-black ${!hasCurData || (pesoPendente && isConforme) ? "text-primary" : !isConforme ? "text-destructive" : "text-success"}`}>
             {!hasCurData ? (
               <>
                 <Info className="h-5 w-5" /> AGUARDANDO LEITURA
+              </>
+            ) : pesoPendente && isConforme ? (
+              <>
+                <Scale className="h-5 w-5" /> AGUARDANDO O PESO DA BALANÇA
               </>
             ) : !isConforme ? (
               <>
@@ -302,43 +365,95 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
         </div>
       )}
 
+      {pesoPendente && hasCurData && veredito && (
+        <div
+          role="status"
+          data-testid="veredito-antecipado"
+          className={`space-y-1 rounded-md border-2 p-3 text-sm ${
+            veredito.estado === "nao_conforme_certo"
+              ? "border-destructive bg-destructive/10 text-destructive"
+              : veredito.estado === "conforme_certo"
+                ? "border-success bg-success/10 text-success"
+                : "border-warning bg-warning/10 text-foreground"
+          }`}
+        >
+          <p className="flex items-center gap-2 font-bold">
+            <Scale className="h-4 w-4" />
+            {veredito.estado === "nao_conforme_certo"
+              ? "NÃO CONFORME em qualquer peso — aja agora"
+              : veredito.estado === "conforme_certo"
+                ? "CONFORME em qualquer peso"
+                : "Depende do peso das cargas"}
+          </p>
+          <p className="text-xs">
+            {veredito.estado === "nao_conforme_certo"
+              ? "A renovação apurada está abaixo da meta da faixa de peso mais branda. Emita a RNC ou registre a ação corretiva imediata sem esperar a balança."
+              : veredito.estado === "conforme_certo"
+                ? "A renovação apurada atende a meta da faixa de peso mais exigente."
+                : `Conforme se o peso médio da carcaça for até ${(veredito.conformeSeCarcacaAteKg ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 1 })} kg (peso vivo médio até ${(veredito.conformeSePesoVivoAteKg ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 3 })} kg). A meta final só é fechada quando a balança passar o peso.`}
+          </p>
+        </div>
+      )}
+
       {!isPrimeiroDoDia ? (
         <div className="space-y-3 rounded-md border border-primary/20 bg-primary/5 p-4">
           <div className="flex flex-wrap gap-2 items-center justify-between">
             <h4 className="text-sm font-bold text-primary">Cargas Processadas no Período</h4>
-            <Button type="button" size="sm" variant="outline" onClick={adicionarCarga} disabled={disabled}>
+            <Button type="button" size="sm" variant="outline" onClick={adicionarCarga} disabled={disabledGeral}>
               <Plus className="h-3.5 w-3.5" /> Adicionar Lote
             </Button>
           </div>
 
-          <div className="space-y-2 rounded-md border border-dashed border-primary/40 bg-background p-3" data-testid="herdar-cargas">
-            <Button type="button" size="sm" variant="outline" disabled={disabled} onClick={() => setHerdarAberto((a) => !a)}>
-              <DownloadCloud className="h-3.5 w-3.5" /> Herdar cargas do Bem-Estar Animal ({disponiveis.length})
-            </Button>
-            {herdarAberto && (
-              <div className="space-y-1">
-                {disponiveis.length === 0 && (
-                  <p className="text-xs text-muted-foreground">Nenhuma carga nova com a pendura iniciada e o peso já registrado (as já usadas em apurações do SPR não aparecem).</p>
-                )}
-                {disponiveis.map((c) => (
-                  <div key={c.carga_id} className="flex flex-wrap items-center justify-between gap-2 rounded border p-2 text-xs">
-                    <span>
-                      <strong>GTA {c.gta}</strong> · {c.qtd_aves.toLocaleString("pt-BR")} aves ·{" "}
-                      peso {c.peso_medio_kg} kg
+          {!modoCompletarPeso && (
+            <div className="space-y-2 rounded-md border border-dashed border-primary/40 bg-background p-3" data-testid="cargas-calculadas">
+              <p className="flex items-center gap-2 text-xs font-bold text-primary">
+                <Clock className="h-3.5 w-3.5" /> Cargas que já chegaram ao pré-resfriamento
+              </p>
+              {!horaMonitoramento ? (
+                <p className="text-xs text-muted-foreground">Informe a hora do monitoramento (no topo da ficha) para calcular as cargas do período.</p>
+              ) : !periodo ? (
+                <p className="text-xs text-muted-foreground">Carregando as cargas do dia…</p>
+              ) : periodo.lotes.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Nenhuma carga nova chegou ao pré-resfriamento até essa hora (ou a pendura ainda não foi registrada no Bem-Estar Animal). Você pode adicionar lotes manualmente.
+                </p>
+              ) : (
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    Corte às {ensureLocalTime(periodo.chegada.corteEm).time}: trânsito de {Math.floor(periodo.chegada.transitoSegundos / 60)} min{" "}
+                    {String(periodo.chegada.transitoSegundos % 60).padStart(2, "0")} s, a {periodo.chegada.velocidadeAvesH.toLocaleString("pt-BR")} aves/h
+                    {periodo.chegada.origemVelocidade === "observada" ? " (velocidade deduzida da pendura das cargas)" : " (velocidade nominal da linha: ainda não há carga concluída para deduzir)"}.
+                  </p>
+                  <div className="space-y-1">
+                    {periodo.lotes.map((l) => (
+                      <div key={l.cargaId} className="flex flex-wrap items-center justify-between gap-2 rounded border p-2 text-xs">
+                        <span>
+                          <strong>GTA {l.gta}</strong> · {l.aves.toLocaleString("pt-BR")} aves{!l.completa && " (parte da carga)"}
+                        </span>
+                        <span className={l.pesoVivo ? "text-muted-foreground" : "font-semibold text-warning-foreground"}>
+                          {l.pesoVivo ? `peso ${exibirPesoVivo(l.pesoVivo)} kg` : "aguardando o peso da balança"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs">
+                      Total: <strong>{periodo.totalAves.toLocaleString("pt-BR")} aves</strong>
+                      {periodo.semPeso.length > 0 && ` · ${periodo.semPeso.length} carga(s) sem peso`}
                     </span>
-                    <Button type="button" size="sm" variant="outline" onClick={() => herdarCargas([c])}>
-                      <Plus className="h-3.5 w-3.5" /> Adicionar
+                    <Button type="button" size="sm" disabled={disabledGeral} onClick={usarCargasCalculadas}>
+                      Usar estas cargas
                     </Button>
                   </div>
-                ))}
-                {disponiveis.length > 1 && (
-                  <Button type="button" size="sm" onClick={() => herdarCargas(disponiveis)}>
-                    Adicionar todas
-                  </Button>
-                )}
-              </div>
-            )}
-          </div>
+                  {periodo.semPeso.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Sem o peso você ainda pode salvar: a leitura vale agora e o peso é completado depois, quando a balança passar. A conformidade só é fechada com o peso real.
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
           <div className="space-y-2">
             {cargas.map((carga, indice) => (
@@ -346,12 +461,13 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
                 <span className="text-xs font-black text-muted-foreground sm:min-w-[60px]">
                   LOTE {indice + 1}
                   {carga.gta && <span className="block font-normal">GTA {carga.gta}</span>}
+                  {carga.parcial && <span className="block font-normal text-warning-foreground">parte da carga</span>}
                 </span>
                 <div className="flex-1 space-y-1">
                   <Label className="text-xs text-muted-foreground">Aves (un)</Label>
                   <Input
                     inputMode="numeric"
-                    disabled={disabled || !!(carga.cargaId && carga.quantity)}
+                    disabled={disabledGeral || !!(carga.cargaId && carga.quantity)}
                     value={carga.quantity}
                     onChange={(e) => alterarCarga(carga.id, "quantity", somenteInteiro(e.target.value))}
                     placeholder="Ex: 4500"
@@ -367,8 +483,9 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
                     onChange={(e) => alterarCarga(carga.id, "avgLiveWeight", mascararPesoVivo(e.target.value))}
                     placeholder="Ex: 2,850"
                   />
+                  {!carga.avgLiveWeight && carga.cargaId && <p className="text-[0.65rem] font-semibold text-warning-foreground">aguardando o peso da balança</p>}
                 </div>
-                {cargas.length > 1 && !disabled && (
+                {cargas.length > 1 && !disabledGeral && (
                   <Button type="button" size="sm" variant="ghost" className="text-destructive" onClick={() => removerCarga(carga.id)}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -380,11 +497,11 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
           <div className="grid grid-cols-1 gap-3 border-t border-dashed pt-3 sm:grid-cols-2">
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Carcaças Parcialmente Aproveitadas</Label>
-              <Input inputMode="numeric" disabled={disabled} value={condenasParcial} onChange={(e) => setCondenasParcial(somenteInteiro(e.target.value))} placeholder="Ex: 40" />
+              <Input inputMode="numeric" disabled={disabledGeral} value={condenasParcial} onChange={(e) => setCondenasParcial(somenteInteiro(e.target.value))} placeholder="Ex: 40" />
             </div>
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Carcaças Totalmente Condenadas</Label>
-              <Input inputMode="numeric" disabled={disabled} value={condenasTotal} onChange={(e) => setCondenasTotal(somenteInteiro(e.target.value))} placeholder="Ex: 80" />
+              <Input inputMode="numeric" disabled={disabledGeral} value={condenasTotal} onChange={(e) => setCondenasTotal(somenteInteiro(e.target.value))} placeholder="Ex: 80" />
             </div>
           </div>
           {totalAves > 0 && (
@@ -409,6 +526,10 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
           Curva das metas (L/carcaça) para o peso médio de carcaça atual
           {pesoMedioCarcaca > 0 ? ` (${formatMaskedValue(pesoMedioCarcaca.toFixed(3))} kg)` : ""}: Pré-chiller {formatMaskedValue(metas.preChiller.toFixed(3)) || "—"} →
           Chiller 01 {formatMaskedValue(metas.chiller1.toFixed(3)) || "—"} → Chiller 02 {formatMaskedValue(metas.chiller2.toFixed(3)) || "—"}.
+        </li>
+        <li>
+          Cargas do período = aves que já chegaram ao pré-resfriamento na hora do monitoramento: aves penduradas até (hora − trânsito), com o trânsito deduzido da velocidade da linha
+          (aves da carga ÷ tempo até a pendura da seguinte), menos o que já entrou no monitoramento anterior.
         </li>
         <li>Aves no Período = Σ aves das cargas − (carcaças parcialmente aproveitadas + totalmente condenadas).</li>
         <li>Peso médio da carcaça = média ponderada do peso vivo × 0,84 (rendimento fixo de 84%).</li>
