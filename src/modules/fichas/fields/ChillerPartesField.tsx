@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, Info, Lock } from "lucide-react";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
-import { formatHidrometro, formatMaskedValue, LIMIAR_IMPLAUSIVEL, parseHidrometro } from "./hidrometro";
+import { formatHidrometro, formatMaskedValue, leituraHerdada, LIMIAR_IMPLAUSIVEL, parseHidrometro } from "./hidrometro";
 import { apurar, detalheDesvio, GELO_PADRAO_PARTES, massaPartes, META_L_KG } from "./calculosSpr";
 import { AvisoImplausivel, AvisoPrimeiroDoDia, CampoBloqueado, LogicaCalculo, TOOLTIP_HIDR_ANTERIOR } from "./componentesSpr";
 import type { ChillerCarcacasValor, ChillerPartesValor, TanqueHidrometro } from "./tiposCompostos";
@@ -34,24 +34,24 @@ interface ChillerPartesFieldProps {
  * BLOQUEADA do SPR Carcaças. */
 export function ChillerPartesField({ value, onChange, disabled, prevAppointment, carcacasAtual }: ChillerPartesFieldProps) {
   const [tanques, setTanques] = useState({
-    chiller1: value?.tanques?.chiller1 ?? tanqueVazio(prevAppointment?.tanques?.chiller1?.cur ?? ""),
-    chiller2: value?.tanques?.chiller2 ?? tanqueVazio(prevAppointment?.tanques?.chiller2?.cur ?? ""),
+    chiller1: value?.tanques?.chiller1 ?? tanqueVazio(leituraHerdada(prevAppointment?.tanques?.chiller1)),
+    chiller2: value?.tanques?.chiller2 ?? tanqueVazio(leituraHerdada(prevAppointment?.tanques?.chiller2)),
   });
   const [prevTravado, setPrevTravado] = useState({
-    chiller1: !!(value?.tanques?.chiller1?.prev || prevAppointment?.tanques?.chiller1?.cur),
-    chiller2: !!(value?.tanques?.chiller2?.prev || prevAppointment?.tanques?.chiller2?.cur),
+    chiller1: !!(value?.tanques?.chiller1?.prev || leituraHerdada(prevAppointment?.tanques?.chiller1)),
+    chiller2: !!(value?.tanques?.chiller2?.prev || leituraHerdada(prevAppointment?.tanques?.chiller2)),
   });
   const isPrimeiroDoDia = !prevTravado.chiller1 && !prevTravado.chiller2;
 
   useEffect(() => {
     if (!prevAppointment) return;
     setTanques((atual) => ({
-      chiller1: { ...atual.chiller1, prev: atual.chiller1.prev || prevAppointment?.tanques?.chiller1?.cur },
-      chiller2: { ...atual.chiller2, prev: atual.chiller2.prev || prevAppointment?.tanques?.chiller2?.cur },
+      chiller1: { ...atual.chiller1, prev: atual.chiller1.prev || leituraHerdada(prevAppointment?.tanques?.chiller1) },
+      chiller2: { ...atual.chiller2, prev: atual.chiller2.prev || leituraHerdada(prevAppointment?.tanques?.chiller2) },
     }));
     setPrevTravado((atual) => ({
-      chiller1: atual.chiller1 || !!prevAppointment?.tanques?.chiller1?.cur,
-      chiller2: atual.chiller2 || !!prevAppointment?.tanques?.chiller2?.cur,
+      chiller1: atual.chiller1 || !!leituraHerdada(prevAppointment?.tanques?.chiller1),
+      chiller2: atual.chiller2 || !!leituraHerdada(prevAppointment?.tanques?.chiller2),
     }));
   }, [prevAppointment]);
 

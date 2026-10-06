@@ -10,28 +10,40 @@ const campos = [
   { chave: "chuveiro", tipo: "lavagem_final" },
 ] as unknown as CampoTemplate[];
 
+// Widgets 100% preenchidos (1º monitoramento do dia: só leitura atual): isolam as flags de bloqueio
+// dos motivos de campo em branco (ver preenchimentoSpr.test.ts).
+const t = (cur: string) => ({ prev: "", cur, ice: "" });
+const completos = {
+  carcacas: { cargas: [], tanques: { preChiller: t("1"), chiller1: t("1"), chiller2: t("1") }, condenasParcial: "", condenasTotal: "" },
+  partes: { tanques: { chiller1: t("1"), chiller2: t("1") }, pesoCarcacaIndisponivel: false },
+  miudos: { tanques: { coracao: t("1"), moela: t("1"), figado: t("1"), cabeca: t("1"), pes: t("1") }, avesIndisponivel: false, pesoMiudoIndisponivel: false },
+  chuveiro: { chuveiro: { prev: "", cur: "1" }, condenacoesParciais: "", avesIndisponivel: false },
+};
+const com = (parcial: Record<string, Record<string, unknown>>) => ({
+  ...completos,
+  ...Object.fromEntries(Object.entries(parcial).map(([k, v]) => [k, { ...(completos as Record<string, object>)[k], ...v }])),
+});
+
 describe("bloqueio de assinatura pelas flags dos widgets", () => {
   it("sem flags, não bloqueia", () => {
-    expect(
-      motivosDeBloqueioSpr(campos, {
-        partes: { pesoCarcacaIndisponivel: false },
-        miudos: { avesIndisponivel: false, pesoMiudoIndisponivel: false },
-        chuveiro: { avesIndisponivel: false },
-      })
-    ).toEqual([]);
+    expect(motivosDeBloqueioSpr(campos, completos)).toEqual([]);
   });
 
   it("Partes bloqueia por peso de carcaça ausente", () => {
-    expect(motivosDeBloqueioSpr(campos, { partes: { pesoCarcacaIndisponivel: true } })).toHaveLength(1);
+    expect(motivosDeBloqueioSpr(campos, com({ partes: { pesoCarcacaIndisponivel: true } }))).toHaveLength(1);
   });
 
   it("Miúdos tem 2 alertas independentes (aves e peso)", () => {
-    expect(motivosDeBloqueioSpr(campos, { miudos: { avesIndisponivel: true, pesoMiudoIndisponivel: false } })).toHaveLength(1);
-    expect(motivosDeBloqueioSpr(campos, { miudos: { avesIndisponivel: true, pesoMiudoIndisponivel: true } })).toHaveLength(2);
+    expect(motivosDeBloqueioSpr(campos, com({ miudos: { avesIndisponivel: true } }))).toHaveLength(1);
+    expect(motivosDeBloqueioSpr(campos, com({ miudos: { avesIndisponivel: true, pesoMiudoIndisponivel: true } }))).toHaveLength(2);
   });
 
   it("Chuveiro bloqueia por total de aves (bruto) ausente", () => {
-    expect(motivosDeBloqueioSpr(campos, { chuveiro: { avesIndisponivel: true } })).toHaveLength(1);
+    expect(motivosDeBloqueioSpr(campos, com({ chuveiro: { avesIndisponivel: true } }))).toHaveLength(1);
+  });
+
+  it("widgets SPR em branco bloqueiam", () => {
+    expect(motivosDeBloqueioSpr(campos, {}).length).toBeGreaterThanOrEqual(4);
   });
 });
 

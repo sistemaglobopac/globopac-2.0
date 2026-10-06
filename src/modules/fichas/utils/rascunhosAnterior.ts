@@ -9,6 +9,24 @@ export interface RegistroAnterior {
   criado_em: string;
 }
 
+/** Ids das cargas já usadas como lote do SPR Carcaças nos RASCUNHOS locais desta ficha+setor. Um
+ * rascunho ainda não assinado não aparece em cargas_ja_monitoradas (servidor): sem isto, a carga
+ * voltaria a ser oferecida para herdar no monitoramento seguinte e entraria duas vezes na vazão. */
+export function cargasEmRascunhos(rascunhos: Rascunho[] | undefined, codigo: string, setor: string): Set<string> {
+  const ids = new Set<string>();
+  for (const r of rascunhos ?? []) {
+    if (r.codigo !== codigo || r.setor !== setor) continue;
+    for (const valor of Object.values(r.dadosDinamicos ?? {})) {
+      const cargas = (valor as { cargas?: unknown } | null)?.cargas;
+      if (!Array.isArray(cargas)) continue;
+      for (const c of cargas as { cargaId?: unknown; avgLiveWeight?: unknown }[]) {
+        if (typeof c?.cargaId === "string" && c.avgLiveWeight !== undefined) ids.add(c.cargaId);
+      }
+    }
+  }
+  return ids;
+}
+
 /** O "monitoramento anterior" que o novo preenchimento herda: o mais recente entre o último registro
  * já gravado no servidor e os RASCUNHOS locais desta ficha+setor, de hoje e do mesmo turno. Assim o
  * 2º monitoramento feito offline (ou ainda não assinado) herda as leituras do 1º, no aparelho.

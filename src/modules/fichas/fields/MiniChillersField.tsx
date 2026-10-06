@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, Info, Lock } from "lucide-react";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
-import { formatHidrometro, formatMaskedValue, LIMIAR_IMPLAUSIVEL, parseHidrometro } from "./hidrometro";
+import { formatHidrometro, formatMaskedValue, leituraHerdada, LIMIAR_IMPLAUSIVEL, parseHidrometro } from "./hidrometro";
 import { apurar, detalheDesvio, GELO_PADRAO_MIUDOS, META_L_KG, pesosMiudosPorCarcaca, type ChaveMiudo } from "./calculosSpr";
 import { AvisoImplausivel, AvisoPrimeiroDoDia, CampoBloqueado, LogicaCalculo, TOOLTIP_HIDR_ANTERIOR } from "./componentesSpr";
 import type { ChillerCarcacasValor, MiniChillersValor, TanqueHidrometro } from "./tiposCompostos";
@@ -32,18 +32,18 @@ interface MiniChillersFieldProps {
  * unitário de cada miúdo vem da Tabela DE-PARA (calculosSpr.ts). Meta: 1,5 L/kg em cada tanque. */
 export function MiniChillersField({ value, onChange, disabled, prevAppointment, carcacasAtual }: MiniChillersFieldProps) {
   const [tanques, setTanques] = useState({
-    coracao: value?.tanques?.coracao ?? tanqueVazio(prevAppointment?.tanques?.coracao?.cur ?? ""),
-    moela: value?.tanques?.moela ?? tanqueVazio(prevAppointment?.tanques?.moela?.cur ?? ""),
-    figado: value?.tanques?.figado ?? tanqueVazio(prevAppointment?.tanques?.figado?.cur ?? ""),
-    cabeca: value?.tanques?.cabeca ?? tanqueVazio(prevAppointment?.tanques?.cabeca?.cur ?? ""),
-    pes: value?.tanques?.pes ?? tanqueVazio(prevAppointment?.tanques?.pes?.cur ?? ""),
+    coracao: value?.tanques?.coracao ?? tanqueVazio(leituraHerdada(prevAppointment?.tanques?.coracao)),
+    moela: value?.tanques?.moela ?? tanqueVazio(leituraHerdada(prevAppointment?.tanques?.moela)),
+    figado: value?.tanques?.figado ?? tanqueVazio(leituraHerdada(prevAppointment?.tanques?.figado)),
+    cabeca: value?.tanques?.cabeca ?? tanqueVazio(leituraHerdada(prevAppointment?.tanques?.cabeca)),
+    pes: value?.tanques?.pes ?? tanqueVazio(leituraHerdada(prevAppointment?.tanques?.pes)),
   });
   const [prevTravado, setPrevTravado] = useState({
-    coracao: !!(value?.tanques?.coracao?.prev || prevAppointment?.tanques?.coracao?.cur),
-    moela: !!(value?.tanques?.moela?.prev || prevAppointment?.tanques?.moela?.cur),
-    figado: !!(value?.tanques?.figado?.prev || prevAppointment?.tanques?.figado?.cur),
-    cabeca: !!(value?.tanques?.cabeca?.prev || prevAppointment?.tanques?.cabeca?.cur),
-    pes: !!(value?.tanques?.pes?.prev || prevAppointment?.tanques?.pes?.cur),
+    coracao: !!(value?.tanques?.coracao?.prev || leituraHerdada(prevAppointment?.tanques?.coracao)),
+    moela: !!(value?.tanques?.moela?.prev || leituraHerdada(prevAppointment?.tanques?.moela)),
+    figado: !!(value?.tanques?.figado?.prev || leituraHerdada(prevAppointment?.tanques?.figado)),
+    cabeca: !!(value?.tanques?.cabeca?.prev || leituraHerdada(prevAppointment?.tanques?.cabeca)),
+    pes: !!(value?.tanques?.pes?.prev || leituraHerdada(prevAppointment?.tanques?.pes)),
   });
   const isPrimeiroDoDia = !Object.values(prevTravado).some(Boolean);
 
@@ -52,14 +52,14 @@ export function MiniChillersField({ value, onChange, disabled, prevAppointment, 
     setTanques((atual) => {
       const novo = { ...atual };
       (Object.keys(novo) as ChaveMiudo[]).forEach((chave) => {
-        novo[chave] = { ...novo[chave], prev: novo[chave].prev || prevAppointment?.tanques?.[chave]?.cur };
+        novo[chave] = { ...novo[chave], prev: novo[chave].prev || leituraHerdada(prevAppointment?.tanques?.[chave]) };
       });
       return novo;
     });
     setPrevTravado((atual) => {
       const novo = { ...atual };
       (Object.keys(novo) as ChaveMiudo[]).forEach((chave) => {
-        novo[chave] = novo[chave] || !!prevAppointment?.tanques?.[chave]?.cur;
+        novo[chave] = novo[chave] || !!leituraHerdada(prevAppointment?.tanques?.[chave]);
       });
       return novo;
     });

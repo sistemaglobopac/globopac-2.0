@@ -5,7 +5,7 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { useCargasJaMonitoradas, useCargasRastreabilidade } from "@/modules/recepcao/api";
 import { ensureLocalTime } from "../utils/tempo";
-import { formatHidrometro, formatMaskedValue, LIMIAR_IMPLAUSIVEL, parseHidrometro } from "./hidrometro";
+import { formatHidrometro, formatMaskedValue, leituraHerdada, LIMIAR_IMPLAUSIVEL, parseHidrometro } from "./hidrometro";
 import {
   apurar,
   avesNoPeriodo,
@@ -44,36 +44,42 @@ interface ChillerCarcacasFieldProps {
   /** dados_dinamicos[chave] do monitoramento mais recente de HOJE (mesma ficha, setor e turno) —
    * a leitura "atual" de lá vira a leitura "anterior" (travada) deste apontamento. */
   prevAppointment?: ChillerCarcacasValor;
+  /** Dia (AAAA-MM-DD, Manaus) cujas cargas podem ser herdadas; sem ele, hoje. */
+  diaMonitoramento?: string;
+  /** Cargas já usadas em rascunhos locais desta ficha (ainda não assinados). */
+  cargasEmRascunho?: ReadonlySet<string>;
 }
 
 /** Renovação da Água do SPR Carcaças. Aves no período = cargas − condenas; peso médio da
  * carcaça = média ponderada do peso vivo × 0,84; meta por tanque em função desse peso. O widget
  * só EXIBE o desvio — quem decide `monitoramentos.conformidade` continua sendo o Verificador
  * (segregação de funções, `trg_segregacao_funcoes`). Todas as contas ficam em calculosSpr.ts. */
-export function ChillerCarcacasField({ value, onChange, disabled, prevAppointment }: ChillerCarcacasFieldProps) {
+export function ChillerCarcacasField({ value, onChange, disabled, prevAppointment, diaMonitoramento, cargasEmRascunho }: ChillerCarcacasFieldProps) {
   const [cargas, setCargas] = useState<CargaProcessada[]>(value?.cargas ?? [{ id: crypto.randomUUID(), quantity: "", avgLiveWeight: "" }]);
   const [condenasParcial, setCondenasParcial] = useState(value?.condenasParcial ?? "");
   // Registros antigos só têm o campo `condenas`: ele entra como "totalmente condenadas".
   const [condenasTotal, setCondenasTotal] = useState(value?.condenasTotal ?? value?.condenas ?? "");
   const [tanques, setTanques] = useState({
-    preChiller: value?.tanques?.preChiller ?? tanqueVazio("preChiller", prevAppointment?.tanques?.preChiller?.cur ?? ""),
-    chiller1: value?.tanques?.chiller1 ?? tanqueVazio("chiller1", prevAppointment?.tanques?.chiller1?.cur ?? ""),
-    chiller2: value?.tanques?.chiller2 ?? tanqueVazio("chiller2", prevAppointment?.tanques?.chiller2?.cur ?? ""),
+    preChiller: value?.tanques?.preChiller ?? tanqueVazio("preChiller", leituraHerdada(prevAppointment?.tanques?.preChiller)),
+    chiller1: value?.tanques?.chiller1 ?? tanqueVazio("chiller1", leituraHerdada(prevAppointment?.tanques?.chiller1)),
+    chiller2: value?.tanques?.chiller2 ?? tanqueVazio("chiller2", leituraHerdada(prevAppointment?.tanques?.chiller2)),
   });
   const [prevTravado, setPrevTravado] = useState({
-    preChiller: !!(value?.tanques?.preChiller?.prev || prevAppointment?.tanques?.preChiller?.cur),
-    chiller1: !!(value?.tanques?.chiller1?.prev || prevAppointment?.tanques?.chiller1?.cur),
-    chiller2: !!(value?.tanques?.chiller2?.prev || prevAppointment?.tanques?.chiller2?.cur),
+    preChiller: !!(value?.tanques?.preChiller?.prev || leituraHerdada(prevAppointment?.tanques?.preChiller)),
+    chiller1: !!(value?.tanques?.chiller1?.prev || leituraHerdada(prevAppointment?.tanques?.chiller1)),
+    chiller2: !!(value?.tanques?.chiller2?.prev || leituraHerdada(prevAppointment?.tanques?.chiller2)),
   });
 
   // Herança do Bem-Estar Animal: cargas do dia com a pendura iniciada, que ainda não entraram em
   // nenhuma apuração do SPR (nem nesta). Só aparecem cargas que já têm peso médio (densidade das
   // caixas feita), pois o cálculo da vazão depende dele.
   const [herdarAberto, setHerdarAberto] = useState(false);
-  const { data: cargasDoDia } = useCargasRastreabilidade(ensureLocalTime(new Date().toISOString()).isoLocal);
+  const { data: cargasDoDia } = useCargasRastreabilidade(diaMonitoramento || ensureLocalTime(new Date().toISOString()).isoLocal);
   const { data: jaUsadas } = useCargasJaMonitoradas("spr");
   const usadasNestaFicha = new Set(cargas.map((c) => c.cargaId).filter(Boolean));
-  const disponiveis = (cargasDoDia ?? []).filter((c) => c.pendura_inicio_em && !!c.peso_medio_kg && !jaUsadas?.has(c.carga_id) && !usadasNestaFicha.has(c.carga_id));
+  const disponiveis = (cargasDoDia ?? []).filter(
+    (c) => c.pendura_inicio_em && !!c.peso_medio_kg && !jaUsadas?.has(c.carga_id) && !cargasEmRascunho?.has(c.carga_id) && !usadasNestaFicha.has(c.carga_id)
+  );
 
   function herdarCargas(escolhidas: typeof disponiveis) {
     if (escolhidas.length === 0) return;
@@ -90,14 +96,14 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
   useEffect(() => {
     if (!prevAppointment) return;
     setTanques((atual) => ({
-      preChiller: { ...atual.preChiller, prev: atual.preChiller.prev || prevAppointment?.tanques?.preChiller?.cur },
-      chiller1: { ...atual.chiller1, prev: atual.chiller1.prev || prevAppointment?.tanques?.chiller1?.cur },
-      chiller2: { ...atual.chiller2, prev: atual.chiller2.prev || prevAppointment?.tanques?.chiller2?.cur },
+      preChiller: { ...atual.preChiller, prev: atual.preChiller.prev || leituraHerdada(prevAppointment?.tanques?.preChiller) },
+      chiller1: { ...atual.chiller1, prev: atual.chiller1.prev || leituraHerdada(prevAppointment?.tanques?.chiller1) },
+      chiller2: { ...atual.chiller2, prev: atual.chiller2.prev || leituraHerdada(prevAppointment?.tanques?.chiller2) },
     }));
     setPrevTravado((atual) => ({
-      preChiller: atual.preChiller || !!prevAppointment?.tanques?.preChiller?.cur,
-      chiller1: atual.chiller1 || !!prevAppointment?.tanques?.chiller1?.cur,
-      chiller2: atual.chiller2 || !!prevAppointment?.tanques?.chiller2?.cur,
+      preChiller: atual.preChiller || !!leituraHerdada(prevAppointment?.tanques?.preChiller),
+      chiller1: atual.chiller1 || !!leituraHerdada(prevAppointment?.tanques?.chiller1),
+      chiller2: atual.chiller2 || !!leituraHerdada(prevAppointment?.tanques?.chiller2),
     }));
   }, [prevAppointment]);
 

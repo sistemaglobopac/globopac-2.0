@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, Info, Lock } from "lucide-react";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
-import { formatHidrometro, formatMaskedValue, LIMIAR_IMPLAUSIVEL, parseHidrometro } from "./hidrometro";
+import { formatHidrometro, formatMaskedValue, leituraHerdada, LIMIAR_IMPLAUSIVEL, parseHidrometro } from "./hidrometro";
 import { apurar, avesNoChuveiro, detalheDesvio, META_L_CARCACA } from "./calculosSpr";
 import { AvisoImplausivel, AvisoPrimeiroDoDia, CampoBloqueado, LogicaCalculo, TOOLTIP_HIDR_ANTERIOR } from "./componentesSpr";
 import type { ChillerCarcacasValor, LavagemFinalValor } from "./tiposCompostos";
@@ -22,15 +22,15 @@ interface LavagemFinalFieldProps {
 export function LavagemFinalField({ value, onChange, disabled, prevAppointment, carcacasAtual }: LavagemFinalFieldProps) {
   const [condenacoesParciais, setCondenacoesParciais] = useState(value?.condenacoesParciais ?? "");
   const [chuveiro, setChuveiro] = useState<{ prev: string; cur: string }>({
-    prev: value?.chuveiro?.prev ?? prevAppointment?.chuveiro?.cur ?? "",
+    prev: value?.chuveiro?.prev ?? leituraHerdada(prevAppointment?.chuveiro),
     cur: value?.chuveiro.cur ?? "",
   });
-  const [prevTravado, setPrevTravado] = useState(!!(value?.chuveiro?.prev || prevAppointment?.chuveiro?.cur));
+  const [prevTravado, setPrevTravado] = useState(!!(value?.chuveiro?.prev || leituraHerdada(prevAppointment?.chuveiro)));
 
   useEffect(() => {
     if (!prevAppointment) return;
-    setChuveiro((atual) => ({ ...atual, prev: atual.prev || prevAppointment?.chuveiro?.cur }));
-    if (prevAppointment?.chuveiro?.cur) setPrevTravado(true);
+    setChuveiro((atual) => ({ ...atual, prev: atual.prev || leituraHerdada(prevAppointment?.chuveiro) }));
+    if (leituraHerdada(prevAppointment?.chuveiro)) setPrevTravado(true);
   }, [prevAppointment]);
 
   const totalAvesBruto = carcacasAtual?.totalAvesBruto ?? 0;

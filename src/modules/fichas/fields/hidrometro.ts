@@ -36,6 +36,13 @@ export function parseNumeroHidrometro(valor: string | number | undefined | null)
   return isNaN(num) ? 0 : num;
 }
 
+/** Leitura que um novo monitoramento herda de um tanque do monitoramento anterior: a leitura atual
+ * dele; se esse tanque não foi lido naquele monitoramento (atual vazia), vale a anterior, que é a
+ * última leitura real do hidrômetro. Sem isso, o tanque pulado volta como "1º monitoramento do dia". */
+export function leituraHerdada(tanque: { cur?: string; prev?: string } | undefined | null): string {
+  return tanque?.cur || tanque?.prev || "";
+}
+
 /** Formata um número com 3 casas decimais fixas, no padrão pt-BR (usado para exibir litros
  * apurados/metas — nunca para o texto do input, que usa parseHidrometro/formatHidrometro). */
 export function formatMaskedValue(valor: string | number | undefined | null): string {

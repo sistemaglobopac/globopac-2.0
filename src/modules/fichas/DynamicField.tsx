@@ -61,12 +61,17 @@ interface DynamicFieldProps {
    * FichaForm) — chiller_partes/lavagem_final/mini_chillers dependem dele, não de uma busca
    * no banco (igual ao v1: NovoRegistro.jsx lê o "campo irmão" do próprio formData). */
   carcacasAtual?: ChillerCarcacasValor;
+  /** Dia (AAAA-MM-DD, Manaus) do monitoramento: as cargas a herdar são as abatidas nesse dia — na
+   * continuação de um monitoramento de ontem, as de ontem. */
+  diaMonitoramento?: string;
+  /** Cargas já usadas em rascunhos locais desta ficha (não aparecem no servidor até assinar). */
+  cargasEmRascunho?: ReadonlySet<string>;
 }
 
 /** Renderiza um campo de formulário a partir da definição declarativa de schema_campos —
  * o mesmo dado que gera o Zod de validação (src/shared/schema-campos.ts), garantindo que
  * UI e validação nunca divirjam (seção 7.1 do PROMPT MESTRE). */
-export function DynamicField({ campo, register, errors, control, prevAppointment, carcacasAtual, faseAbsorcao, aoSalvarPrimeiraEtapaDripping }: DynamicFieldProps) {
+export function DynamicField({ campo, register, errors, control, prevAppointment, carcacasAtual, diaMonitoramento, cargasEmRascunho, faseAbsorcao, aoSalvarPrimeiraEtapaDripping }: DynamicFieldProps) {
   const erro = errors[campo.chave]?.message as string | undefined;
 
   return (
@@ -114,6 +119,8 @@ export function DynamicField({ campo, register, errors, control, prevAppointment
               value={field.value as ChillerCarcacasValor | undefined}
               onChange={field.onChange}
               prevAppointment={prevAppointment?.[campo.chave] as ChillerCarcacasValor | undefined}
+              diaMonitoramento={diaMonitoramento}
+              cargasEmRascunho={cargasEmRascunho}
             />
           )}
         />
