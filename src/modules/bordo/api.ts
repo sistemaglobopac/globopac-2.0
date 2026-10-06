@@ -316,6 +316,31 @@ interface AdendoBruto {
   corrections?: Record<string, { old: unknown; new: unknown; rotulo?: string }>;
 }
 
+/** Adendos que aguardam a assinatura do inspetor `userId` nos registros dados (e que nenhum aditivo concluiu). */
+export function coletarAdendosPendentes(
+  registros: { id: string; dados_dinamicos: Record<string, unknown> | null }[],
+  concluidos: Set<string>,
+  userId: string
+): AdendoPendente[] {
+  const pendentes: AdendoPendente[] = [];
+  for (const m of registros) {
+    const adendos = (m.dados_dinamicos as { adendos?: AdendoBruto[] } | null)?.adendos;
+    if (!Array.isArray(adendos)) continue;
+    for (const adendo of adendos) {
+      if (adendo.status === "pending_monitor" && adendo.monitorId === userId && !concluidos.has(adendo.id)) {
+        pendentes.push({
+          id: adendo.id,
+          monitoramentoId: m.id,
+          verificadorName: adendo.verificadorName ?? "Verificador",
+          notes: adendo.notes ?? "",
+          corrections: adendo.corrections ?? {},
+        });
+      }
+    }
+  }
+  return pendentes;
+}
+
 export interface AdendoPendente {
   id: string;
   monitoramentoId: string;
@@ -455,23 +480,29 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
         })
         .filter((d) => (d.rnc === null ? !autocorrigidos.has(d.monitoramentoId) : d.rnc.status !== "FECHADA"));
 
-      const adendosPendentes: AdendoPendente[] = [];
-      const adendosConcluidos = idsAdendosConcluidos(recentes ?? []);
-      for (const m of recentes ?? []) {
-        const adendos = (m.dados_dinamicos as { adendos?: AdendoBruto[] } | null)?.adendos;
-        if (!Array.isArray(adendos)) continue;
-        for (const adendo of adendos) {
-          if (adendo.status === "pending_monitor" && adendo.monitorId === userId && !adendosConcluidos.has(adendo.id)) {
-            adendosPendentes.push({
-              id: adendo.id,
-              monitoramentoId: m.id,
-              verificadorName: adendo.verificadorName ?? "Verificador",
-              notes: adendo.notes ?? "",
-              corrections: adendo.corrections ?? {},
-            });
-          }
-        }
-      }
+      // Adendos pedidos pelo Verificador: o registro pedido pode ser de QUALQUER dia (inspetores com dezenas de monitoramentos por
+      // dia têm o registro bem além dos 50 mais recentes). Por isso buscam-se, no servidor, os registros do inspetor com adendo
+      // pendente e os aditivos que os concluem — não só a janela dos 50 mais recentes. Falha nesta busca cai só na janela.
+      const { data: comAdendo } = await supabase
+        .from("monitoramentos")
+        .select("id, dados_dinamicos, aditivo_de")
+        .eq("user_id", userId as string)
+        .contains("dados_dinamicos", { adendos: [{ status: "pending_monitor", monitorId: userId }] })
+        .order("criado_em", { ascending: false })
+        .limit(500)
+        .overrideTypes<{ id: string; dados_dinamicos: Record<string, unknown>; aditivo_de: string | null }[], { merge: false }>();
+      const idsComAdendo = (comAdendo ?? []).map((m) => m.id);
+      const { data: aditivos } =
+        idsComAdendo.length > 0
+          ? await supabase
+              .from("monitoramentos")
+              .select("id, dados_dinamicos, aditivo_de")
+              .in("aditivo_de", idsComAdendo)
+              .overrideTypes<{ id: string; dados_dinamicos: Record<string, unknown>; aditivo_de: string | null }[], { merge: false }>()
+          : { data: [] as { id: string; dados_dinamicos: Record<string, unknown>; aditivo_de: string | null }[] };
+      const registrosComAdendo = [...new Map([...(recentes ?? []), ...(comAdendo ?? [])].map((m) => [m.id, m])).values()];
+      const adendosConcluidos = idsAdendosConcluidos([...registrosComAdendo, ...(aditivos ?? [])]);
+      const adendosPendentes = coletarAdendosPendentes(registrosComAdendo, adendosConcluidos, userId as string);
 
       const nomesFicha = new Map<string, { codigo: string; nome: string }>();
       for (const f of fichasAtivas) nomesFicha.set(f.id, { codigo: f.codigo, nome: f.nome });
