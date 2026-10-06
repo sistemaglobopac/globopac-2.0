@@ -10,27 +10,41 @@ export function diaTurno(createdAt: string): string {
   return new Date(createdAt).toISOString().slice(0, 10);
 }
 
-interface TurnoBasico {
+export interface TurnoAberto {
   user_id: string;
-  fim: string | null;
+  inicio: string;
 }
 
-async function turnosAbertosPorDia(porDia: Map<string, Set<string>>): Promise<Set<string>> {
-  const abertos = new Set<string>(); // chave "userId|dia"
-  for (const [dia, userIds] of porDia) {
-    const { data, error } = await supabase
-      .from("turnos_inspetores")
-      .select("user_id, fim")
-      .in("user_id", [...userIds])
-      .gte("inicio", `${dia}T00:00:00.000Z`)
-      .lte("inicio", `${dia}T23:59:59.999Z`)
-      .overrideTypes<TurnoBasico[], { merge: false }>();
-    if (error) throw error;
-    for (const turno of data ?? []) {
-      if (turno.fim === null) abertos.add(`${turno.user_id}|${dia}`);
-    }
+/** Turnos ainda ABERTOS (sem fim) dos usuários. Lê pela função do banco `turnos_para_resolucao`: o Verificador e a Inspeção
+ * Federal não leem `turnos_inspetores` (RLS: só o ADMIN_MASTER e o próprio dono), e lendo a tabela direto eles não enxergavam
+ * nenhum turno aberto — o painel mostrava "Turno Finalizado" para tudo e deixava verificar com o turno ainda aberto. Sem a
+ * função (banco sem a migração), cai na leitura direta da tabela. */
+async function turnosAbertosDosUsuarios(userIds: string[]): Promise<TurnoAberto[]> {
+  const desde = new Date(Date.now() - 90 * 86_400_000).toISOString();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: viaRpc, error: erroRpc } = await (supabase.rpc as any)("turnos_para_resolucao", { p_desde: desde });
+  if (!erroRpc) {
+    return ((viaRpc ?? []) as { user_id: string; inicio: string; fim: string | null }[])
+      .filter((t) => t.fim === null && userIds.includes(t.user_id))
+      .map((t) => ({ user_id: t.user_id, inicio: t.inicio }));
   }
-  return abertos;
+  const { data, error } = await supabase
+    .from("turnos_inspetores")
+    .select("user_id, inicio")
+    .in("user_id", userIds)
+    .is("fim", null)
+    .overrideTypes<TurnoAberto[], { merge: false }>();
+  if (error) throw error;
+  return data ?? [];
+}
+
+/** O monitoramento (feito em `instante`) está com o turno do autor ainda aberto? Vale um turno aberto que começou no MESMO dia
+ * (UTC, como turnos_inspetores.inicio) do monitoramento, ou que já estava aberto quando ele foi feito — este cobre o 2º turno
+ * (começa 17h de Manaus = 21h UTC) nos monitoramentos depois das 20h, que já caem no dia UTC seguinte. */
+export function turnoAbertoParaRegistro(instante: string, userId: string, abertos: TurnoAberto[]): boolean {
+  const dia = diaTurno(instante);
+  const t = new Date(instante).getTime();
+  return abertos.some((a) => a.user_id === userId && (diaTurno(a.inicio) === dia || new Date(a.inicio).getTime() <= t));
 }
 
 export interface TurnoInspetorResolucao {
@@ -68,18 +82,10 @@ export function turnoDoRegistro(
 export async function turnosBloqueadosMap(records: { id: string; user_id: string; criado_em: string }[]): Promise<Set<string>> {
   if (records.length === 0) return new Set();
   try {
-    const porDia = new Map<string, Set<string>>();
-    for (const registro of records) {
-      const dia = diaTurno(registro.criado_em);
-      if (!porDia.has(dia)) porDia.set(dia, new Set());
-      porDia.get(dia)!.add(registro.user_id);
-    }
-
-    const abertos = await turnosAbertosPorDia(porDia);
-
+    const abertos = await turnosAbertosDosUsuarios([...new Set(records.map((r) => r.user_id))]);
     const bloqueados = new Set<string>();
     for (const registro of records) {
-      if (abertos.has(`${registro.user_id}|${diaTurno(registro.criado_em)}`)) bloqueados.add(registro.id);
+      if (turnoAbertoParaRegistro(registro.criado_em, registro.user_id, abertos)) bloqueados.add(registro.id);
     }
     return bloqueados;
   } catch (erro) {
