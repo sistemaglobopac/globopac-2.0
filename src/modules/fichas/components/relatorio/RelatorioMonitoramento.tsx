@@ -181,6 +181,19 @@ function BlocoRnc({ rnc, nomesPorId, camposNc }: { rnc: Rnc; nomesPorId: Map<str
   );
 }
 
+function BlocoContinuacao({ continuacao }: { continuacao: { criadoEm?: string; motivo?: string } }) {
+  return (
+    <div className="mt-3 rounded-lg border-2 border-primary/30 bg-primary/5 p-3 text-xs print:mt-2 print:p-2 print:text-[9px]">
+      <span className="block text-[10px] font-bold uppercase tracking-wider text-primary print:text-[8px]">Continuação de monitoramento anterior</span>
+      <p className="mt-1 text-ink">
+        Continuação do monitoramento de{" "}
+        <strong>{continuacao.criadoEm ? new Date(continuacao.criadoEm).toLocaleString("pt-BR", { timeZone: "America/Manaus" }) : "—"}</strong>.
+      </p>
+      <p className="italic text-ink">Motivo: {continuacao.motivo ?? "—"}</p>
+    </div>
+  );
+}
+
 function BlocoAdendos({ adendos }: { adendos: AdendoBruto[] }) {
   return (
     <div className="mt-3 overflow-hidden rounded-lg border-2 border-warning/40 print:mt-2">
@@ -276,6 +289,7 @@ function RegistroUnico({ record, ordem, template, dados, hashesAoVivo }: Registr
   const rnc = dados.rncs.find((r) => r.monitoramento_id === record.id);
   const autocorrecao = dados.autocorrecoes.find((a) => a.monitoramento_id === record.id);
   const adendos = (record.dados_dinamicos.adendos as AdendoBruto[] | undefined) ?? [];
+  const continuacao = record.dados_dinamicos.continuacao_de as { criadoEm?: string; motivo?: string } | undefined;
   const { time } = ensureLocalTime(record.criado_em);
   // Campos "hora" (ex.: "Hora do Monitoramento") já aparecem no cabeçalho deste bloco
   // ("Monitoramento N — HH:MM") — listá-los de novo em Dados Coletados é redundante e pode
@@ -305,6 +319,7 @@ function RegistroUnico({ record, ordem, template, dados, hashesAoVivo }: Registr
         />
       )}
       {autocorrecao && <BlocoAutocorrecao autocorrecao={autocorrecao} nome={dados.nomesPorId.get(autocorrecao.user_id) ?? "Inspetor de Qualidade"} camposNc={camposNaoConformes(template?.schema_campos ?? [], record.dados_dinamicos)} />}
+      {continuacao && <BlocoContinuacao continuacao={continuacao} />}
       {adendos.length > 0 && <BlocoAdendos adendos={adendos} />}
       {record.aditivo_de && (
         <p className="mt-2 text-[10px] italic text-muted-foreground print:text-[8px]">

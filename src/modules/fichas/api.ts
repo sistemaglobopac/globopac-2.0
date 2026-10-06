@@ -27,6 +27,7 @@ export interface TemplateAtivo {
 export function useTemplatesAtivos() {
   return useQuery({
     queryKey: ["fichas_templates", "ativos"],
+    meta: { offline: true },
     queryFn: async () => {
       const { data, error } = await supabase
         .from("fichas_templates")
@@ -50,15 +51,16 @@ export function useTemplatesAtivos() {
 // tolerância antes de virar "atrasado".
 // ---------------------------------------------------------------------------------------
 export interface UltimosApontamentosHoje {
-  /** ficha_template_id → horário (ISO) do apontamento mais recente de hoje, neste setor. */
+  /** código da ficha → horário (ISO) do apontamento mais recente de hoje, neste setor (qualquer versão). */
   mapaUltimos: Map<string, string>;
-  /** ficha_template_id com um desvio ainda ativo hoje (não conforme, sem RNC fechada). */
+  /** código da ficha com um desvio ainda ativo hoje (não conforme, sem RNC fechada). */
   fichasComDesvio: Set<string>;
 }
 
 export function useUltimosApontamentosHoje(setor: string | undefined) {
   return useQuery({
     queryKey: ["monitoramentos", "ultimos-hoje", setor],
+    meta: { offline: true },
     enabled: !!setor,
     refetchInterval: 15_000,
     queryFn: async (): Promise<UltimosApontamentosHoje> => {
@@ -72,9 +74,21 @@ export function useUltimosApontamentosHoje(setor: string | undefined) {
         .overrideTypes<{ id: string; ficha_template_id: string; criado_em: string; conformidade: boolean | null }[], { merge: false }>();
       if (error) throw error;
 
+      // Ficha reeditada ganha um template novo com o MESMO código, e o inspetor não lê o template
+      // antigo (RLS): o código de cada versão vem de uma função do banco, para o cronômetro e o
+      // desvio valerem para a ficha e não para uma versão dela.
+      const idsDoDia = Array.from(new Set((hoje ?? []).map((m) => m.ficha_template_id)));
+      const codigoPorId = new Map<string, string>();
+      if (idsDoDia.length > 0) {
+        const { data: codigos } = await supabase.rpc("codigos_de_templates", { p_ids: idsDoDia });
+        for (const c of (codigos as unknown as { id: string; codigo: string }[] | null) ?? []) codigoPorId.set(c.id, c.codigo);
+      }
+      const codigoDe = (idTemplate: string) => codigoPorId.get(idTemplate) ?? idTemplate;
+
       const mapaUltimos = new Map<string, string>();
       for (const m of hoje ?? []) {
-        if (!mapaUltimos.has(m.ficha_template_id)) mapaUltimos.set(m.ficha_template_id, m.criado_em);
+        const chave = codigoDe(m.ficha_template_id);
+        if (!mapaUltimos.has(chave)) mapaUltimos.set(chave, m.criado_em);
       }
 
       const naoConformes = (hoje ?? []).filter((m) => m.conformidade === false);
@@ -92,7 +106,7 @@ export function useUltimosApontamentosHoje(setor: string | undefined) {
         if (erroRnc) throw erroRnc;
         const idsComRncAtiva = new Set((rncs ?? []).map((r) => r.monitoramento_id));
         for (const m of naoConformes) {
-          if (idsComRncAtiva.has(m.id)) fichasComDesvio.add(m.ficha_template_id);
+          if (idsComRncAtiva.has(m.id)) fichasComDesvio.add(codigoDe(m.ficha_template_id));
         }
       }
 
@@ -116,15 +130,14 @@ export function useUltimosApontamentosHoje(setor: string | undefined) {
 export function useUltimoRegistroFicha(codigo: string | undefined, setor: string | undefined, turno?: TurnoHeranca, habilitado = true) {
   return useQuery({
     queryKey: ["monitoramentos", "ultimo-registro-ficha", codigo, setor, turno],
+    meta: { offline: true },
     enabled: !!codigo && !!setor && habilitado,
     queryFn: async () => {
-      const { data: versoes, error: erroVersoes } = await supabase
-        .from("fichas_templates")
-        .select("id")
-        .eq("codigo", codigo as string)
-        .overrideTypes<{ id: string }[], { merge: false }>();
+      // Função do banco: o inspetor só lê templates ativos, e os registros do dia podem apontar
+      // para versões já inativas (ficha reeditada no meio do dia).
+      const { data: versoes, error: erroVersoes } = await supabase.rpc("ids_versoes_ficha", { p_codigo: codigo as string });
       if (erroVersoes) throw erroVersoes;
-      const idsDasVersoes = (versoes ?? []).map((v) => v.id);
+      const idsDasVersoes = (versoes as unknown as string[] | null) ?? [];
       if (idsDasVersoes.length === 0) return null;
 
       const desde = inicioDoDiaManaus(new Date()).toISOString();
@@ -144,11 +157,55 @@ export function useUltimoRegistroFicha(codigo: string | undefined, setor: string
   });
 }
 
+/** Janela máxima (horas) para continuar um monitoramento anterior que ficou para trás. */
+export const CONTINUACAO_JANELA_HORAS = 24;
+/** Chave reservada em dados_dinamicos (entra no hash assinado) que marca o registro como
+ * continuação de outro monitoramento: { registroId, criadoEm, motivo }. */
+export const CHAVE_CONTINUACAO = "continuacao_de";
+
+export interface RegistroContinuavel {
+  id: string;
+  dados_dinamicos: Record<string, unknown>;
+  criado_em: string;
+}
+
+/** Último monitoramento finalizado desta ficha+setor nas últimas CONTINUACAO_JANELA_HORAS, ANTERIOR
+ * ao início de hoje: candidato a "continuação" quando o turno/dia terminou antes do lançamento. A
+ * leitura anterior que o novo registro herda. Hoje vale a herança normal (useUltimoRegistroFicha). */
+export function useRegistroContinuavel(codigo: string | undefined, setor: string | undefined, habilitado = true) {
+  return useQuery({
+    queryKey: ["monitoramentos", "continuavel", codigo, setor],
+    meta: { offline: true },
+    enabled: !!codigo && !!setor && habilitado,
+    queryFn: async (): Promise<RegistroContinuavel | null> => {
+      const { data: versoes, error: erroVersoes } = await supabase.rpc("ids_versoes_ficha", { p_codigo: codigo as string });
+      if (erroVersoes) throw erroVersoes;
+      const ids = (versoes as unknown as string[] | null) ?? [];
+      if (ids.length === 0) return null;
+      const desde = new Date(Date.now() - CONTINUACAO_JANELA_HORAS * 3_600_000).toISOString();
+      const { data, error } = await supabase
+        .from("monitoramentos")
+        .select("id, dados_dinamicos, criado_em")
+        .in("ficha_template_id", ids)
+        .eq("setor", setor as string)
+        .eq("status_ficha", "FINALIZADO")
+        .gte("criado_em", desde)
+        .lt("criado_em", inicioDoDiaManaus(new Date()).toISOString())
+        .order("criado_em", { ascending: false })
+        .limit(1)
+        .overrideTypes<RegistroContinuavel[], { merge: false }>();
+      if (error) throw error;
+      return data?.[0] ?? null;
+    },
+  });
+}
+
 /** Turno fixo configurado para o usuário (Painel de Gestão → configuracoes_extras). Ausente ou
  * "Ambos" → o turno é deduzido pelo horário (ver turnoAlvoHeranca). */
 export function useTurnoFixoDoUsuario(userId: string | undefined) {
   return useQuery({
     queryKey: ["perfis_usuarios", "turno-fixo", userId],
+    meta: { offline: true },
     enabled: !!userId,
     staleTime: 5 * 60_000,
     queryFn: async () => {
@@ -463,6 +520,22 @@ export function useFichasTemplatesTodas() {
         .overrideTypes<TemplateResumo[], { merge: false }>();
       if (error) throw error;
       return data ?? [];
+    },
+  });
+}
+
+/** Templates (inclusive inativos) pelos ids de registros que o inspetor tem em mãos. O inspetor só
+ * lê templates ativos (RLS), mas um monitoramento em andamento continua com o template da versão em
+ * que foi iniciado, mesmo que a ficha tenha ganhado versão nova depois. */
+export function useTemplatesPorIds(ids: string[]) {
+  const chave = Array.from(new Set(ids)).sort();
+  return useQuery({
+    queryKey: ["fichas_templates", "por-ids", chave],
+    enabled: chave.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("templates_por_ids", { p_ids: chave });
+      if (error) throw error;
+      return (data as unknown as TemplateResumo[] | null) ?? [];
     },
   });
 }
@@ -795,6 +868,7 @@ const CAMPOS_EM_ANDAMENTO = "id, ficha_template_id, setor, user_id, dados_dinami
 export function useMonitoramentosEmAndamento(userId: string | undefined) {
   return useQuery({
     queryKey: ["monitoramentos", "em-andamento", userId],
+    meta: { offline: true },
     enabled: !!userId,
     refetchInterval: 30_000,
     queryFn: async () => {

@@ -31,6 +31,7 @@ export function normalizarPlaca(placa: string): string {
 export function useCargasDoDia(dataAbate: string | undefined) {
   return useQuery({
     queryKey: ["cargas-aves", dataAbate],
+    meta: { offline: true },
     enabled: !!dataAbate,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -63,6 +64,7 @@ export interface CargaRastreabilidade {
 export function useCargasRastreabilidade(dataAbate: string | undefined) {
   return useQuery({
     queryKey: ["cargas-rastreabilidade", dataAbate],
+    meta: { offline: true },
     enabled: !!dataAbate,
     refetchInterval: 30_000,
     queryFn: async () => {
@@ -77,6 +79,7 @@ export function useCargasRastreabilidade(dataAbate: string | undefined) {
 export function useCargasJaMonitoradas(tipo: "recepcao" | "espera" | "peso" | "spr") {
   return useQuery({
     queryKey: ["cargas-ja-monitoradas", tipo],
+    meta: { offline: true },
     refetchInterval: 30_000,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("cargas_ja_monitoradas", { p_tipo: tipo });
@@ -90,6 +93,7 @@ export function useCargasJaMonitoradas(tipo: "recepcao" | "espera" | "peso" | "s
 export function useDoaCargasRegistradas(dataAbate: string | undefined) {
   return useQuery({
     queryKey: ["doa-cargas-registradas", dataAbate],
+    meta: { offline: true },
     enabled: !!dataAbate,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("doa_cargas_ja_registradas", { p_dia: dataAbate });
@@ -127,6 +131,7 @@ export function useExcluirCarga() {
 export function useVeiculos() {
   return useQuery({
     queryKey: ["veiculos-transporte"],
+    meta: { offline: true },
     queryFn: async () => {
       const { data, error } = await supabase
         .from("veiculos_transporte")

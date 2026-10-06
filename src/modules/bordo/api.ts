@@ -49,6 +49,7 @@ export interface TurnoHoje {
 export function useTurnoHoje(userId: string | undefined) {
   return useQuery({
     queryKey: ["turnos_inspetores", "hoje", userId],
+    meta: { offline: true },
     enabled: !!userId,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -100,6 +101,7 @@ export interface PausaAtiva {
 export function usePausaAtiva(userId: string | undefined) {
   return useQuery({
     queryKey: ["pausas_inspetores", "ativa", userId],
+    meta: { offline: true },
     enabled: !!userId,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -341,6 +343,7 @@ export interface KpisTurno {
 export function useKpisTurno(userId: string | undefined, userSetores: string[]) {
   return useQuery({
     queryKey: ["painel-bordo", "kpis", userId, userSetores],
+    meta: { offline: true },
     enabled: !!userId && userSetores.length > 0,
     refetchInterval: 15_000,
     queryFn: async (): Promise<KpisTurno> => {
@@ -486,12 +489,9 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
       ).filter((id) => !fichasAtivas.some((f) => f.id === id));
       const versaoAtivaPorTemplate = new Map<string, string>();
       if (idsNaoAtivos.length > 0) {
-        const { data: antigos } = await supabase
-          .from("fichas_templates")
-          .select("id, codigo")
-          .in("id", idsNaoAtivos)
-          .overrideTypes<{ id: string; codigo: string }[], { merge: false }>();
-        for (const antigo of antigos ?? []) {
+        // Função do banco: o inspetor não lê templates inativos (RLS), justamente os antigos.
+        const { data: antigos } = await supabase.rpc("codigos_de_templates", { p_ids: idsNaoAtivos });
+        for (const antigo of (antigos as unknown as { id: string; codigo: string }[] | null) ?? []) {
           const ativa = fichasAtivas.find((f) => f.codigo === antigo.codigo);
           if (ativa) versaoAtivaPorTemplate.set(antigo.id, ativa.id);
         }

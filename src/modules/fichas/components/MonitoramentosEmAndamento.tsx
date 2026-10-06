@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertTriangle, Hourglass } from "lucide-react";
 import { useSessionStore } from "@/store/session";
-import { useFichasTemplatesTodas, useMonitoramentosEmAndamento } from "../api";
+import { useFichasTemplatesTodas, useMonitoramentosEmAndamento, useTemplatesPorIds } from "../api";
 import { ALERTA_PESAGEM_FINAL_MIN, minutosAguardandoPesoFinal } from "../fields/calculosAbsorcao";
 import { ensureLocalTime } from "../utils/tempo";
 
@@ -19,6 +19,7 @@ export function MonitoramentosEmAndamento() {
   const navigate = useNavigate();
   const { data: emAndamento } = useMonitoramentosEmAndamento(perfil?.id);
   const { data: templates } = useFichasTemplatesTodas();
+  const { data: templatesDosRegistros } = useTemplatesPorIds((emAndamento ?? []).map((m) => m.ficha_template_id));
   const [agora, setAgora] = useState(() => new Date());
   useEffect(() => {
     const t = setInterval(() => setAgora(new Date()), 30_000);
@@ -26,7 +27,7 @@ export function MonitoramentosEmAndamento() {
   }, []);
 
   if (!emAndamento || emAndamento.length === 0) return null;
-  const nomePorId = new Map((templates ?? []).map((t) => [t.id, t.nome]));
+  const nomePorId = new Map([...(templatesDosRegistros ?? []), ...(templates ?? [])].map((t) => [t.id, t.nome]));
 
   return (
     <section className="space-y-2 rounded-xl border-2 border-primary/30 bg-primary/5 p-4" data-testid="monitoramentos-em-andamento">

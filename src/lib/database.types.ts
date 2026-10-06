@@ -228,6 +228,18 @@ export interface Database {
         Args: { p_matricula: string };
         Returns: string | null;
       };
+      ids_versoes_ficha: {
+        Args: { p_codigo: string };
+        Returns: string[];
+      };
+      templates_por_ids: {
+        Args: { p_ids: string[] };
+        Returns: { id: string; codigo: string; nome: string; pac_correspondente: string; schema_campos: unknown }[];
+      };
+      codigos_de_templates: {
+        Args: { p_ids: string[] };
+        Returns: { id: string; codigo: string }[];
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

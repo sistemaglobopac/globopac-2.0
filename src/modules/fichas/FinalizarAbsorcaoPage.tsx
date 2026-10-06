@@ -7,7 +7,7 @@ import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Card, CardContent } from "@/shared/ui/card";
-import { useFichasTemplatesTodas, useFinalizarAbsorcao, useMonitoramentoEmAndamento, type MonitoramentoEmAndamento } from "./api";
+import { useFichasTemplatesTodas, useFinalizarAbsorcao, useMonitoramentoEmAndamento, useTemplatesPorIds, type MonitoramentoEmAndamento } from "./api";
 import { AbsorcaoAguaField } from "./fields/AbsorcaoAguaField";
 import { calcularAbsorcaoAgua, minutosAguardandoPesoFinal, validarFinalizacao, LIMITE_ABSORCAO_AGUA } from "./fields/calculosAbsorcao";
 import type { AbsorcaoAguaValor } from "./fields/tiposCompostos";
@@ -54,7 +54,12 @@ export function FinalizarAbsorcaoPage() {
     if (registroAtual && !registro) setRegistro(registroAtual);
   }, [registroAtual, registro]);
 
-  const template = templates?.find((t) => t.id === registro?.ficha_template_id);
+  // Ficha reeditada depois da pesagem inicial: o registro continua com o template da versão em que
+  // foi iniciado (o inspetor não lê template inativo, então vem de função do banco).
+  const { data: templatesDoRegistro } = useTemplatesPorIds(registro ? [registro.ficha_template_id] : []);
+  const template =
+    templates?.find((t) => t.id === registro?.ficha_template_id) ??
+    templatesDoRegistro?.find((t) => t.id === registro?.ficha_template_id);
   const campos = (template?.schema_campos ?? []) as CampoTemplate[];
   const campoAbsorcao = campos.find((c) => c.tipo === "absorcao_agua");
   const outrosCampos = campos.filter((c) => c.tipo !== "absorcao_agua");

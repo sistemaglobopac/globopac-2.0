@@ -24,6 +24,7 @@ export function resolverSetoresEfetivos(setoresPermitidos: string[], setoresCada
 export function useSetoresCadastrados() {
   return useQuery({
     queryKey: ["app_config", "setores_cadastrados"],
+    meta: { offline: true },
     queryFn: async () => {
       const { data, error } = await supabase
         .from("app_config")

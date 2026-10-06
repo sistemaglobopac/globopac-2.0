@@ -13,6 +13,7 @@ import { AlertaComunicado } from "@/modules/comunicados/AlertaComunicado";
 import { NIVEL_ACESSO_BADGE } from "@/modules/gestao/api";
 import { useRncsAbertas } from "@/modules/rnc/api";
 import { AlertaRncGestor } from "@/modules/rnc/AlertaRncGestor";
+import { SemConexaoBanner } from "@/shared/SemConexaoBanner";
 
 interface ItemMenu {
   rota: string;
@@ -269,6 +270,7 @@ export function AppShell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <CabecalhoGlobal perfil={perfil} onAbrirMenu={() => setMenuAberto(true)} />
         <main className="min-w-0 flex-1 p-3 sm:p-4 lg:p-6">
+          <SemConexaoBanner />
           <Outlet />
         </main>
       </div>

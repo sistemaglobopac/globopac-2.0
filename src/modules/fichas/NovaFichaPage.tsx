@@ -7,7 +7,8 @@ import { useSessionStore, type PerfilSessao } from "@/store/session";
 import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/api";
 import { zodFromSchemaCampos, valoresIniciaisDe, type CampoTemplate } from "@/shared/schema-campos";
 import { supabase } from "@/lib/supabase";
-import { useCriarMonitoramento, useTemplatesAtivos, useTurnoFixoDoUsuario, useUltimoRegistroFicha, useUltimosApontamentosHoje, type TemplateAtivo } from "./api";
+import { CHAVE_CONTINUACAO, useCriarMonitoramento, useRegistroContinuavel, useTemplatesAtivos, useTurnoFixoDoUsuario, useUltimoRegistroFicha, useUltimosApontamentosHoje, type TemplateAtivo } from "./api";
+import { ContinuacaoMonitoramento, MOTIVO_CONTINUACAO_MIN_CARACTERES } from "./components/ContinuacaoMonitoramento";
 import { motivosDeBloqueioSpr } from "./utils/bloqueiosSpr";
 import { desviosEspeciais, temNaoConformidade } from "./utils/desviosEspeciais";
 import { ModalAutocorrecao } from "@/modules/autocorrecao/ModalAutocorrecao";
@@ -130,7 +131,7 @@ export function NovaFichaPage() {
   const statusPorFicha = useMemo(
     () =>
       new Map(
-        fichasDoSetor.map((f) => [f.id, calcularStatus(f, apontamentos?.mapaUltimos.get(f.id), agora)])
+        fichasDoSetor.map((f) => [f.id, calcularStatus(f, apontamentos?.mapaUltimos.get(f.codigo), agora)])
       ),
     [fichasDoSetor, apontamentos, agora]
   );
@@ -185,7 +186,7 @@ export function NovaFichaPage() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {fichasDoSetor.map((ficha) => {
             const { status, texto } = statusPorFicha.get(ficha.id) ?? { status: "LIBERADO" as StatusFicha, texto: "Liberado" };
-            const temDesvio = apontamentos?.fichasComDesvio.has(ficha.id) ?? false;
+            const temDesvio = apontamentos?.fichasComDesvio.has(ficha.codigo) ?? false;
 
             return (
               <Card
@@ -291,6 +292,13 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, setor, pe
     turnoAlvo,
     turnoConhecido,
   );
+  // Continuação de um monitoramento de antes de hoje (turno encerrado antes do lançamento): só é
+  // oferecida quando hoje ainda não há registro desta ficha para herdar.
+  const camposComHeranca = campos.some((c) => ["chiller_carcacas", "chiller_partes", "mini_chillers", "lavagem_final", "potabilidade_agua"].includes(c.tipo));
+  const { data: registroContinuavel } = useRegistroContinuavel(codigo, setor, turnoConhecido && camposComHeranca && ultimoRegistro === null);
+  const [continuando, setContinuando] = useState(false);
+  const [motivoContinuacao, setMotivoContinuacao] = useState("");
+  const registroPrevio = ultimoRegistro ?? (continuando ? registroContinuavel : null);
   const [motivosBloqueio, setMotivosBloqueio] = useState<string[]>([]);
   const [avisosDesvio, setAvisosDesvio] = useState<string[]>([]);
   // Dados aguardando a confirmação "assinar monitoramento NÃO CONFORME?" (antes do modal de senha).
@@ -355,6 +363,9 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, setor, pe
     // Partes/Miúdos/Chuveiro dependem do SPR Carcaças: sem a base vinda dele (fora do 1º
     // monitoramento do dia) a ficha não pode ser assinada nem enfileirada offline.
     const motivos = motivosDeBloqueioSpr(camposVisiveis, dados);
+    if (continuando && motivoContinuacao.trim().length < MOTIVO_CONTINUACAO_MIN_CARACTERES) {
+      motivos.push(`Continuação: informe o motivo (mínimo ${MOTIVO_CONTINUACAO_MIN_CARACTERES} caracteres).`);
+    }
     setMotivosBloqueio(motivos);
     if (motivos.length > 0) return;
 
@@ -431,8 +442,13 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, setor, pe
         versaoTemplate,
         userId: perfil.id,
         setor,
-        dadosDinamicos: dados,
+        dadosDinamicos:
+          continuando && registroContinuavel
+            ? { ...dados, [CHAVE_CONTINUACAO]: { registroId: registroContinuavel.id, criadoEm: registroContinuavel.criado_em, motivo: motivoContinuacao.trim() } }
+            : dados,
       });
+      setContinuando(false);
+      setMotivoContinuacao("");
       reset(valoresIniciaisDe(campos));
       setSucesso(resultado.modo);
       setDadosPendentes(null);
@@ -494,14 +510,28 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, setor, pe
           {/* Ficha com absorção de água: 1ª etapa (pesagem inicial) — não há "Criar e assinar" aqui; a pesagem
               final e a assinatura vêm depois, pela lista "Monitoramentos em andamento". */}
           <form onSubmit={handleSubmit(campoAbsorcao ? aoSalvarDepois : aoEnviar)} className="space-y-4" noValidate>
+            {ultimoRegistro === null && registroContinuavel && !campoAbsorcao && (
+              <ContinuacaoMonitoramento
+                registro={registroContinuavel}
+                ativo={continuando}
+                motivo={motivoContinuacao}
+                onMotivo={setMotivoContinuacao}
+                onAtivar={() => setContinuando(true)}
+                onCancelar={() => {
+                  setContinuando(false);
+                  setMotivoContinuacao("");
+                  reset(valoresIniciaisDe(campos));
+                }}
+              />
+            )}
             {camposVisiveis.map((campo) => (
               <DynamicField
-                key={campo.chave}
+                key={`${campo.chave}-${continuando ? "continuacao" : "novo"}`}
                 campo={campo}
                 register={register}
                 errors={errors}
                 control={control}
-                prevAppointment={ultimoRegistro?.dados_dinamicos}
+                prevAppointment={registroPrevio?.dados_dinamicos}
                 carcacasAtual={carcacasAtual}
                 faseAbsorcao={campoAbsorcao ? "INICIAL" : undefined}
                 aoSalvarPrimeiraEtapaDripping={onVoltar}
