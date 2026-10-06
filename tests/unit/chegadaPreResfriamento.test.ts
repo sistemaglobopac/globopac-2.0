@@ -165,3 +165,42 @@ describe("pausas da linha de abate", () => {
   });
 });
 
+// ---------------- Cargas sem pendura registrada: entram pelo andamento do processo ----------------
+describe("cargas cuja pendura ainda não foi registrada", () => {
+  const registrada = (n: number, m: number): CargaDaProgramacao => ({ cargaId: `c${n}`, gta: `GTA${n}`, qtdAves: 5000, penduraInicioEm: min(m) });
+  const semRegistro = (n: number): CargaDaProgramacao => ({ cargaId: `c${n}`, gta: `GTA${n}`, qtdAves: 5000, penduraInicioEm: "" });
+  const programacao = [registrada(1, 0), registrada(2, durAnda), semRegistro(3), semRegistro(4)];
+
+  it("quando a linha já pendurou toda a última carga registrada, o que sobra é da carga seguinte da programação", () => {
+    // min 120 − 13 min de trânsito = corte ≈ min 107: a carga 2 (início min 43) já foi toda pendurada e sobram ~2.400 aves
+    const r = avesQueChegaram(programacao, new Date(inicio + 120 * MIN));
+    const c3 = r.porCarga.find((c) => c.gta === "GTA3")!;
+    expect(c3.penduraNaoRegistrada).toBe(true);
+    expect(c3.completa).toBe(false);
+    expect(c3.aves).toBeGreaterThan(2350);
+    expect(c3.aves).toBeLessThan(2450);
+    expect(r.porCarga.find((c) => c.gta === "GTA4")).toBeUndefined(); // ainda não chegou à carga 4
+    // todas as aves da linha entram na conta: 5.000 + 5.000 + a parte da carga 3
+    expect(r.total).toBe(5000 + 5000 + c3.aves);
+  });
+
+  it("mais tarde a carga 3 fecha e a 4 começa a entrar; ordem: registradas primeiro, depois as estimadas", () => {
+    const r = avesQueChegaram(programacao, new Date(inicio + 150 * MIN));
+    expect(r.porCarga.map((c) => [c.gta, c.completa])).toEqual([["GTA1", true], ["GTA2", true], ["GTA3", true], ["GTA4", false]]);
+    expect(r.porCarga.find((c) => c.gta === "GTA3")!.penduraNaoRegistrada).toBe(true);
+    expect(r.porCarga.find((c) => c.gta === "GTA1")!.penduraNaoRegistrada).toBeUndefined();
+  });
+
+  it("sem sobra (a última registrada ainda está sendo pendurada) nenhuma carga sem registro entra", () => {
+    const r = avesQueChegaram(programacao, new Date(inicio + 70 * MIN));
+    expect(r.porCarga.some((c) => c.penduraNaoRegistrada)).toBe(false);
+  });
+
+  it("e o monitoramento seguinte só conta o que veio depois (nada é contado duas vezes)", () => {
+    const m1 = avesQueChegaram(programacao, new Date(inicio + 120 * MIN));
+    const m2 = avesQueChegaram(programacao, new Date(inicio + 170 * MIN));
+    const periodo2 = avesDoPeriodo(m2, acumuladoPorCarga(m1));
+    expect(m1.total + periodo2.total).toBe(m2.total);
+  });
+});
+

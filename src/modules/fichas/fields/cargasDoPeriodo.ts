@@ -21,6 +21,8 @@ export interface LoteDoPeriodo {
   aves: number;
   /** A carga inteira já chegou ao pré-resfriamento. */
   completa: boolean;
+  /** A pendura desta carga não foi registrada: as aves vêm do andamento do processo. */
+  penduraNaoRegistrada?: boolean;
   /** Peso vivo médio no formato do lote ("2.904"); "" = aguardando o peso da balança. */
   pesoVivo: string;
 }
@@ -45,6 +47,25 @@ export function baseDeCargasJaUsadas(cargas: CargaDoDia[], jaUsadas: ReadonlySet
   return Object.fromEntries(cargas.filter((c) => jaUsadas?.has(c.carga_id)).map((c) => [c.carga_id, c.qtd_aves]));
 }
 
+/** Aves já contadas de cada carga quando o monitoramento anterior não guardou o acumulado (registros antigos ou lotes
+ * digitados à mão): as cargas já apuradas contam inteiras, exceto as que o anterior usou só em parte — para essas vale a
+ * quantidade que de fato entrou naquele lote. */
+export function baseDeCargasAnteriores(
+  cargas: CargaDoDia[],
+  jaUsadas: ReadonlySet<string> | undefined,
+  lotesAnteriores: { cargaId?: string; quantity: string }[] | undefined
+): Record<string, number> {
+  const base = baseDeCargasJaUsadas(cargas, jaUsadas);
+  const porCarga = new Map(cargas.map((c) => [c.carga_id, c.qtd_aves]));
+  const doLote: Record<string, number> = {};
+  for (const l of lotesAnteriores ?? []) {
+    const total = porCarga.get(l.cargaId ?? "");
+    const aves = Number.parseInt(String(l.quantity).replace(/\D/g, ""), 10);
+    if (l.cargaId && total !== undefined && aves > 0) doLote[l.cargaId] = Math.min(total, (doLote[l.cargaId] ?? 0) + aves);
+  }
+  return { ...base, ...doLote };
+}
+
 export function calcularPeriodo(
   cargas: CargaDoDia[],
   horaMonitoramento: Date,
@@ -52,7 +73,8 @@ export function calcularPeriodo(
   paradas?: ParadaDaLinha[]
 ): PeriodoCalculado {
   const chegada = avesQueChegaram(
-    cargas.filter((c) => c.pendura_inicio_em).map((c) => ({ cargaId: c.carga_id, gta: c.gta, qtdAves: c.qtd_aves, penduraInicioEm: penduraParaIso(c.pendura_inicio_em!) })),
+    // Também as cargas sem pendura registrada (na ordem da programação): entram quando o processo chega até elas.
+    cargas.map((c) => ({ cargaId: c.carga_id, gta: c.gta, qtdAves: c.qtd_aves, penduraInicioEm: c.pendura_inicio_em ? penduraParaIso(c.pendura_inicio_em) : "" })),
     horaMonitoramento,
     undefined,
     paradas
@@ -64,6 +86,7 @@ export function calcularPeriodo(
     gta: p.gta,
     aves: p.aves,
     completa: p.completa,
+    ...(p.penduraNaoRegistrada ? { penduraNaoRegistrada: true } : {}),
     pesoVivo: pesoVivoDeHerdado(porId.get(p.cargaId)?.peso_medio_kg),
   }));
   return { chegada, lotes, totalAves: periodo.total, semPeso: lotes.filter((l) => l.pesoVivo === "") };

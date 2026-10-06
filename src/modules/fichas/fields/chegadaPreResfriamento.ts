@@ -39,7 +39,8 @@ export interface CargaDaProgramacao {
   gta: string;
   /** Aves da GTA. */
   qtdAves: number;
-  /** Início da pendura (ISO). Cargas sem pendura iniciada ainda não entram. */
+  /** Início da pendura (ISO). Vazio = a pendura ainda não foi registrada: a carga só entra quando o andamento do processo
+   * (as cargas anteriores já penduradas por inteiro) chega até ela, na ordem da programação. */
   penduraInicioEm: string;
 }
 
@@ -49,6 +50,8 @@ export interface AvesDaCarga {
   /** Aves desta carga que já chegaram ao pré-resfriamento (inteira ou parte). */
   aves: number;
   completa: boolean;
+  /** A pendura desta carga não foi registrada: as aves vêm do andamento do processo (a carga anterior já foi toda pendurada). */
+  penduraNaoRegistrada?: boolean;
 }
 
 export interface ChegadaAcumulada {
@@ -122,6 +125,10 @@ export function avesQueChegaram(
     .filter((c) => c.inicio <= em.getTime())
     .sort((a, b) => a.inicio - b.inicio);
 
+  // Cargas ainda sem pendura registrada, na ordem da programação (a de `cargas`): consomem as aves que a linha já pendurou
+  // além da última carga registrada.
+  const semPendura = cargas.filter((c) => !c.penduraInicioEm && c.qtdAves > 0);
+
   const obs = velocidadesObservadas(ordenadas, pausas);
   const ultimaObservada = [...obs].reverse().find((v): v is number => v !== null && Number.isFinite(v) && v > 0);
   const velocidade = ultimaObservada ?? VELOCIDADE_NOMINAL_AVES_H;
@@ -137,10 +144,24 @@ export function avesQueChegaram(
     else if (prox) {
       const duracao = tempoAndandoMs(c.inicio, prox.inicio, pausas);
       aves = duracao > 0 ? Math.min(c.qtdAves, (c.qtdAves * tempoAndandoMs(c.inicio, corte, pausas)) / duracao) : c.qtdAves;
-    } else aves = Math.min(c.qtdAves, (velocidade * tempoAndandoMs(c.inicio, corte, pausas)) / HORA_MS);
+    } else {
+      const penduradas = (velocidade * tempoAndandoMs(c.inicio, corte, pausas)) / HORA_MS;
+      aves = Math.min(c.qtdAves, penduradas);
+      // Última carga registrada já toda pendurada: o que a linha pendurou além dela é da(s) carga(s) seguinte(s) da programação.
+      let sobra = penduradas - c.qtdAves;
+      for (const s of semPendura) {
+        if (sobra <= 0) break;
+        const doS = Math.round(Math.min(s.qtdAves, sobra));
+        porCarga.push({ cargaId: s.cargaId, gta: s.gta, aves: doS, completa: doS >= s.qtdAves, penduraNaoRegistrada: true });
+        sobra -= s.qtdAves;
+      }
+    }
     aves = Math.round(aves);
+    // (a carga registrada entra antes das estimadas, que foram acrescentadas acima: reordena ao final)
     porCarga.push({ cargaId: c.cargaId, gta: c.gta, aves, completa: aves >= c.qtdAves });
   });
+  // Estimadas depois das registradas, cada grupo na sua ordem.
+  porCarga.sort((a, b) => Number(!!a.penduraNaoRegistrada) - Number(!!b.penduraNaoRegistrada));
 
   return {
     corteEm: new Date(corte).toISOString(),

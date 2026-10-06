@@ -233,7 +233,8 @@ export function ChillerCarcacasRelatorio({ valor, titulo = "Renovação da Água
           <strong>Cargas do período pela chegada ao pré-resfriamento:</strong> corte às {horaDeRelatorio(valor.chegada.corteEm)}, trânsito de{" "}
           {Math.floor(valor.chegada.transitoSegundos / 60)} min {String(valor.chegada.transitoSegundos % 60).padStart(2, "0")} s a{" "}
           {valor.chegada.velocidadeAvesH.toLocaleString("pt-BR")} aves/h (
-          {valor.chegada.origemVelocidade === "observada" ? "velocidade deduzida da pendura das cargas" : "velocidade nominal da linha"}).
+          {valor.chegada.origemVelocidade === "observada" ? "velocidade deduzida da pendura das cargas" : "velocidade nominal da linha"}). Houve pausa da
+          linha neste período: {valor.pausaInformada === "sim" ? "sim" : valor.pausaInformada === "nao" ? "não" : "não informado"}.
           {valor.paradas && valor.paradas.length > 0 && (
             <>
               {" "}

@@ -123,6 +123,23 @@ export function avesNoChuveiro(bruto: number, totalmenteCondenadasSPR: number, p
 
 // ---------------- Máscara do peso vivo ----------------
 
+/** Faixa plausível do peso vivo médio de uma carga (kg). A máscara preenche da direita para a esquerda (digitar 2850 passa por
+ * 0,002 → 0,028 → 0,285 → 2,850): enquanto o peso ainda está sendo digitado ele fica abaixo do mínimo, e um dedo a mais passa do
+ * máximo. Fora da faixa o lote segue "sem peso" — a meta e a conformidade nunca são avaliadas com um peso pela metade. */
+export const PESO_VIVO_MINIMO_KG = 0.5;
+export const PESO_VIVO_MAXIMO_KG = 10;
+
+/** O peso vivo do lote está completo (informado e dentro da faixa plausível)? */
+export function pesoVivoCompleto(texto: string | null | undefined): boolean {
+  const n = parseNumeroPeso(texto);
+  return n >= PESO_VIVO_MINIMO_KG && n <= PESO_VIVO_MAXIMO_KG;
+}
+
+function parseNumeroPeso(texto: string | null | undefined): number {
+  const n = Number.parseFloat(String(texto ?? "").replace(",", "."));
+  return Number.isFinite(n) ? n : 0;
+}
+
 /** Máscara de 3 casas decimais: digitar 2850 → "2.850" (armazenado com ponto; exibido com
  * vírgula por `exibirPesoVivo`). Ignora tudo que não for dígito. */
 export function mascararPesoVivo(digitado: string): string {

@@ -62,6 +62,8 @@ export interface ChillerCarcacasValor {
   pesoMedioCarcaca: number;
   /** Período calculado pela chegada ao pré-resfriamento; ausente em lotes digitados à mão. */
   chegada?: ChegadaRegistrada;
+  /** Resposta à pergunta "houve pausa da linha neste período?" — obrigatória antes de usar as cargas calculadas. */
+  pausaInformada?: "sim" | "nao";
   /** Pausas da linha do dia conhecidas neste monitoramento (as dos anteriores + as novas): descontadas da duração de
    * cada carga e do avanço da carga em andamento. */
   paradas?: ParadaLinha[];

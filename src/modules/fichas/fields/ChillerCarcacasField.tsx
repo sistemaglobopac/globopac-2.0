@@ -14,7 +14,7 @@ import {
   exibirPesoVivo,
   GELO_PADRAO_CARCACAS,
   mascararPesoVivo,
-  numero,
+  pesoVivoCompleto,
   pesoVivoDeHerdado,
   metaTanqueCarcacas,
   pesoMedioCarcaca as calcularPesoMedioCarcaca,
@@ -22,7 +22,7 @@ import {
   type ChaveTanqueCarcacas as ChaveTanque,
 } from "./calculosSpr";
 import { AvisoImplausivel, AvisoPrimeiroDoDia, LogicaCalculo, TOOLTIP_HIDR_ANTERIOR } from "./componentesSpr";
-import { baseDeCargasJaUsadas, baseParaProximo, calcularPeriodo, type CargaDoDia } from "./cargasDoPeriodo";
+import { baseDeCargasAnteriores, baseParaProximo, calcularPeriodo, type CargaDoDia } from "./cargasDoPeriodo";
 import { vereditoAntecipado, vereditoGeral } from "./vereditoVazao";
 import type { CargaProcessada, ChegadaRegistrada, ChillerCarcacasValor, ParadaLinha, TanqueHidrometro } from "./tiposCompostos";
 
@@ -75,6 +75,10 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
     setParadas((atual) => (atual.length > 0 ? atual : anteriores));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prevAppointment]);
+  // "Houve pausa da linha neste período?" — responder ANTES de usar as cargas: a pausa muda quais aves entram.
+  const [pausaInformada, setPausaInformada] = useState<"sim" | "nao" | undefined>(value?.pausaInformada);
+  const paradasHerdadas = prevAppointment?.paradas?.length ?? 0;
+  const novasParadas = Math.max(0, paradas.length - paradasHerdadas);
   const [novaParada, setNovaParada] = useState({ inicio: "", fim: "", aberta: false });
   const [erroParada, setErroParada] = useState<string | null>(null);
   const [cargas, setCargas] = useState<CargaProcessada[]>(value?.cargas ?? [{ id: crypto.randomUUID(), quantity: "", avgLiveWeight: "" }]);
@@ -100,9 +104,24 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
     if (!horaMonitoramento || !cargasDoDia) return null;
     const lista: CargaDoDia[] = cargasDoDia.map((c) => ({ carga_id: c.carga_id, gta: c.gta, qtd_aves: c.qtd_aves, pendura_inicio_em: c.pendura_inicio_em, peso_medio_kg: c.peso_medio_kg }));
     // Base: o acumulado guardado no monitoramento anterior; sem ele, as cargas já apuradas contam inteiras.
-    const base = prevAppointment?.chegada?.acumulado ?? baseDeCargasJaUsadas(lista, new Set([...(jaUsadas ?? []), ...(cargasEmRascunho ?? [])]));
+    const base = prevAppointment?.chegada?.acumulado ?? baseDeCargasAnteriores(lista, new Set([...(jaUsadas ?? []), ...(cargasEmRascunho ?? [])]), prevAppointment?.cargas);
     return calcularPeriodo(lista, new Date(horaMonitoramento), base, paradas);
   }, [horaMonitoramento, cargasDoDia, jaUsadas, cargasEmRascunho, prevAppointment, paradas]);
+
+  // 1ª leitura do dia (ou do turno): não há aves a apurar, mas o que já chegou ao pré-resfriamento até agora é a BASE do
+  // monitoramento seguinte — as aves que já passaram não podem ser contadas de novo. Guarda o acumulado por carga.
+  const primeiroDoDiaGlobal = !prevAppointment?.tanques?.preChiller?.cur && !prevAppointment?.tanques?.chiller1?.cur && !prevAppointment?.tanques?.chiller2?.cur;
+  useEffect(() => {
+    if (modoCompletarPeso || !primeiroDoDiaGlobal || !periodo) return;
+    const nova: ChegadaRegistrada = {
+      corteEm: periodo.chegada.corteEm,
+      velocidadeAvesH: periodo.chegada.velocidadeAvesH,
+      origemVelocidade: periodo.chegada.origemVelocidade,
+      transitoSegundos: periodo.chegada.transitoSegundos,
+      acumulado: baseParaProximo(periodo.chegada),
+    };
+    setChegada((atual) => (atual && JSON.stringify(atual) === JSON.stringify(nova) ? atual : nova));
+  }, [periodo, primeiroDoDiaGlobal, modoCompletarPeso]);
 
   // As cargas já usadas foram calculadas antes de uma pausa ser informada (ou removida): precisam ser recalculadas.
   const cargasDesatualizadas =
@@ -120,11 +139,12 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
     if (fim && new Date(fim).getTime() > agoraMs + 5 * 60_000) return setErroParada("A pausa não pode terminar depois da hora do monitoramento (use \"linha ainda parada\").");
     setErroParada(null);
     setParadas((atual) => [...atual, { inicio, fim }].sort((a, b) => (a.inicio < b.inicio ? -1 : 1)));
+    setPausaInformada("sim");
     setNovaParada({ inicio: "", fim: "", aberta: false });
   }
 
   function usarCargasCalculadas() {
-    if (!periodo || periodo.lotes.length === 0) return;
+    if (!periodo || periodo.lotes.length === 0 || !pausaInformada) return;
     setCargas(
       periodo.lotes.map((l) => ({ id: crypto.randomUUID(), quantity: String(l.aves), avgLiveWeight: l.pesoVivo, cargaId: l.cargaId, gta: l.gta, parcial: !l.completa }))
     );
@@ -136,6 +156,9 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
       acumulado: baseParaProximo(periodo.chegada),
     });
   }
+
+  /** Peso vivo que o peso por caixa já informou para a carga ("" se a balança ainda não passou). */
+  const pesoHerdadoDe = (cargaId: string) => pesoVivoDeHerdado(cargasDoDia?.find((x) => x.carga_id === cargaId)?.peso_medio_kg);
 
   // Etapa 2: o peso da carga chegou da balança → completa sozinho o peso vivo dos lotes que estavam em branco.
   useEffect(() => {
@@ -175,7 +198,7 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
   const totalAves = totalAvesBruto(cargas);
   // Lote com aves e sem peso vivo: a balança ainda não passou o peso daquela carga. Enquanto isso o peso médio (e a meta) é
   // desconhecido e a conformidade só pode ser ANTECIPADA (vereditoVazao.ts). Nunca se usa peso estimado.
-  const lotesPendentes = cargas.filter((c) => (parseFloat(c.quantity) || 0) > 0 && numero(c.avgLiveWeight) <= 0);
+  const lotesPendentes = cargas.filter((c) => (parseFloat(c.quantity) || 0) > 0 && !pesoVivoCompleto(c.avgLiveWeight));
   const pesoPendente = lotesPendentes.length > 0;
   const pesoMedioCarcaca = pesoPendente ? 0 : calcularPesoMedioCarcaca(cargas); // já com o rendimento fixo de 84%
 
@@ -235,6 +258,7 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
       pesoMedioCarcaca,
       ...(chegada ? { chegada } : {}),
       ...(paradas.length > 0 ? { paradas } : {}),
+      ...(pausaInformada ? { pausaInformada } : {}),
       conformidade: isConforme,
       detalhesRNC:
         detalhes.length > 0
@@ -244,7 +268,7 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
           : null,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cargas, tanques, condenasParcial, condenasTotal, isConforme, chegada, pesoPendente, paradas]);
+  }, [cargas, tanques, condenasParcial, condenasTotal, isConforme, chegada, pesoPendente, paradas, pausaInformada]);
 
   function adicionarCarga() {
     setCargas((atual) => [...atual, { id: crypto.randomUUID(), quantity: "", avgLiveWeight: "" }]);
@@ -343,6 +367,92 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
     );
   }
 
+  const secaoParadas = horaMonitoramento && (
+            <div className="space-y-2 rounded-md border border-dashed border-primary/40 bg-background p-3" data-testid="paradas-linha">
+              <p className="flex items-center gap-2 text-xs font-bold text-primary">
+                <Clock className="h-3.5 w-3.5" /> Houve pausa da linha neste período?{!modoCompletarPeso && <span className="text-destructive"> *</span>}
+              </p>
+              {!modoCompletarPeso && (
+                <p className="text-xs text-muted-foreground">
+                  Responda antes de usar as cargas. Na pausa a pendura para, mas as aves já penduradas seguem até o pré-resfriamento; os horários permitem ao cálculo das cargas descontar o
+                  tempo parado.
+                </p>
+              )}
+              {!disabledGeral ? (
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Houve pausa da linha neste período?">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={pausaInformada === "nao" ? "default" : "outline"}
+                    aria-pressed={pausaInformada === "nao"}
+                    disabled={novasParadas > 0}
+                    title={novasParadas > 0 ? "Remova as pausas informadas para marcar que não houve pausa." : undefined}
+                    onClick={() => setPausaInformada("nao")}
+                  >
+                    Não houve pausa
+                  </Button>
+                  <Button type="button" size="sm" variant={pausaInformada === "sim" ? "default" : "outline"} aria-pressed={pausaInformada === "sim"} onClick={() => setPausaInformada("sim")}>
+                    Houve pausa
+                  </Button>
+                </div>
+              ) : (
+                pausaInformada && <p className="text-xs">Houve pausa da linha neste período: {pausaInformada === "sim" ? "sim" : "não"}.</p>
+              )}
+              {paradas.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Nenhuma pausa informada.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {paradas.map((pa, i) => (
+                    <li key={`${pa.inicio}-${i}`} className="flex flex-wrap items-center justify-between gap-2 rounded border p-2 text-xs">
+                      <span>
+                        {horaManaus(new Date(pa.inicio))} → {pa.fim ? horaManaus(new Date(pa.fim)) : "linha ainda parada"}
+                      </span>
+                      {!disabledGeral && (
+                        <Button type="button" size="sm" variant="ghost" className="text-destructive" aria-label="Remover pausa" onClick={() => setParadas((a) => a.filter((_, j) => j !== i))}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {!disabledGeral && pausaInformada === "sim" && (
+                <div className="flex flex-wrap items-end gap-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="parada-inicio" className="text-xs text-muted-foreground">
+                      Início da pausa
+                    </Label>
+                    <Input id="parada-inicio" type="time" className="w-auto" value={novaParada.inicio} onChange={(e) => setNovaParada((a) => ({ ...a, inicio: e.target.value }))} />
+                  </div>
+                  {!novaParada.aberta && (
+                    <div className="space-y-1">
+                      <Label htmlFor="parada-fim" className="text-xs text-muted-foreground">
+                        Fim da pausa
+                      </Label>
+                      <Input id="parada-fim" type="time" className="w-auto" value={novaParada.fim} onChange={(e) => setNovaParada((a) => ({ ...a, fim: e.target.value }))} />
+                    </div>
+                  )}
+                  <label className="flex items-center gap-1 text-xs">
+                    <input type="checkbox" checked={novaParada.aberta} onChange={(e) => setNovaParada((a) => ({ ...a, aberta: e.target.checked }))} /> linha ainda parada
+                  </label>
+                  <Button type="button" size="sm" variant="outline" onClick={registrarParada}>
+                    <Plus className="h-3.5 w-3.5" /> Informar pausa
+                  </Button>
+                </div>
+              )}
+              {erroParada && (
+                <p role="alert" className="text-xs font-medium text-destructive">
+                  {erroParada}
+                </p>
+              )}
+              {cargasDesatualizadas && !modoCompletarPeso && (
+                <p role="status" data-testid="cargas-desatualizadas" className="rounded border border-warning bg-warning/10 p-2 text-xs font-medium">
+                  As cargas usadas foram calculadas antes desta alteração das pausas: toque em "Usar estas cargas" para atualizar.
+                </p>
+              )}
+            </div>
+          );
+
   return (
     <div className="space-y-4 rounded-lg border p-4">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-muted/40 p-4">
@@ -437,6 +547,8 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
             </Button>
           </div>
 
+          {secaoParadas}
+
           {!modoCompletarPeso && (
             <div className="space-y-2 rounded-md border border-dashed border-primary/40 bg-background p-3" data-testid="cargas-calculadas">
               <p className="flex items-center gap-2 text-xs font-bold text-primary">
@@ -462,6 +574,7 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
                       <div key={l.cargaId} className="flex flex-wrap items-center justify-between gap-2 rounded border p-2 text-xs">
                         <span>
                           <strong>GTA {l.gta}</strong> · {l.aves.toLocaleString("pt-BR")} aves{!l.completa && " (parte da carga)"}
+                          {l.penduraNaoRegistrada && " — pendura não registrada: estimada pelo andamento do abate"}
                         </span>
                         <span className={l.pesoVivo ? "text-muted-foreground" : "font-semibold text-warning-foreground"}>
                           {l.pesoVivo ? `peso ${exibirPesoVivo(l.pesoVivo)} kg` : "aguardando o peso da balança"}
@@ -474,81 +587,21 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
                       Total: <strong>{periodo.totalAves.toLocaleString("pt-BR")} aves</strong>
                       {periodo.semPeso.length > 0 && ` · ${periodo.semPeso.length} carga(s) sem peso`}
                     </span>
-                    <Button type="button" size="sm" disabled={disabledGeral} onClick={usarCargasCalculadas}>
+                    <Button type="button" size="sm" disabled={disabledGeral || !pausaInformada} onClick={usarCargasCalculadas}>
                       Usar estas cargas
                     </Button>
                   </div>
+                  {!pausaInformada && (
+                    <p role="status" data-testid="falta-pausa" className="text-xs font-medium text-warning-foreground">
+                      Responda acima se houve pausa da linha neste período para poder usar as cargas.
+                    </p>
+                  )}
                   {periodo.semPeso.length > 0 && (
                     <p className="text-xs text-muted-foreground">
                       Sem o peso você ainda pode salvar: a leitura vale agora e o peso é completado depois, quando a balança passar. A conformidade só é fechada com o peso real.
                     </p>
                   )}
                 </>
-              )}
-            </div>
-          )}
-
-          {horaMonitoramento && (
-            <div className="space-y-2 rounded-md border border-dashed border-primary/40 bg-background p-3" data-testid="paradas-linha">
-              <p className="flex items-center gap-2 text-xs font-bold text-primary">
-                <Clock className="h-3.5 w-3.5" /> Pausas da linha de abate
-              </p>
-              {!modoCompletarPeso && (
-                <p className="text-xs text-muted-foreground">
-                  Houve pausa da linha? A pendura para, mas as aves já penduradas seguem até o pré-resfriamento. Informe os horários para o cálculo das cargas descontar o tempo parado.
-                </p>
-              )}
-              {paradas.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Nenhuma pausa informada.</p>
-              ) : (
-                <ul className="space-y-1">
-                  {paradas.map((pa, i) => (
-                    <li key={`${pa.inicio}-${i}`} className="flex flex-wrap items-center justify-between gap-2 rounded border p-2 text-xs">
-                      <span>
-                        {horaManaus(new Date(pa.inicio))} → {pa.fim ? horaManaus(new Date(pa.fim)) : "linha ainda parada"}
-                      </span>
-                      {!disabledGeral && (
-                        <Button type="button" size="sm" variant="ghost" className="text-destructive" aria-label="Remover pausa" onClick={() => setParadas((a) => a.filter((_, j) => j !== i))}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {!disabledGeral && (
-                <div className="flex flex-wrap items-end gap-2">
-                  <div className="space-y-1">
-                    <Label htmlFor="parada-inicio" className="text-xs text-muted-foreground">
-                      Início da pausa
-                    </Label>
-                    <Input id="parada-inicio" type="time" className="w-auto" value={novaParada.inicio} onChange={(e) => setNovaParada((a) => ({ ...a, inicio: e.target.value }))} />
-                  </div>
-                  {!novaParada.aberta && (
-                    <div className="space-y-1">
-                      <Label htmlFor="parada-fim" className="text-xs text-muted-foreground">
-                        Fim da pausa
-                      </Label>
-                      <Input id="parada-fim" type="time" className="w-auto" value={novaParada.fim} onChange={(e) => setNovaParada((a) => ({ ...a, fim: e.target.value }))} />
-                    </div>
-                  )}
-                  <label className="flex items-center gap-1 text-xs">
-                    <input type="checkbox" checked={novaParada.aberta} onChange={(e) => setNovaParada((a) => ({ ...a, aberta: e.target.checked }))} /> linha ainda parada
-                  </label>
-                  <Button type="button" size="sm" variant="outline" onClick={registrarParada}>
-                    <Plus className="h-3.5 w-3.5" /> Informar pausa
-                  </Button>
-                </div>
-              )}
-              {erroParada && (
-                <p role="alert" className="text-xs font-medium text-destructive">
-                  {erroParada}
-                </p>
-              )}
-              {cargasDesatualizadas && !modoCompletarPeso && (
-                <p role="status" data-testid="cargas-desatualizadas" className="rounded border border-warning bg-warning/10 p-2 text-xs font-medium">
-                  As cargas usadas foram calculadas antes desta alteração das pausas: toque em "Usar estas cargas" para atualizar.
-                </p>
               )}
             </div>
           )}
@@ -576,12 +629,18 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
                   <Input
                     className="font-mono"
                     inputMode="numeric"
-                    disabled={disabled || !!(carga.cargaId && carga.avgLiveWeight)}
+                    // Só o peso HERDADO do peso por caixa fica travado. O que o inspetor está digitando (carga ainda sem peso da
+                    // balança) nunca trava: senão o campo bloqueava no primeiro dígito.
+                    disabled={disabled || (!!carga.cargaId && !!carga.avgLiveWeight && carga.avgLiveWeight === pesoHerdadoDe(carga.cargaId))}
                     value={exibirPesoVivo(carga.avgLiveWeight)}
                     onChange={(e) => alterarCarga(carga.id, "avgLiveWeight", mascararPesoVivo(e.target.value))}
                     placeholder="Ex: 2,850"
                   />
-                  {!carga.avgLiveWeight && carga.cargaId && <p className="text-[0.65rem] font-semibold text-warning-foreground">aguardando o peso da balança</p>}
+                  {!pesoVivoCompleto(carga.avgLiveWeight) && carga.cargaId && (
+                    <p className="text-[0.65rem] font-semibold text-warning-foreground">
+                      {carga.avgLiveWeight ? "digite o peso completo (ex.: 2,850)" : "aguardando o peso da balança"}
+                    </p>
+                  )}
                 </div>
                 {cargas.length > 1 && !disabledGeral && (
                   <Button type="button" size="sm" variant="ghost" className="text-destructive" onClick={() => removerCarga(carga.id)}>
@@ -610,7 +669,17 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
           )}
         </div>
       ) : (
-        <AvisoPrimeiroDoDia />
+        <>
+          <AvisoPrimeiroDoDia />
+          {secaoParadas}
+          {periodo && !modoCompletarPeso && (
+            <p className="rounded-md border border-primary/30 bg-primary/5 p-3 text-xs" data-testid="base-chegada">
+              <strong>Base para os próximos monitoramentos:</strong> até as {ensureLocalTime(periodo.chegada.corteEm).time} (corte de chegada) já passaram{" "}
+              <strong>{periodo.chegada.total.toLocaleString("pt-BR")} aves</strong> pelo pré-resfriamento. Elas ficam gravadas aqui e não serão contadas de novo nos
+              monitoramentos seguintes.
+            </p>
+          )}
+        </>
       )}
 
       <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(260px,1fr))]">

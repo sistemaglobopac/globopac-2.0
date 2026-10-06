@@ -136,3 +136,31 @@ describe("motivosDeBloqueioSpr", () => {
     expect(motivosDeBloqueioSpr(campos, { p: null })).toHaveLength(1);
   });
 });
+
+describe("pausa da linha obrigatória quando o período é calculado pela chegada ao pré-resfriamento", () => {
+  const v = (extra: Record<string, unknown>) =>
+    ({
+      cargas: [{ id: "1", quantity: "100", avgLiveWeight: "2.9" }],
+      tanques: { preChiller: { prev: "1", cur: "2", ice: "0" }, chiller1: { prev: "1", cur: "2", ice: "0" }, chiller2: { prev: "1", cur: "2", ice: "0" } },
+      condenasParcial: "0",
+      condenasTotal: "0",
+      totalAves: 100,
+      totalAvesBruto: 100,
+      pesoMedioCarcaca: 0,
+      conformidade: true,
+      detalhesRNC: null,
+      ...extra,
+    }) as unknown as Parameters<typeof motivosPreenchimentoCarcacas>[0];
+  const chegada = { corteEm: "2026-10-06T12:00:00Z", velocidadeAvesH: 6960, origemVelocidade: "observada", transitoSegundos: 784, acumulado: {} };
+
+  it("com período calculado e sem resposta, bloqueia; respondendo (sim ou não) libera", () => {
+    expect(motivosPreenchimentoCarcacas(v({ chegada })).some((m) => m.includes("pausa da linha"))).toBe(true);
+    expect(motivosPreenchimentoCarcacas(v({ chegada, pausaInformada: "nao" })).some((m) => m.includes("pausa da linha"))).toBe(false);
+    expect(motivosPreenchimentoCarcacas(v({ chegada, pausaInformada: "sim" })).some((m) => m.includes("pausa da linha"))).toBe(false);
+  });
+
+  it("lotes digitados à mão (sem período calculado) não exigem a resposta", () => {
+    expect(motivosPreenchimentoCarcacas(v({})).some((m) => m.includes("pausa da linha"))).toBe(false);
+  });
+});
+

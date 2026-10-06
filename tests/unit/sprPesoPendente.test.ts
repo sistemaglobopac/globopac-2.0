@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { lotesSemPeso, motivosPreenchimentoCarcacas } from "@/modules/fichas/fields/preenchimentoSpr";
+import { pesoVivoCompleto } from "@/modules/fichas/fields/calculosSpr";
 import { motivosDeBloqueioSpr } from "@/modules/fichas/utils/bloqueiosSpr";
 import type { CampoTemplate } from "@/shared/schema-campos";
 import type { ChillerCarcacasValor } from "@/modules/fichas/fields/tiposCompostos";
@@ -50,5 +51,15 @@ describe("SPR Carcaças aguardando o peso das cargas (etapa 1)", () => {
     };
     expect(motivosDeBloqueioSpr(campos, dados).filter((m) => m.includes("peso médio")).length).toBe(2);
     expect(motivosDeBloqueioSpr(campos, dados, { permitirPesoPendente: true }).filter((m) => m.includes("peso médio"))).toEqual([]);
+  });
+
+  it("peso vivo completo: dentro da faixa plausível; pela metade (máscara) ou com dígito a mais não vale", () => {
+    expect(pesoVivoCompleto("2.850")).toBe(true);
+    expect(pesoVivoCompleto("2,9")).toBe(true);
+    // digitando 2850 a máscara passa por estes valores
+    for (const parcial of ["0.002", "0.028", "0.285", "", undefined, null]) expect(pesoVivoCompleto(parcial as string)).toBe(false);
+    expect(pesoVivoCompleto("28.500")).toBe(false);
+    expect(lotesSemPeso(valor([{ id: "1", quantity: "100", avgLiveWeight: "0.285" }])).map((l) => l.id)).toEqual(["1"]);
+    expect(lotesSemPeso(valor([{ id: "1", quantity: "100", avgLiveWeight: "2.850" }]))).toEqual([]);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { vereditoAntecipado, vereditoGeral } from "@/modules/fichas/fields/vereditoVazao";
-import { baseDeCargasJaUsadas, calcularPeriodo, penduraParaIso, type CargaDoDia } from "@/modules/fichas/fields/cargasDoPeriodo";
+import { baseDeCargasAnteriores, baseDeCargasJaUsadas, calcularPeriodo, penduraParaIso, type CargaDoDia } from "@/modules/fichas/fields/cargasDoPeriodo";
 import { metaTanqueCarcacas } from "@/modules/fichas/fields/calculosSpr";
 
 describe("veredito antecipado da vazão (sem o peso)", () => {
@@ -109,4 +109,14 @@ describe("cargas do período (pela chegada ao pré-resfriamento)", () => {
     const r = calcularPeriodo([...dia, { carga_id: "c4", gta: "GTA4", qtd_aves: 5000, pendura_inicio_em: null, peso_medio_kg: "2,9" }], new Date("2026-10-06T08:10:00-04:00"), null);
     expect(r.lotes.some((l) => l.gta === "GTA4")).toBe(false);
   });
+
+  it("base quando o anterior foi digitado à mão: vale a quantidade que entrou no lote, não a carga inteira", () => {
+    const base = baseDeCargasAnteriores(dia, new Set(["c1", "c2"]), [{ cargaId: "c2", quantity: "1200" }, { quantity: "50" }]);
+    expect(base).toEqual({ c1: 5000, c2: 1200 }); // c1 já apurada inteira; c2 só 1.200 entraram
+    // o período seguinte ainda recebe o resto da carga 2
+    const r = calcularPeriodo(dia, new Date("2026-10-06T08:10:00-04:00"), base);
+    expect(r.lotes.find((l) => l.gta === "GTA2")!.aves).toBe(5000 - 1200);
+    expect(r.lotes.some((l) => l.gta === "GTA1")).toBe(false);
+  });
 });
+
