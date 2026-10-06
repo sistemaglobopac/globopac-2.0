@@ -12,6 +12,8 @@ import {
   useExcluirCarga,
   useExcluirVeiculo,
   useVeiculos,
+  buscarGtaCadastrada,
+  mensagemGtaJaCadastrada,
 } from "./api";
 
 function mensagemDe(erro: unknown): string {
@@ -111,7 +113,17 @@ export function CargasAvesPage() {
           </div>
           <div className="space-y-1">
             <Label htmlFor="carga-gta">Nº da GTA</Label>
-            <Input id="carga-gta" value={carga.gta} onChange={(e) => setCarga({ ...carga, gta: e.target.value })} />
+            <Input
+              id="carga-gta"
+              value={carga.gta}
+              onChange={(e) => setCarga({ ...carga, gta: e.target.value })}
+              // Avisa já ao sair do campo, sem esperar o "Adicionar": a GTA não pode se repetir na mesma data de abate.
+              onBlur={async () => {
+                if (!carga.gta.trim()) return;
+                const existente = await buscarGtaCadastrada(carga.gta, dataAbate);
+                setErroCarga(existente ? mensagemGtaJaCadastrada(carga.gta, existente) : null);
+              }}
+            />
           </div>
           <div className="space-y-1">
             <Label htmlFor="carga-qtd">Qtd. de aves</Label>

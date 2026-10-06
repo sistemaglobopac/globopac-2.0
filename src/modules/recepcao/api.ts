@@ -22,6 +22,45 @@ export type NovaCargaAves = Omit<CargaAves, "id">;
 
 const COLUNAS_CARGA = "id, data_abate, integrado, aviario, nucleo, gta, qtd_aves";
 
+/** GTA para comparação: maiúsculas, sem espaços nem pontuação ("gta 001", "GTA-001" e "GTA001" são a mesma). Espelha
+ * normalizar_gta() do banco, que garante a unicidade por data de abate. Zeros à esquerda continuam valendo. */
+export function normalizarGta(gta: string): string {
+  return gta.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+/** GTAs que aparecem mais de uma vez, NA MESMA DATA de abate, no lote a cadastrar (como digitadas). A mesma GTA em datas
+ * diferentes é permitida. */
+export function gtasRepetidasNoLote(cargas: { gta: string; data_abate: string }[]): string[] {
+  const vistas = new Set<string>();
+  const repetidas = new Set<string>();
+  for (const c of cargas) {
+    const chave = `${c.data_abate}|${normalizarGta(c.gta)}`;
+    if (vistas.has(chave)) repetidas.add(c.gta.trim());
+    else vistas.add(chave);
+  }
+  return [...repetidas];
+}
+
+export interface GtaCadastrada {
+  data_abate: string;
+  integrado: string;
+  aviario: string;
+}
+
+export function mensagemGtaJaCadastrada(gta: string, existente: GtaCadastrada | null): string {
+  const onde = existente ? ` (${existente.integrado}, aviário ${existente.aviario})` : "";
+  const data = existente ? ` para o abate de ${existente.data_abate.split("-").reverse().join("/")}` : " para esta data de abate";
+  return `A GTA ${gta.trim()} já está cadastrada${data}${onde}. O número da GTA não pode se repetir na mesma data.`;
+}
+
+/** Carga já cadastrada com essa GTA NA MESMA DATA de abate, ou null. Falha de consulta devolve null: quem decide é a restrição do banco. */
+export async function buscarGtaCadastrada(gta: string, dataAbate: string): Promise<GtaCadastrada | null> {
+  if (!normalizarGta(gta) || !dataAbate) return null;
+  const { data, error } = await supabase.rpc("gta_ja_cadastrada", { p_gta: gta, p_data: dataAbate });
+  if (error) return null;
+  return ((data ?? []) as unknown as GtaCadastrada[])[0] ?? null;
+}
+
 /** Placa em maiúsculas, sem espaços (ABC1D23 / ABC-1234). */
 export function normalizarPlaca(placa: string): string {
   return placa.toUpperCase().replace(/[^A-Z0-9-]/g, "");
@@ -107,9 +146,17 @@ export function useCriarCargas() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (cargas: NovaCargaAves[]) => {
+      const repetidas = gtasRepetidasNoLote(cargas);
+      if (repetidas.length > 0) throw new Error(`GTA repetida no cadastro: ${repetidas.join(", ")}. O número da GTA não pode se repetir na mesma data de abate.`);
+      // Verifica antes para dizer ONDE a GTA já está; a restrição do banco continua sendo a garantia final.
+      for (const c of cargas) {
+        const existente = await buscarGtaCadastrada(c.gta, c.data_abate);
+        if (existente) throw new Error(mensagemGtaJaCadastrada(c.gta, existente));
+      }
       const { error } = await supabase.from("cargas_aves").insert(cargas);
       if (error) {
-        if (error.code === "23505") throw new Error("Já existe uma carga com essa GTA para a data de abate informada.");
+        if (error.code === "23505") throw new Error("Essa GTA já está cadastrada para esta data de abate. O número da GTA não pode se repetir na mesma data.");
+        if (error.code === "23514") throw new Error("Informe um número de GTA válido (com letras ou números).");
         throw error;
       }
     },

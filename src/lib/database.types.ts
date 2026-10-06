@@ -228,6 +228,10 @@ export interface Database {
         Args: { p_matricula: string };
         Returns: string | null;
       };
+      gta_ja_cadastrada: {
+        Args: { p_gta: string; p_data: string };
+        Returns: { data_abate: string; integrado: string; aviario: string }[];
+      };
       ids_versoes_ficha: {
         Args: { p_codigo: string };
         Returns: string[];
