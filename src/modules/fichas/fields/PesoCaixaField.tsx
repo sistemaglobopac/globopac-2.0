@@ -9,10 +9,14 @@ import { ensureLocalTime } from "../utils/tempo";
 import { acimaDoLimite, avaliarPesoCaixa, cargaPesoVazia, cargasSemPeso, LIMITE_PESO_CAIXA_KG, montarValorPesoCaixa, motivosBloqueioPesoCaixa, pesoCaixaVazio, pesoPorCaixa } from "./pesoCaixa";
 import type { CargaPesoCaixa, PesoCaixaValor } from "./tiposCompostos";
 
+import type { CargasEmRascunhoPorTipo } from "../utils/rascunhosAnterior";
+
 interface PesoCaixaFieldProps {
   value: PesoCaixaValor | undefined | null;
   onChange: (valor: PesoCaixaValor) => void;
   disabled?: boolean;
+  /** Cargas já monitoradas em rascunhos locais (ainda não assinados): não voltam à lista. */
+  cargasUsadasEmRascunho?: CargasEmRascunhoPorTipo;
 }
 
 function rotuloCarga(c: CargaAves): string {
@@ -21,7 +25,7 @@ function rotuloCarga(c: CargaAves): string {
 
 /** Peso vivo por caixa de transporte: seleciona a carga pré-cadastrada (GTA), informa aves por
  * caixa e peso médio das aves; calcula o peso por caixa. Conforme até 25 kg, não conforme acima. */
-export function PesoCaixaField({ value, onChange, disabled }: PesoCaixaFieldProps) {
+export function PesoCaixaField({ value, onChange, disabled, cargasUsadasEmRascunho }: PesoCaixaFieldProps) {
   const [v, setV] = useState<PesoCaixaValor>({ ...pesoCaixaVazio(), ...(value ?? {}) });
   const [dataProgramacao, setDataProgramacao] = useState(() => ensureLocalTime(new Date().toISOString()).isoLocal);
   const { data: cargasDoDia } = useCargasDoDia(dataProgramacao);
@@ -74,7 +78,9 @@ export function PesoCaixaField({ value, onChange, disabled }: PesoCaixaFieldProp
 
         {v.cargas.map((c, i) => {
           // Já monitoradas (ou escolhidas em outra carga desta ficha) saem da lista; a desta linha permanece.
-          const opcoes = (cargasDoDia ?? []).filter((x) => x.id === c.cargaId || (!jaMonitoradas?.has(x.id) && !escolhidas.has(x.id)));
+          const opcoes = (cargasDoDia ?? []).filter(
+            (x) => x.id === c.cargaId || (!jaMonitoradas?.has(x.id) && !cargasUsadasEmRascunho?.peso.has(x.id) && !escolhidas.has(x.id))
+          );
           const naLista = opcoes.some((x) => x.id === c.cargaId);
           const peso = pesoPorCaixa(c);
           const acima = acimaDoLimite(c);

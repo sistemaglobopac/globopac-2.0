@@ -18,6 +18,7 @@ import { PenduraAvesField } from "./fields/PenduraAvesField";
 import { EletronarcoseAvesField } from "./fields/EletronarcoseAvesField";
 import { CaixasVaziasField } from "./fields/CaixasVaziasField";
 import { PesoCaixaField } from "./fields/PesoCaixaField";
+import type { CargasEmRascunhoPorTipo } from "./utils/rascunhosAnterior";
 import { RastreabilidadeDoaField } from "./fields/RastreabilidadeDoaField";
 import { TemperaturaResfriamentoField } from "./fields/TemperaturaResfriamentoField";
 import { PotabilidadeAguaField } from "./fields/PotabilidadeAguaField";
@@ -66,6 +67,8 @@ interface DynamicFieldProps {
   diaMonitoramento?: string;
   /** Cargas já usadas em rascunhos locais desta ficha (não aparecem no servidor até assinar). */
   cargasEmRascunho?: ReadonlySet<string>;
+  /** Cargas já monitoradas em rascunhos locais (ainda não assinados), por tipo de monitoramento: não voltam à lista. */
+  cargasUsadasEmRascunho?: CargasEmRascunhoPorTipo;
   /** Hora do monitoramento (ISO) informada pelo inspetor — base do cálculo das cargas que já chegaram ao pré-resfriamento. */
   horaMonitoramento?: string;
   /** Etapa 2 do SPR: trava o que foi assinado na etapa 1; só o peso vivo dos lotes sem peso pode ser completado. */
@@ -75,7 +78,7 @@ interface DynamicFieldProps {
 /** Renderiza um campo de formulário a partir da definição declarativa de schema_campos —
  * o mesmo dado que gera o Zod de validação (src/shared/schema-campos.ts), garantindo que
  * UI e validação nunca divirjam (seção 7.1 do PROMPT MESTRE). */
-export function DynamicField({ campo, register, errors, control, prevAppointment, carcacasAtual, diaMonitoramento, cargasEmRascunho, horaMonitoramento, modoCompletarPeso, faseAbsorcao, aoSalvarPrimeiraEtapaDripping }: DynamicFieldProps) {
+export function DynamicField({ campo, register, errors, control, prevAppointment, carcacasAtual, diaMonitoramento, cargasEmRascunho, cargasUsadasEmRascunho, horaMonitoramento, modoCompletarPeso, faseAbsorcao, aoSalvarPrimeiraEtapaDripping }: DynamicFieldProps) {
   const erro = errors[campo.chave]?.message as string | undefined;
 
   return (
@@ -224,7 +227,7 @@ export function DynamicField({ campo, register, errors, control, prevAppointment
         <Controller
           name={campo.chave}
           control={control}
-          render={({ field }) => <RecepcaoAvesField value={field.value as RecepcaoAvesValor | undefined} onChange={field.onChange} />}
+          render={({ field }) => <RecepcaoAvesField value={field.value as RecepcaoAvesValor | undefined} onChange={field.onChange} cargasUsadasEmRascunho={cargasUsadasEmRascunho} />}
         />
       )}
 
@@ -256,7 +259,7 @@ export function DynamicField({ campo, register, errors, control, prevAppointment
         <Controller
           name={campo.chave}
           control={control}
-          render={({ field }) => <PesoCaixaField value={field.value as PesoCaixaValor | undefined} onChange={field.onChange} />}
+          render={({ field }) => <PesoCaixaField value={field.value as PesoCaixaValor | undefined} onChange={field.onChange} cargasUsadasEmRascunho={cargasUsadasEmRascunho} />}
         />
       )}
 
@@ -264,7 +267,7 @@ export function DynamicField({ campo, register, errors, control, prevAppointment
         <Controller
           name={campo.chave}
           control={control}
-          render={({ field }) => <RastreabilidadeDoaField value={field.value as RastreabilidadeDoaValor | undefined} onChange={field.onChange} />}
+          render={({ field }) => <RastreabilidadeDoaField value={field.value as RastreabilidadeDoaValor | undefined} onChange={field.onChange} cargasUsadasEmRascunho={cargasUsadasEmRascunho} />}
         />
       )}
 

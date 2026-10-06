@@ -1,6 +1,7 @@
 import { turnoParaHeranca, type TurnoHeranca } from "./turnoUtils";
 import { dataManaus } from "./horaMonitoramento";
 import type { Rascunho } from "@/lib/rascunhos";
+import type { CargaDoa } from "../fields/tiposCompostos";
 
 export interface RegistroAnterior {
   id: string;
@@ -25,6 +26,40 @@ export function cargasEmRascunhos(rascunhos: Rascunho[] | undefined, codigo: str
     }
   }
   return ids;
+}
+
+/** Cargas já monitoradas nos RASCUNHOS locais do usuário, por tipo de monitoramento. O servidor (cargas_ja_monitoradas) só
+ * conhece o que já foi assinado: sem isto, uma carga salva só como rascunho voltaria a ser oferecida no monitoramento
+ * seguinte. Vale para qualquer ficha do mesmo tipo de campo (a carga é monitorada uma vez por tipo, não por ficha). */
+export interface CargasEmRascunhoPorTipo {
+  /** Recepção de aves (início da pendura). */
+  recepcao: Set<string>;
+  /** Peso por caixa de transporte. */
+  peso: Set<string>;
+  /** Rastreabilidade e DOA: as linhas já preenchidas, que entram como "já registradas" (somente leitura). */
+  doa: CargaDoa[];
+}
+
+const preenchido = (t: unknown) => typeof t === "string" && t.trim() !== "";
+
+export function cargasEmRascunhoPorTipo(rascunhos: Rascunho[] | undefined): CargasEmRascunhoPorTipo {
+  const r: CargasEmRascunhoPorTipo = { recepcao: new Set(), peso: new Set(), doa: [] };
+  for (const rascunho of rascunhos ?? []) {
+    for (const valor of Object.values(rascunho.dadosDinamicos ?? {})) {
+      if (!valor || typeof valor !== "object" || Array.isArray(valor)) continue;
+      const v = valor as Record<string, unknown>;
+      // Recepção: o valor do campo tem `penduraInicioEm` e `cargaId`.
+      if ("penduraInicioEm" in v && preenchido(v.cargaId)) r.recepcao.add(v.cargaId as string);
+      const cargas = v.cargas;
+      if (!Array.isArray(cargas)) continue;
+      for (const c of cargas as Record<string, unknown>[]) {
+        if (!c || typeof c !== "object" || !preenchido(c.cargaId)) continue;
+        if ("avesPorCaixa" in c) r.peso.add(c.cargaId as string);
+        if ("avesMortas" in c && (preenchido(c.avesRecebidas) || preenchido(c.avesMortas))) r.doa.push(c as unknown as CargaDoa);
+      }
+    }
+  }
+  return r;
 }
 
 /** O "monitoramento anterior" que o novo preenchimento herda: o mais recente entre o último registro

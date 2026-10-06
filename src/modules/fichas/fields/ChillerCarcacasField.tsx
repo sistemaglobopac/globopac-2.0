@@ -62,7 +62,7 @@ interface ChillerCarcacasFieldProps {
  * carcaça = média ponderada do peso vivo × 0,84; meta por tanque em função desse peso. O widget
  * só EXIBE o desvio — quem decide `monitoramentos.conformidade` continua sendo o Verificador
  * (segregação de funções, `trg_segregacao_funcoes`). Todas as contas ficam em calculosSpr.ts. */
-export function ChillerCarcacasField({ value, onChange, disabled, prevAppointment, diaMonitoramento, horaMonitoramento, modoCompletarPeso }: ChillerCarcacasFieldProps) {
+export function ChillerCarcacasField({ value, onChange, disabled, prevAppointment, diaMonitoramento, horaMonitoramento, modoCompletarPeso, cargasEmRascunho }: ChillerCarcacasFieldProps) {
   const disabledGeral = disabled || modoCompletarPeso;
   const [chegada, setChegada] = useState<ChegadaRegistrada | undefined>(value?.chegada);
   // Pausas da linha de abate (informadas pelo inspetor): a pendura para; as aves já penduradas seguem até o pré-resfriamento.
@@ -100,9 +100,9 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
     if (!horaMonitoramento || !cargasDoDia) return null;
     const lista: CargaDoDia[] = cargasDoDia.map((c) => ({ carga_id: c.carga_id, gta: c.gta, qtd_aves: c.qtd_aves, pendura_inicio_em: c.pendura_inicio_em, peso_medio_kg: c.peso_medio_kg }));
     // Base: o acumulado guardado no monitoramento anterior; sem ele, as cargas já apuradas contam inteiras.
-    const base = prevAppointment?.chegada?.acumulado ?? baseDeCargasJaUsadas(lista, jaUsadas);
+    const base = prevAppointment?.chegada?.acumulado ?? baseDeCargasJaUsadas(lista, new Set([...(jaUsadas ?? []), ...(cargasEmRascunho ?? [])]));
     return calcularPeriodo(lista, new Date(horaMonitoramento), base, paradas);
-  }, [horaMonitoramento, cargasDoDia, jaUsadas, prevAppointment, paradas]);
+  }, [horaMonitoramento, cargasDoDia, jaUsadas, cargasEmRascunho, prevAppointment, paradas]);
 
   // As cargas já usadas foram calculadas antes de uma pausa ser informada (ou removida): precisam ser recalculadas.
   const cargasDesatualizadas =

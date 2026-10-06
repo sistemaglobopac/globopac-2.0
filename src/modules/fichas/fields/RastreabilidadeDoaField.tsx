@@ -8,17 +8,21 @@ import { formatarDataHora } from "./recepcaoAves";
 import { doaVazio, formatarPctDoa, herdarComRegistradas, lerContagem, montarCargas, montarValorDoa, motivosBloqueioDoa, type CargaHerdadaDoa, type EntradaDoa } from "./rastreabilidadeDoa";
 import type { RastreabilidadeDoaValor } from "./tiposCompostos";
 
+import type { CargasEmRascunhoPorTipo } from "../utils/rascunhosAnterior";
+
 interface RastreabilidadeDoaFieldProps {
   value: RastreabilidadeDoaValor | undefined | null;
   onChange: (valor: RastreabilidadeDoaValor) => void;
   disabled?: boolean;
+  /** Cargas já registradas em rascunhos locais (ainda não assinados): entram como já registradas, como as do servidor. */
+  cargasUsadasEmRascunho?: CargasEmRascunhoPorTipo;
 }
 
 /** Rastreabilidade e Controle de DOA: lista as cargas do dia na ordem em que começaram a ser
  * penduradas, com GTA, veículo, início do abate e aves previstas HERDADOS da programação e da
  * recepção de aves. O inspetor informa só as aves que de fato vieram e as mortas; o % de DOA sai
  * calculado e, se o saldo da GTA divergir, aparece a nota de documento de correção de saldo. */
-export function RastreabilidadeDoaField({ value, onChange, disabled }: RastreabilidadeDoaFieldProps) {
+export function RastreabilidadeDoaField({ value, onChange, disabled, cargasUsadasEmRascunho }: RastreabilidadeDoaFieldProps) {
   const inicial = useRef({ ...doaVazio(ensureLocalTime(new Date().toISOString()).isoLocal), ...(value ?? {}) });
   const [dataAbate, setDataAbate] = useState(inicial.current.dataAbate);
   const [entradas, setEntradas] = useState<Record<string, EntradaDoa>>(() =>
@@ -31,8 +35,10 @@ export function RastreabilidadeDoaField({ value, onChange, disabled }: Rastreabi
   // leitura); as desta própria ficha (edição) continuam editáveis.
   const anteriores = useMemo(() => {
     const proprias = new Set(dataAbate === inicial.current.dataAbate ? inicial.current.cargas.map((c) => c.cargaId) : []);
-    return new Map((registradas ?? []).filter((c) => !proprias.has(c.cargaId)).map((c) => [c.cargaId, c]));
-  }, [registradas, dataAbate]);
+    // Do servidor (assinadas) + dos rascunhos locais (ainda não assinados); o rascunho mais recente vale.
+    const doRascunho = cargasUsadasEmRascunho?.doa ?? [];
+    return new Map([...(registradas ?? []), ...doRascunho].filter((c) => !proprias.has(c.cargaId)).map((c) => [c.cargaId, c]));
+  }, [registradas, dataAbate, cargasUsadasEmRascunho]);
 
   const herdadas = useMemo<CargaHerdadaDoa[]>(() => {
     const proprias = new Map((dataAbate === inicial.current.dataAbate ? inicial.current.cargas : []).map((c) => [c.cargaId, c]));

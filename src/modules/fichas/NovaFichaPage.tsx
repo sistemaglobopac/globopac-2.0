@@ -11,7 +11,7 @@ import { CHAVE_CONTINUACAO, useCriarMonitoramento, useRegistroContinuavel, useTe
 import { ContinuacaoMonitoramento, MOTIVO_CONTINUACAO_MIN_CARACTERES } from "./components/ContinuacaoMonitoramento";
 import { RascunhosPainel } from "./components/RascunhosPainel";
 import { useAtualizarRascunhos, useRascunhos } from "./useRascunhos";
-import { cargasEmRascunhos, combinarAnterior } from "./utils/rascunhosAnterior";
+import { cargasEmRascunhoPorTipo, cargasEmRascunhos, combinarAnterior } from "./utils/rascunhosAnterior";
 import { CHAVE_HORA_MONITORAMENTO, dataManaus, horaManaus, isoDeManaus, validarHoraMonitoramento } from "./utils/horaMonitoramento";
 import { salvarRascunho } from "@/lib/rascunhos";
 import { CHAVE_AGUARDANDO_PESO, cargasSemPeso } from "./fields/pesoCaixa";
@@ -344,6 +344,8 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
   );
   const registroPrevio = ultimoRegistro ?? anteriorContinuacao;
   const cargasEmRascunho = useMemo(() => cargasEmRascunhos(rascunhosLocais, codigo, setor), [rascunhosLocais, codigo, setor]);
+  // Carga já monitorada em rascunho (ainda não assinado) não volta à lista no monitoramento seguinte.
+  const cargasUsadasEmRascunho = useMemo(() => cargasEmRascunhoPorTipo(rascunhosLocais), [rascunhosLocais]);
   const [motivosBloqueio, setMotivosBloqueio] = useState<string[]>([]);
   const [avisosDesvio, setAvisosDesvio] = useState<string[]>([]);
   // Dados aguardando a confirmação "assinar monitoramento NÃO CONFORME?" (antes do modal de senha).
@@ -759,6 +761,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
                 diaMonitoramento={horaData}
                 horaMonitoramento={horaMonitoramentoIso}
                 cargasEmRascunho={cargasEmRascunho}
+                cargasUsadasEmRascunho={cargasUsadasEmRascunho}
                 faseAbsorcao={campoAbsorcao ? "INICIAL" : undefined}
                 aoSalvarPrimeiraEtapaDripping={onVoltar}
               />

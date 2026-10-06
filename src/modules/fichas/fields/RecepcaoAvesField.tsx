@@ -19,10 +19,14 @@ import {
 } from "./recepcaoAves";
 import type { RecepcaoAvesValor } from "./tiposCompostos";
 
+import type { CargasEmRascunhoPorTipo } from "../utils/rascunhosAnterior";
+
 interface RecepcaoAvesFieldProps {
   value: RecepcaoAvesValor | undefined | null;
   onChange: (valor: RecepcaoAvesValor) => void;
   disabled?: boolean;
+  /** Cargas já monitoradas em rascunhos locais (ainda não assinados): não voltam à lista. */
+  cargasUsadasEmRascunho?: CargasEmRascunhoPorTipo;
 }
 
 type CampoHorario = "retiradaRacaoEm" | "embarqueInicioEm" | "embarqueFimEm" | "chegadaEm" | "penduraInicioEm";
@@ -49,7 +53,7 @@ function rotuloCarga(c: CargaAves): string {
  * pelo Administrador/Verificador) e o veículo (por placa), confere o veículo, registra os horários
  * da carga e as condições dos animais na chegada. Jejum, dieta hídrica, viagem e espera são
  * calculados sozinhos. */
-export function RecepcaoAvesField({ value, onChange, disabled }: RecepcaoAvesFieldProps) {
+export function RecepcaoAvesField({ value, onChange, disabled, cargasUsadasEmRascunho }: RecepcaoAvesFieldProps) {
   const [v, setV] = useState<RecepcaoAvesValor>({ ...recepcaoVazia(), ...(value ?? {}) });
   const [dataProgramacao, setDataProgramacao] = useState(() => ensureLocalTime(new Date().toISOString()).isoLocal);
   const [novaPlaca, setNovaPlaca] = useState("");
@@ -57,8 +61,8 @@ export function RecepcaoAvesField({ value, onChange, disabled }: RecepcaoAvesFie
 
   const { data: cargasDoDia } = useCargasDoDia(dataProgramacao);
   const { data: jaMonitoradas } = useCargasJaMonitoradas("recepcao");
-  // A carga já monitorada sai da lista; a selecionada nesta ficha (edição/rascunho) permanece.
-  const cargas = (cargasDoDia ?? []).filter((c) => c.id === v.cargaId || !jaMonitoradas?.has(c.id));
+  // A carga já monitorada (assinada ou salva em rascunho) sai da lista; a selecionada nesta ficha permanece.
+  const cargas = (cargasDoDia ?? []).filter((c) => c.id === v.cargaId || (!jaMonitoradas?.has(c.id) && !cargasUsadasEmRascunho?.recepcao.has(c.id)));
   const { data: veiculos } = useVeiculos();
   const criarVeiculo = useCriarVeiculo();
 
