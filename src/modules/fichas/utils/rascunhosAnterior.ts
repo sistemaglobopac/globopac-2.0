@@ -19,7 +19,10 @@ export function combinarAnterior(
   codigo: string,
   setor: string,
   turno: TurnoHeranca | undefined,
-  agora: Date
+  agora: Date,
+  /** "continuacao": o inspetor está registrando monitoramentos de ANTES de hoje (continuação); vale o
+   * rascunho mais recente da ficha+setor, de qualquer dia e turno. */
+  modo: "hoje" | "continuacao" = "hoje"
 ): RegistroAnterior | null | undefined {
   const hoje = dataManaus(agora);
   const candidatos: RegistroAnterior[] = (rascunhos ?? [])
@@ -27,8 +30,8 @@ export function combinarAnterior(
       (r) =>
         r.codigo === codigo &&
         r.setor === setor &&
-        dataManaus(new Date(r.horaMonitoramento)) === hoje &&
-        (!turno || turnoParaHeranca(new Date(r.horaMonitoramento)) === turno)
+        (modo === "continuacao" ||
+          (dataManaus(new Date(r.horaMonitoramento)) === hoje && (!turno || turnoParaHeranca(new Date(r.horaMonitoramento)) === turno)))
     )
     .map((r) => ({ id: r.id, dados_dinamicos: r.dadosDinamicos, criado_em: r.horaMonitoramento }));
   if (doServidor) candidatos.push(doServidor);

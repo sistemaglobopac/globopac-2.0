@@ -91,6 +91,9 @@ describe("rascunhos locais", () => {
     // rascunho de outro dia não é herdado
     const ontem = await salvarRascunho(rascunho("ontem", "2026-10-05T14:00:00Z"));
     expect(combinarAnterior(null, [ontem], "RAC 001", "S1", "1º Turno", AGORA)).toBeNull();
+    // em continuação (monitoramentos pendentes de ontem), o rascunho de ontem É o anterior, de qualquer dia/turno
+    const ontem2 = await salvarRascunho(rascunho("ontem2", "2026-10-05T22:00:00Z"));
+    expect(combinarAnterior({ id: "s", dados_dinamicos: {}, criado_em: "2026-10-05T19:32:00Z" }, [ontem, ontem2], "RAC 001", "S1", undefined, AGORA, "continuacao")?.id).toBe("ontem2");
   });
 
   it("assinatura em lote: o que falha continua como rascunho; o vencido não é enviado", async () => {

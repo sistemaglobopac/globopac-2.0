@@ -332,7 +332,13 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
   const { data: registroContinuavel } = useRegistroContinuavel(codigo, setor, turnoConhecido && camposComHeranca && ultimoRegistro === null);
   const [continuando, setContinuando] = useState(false);
   const [motivoContinuacao, setMotivoContinuacao] = useState("");
-  const registroPrevio = ultimoRegistro ?? (continuando ? registroContinuavel : null);
+  // Em continuação, a leitura anterior é a do mais recente entre o registro continuado e os rascunhos
+  // desta ficha (de qualquer dia): vários monitoramentos de ontem se encadeiam entre si.
+  const anteriorContinuacao = useMemo(
+    () => (continuando ? combinarAnterior(registroContinuavel, rascunhosLocais, codigo, setor, undefined, new Date(), "continuacao") : null),
+    [continuando, registroContinuavel, rascunhosLocais, codigo, setor]
+  );
+  const registroPrevio = ultimoRegistro ?? anteriorContinuacao;
   const [motivosBloqueio, setMotivosBloqueio] = useState<string[]>([]);
   const [avisosDesvio, setAvisosDesvio] = useState<string[]>([]);
   // Dados aguardando a confirmação "assinar monitoramento NÃO CONFORME?" (antes do modal de senha).
@@ -390,12 +396,21 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
    * ao sincronizar, seção 7.5/ADR 0002). */
   /** Valida a hora informada (obrigatória, não futura, dentro de 24 h, posterior à anterior e respeitando o
    * intervalo mínimo) e a devolve em ISO; null (com a mensagem na tela) se inválida. */
+  /** Hora do monitoramento anterior desta ficha+setor: o mais recente entre o anterior herdado e os
+   * rascunhos locais (de qualquer dia, dentro da janela de 24 h). */
+  function anteriorParaValidar(): string | null {
+    const horas = [registroPrevio?.criado_em, ...(rascunhosLocais ?? []).filter((r) => r.codigo === codigo && r.setor === setor).map((r) => r.horaMonitoramento)].filter(
+      (h): h is string => !!h
+    );
+    return horas.length > 0 ? horas.sort().at(-1)! : null;
+  }
+
   function horaValidada(): string | null {
     const iso = isoDeManaus(horaData, horaHora);
     const erro = validarHoraMonitoramento({
       hora: iso,
       agora: new Date(),
-      anteriorEm: ultimoRegistro?.criado_em ?? null,
+      anteriorEm: anteriorParaValidar(),
       intervaloMin,
     });
     setErroHora(erro);
@@ -494,8 +509,8 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
   async function gravarRascunho(dados: FieldValues, naoConforme: boolean, avisos: string[]) {
     setNcRascunho(null);
     const dadosFinais =
-      continuando && registroContinuavel
-        ? { ...dados, [CHAVE_CONTINUACAO]: { registroId: registroContinuavel.id, criadoEm: registroContinuavel.criado_em, motivo: motivoContinuacao.trim() } }
+      continuando && registroPrevio
+        ? { ...dados, [CHAVE_CONTINUACAO]: { registroId: registroPrevio.id, criadoEm: registroPrevio.criado_em, motivo: motivoContinuacao.trim() } }
         : dados;
     await salvarRascunho({
       id: crypto.randomUUID(),
@@ -547,8 +562,8 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
         userId: perfil.id,
         setor,
         dadosDinamicos:
-          continuando && registroContinuavel
-            ? { ...dados, [CHAVE_CONTINUACAO]: { registroId: registroContinuavel.id, criadoEm: registroContinuavel.criado_em, motivo: motivoContinuacao.trim() } }
+          continuando && registroPrevio
+            ? { ...dados, [CHAVE_CONTINUACAO]: { registroId: registroPrevio.id, criadoEm: registroPrevio.criado_em, motivo: motivoContinuacao.trim() } }
             : dados,
       });
       setContinuando(false);
@@ -659,14 +674,19 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
             </section>
             {ultimoRegistro === null && registroContinuavel && !campoAbsorcao && (
               <ContinuacaoMonitoramento
-                registro={registroContinuavel}
+                registro={anteriorContinuacao ?? registroContinuavel}
                 ativo={continuando}
                 motivo={motivoContinuacao}
                 onMotivo={setMotivoContinuacao}
-                onAtivar={() => setContinuando(true)}
+                onAtivar={() => {
+                  setContinuando(true);
+                  // O monitoramento pendente é do dia do registro continuado (ex.: ontem): já sugere essa data.
+                  setHoraData(dataManaus(new Date(registroContinuavel.criado_em)));
+                }}
                 onCancelar={() => {
                   setContinuando(false);
                   setMotivoContinuacao("");
+                  setHoraData(dataManaus(new Date()));
                   reset(valoresIniciaisDe(campos));
                 }}
               />
