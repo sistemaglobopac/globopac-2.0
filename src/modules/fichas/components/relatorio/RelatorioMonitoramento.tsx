@@ -290,7 +290,9 @@ function RegistroUnico({ record, ordem, template, dados, hashesAoVivo }: Registr
   const autocorrecao = dados.autocorrecoes.find((a) => a.monitoramento_id === record.id);
   const adendos = (record.dados_dinamicos.adendos as AdendoBruto[] | undefined) ?? [];
   const continuacao = record.dados_dinamicos.continuacao_de as { criadoEm?: string; motivo?: string } | undefined;
-  const { time } = ensureLocalTime(record.criado_em);
+  // Hora em que o monitoramento foi REALIZADO (informada pelo inspetor); registros antigos: criado_em.
+  const horaInformada = record.dados_dinamicos.hora_monitoramento as string | undefined;
+  const { time } = ensureLocalTime(horaInformada ?? record.criado_em);
   // Campos "hora" (ex.: "Hora do Monitoramento") já aparecem no cabeçalho deste bloco
   // ("Monitoramento N — HH:MM") — listá-los de novo em Dados Coletados é redundante e pode
   // divergir do horário real de criação do registro (o campo é digitado/editável pelo
@@ -420,7 +422,7 @@ export function RelatorioMonitoramento({ ids, dados, turnoDe = (r) => turnoDoDia
   const todasTratadas = rncsDoGrupo.length > 0 && rncsDoGrupo.every((r) => r.status === "FECHADA");
 
   const turnos = [...new Set(records.map((r) => turnoDe(r)))];
-  const horarios = records.map((r) => ensureLocalTime(r.criado_em).time).sort();
+  const horarios = records.map((r) => ensureLocalTime((r.dados_dinamicos.hora_monitoramento as string | undefined) ?? r.criado_em).time).sort();
   const horarioDocumento = horarios.length <= 1 ? horarios[0] ?? "—" : `${horarios[0]}–${horarios[horarios.length - 1]}`;
 
   return (

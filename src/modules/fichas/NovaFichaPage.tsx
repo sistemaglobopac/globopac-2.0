@@ -9,6 +9,11 @@ import { zodFromSchemaCampos, valoresIniciaisDe, type CampoTemplate } from "@/sh
 import { supabase } from "@/lib/supabase";
 import { CHAVE_CONTINUACAO, useCriarMonitoramento, useRegistroContinuavel, useTemplatesAtivos, useTurnoFixoDoUsuario, useUltimoRegistroFicha, useUltimosApontamentosHoje, type TemplateAtivo } from "./api";
 import { ContinuacaoMonitoramento, MOTIVO_CONTINUACAO_MIN_CARACTERES } from "./components/ContinuacaoMonitoramento";
+import { RascunhosPainel } from "./components/RascunhosPainel";
+import { useAtualizarRascunhos, useRascunhos } from "./useRascunhos";
+import { combinarAnterior } from "./utils/rascunhosAnterior";
+import { CHAVE_HORA_MONITORAMENTO, dataManaus, horaManaus, isoDeManaus, validarHoraMonitoramento } from "./utils/horaMonitoramento";
+import { salvarRascunho } from "@/lib/rascunhos";
 import { motivosDeBloqueioSpr } from "./utils/bloqueiosSpr";
 import { desviosEspeciais, temNaoConformidade } from "./utils/desviosEspeciais";
 import { ModalAutocorrecao } from "@/modules/autocorrecao/ModalAutocorrecao";
@@ -125,7 +130,19 @@ export function NovaFichaPage() {
     () => (templates ?? []).filter((f) => f.locais_aplicacao?.includes(setor)),
     [templates, setor]
   );
-  const { data: apontamentos } = useUltimosApontamentosHoje(setor);
+  const { data: apontamentosServidor } = useUltimosApontamentosHoje(setor);
+  const { data: rascunhos } = useRascunhos(perfil?.id);
+  // Rascunho = monitoramento já realizado (só não assinado): conta para o intervalo mínimo e o atraso.
+  const apontamentos = useMemo(() => {
+    if (!apontamentosServidor) return apontamentosServidor;
+    const mapaUltimos = new Map(apontamentosServidor.mapaUltimos);
+    for (const r of rascunhos ?? []) {
+      if (r.setor !== setor) continue;
+      const atual = mapaUltimos.get(r.codigo);
+      if (!atual || r.horaMonitoramento > atual) mapaUltimos.set(r.codigo, r.horaMonitoramento);
+    }
+    return { ...apontamentosServidor, mapaUltimos };
+  }, [apontamentosServidor, rascunhos, setor]);
   const templateSelecionado = fichasDoSetor.find((t) => t.id === templateId);
 
   const statusPorFicha = useMemo(
@@ -160,6 +177,7 @@ export function NovaFichaPage() {
           {setoresDoUsuario.length === 1 && <Badge variant="outline">{setor}</Badge>}
         </div>
 
+        <RascunhosPainel />
         <FilaOfflinePainel />
         <MonitoramentosEmAndamento />
 
@@ -254,6 +272,7 @@ export function NovaFichaPage() {
       versaoTemplate={templateSelecionado.versao}
       campos={templateSelecionado.schema_campos as CampoTemplate[]}
       nome={templateSelecionado.nome}
+      intervaloMin={templateSelecionado.tempo_entre_apontamentos_min}
       setor={setor}
       perfil={perfil}
       onVoltar={() => setTemplateId("")}
@@ -267,13 +286,21 @@ interface FichaFormProps {
   versaoTemplate: number;
   campos: CampoTemplate[];
   nome: string;
+  intervaloMin: number | null;
   setor: string;
   perfil: PerfilSessao;
   onVoltar: () => void;
 }
 
-function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, setor, perfil, onVoltar }: FichaFormProps) {
-  const [sucesso, setSucesso] = useState<"online" | "offline" | "em_andamento" | null>(null);
+function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervaloMin, setor, perfil, onVoltar }: FichaFormProps) {
+  const [sucesso, setSucesso] = useState<"online" | "offline" | "em_andamento" | "rascunho" | "rascunho_nc" | null>(null);
+  // Hora do monitoramento: informada MANUALMENTE (abrir a ficha só para olhar não registra hora).
+  const [horaData, setHoraData] = useState(() => dataManaus(new Date()));
+  const [horaHora, setHoraHora] = useState("");
+  const [erroHora, setErroHora] = useState<string | null>(null);
+  // Monitoramento NÃO CONFORME salvo como rascunho: avisa na hora, pois a RNC/ação corretiva imediata só existe depois de assinar.
+  const [ncRascunho, setNcRascunho] = useState<{ dados: FieldValues; avisos: string[] } | null>(null);
+  const atualizarRascunhos = useAtualizarRascunhos();
   const [dadosPendentes, setDadosPendentes] = useState<FieldValues | null>(null);
   const [senha, setSenha] = useState("");
   const [autenticando, setAutenticando] = useState(false);
@@ -286,11 +313,18 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, setor, pe
     perfil.id,
   );
   const turnoAlvo = turnoAlvoHeranca(turnoFixo, new Date());
-  const { data: ultimoRegistro } = useUltimoRegistroFicha(
+  const { data: ultimoServidor } = useUltimoRegistroFicha(
     codigo,
     setor,
     turnoAlvo,
     turnoConhecido,
+  );
+  const { data: rascunhosLocais } = useRascunhos(perfil.id);
+  // A leitura anterior vem do mais recente entre o servidor e os rascunhos locais desta ficha: o 2º
+  // monitoramento feito sem internet herda do 1º.
+  const ultimoRegistro = useMemo(
+    () => combinarAnterior(ultimoServidor, rascunhosLocais, codigo, setor, turnoAlvo, new Date()),
+    [ultimoServidor, rascunhosLocais, codigo, setor, turnoAlvo]
   );
   // Continuação de um monitoramento de antes de hoje (turno encerrado antes do lançamento): só é
   // oferecida quando hoje ainda não há registro desta ficha para herdar.
@@ -354,7 +388,24 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, setor, pe
    * sem rede, não há como validar a senha contra o servidor, então esse passo é pulado e o
    * registro vai direto para a fila offline (useCriarMonitoramento já assina automaticamente
    * ao sincronizar, seção 7.5/ADR 0002). */
-  async function aoEnviar(dados: FieldValues) {
+  /** Valida a hora informada (obrigatória, não futura, dentro de 24 h, posterior à anterior e respeitando o
+   * intervalo mínimo) e a devolve em ISO; null (com a mensagem na tela) se inválida. */
+  function horaValidada(): string | null {
+    const iso = isoDeManaus(horaData, horaHora);
+    const erro = validarHoraMonitoramento({
+      hora: iso,
+      agora: new Date(),
+      anteriorEm: ultimoRegistro?.criado_em ?? null,
+      intervaloMin,
+    });
+    setErroHora(erro);
+    return erro ? null : iso;
+  }
+
+  async function aoEnviar(dadosForm: FieldValues) {
+    const hora = horaValidada();
+    if (!hora) return;
+    const dados: FieldValues = { ...dadosForm, [CHAVE_HORA_MONITORAMENTO]: hora };
     // Dripping em 1ª etapa (sem Retirada/M2): não assina — só "Salvar 1ª etapa do teste" (Enter no formulário não pode furar isso).
     if (drippingFase1) {
       setMotivosBloqueio(['Dripping Test: salve a 1ª etapa do teste. A assinatura só vem depois da Retirada e do M2 (2ª etapa).']);
@@ -389,8 +440,11 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, setor, pe
   const campoDripping = campos.find((c) => c.tipo === "dripping_test");
   const drippingFase1 = Boolean(campoDripping) && drippingEmFase1((valoresForm?.[campoDripping?.chave ?? ""] as DrippingTestValor | null | undefined)?.items);
 
-  async function aoSalvarDepois(dados: FieldValues) {
+  async function aoSalvarDepois(dadosForm: FieldValues) {
     if (!campoAbsorcao) return;
+    const hora = horaValidada();
+    if (!hora) return;
+    const dados: FieldValues = { ...dadosForm, [CHAVE_HORA_MONITORAMENTO]: hora };
     const valor = dados[campoAbsorcao.chave] as AbsorcaoAguaValor | null | undefined;
     const impedimentos = validarFaseInicial(valor?.items ?? []);
     setMotivosBloqueio(impedimentos);
@@ -412,6 +466,56 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, setor, pe
     } catch {
       // erro refletido em criarMonitoramento.isError (ex.: lacre já em andamento em outro registro).
     }
+  }
+
+  /** Salva o monitoramento como RASCUNHO neste aparelho (com ou sem internet), para assinar depois em lote.
+   * Mesmas validações do "Criar e assinar"; se estiver NÃO CONFORME, avisa na hora. */
+  async function aoSalvarRascunho(dadosForm: FieldValues) {
+    const hora = horaValidada();
+    if (!hora) return;
+    const dados: FieldValues = { ...dadosForm, [CHAVE_HORA_MONITORAMENTO]: hora };
+    const motivos = motivosDeBloqueioSpr(camposVisiveis, dados);
+    if (continuando && motivoContinuacao.trim().length < MOTIVO_CONTINUACAO_MIN_CARACTERES) {
+      motivos.push(`Continuação: informe o motivo (mínimo ${MOTIVO_CONTINUACAO_MIN_CARACTERES} caracteres).`);
+    }
+    setMotivosBloqueio(motivos);
+    if (motivos.length > 0) return;
+
+    const avisos = desviosEspeciais(camposVisiveis, dados);
+    const naoConforme = avisos.length > 0 || temNaoConformidade(dados);
+    if (naoConforme && navigator.onLine) {
+      // Com internet dá para assinar já e tratar na hora (RNC ou ação corretiva imediata).
+      setNcRascunho({ dados, avisos });
+      return;
+    }
+    await gravarRascunho(dados, naoConforme, avisos);
+  }
+
+  async function gravarRascunho(dados: FieldValues, naoConforme: boolean, avisos: string[]) {
+    setNcRascunho(null);
+    const dadosFinais =
+      continuando && registroContinuavel
+        ? { ...dados, [CHAVE_CONTINUACAO]: { registroId: registroContinuavel.id, criadoEm: registroContinuavel.criado_em, motivo: motivoContinuacao.trim() } }
+        : dados;
+    await salvarRascunho({
+      id: crypto.randomUUID(),
+      fichaTemplateId: templateId,
+      codigo,
+      nomeFicha: nome,
+      versaoTemplate,
+      userId: perfil.id,
+      setor,
+      dadosDinamicos: dadosFinais,
+      horaMonitoramento: dados[CHAVE_HORA_MONITORAMENTO] as string,
+      naoConforme,
+      motivosNc: avisos,
+    });
+    void atualizarRascunhos();
+    setContinuando(false);
+    setMotivoContinuacao("");
+    reset(valoresIniciaisDe(campos));
+    setSucesso(naoConforme ? "rascunho_nc" : "rascunho");
+    setTimeout(onVoltar, naoConforme ? 4000 : 1500);
   }
 
   async function seguirParaAssinatura(dados: FieldValues) {
@@ -510,6 +614,49 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, setor, pe
           {/* Ficha com absorção de água: 1ª etapa (pesagem inicial) — não há "Criar e assinar" aqui; a pesagem
               final e a assinatura vêm depois, pela lista "Monitoramentos em andamento". */}
           <form onSubmit={handleSubmit(campoAbsorcao ? aoSalvarDepois : aoEnviar)} className="space-y-4" noValidate>
+            <section className="space-y-2 rounded-lg border-2 border-primary/30 bg-primary/5 p-3" data-testid="hora-monitoramento">
+              <Label htmlFor="hora-monitoramento-hora" className="text-xs font-black uppercase tracking-wider text-primary">
+                Hora do monitoramento *
+              </Label>
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  id="hora-monitoramento-data"
+                  aria-label="Data do monitoramento"
+                  type="date"
+                  className="w-auto"
+                  value={horaData}
+                  onChange={(e) => setHoraData(e.target.value)}
+                />
+                <Input
+                  id="hora-monitoramento-hora"
+                  aria-label="Hora do monitoramento"
+                  type="time"
+                  className="w-auto"
+                  value={horaHora}
+                  onChange={(e) => setHoraHora(e.target.value)}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const agoraLocal = new Date();
+                    setHoraData(dataManaus(agoraLocal));
+                    setHoraHora(horaManaus(agoraLocal));
+                  }}
+                >
+                  Agora
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Informe a hora em que você <strong>realizou</strong> a medição (horário de Manaus). Só abrir a ficha não registra hora. O intervalo mínimo entre monitoramentos conta a partir dela.
+              </p>
+              {erroHora && (
+                <p role="alert" className="text-sm font-medium text-destructive">
+                  {erroHora}
+                </p>
+              )}
+            </section>
             {ultimoRegistro === null && registroContinuavel && !campoAbsorcao && (
               <ContinuacaoMonitoramento
                 registro={registroContinuavel}
@@ -565,6 +712,14 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, setor, pe
               </p>
             )}
             {sucesso === "online" && <p className="text-sm text-success">Ficha criada e assinada com sucesso.</p>}
+            {sucesso === "rascunho" && (
+              <p className="text-sm text-success">Rascunho salvo neste aparelho. Assine pela lista de rascunhos em até 24 h.</p>
+            )}
+            {sucesso === "rascunho_nc" && (
+              <p role="alert" className="rounded border border-destructive bg-destructive/10 p-2 text-sm font-medium text-destructive">
+                Rascunho salvo como NÃO CONFORME. Sem conexão não dá para emitir a RNC nem a ação corretiva agora: assine assim que houver internet.
+              </p>
+            )}
             {sucesso === "offline" && (
               <p className="text-sm text-warning">
                 Sem conexão — ficha salva no dispositivo e será enviada e assinada automaticamente assim que a rede voltar.
@@ -580,13 +735,61 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, setor, pe
                 Dripping Test: a assinatura só vem na 2ª etapa, depois da drenagem (Retirada e M2). Na 1ª etapa use "Salvar 1ª etapa do teste".
               </p>
             ) : (
-              <Button type="submit" disabled={isSubmitting || criarMonitoramento.isPending}>
-                {isSubmitting || criarMonitoramento.isPending ? "Salvando e assinando…" : "Criar e assinar"}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit" disabled={isSubmitting || criarMonitoramento.isPending}>
+                  {isSubmitting || criarMonitoramento.isPending ? "Salvando e assinando…" : "Criar e assinar"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isSubmitting || criarMonitoramento.isPending}
+                  onClick={() => void handleSubmit(aoSalvarRascunho)()}
+                >
+                  Salvar rascunho (assinar depois)
+                </Button>
+              </div>
             )}
           </form>
         </CardContent>
       </Card>
+
+      {ncRascunho && (
+        <ModalAssinatura titulo="Monitoramento NÃO CONFORME" onFechar={() => setNcRascunho(null)}>
+          <div className="space-y-4" data-testid="nc-no-rascunho">
+            <div role="alert" className="space-y-1 rounded-md border-2 border-destructive bg-destructive/10 p-3 text-sm text-destructive">
+              <p className="flex items-center gap-2 font-bold">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                Este monitoramento está NÃO CONFORME.
+              </p>
+              {ncRascunho.avisos.length > 0 && (
+                <ul className="list-disc pl-5">
+                  {ncRascunho.avisos.map((aviso) => (
+                    <li key={aviso}>{aviso}</li>
+                  ))}
+                </ul>
+              )}
+              <p>Para emitir a RNC ou registrar a ação corretiva imediata agora, é preciso assinar o monitoramento.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => void gravarRascunho(ncRascunho.dados, true, ncRascunho.avisos)}>
+                Salvar rascunho mesmo assim
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                className="flex-1"
+                onClick={() => {
+                  const dados = ncRascunho.dados;
+                  setNcRascunho(null);
+                  void seguirParaAssinatura(dados);
+                }}
+              >
+                Assinar agora e tratar
+              </Button>
+            </div>
+          </div>
+        </ModalAssinatura>
+      )}
 
       {confirmarNc && (
         <ModalAssinatura titulo="Monitoramento NÃO CONFORME" onFechar={cancelarConfirmacaoNc}>

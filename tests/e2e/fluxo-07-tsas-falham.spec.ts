@@ -33,6 +33,8 @@ test("falha simultânea de todas as TSAs marca o carimbo como pendente sem trava
     await page.locator("#temperatura_celsius").fill("25");
 
     const antesDaCriacao = new Date().toISOString();
+    // Hora do monitoramento agora é obrigatória e informada pelo inspetor.
+    await page.getByRole("button", { name: "Agora" }).click();
     await page.getByRole("button", { name: "Criar e assinar" }).click();
     await assinarComSenha(page, "121072");
 

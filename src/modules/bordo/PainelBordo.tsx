@@ -52,6 +52,7 @@ import {
   type AdendoPendente,
 } from "./api";
 import { Button } from "@/shared/ui/button";
+import { rascunhosComoMonitoramentos, useRascunhos } from "@/modules/fichas/useRascunhos";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Select } from "@/shared/ui/select";
@@ -102,6 +103,7 @@ export function PainelBordo() {
   const iniciarTurno = useIniciarTurno();
   const finalizarTurno = useFinalizarTurno();
   const encerrarFicha = useEncerrarFichaDia();
+  const { data: rascunhosLocais } = useRascunhos(perfil?.id);
   const reabrirFicha = useReabrirFichaDia();
 
   const pausaQuery = usePausaAtiva(perfil?.id);
@@ -244,7 +246,7 @@ export function PainelBordo() {
   const fichasIniciadas = fichasAplicaveis.filter((f) => fichasIniciadasNoTurno.has(f.id));
   const codigosEncerrados = new Set(kpis?.fichasEncerradasHoje ?? []);
   const fichasEncerradas = fichasAplicaveis.filter((f) => f.encerravel && codigosEncerrados.has(f.codigo));
-  const fichasAtrasadas = turnoHoje ? calcularFichasAtrasadas(fichasAplicaveis, kpis?.monitoramentosDoSetorHoje ?? [], agora, codigosEncerrados) : [];
+  const fichasAtrasadas = turnoHoje ? calcularFichasAtrasadas(fichasAplicaveis, [...(kpis?.monitoramentosDoSetorHoje ?? []), ...rascunhosComoMonitoramentos(rascunhosLocais, userSetores)], agora, codigosEncerrados) : [];
   const desviosComRnc = (kpis?.desviosAtivos ?? []).filter((d) => d.rnc !== null);
   const bloqueadoPorPausa = pausaAtiva != null;
 

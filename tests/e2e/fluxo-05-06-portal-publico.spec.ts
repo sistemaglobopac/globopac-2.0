@@ -18,6 +18,8 @@ test("documento liberado aparece com trilha e badge corretos no portal público 
   await selecionarTemplate(page, "Monitoramento de Temperatura — Linha DIF (v1)");
   await page.locator("#temperatura_celsius").fill("21");
   await page.locator("#observacoes").fill(marcador);
+  // Hora do monitoramento agora é obrigatória e informada pelo inspetor.
+  await page.getByRole("button", { name: "Agora" }).click();
   await page.getByRole("button", { name: "Criar e assinar" }).click();
   await assinarComSenha(page, "121072");
   await expect(page.getByText("Ficha criada e assinada com sucesso.")).toBeVisible({ timeout: 15_000 });
@@ -87,6 +89,8 @@ test("documento ainda não liberado não é encontrado no portal público (fluxo
   await selecionarTemplate(page, "Monitoramento de Temperatura — Linha DIF (v1)");
   await page.locator("#temperatura_celsius").fill("22");
   await page.locator("#observacoes").fill(marcador);
+  // Hora do monitoramento agora é obrigatória e informada pelo inspetor.
+  await page.getByRole("button", { name: "Agora" }).click();
   await page.getByRole("button", { name: "Criar e assinar" }).click();
   await assinarComSenha(page, "121072");
   await expect(page.getByText("Ficha criada e assinada com sucesso.")).toBeVisible({ timeout: 15_000 });

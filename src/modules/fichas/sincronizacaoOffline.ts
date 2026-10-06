@@ -35,7 +35,7 @@ async function jaAssinadaComoInspetor(monitoramentoId: string, userId: string, t
   return (data?.length ?? 0) > 0;
 }
 
-async function sincronizarUmaFicha(item: FichaEnfileirada): Promise<void> {
+export async function sincronizarUmaFicha(item: FichaEnfileirada): Promise<void> {
   // 1) Garante que o registro existe (upsert idempotente — se uma tentativa anterior já
   // inseriu e falhou só na assinatura, ignoreDuplicates faz isto virar um no-op).
   const { error: erroUpsert } = await supabase.from("monitoramentos").upsert(

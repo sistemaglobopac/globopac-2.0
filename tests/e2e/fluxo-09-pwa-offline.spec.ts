@@ -30,6 +30,8 @@ test("ficha criada sem rede é enfileirada e sincronizada automaticamente quando
   try {
     await page.locator("#temperatura_celsius").fill("19");
     await page.locator("#observacoes").fill(marcador);
+    // Hora do monitoramento agora é obrigatória e informada pelo inspetor.
+    await page.getByRole("button", { name: "Agora" }).click();
     await page.getByRole("button", { name: "Criar e assinar" }).click();
     // signInWithPassword (reautenticação da assinatura) bate em /auth/v1/token, rota diferente
     // das interceptadas acima (rest/v1/monitoramentos, functions/v1/assinar-documento) —

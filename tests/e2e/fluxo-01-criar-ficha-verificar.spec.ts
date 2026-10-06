@@ -24,6 +24,10 @@ test("inspetor cria e assina uma ficha, que aparece para o verificador", async (
   await page.locator("#temperatura_celsius").fill(temperatura);
   await page.locator("#observacoes").fill(marcador);
 
+  // Hora do monitoramento agora é obrigatória e informada pelo inspetor.
+
+  await page.getByRole("button", { name: "Agora" }).click();
+
   await page.getByRole("button", { name: "Criar e assinar" }).click();
   await assinarComSenha(page, "121072");
   await expect(page.getByText("Ficha criada e assinada com sucesso.")).toBeVisible({ timeout: 15_000 });

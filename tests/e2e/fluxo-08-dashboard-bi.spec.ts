@@ -15,6 +15,8 @@ test("painel gerencial mostra KPIs e permite exportar CSV de monitoramentos (Fas
   await selecionarTemplate(page, "Monitoramento de Temperatura — Linha DIF (v1)");
   await page.locator("#temperatura_celsius").fill("23");
   await page.locator("#observacoes").fill(marcador);
+  // Hora do monitoramento agora é obrigatória e informada pelo inspetor.
+  await page.getByRole("button", { name: "Agora" }).click();
   await page.getByRole("button", { name: "Criar e assinar" }).click();
   await assinarComSenha(page, "121072");
   await expect(page.getByText("Ficha criada e assinada com sucesso.")).toBeVisible({ timeout: 15_000 });

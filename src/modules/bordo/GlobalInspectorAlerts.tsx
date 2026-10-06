@@ -7,6 +7,7 @@ import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/
 import { supabase } from "@/lib/supabase";
 import { useAudioAlarm } from "@/modules/fichas/useAudioAlarm";
 import { Button } from "@/shared/ui/button";
+import { rascunhosComoMonitoramentos, useRascunhos } from "@/modules/fichas/useRascunhos";
 import {
   PAUSAS_CONFIG,
   calcularFichasAtrasadas,
@@ -45,6 +46,7 @@ export function GlobalInspectorAlerts() {
   const turnoAtivo = Boolean(turnoHoje && !turnoHoje.fim);
   const { data: kpis } = useKpisTurno(turnoAtivo ? userId : undefined, userSetores);
   const encerrarFicha = useEncerrarFichaDia();
+  const { data: rascunhos } = useRascunhos(userId);
 
   const [agora, setAgora] = useState(() => new Date());
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
@@ -100,11 +102,19 @@ export function GlobalInspectorAlerts() {
   const fichasAtrasadas: FichaAtrasada[] = useMemo(() => {
     if (!kpis || !turnoAtivo || !turnoHoje) return [];
     const aplicaveis = fichasAplicaveisAoInspetor(kpis.fichasAtivas, userSetores);
-    return calcularFichasAtrasadas(aplicaveis, kpis.monitoramentosDoSetorHoje, agora, new Set(kpis.fichasEncerradasHoje)).filter(
+    // Rascunho = monitoramento já realizado (só não assinado): não é atraso.
+    const feitos = [...kpis.monitoramentosDoSetorHoje, ...rascunhosComoMonitoramentos(rascunhos, userSetores)];
+    return calcularFichasAtrasadas(aplicaveis, feitos, agora, new Set(kpis.fichasEncerradasHoje)).filter(
       (f) => !dismissed.has(`ficha_${f.ficha.id}`)
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kpis, turnoAtivo, turnoHoje, agora, dismissed]);
+  }, [kpis, turnoAtivo, turnoHoje, agora, dismissed, rascunhos]);
+
+  // Rascunho NÃO CONFORME aguardando assinatura: a RNC/ação corretiva imediata só existe depois de assinar.
+  const rascunhosNc = useMemo(
+    () => (rascunhos ?? []).filter((r) => r.naoConforme && !dismissed.has(`rascunho_nc_${r.id}`)),
+    [rascunhos, dismissed]
+  );
 
   const rncsCriticas: RncCritica[] = useMemo(() => {
     if (!kpis) return [];
@@ -138,7 +148,7 @@ export function GlobalInspectorAlerts() {
       .map((d) => ({ monitoramentoId: d.monitoramentoId, nomeFicha: kpis.nomesFicha.get(d.fichaTemplateId)?.nome ?? "Ficha" }));
   }, [kpis, agora, dismissed]);
 
-  const isVisible = Boolean(isInspetor && (pausaEstourada || ncSemRnc.length > 0 || fichasAtrasadas.length > 0 || rncsCriticas.length > 0));
+  const isVisible = Boolean(isInspetor && (pausaEstourada || ncSemRnc.length > 0 || rascunhosNc.length > 0 || fichasAtrasadas.length > 0 || rncsCriticas.length > 0));
   useAudioAlarm(isVisible && !minimizado);
 
   useEffect(() => {
@@ -200,6 +210,42 @@ export function GlobalInspectorAlerts() {
                         Emitir relatório agora
                       </Button>
                       <Button type="button" variant="outline" onClick={() => dismiss(`nc_${nc.monitoramentoId}`)}>
+                        Depois
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {rascunhosNc.length > 0 && (
+            <div data-testid="alerta-rascunho-nc">
+              <h3 className="mb-2 flex items-center gap-1 text-[0.7rem] font-black uppercase tracking-wider text-muted-foreground">
+                <AlertTriangle className="h-3.5 w-3.5 text-destructive" /> Rascunho não conforme aguardando assinatura
+              </h3>
+              <div className="flex flex-col gap-2">
+                {rascunhosNc.map((r) => (
+                  <div key={r.id} className="flex flex-col gap-3 rounded border-l-4 border-destructive bg-background p-4 shadow-sm">
+                    <div>
+                      <h4 className="text-sm font-bold text-foreground">{r.nomeFicha}</h4>
+                      <p className="mt-1 text-sm font-medium text-destructive">
+                        Este monitoramento está NÃO CONFORME e ainda é só um rascunho. Assine para emitir a RNC ou registrar a ação corretiva imediata.
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        className="flex-1"
+                        onClick={() => {
+                          dismiss(`rascunho_nc_${r.id}`);
+                          navigate("/fichas/nova");
+                        }}
+                      >
+                        Ir assinar
+                      </Button>
+                      <Button type="button" variant="outline" onClick={() => dismiss(`rascunho_nc_${r.id}`)}>
                         Depois
                       </Button>
                     </div>

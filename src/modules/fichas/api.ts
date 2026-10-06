@@ -9,6 +9,7 @@ import type { Rnc, StatusRnc } from "@/modules/rnc/api";
 import type { MonitoramentoVerificacao } from "./utils/recordGrouping";
 import { parseConfigExtras } from "@/modules/gestao/api";
 import { turnoParaHeranca, type TurnoHeranca } from "./utils/turnoUtils";
+import { horaEfetiva } from "./utils/horaMonitoramento";
 
 export interface TemplateAtivo {
   id: string;
@@ -65,14 +66,21 @@ export function useUltimosApontamentosHoje(setor: string | undefined) {
     refetchInterval: 15_000,
     queryFn: async (): Promise<UltimosApontamentosHoje> => {
       const desde = inicioDoDiaManaus(new Date()).toISOString();
-      const { data: hoje, error } = await supabase
+      const { data: dados, error } = await supabase
         .from("monitoramentos")
-        .select("id, ficha_template_id, criado_em, conformidade")
+        .select("id, ficha_template_id, criado_em, hora_monitoramento, conformidade")
         .eq("setor", setor as string)
-        .gte("criado_em", desde)
-        .order("criado_em", { ascending: false })
-        .overrideTypes<{ id: string; ficha_template_id: string; criado_em: string; conformidade: boolean | null }[], { merge: false }>();
+        .or(`hora_monitoramento.gte.${desde},and(hora_monitoramento.is.null,criado_em.gte.${desde})`)
+        .overrideTypes<
+          { id: string; ficha_template_id: string; criado_em: string; hora_monitoramento: string | null; conformidade: boolean | null }[],
+          { merge: false }
+        >();
       if (error) throw error;
+      // Vale a hora em que o monitoramento foi REALIZADO (informada pelo inspetor), não a da
+      // assinatura: o intervalo mínimo conta a partir dela. Mais recente primeiro.
+      const hoje = (dados ?? [])
+        .map((m) => ({ ...m, criado_em: horaEfetiva(m) }))
+        .sort((a, b) => (a.criado_em < b.criado_em ? 1 : -1));
 
       // Ficha reeditada ganha um template novo com o MESMO código, e o inspetor não lê o template
       // antigo (RLS): o código de cada versão vem de uma função do banco, para o cronômetro e o
@@ -143,16 +151,22 @@ export function useUltimoRegistroFicha(codigo: string | undefined, setor: string
       const desde = inicioDoDiaManaus(new Date()).toISOString();
       const { data, error } = await supabase
         .from("monitoramentos")
-        .select("id, dados_dinamicos, criado_em")
+        .select("id, dados_dinamicos, criado_em, hora_monitoramento")
         .in("ficha_template_id", idsDasVersoes)
         .eq("setor", setor as string)
-        .gte("criado_em", desde)
-        .order("criado_em", { ascending: false })
-        .limit(50)
-        .overrideTypes<{ id: string; dados_dinamicos: Record<string, unknown>; criado_em: string }[], { merge: false }>();
+        .or(`hora_monitoramento.gte.${desde},and(hora_monitoramento.is.null,criado_em.gte.${desde})`)
+        .limit(100)
+        .overrideTypes<
+          { id: string; dados_dinamicos: Record<string, unknown>; criado_em: string; hora_monitoramento: string | null }[],
+          { merge: false }
+        >();
       if (error) throw error;
-      // O "monitoramento anterior" é o mais recente DO MESMO TURNO (ver turnoParaHeranca).
-      return (data ?? []).find((m) => !turno || turnoParaHeranca(new Date(m.criado_em)) === turno) ?? null;
+      // O "monitoramento anterior" é o mais recente DO MESMO TURNO (ver turnoParaHeranca), pela hora
+      // em que foi realizado (criado_em volta já com a hora efetiva).
+      return (data ?? [])
+        .map((m) => ({ id: m.id, dados_dinamicos: m.dados_dinamicos, criado_em: horaEfetiva(m) }))
+        .sort((a, b) => (a.criado_em < b.criado_em ? 1 : -1))
+        .find((m) => !turno || turnoParaHeranca(new Date(m.criado_em)) === turno) ?? null;
     },
   });
 }
@@ -183,19 +197,21 @@ export function useRegistroContinuavel(codigo: string | undefined, setor: string
       const ids = (versoes as unknown as string[] | null) ?? [];
       if (ids.length === 0) return null;
       const desde = new Date(Date.now() - CONTINUACAO_JANELA_HORAS * 3_600_000).toISOString();
+      const hoje = inicioDoDiaManaus(new Date()).toISOString();
       const { data, error } = await supabase
         .from("monitoramentos")
-        .select("id, dados_dinamicos, criado_em")
+        .select("id, dados_dinamicos, criado_em, hora_monitoramento")
         .in("ficha_template_id", ids)
         .eq("setor", setor as string)
         .eq("status_ficha", "FINALIZADO")
-        .gte("criado_em", desde)
-        .lt("criado_em", inicioDoDiaManaus(new Date()).toISOString())
-        .order("criado_em", { ascending: false })
-        .limit(1)
-        .overrideTypes<RegistroContinuavel[], { merge: false }>();
+        .or(`and(hora_monitoramento.gte.${desde},hora_monitoramento.lt.${hoje}),and(hora_monitoramento.is.null,criado_em.gte.${desde},criado_em.lt.${hoje})`)
+        .limit(50)
+        .overrideTypes<(RegistroContinuavel & { hora_monitoramento: string | null })[], { merge: false }>();
       if (error) throw error;
-      return data?.[0] ?? null;
+      const maisRecente = (data ?? [])
+        .map((m) => ({ id: m.id, dados_dinamicos: m.dados_dinamicos, criado_em: horaEfetiva(m) }))
+        .sort((a, b) => (a.criado_em < b.criado_em ? 1 : -1))[0];
+      return maisRecente ?? null;
     },
   });
 }

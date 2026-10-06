@@ -183,6 +183,8 @@ export interface FichaAtivaResumo {
   encerravel?: boolean;
 }
 
+type MonitoramentoComHora = MonitoramentoHoje & { hora_monitoramento: string | null };
+
 export interface MonitoramentoHoje {
   id: string;
   ficha_template_id: string;
@@ -347,6 +349,10 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
     enabled: !!userId && userSetores.length > 0,
     refetchInterval: 15_000,
     queryFn: async (): Promise<KpisTurno> => {
+      // "Hoje" e atraso pela hora em que o monitoramento foi REALIZADO (informada pelo inspetor),
+      // não pela da assinatura (registros antigos, sem hora informada, usam criado_em).
+      const desdeHoje = inicioDoDiaManaus(new Date()).toISOString();
+      const filtroHoje = `hora_monitoramento.gte.${desdeHoje},and(hora_monitoramento.is.null,criado_em.gte.${desdeHoje})`;
       const [
         { data: monitoramentosHoje, error: erroHoje },
         { data: monitoramentosDoSetor, error: erroSetor },
@@ -356,17 +362,17 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
       ] = await Promise.all([
         supabase
           .from("monitoramentos")
-          .select("id, ficha_template_id, criado_em, setor")
+          .select("id, ficha_template_id, criado_em, hora_monitoramento, setor")
           .eq("user_id", userId as string)
           .in("setor", userSetores)
-          .gte("criado_em", inicioDoDiaManaus(new Date()).toISOString())
-          .overrideTypes<MonitoramentoHoje[], { merge: false }>(),
+          .or(filtroHoje)
+          .overrideTypes<MonitoramentoComHora[], { merge: false }>(),
         supabase
           .from("monitoramentos")
-          .select("id, ficha_template_id, criado_em, setor")
+          .select("id, ficha_template_id, criado_em, hora_monitoramento, setor")
           .in("setor", userSetores)
-          .gte("criado_em", inicioDoDiaManaus(new Date()).toISOString())
-          .overrideTypes<MonitoramentoHoje[], { merge: false }>(),
+          .or(filtroHoje)
+          .overrideTypes<MonitoramentoComHora[], { merge: false }>(),
         supabase
           .from("monitoramentos")
           .select("id, ficha_template_id, criado_em, conformidade, dados_dinamicos, aditivo_de")
@@ -496,8 +502,11 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
           if (ativa) versaoAtivaPorTemplate.set(antigo.id, ativa.id);
         }
       }
-      const normalizar = (lista: MonitoramentoHoje[] | null) =>
-        (lista ?? []).map((m) => (versaoAtivaPorTemplate.has(m.ficha_template_id) ? { ...m, ficha_template_id: versaoAtivaPorTemplate.get(m.ficha_template_id)! } : m));
+      const normalizar = (lista: MonitoramentoComHora[] | null): MonitoramentoHoje[] =>
+        (lista ?? []).map(({ hora_monitoramento, ...m }) => {
+          const efetivo = { ...m, criado_em: hora_monitoramento ?? m.criado_em };
+          return versaoAtivaPorTemplate.has(m.ficha_template_id) ? { ...efetivo, ficha_template_id: versaoAtivaPorTemplate.get(m.ficha_template_id)! } : efetivo;
+        });
 
       return { monitoramentosHoje: normalizar(monitoramentosHoje), monitoramentosDoSetorHoje: normalizar(monitoramentosDoSetor), fichasAtivas, fichasEncerradasHoje: (encerradas ?? []).map((e) => e.codigo), desviosAtivos, adendosPendentes, nomesFicha };
     },
