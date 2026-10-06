@@ -25,6 +25,13 @@ export interface CargaProcessada {
   parcial?: boolean;
 }
 
+/** Pausa da linha de abate informada pelo inspetor: a pendura para (as aves já penduradas continuam a chegar ao
+ * pré-resfriamento). `fim` nulo = linha ainda parada na hora do monitoramento. */
+export interface ParadaLinha {
+  inicio: string;
+  fim: string | null;
+}
+
 /** Como o período foi calculado pela chegada ao pré-resfriamento (ver chegadaPreResfriamento.ts). `acumulado`
  * (aves já chegadas, por carga) é a base do monitoramento seguinte. */
 export interface ChegadaRegistrada {
@@ -55,6 +62,9 @@ export interface ChillerCarcacasValor {
   pesoMedioCarcaca: number;
   /** Período calculado pela chegada ao pré-resfriamento; ausente em lotes digitados à mão. */
   chegada?: ChegadaRegistrada;
+  /** Pausas da linha do dia conhecidas neste monitoramento (as dos anteriores + as novas): descontadas da duração de
+   * cada carga e do avanço da carga em andamento. */
+  paradas?: ParadaLinha[];
   conformidade: boolean;
   detalhesRNC: string | null;
 }

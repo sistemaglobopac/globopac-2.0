@@ -64,24 +64,65 @@ export interface ChegadaAcumulada {
 
 const HORA_MS = 3_600_000;
 
-/** Velocidade (aves/h) deduzida de cada carga cuja seguinte já começou. */
-function velocidadesObservadas(ordenadas: { qtdAves: number; inicio: number }[]): (number | null)[] {
+export interface ParadaDaLinha {
+  /** ISO. */
+  inicio: string;
+  /** ISO; nulo = ainda parada na hora do monitoramento. */
+  fim: string | null;
+}
+
+type Intervalo = [number, number];
+
+/** Pausas como intervalos [início, fim] em ms, mescladas (pausas sobrepostas não contam em dobro). Pausa sem fim vale
+ * até `ate`. */
+export function intervalosDePausa(paradas: ParadaDaLinha[] | undefined, ate: number): Intervalo[] {
+  const lista: Intervalo[] = (paradas ?? [])
+    .map((p): Intervalo => [new Date(p.inicio).getTime(), p.fim ? new Date(p.fim).getTime() : ate])
+    .filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b) && b > a)
+    .sort((x, y) => x[0] - y[0]);
+  const mescladas: Intervalo[] = [];
+  for (const [a, b] of lista) {
+    const ultimo = mescladas[mescladas.length - 1];
+    if (ultimo && a <= ultimo[1]) ultimo[1] = Math.max(ultimo[1], b);
+    else mescladas.push([a, b]);
+  }
+  return mescladas;
+}
+
+/** Tempo (ms) com a linha ANDANDO entre `a` e `b`: o intervalo menos as pausas que caem nele. */
+export function tempoAndandoMs(a: number, b: number, pausas: Intervalo[]): number {
+  if (b <= a) return 0;
+  const parado = pausas.reduce((soma, [i, f]) => soma + Math.max(0, Math.min(b, f) - Math.max(a, i)), 0);
+  return Math.max(0, b - a - parado);
+}
+
+/** Velocidade (aves/h) deduzida de cada carga cuja seguinte já começou, sobre o tempo com a linha andando. */
+function velocidadesObservadas(ordenadas: { qtdAves: number; inicio: number }[], pausas: Intervalo[]): (number | null)[] {
   return ordenadas.map((c, i) => {
     const prox = ordenadas[i + 1];
     if (!prox || prox.inicio <= c.inicio) return null;
-    return c.qtdAves / ((prox.inicio - c.inicio) / HORA_MS);
+    const andando = tempoAndandoMs(c.inicio, prox.inicio, pausas);
+    return andando > 0 ? c.qtdAves / (andando / HORA_MS) : null;
   });
 }
 
 /** Aves que já chegaram ao pré-resfriamento na hora `em`. */
-export function avesQueChegaram(cargas: CargaDaProgramacao[], em: Date, calibracao = CALIBRACAO_TRANSITO): ChegadaAcumulada {
+export function avesQueChegaram(
+  cargas: CargaDaProgramacao[],
+  em: Date,
+  calibracao = CALIBRACAO_TRANSITO,
+  /** Pausas da linha: a pendura para, mas as aves já penduradas seguem até o pré-resfriamento no trânsito normal (o
+   * corte continua em tempo de relógio); a pausa só tira tempo de pendura da duração das cargas. */
+  paradas?: ParadaDaLinha[]
+): ChegadaAcumulada {
+  const pausas = intervalosDePausa(paradas, em.getTime());
   const ordenadas = cargas
     .filter((c) => c.penduraInicioEm && c.qtdAves > 0)
     .map((c) => ({ ...c, inicio: new Date(c.penduraInicioEm).getTime() }))
     .filter((c) => c.inicio <= em.getTime())
     .sort((a, b) => a.inicio - b.inicio);
 
-  const obs = velocidadesObservadas(ordenadas);
+  const obs = velocidadesObservadas(ordenadas, pausas);
   const ultimaObservada = [...obs].reverse().find((v): v is number => v !== null && Number.isFinite(v) && v > 0);
   const velocidade = ultimaObservada ?? VELOCIDADE_NOMINAL_AVES_H;
   const transitoSegundos = tempoTransitoSegundos(velocidade, calibracao);
@@ -93,8 +134,10 @@ export function avesQueChegaram(cargas: CargaDaProgramacao[], em: Date, calibrac
     const prox = ordenadas[i + 1];
     let aves: number;
     if (prox && corte >= prox.inicio) aves = c.qtdAves;
-    else if (prox) aves = Math.min(c.qtdAves, (c.qtdAves * (corte - c.inicio)) / (prox.inicio - c.inicio));
-    else aves = Math.min(c.qtdAves, (velocidade * (corte - c.inicio)) / HORA_MS);
+    else if (prox) {
+      const duracao = tempoAndandoMs(c.inicio, prox.inicio, pausas);
+      aves = duracao > 0 ? Math.min(c.qtdAves, (c.qtdAves * tempoAndandoMs(c.inicio, corte, pausas)) / duracao) : c.qtdAves;
+    } else aves = Math.min(c.qtdAves, (velocidade * tempoAndandoMs(c.inicio, corte, pausas)) / HORA_MS);
     aves = Math.round(aves);
     porCarga.push({ cargaId: c.cargaId, gta: c.gta, aves, completa: aves >= c.qtdAves });
   });

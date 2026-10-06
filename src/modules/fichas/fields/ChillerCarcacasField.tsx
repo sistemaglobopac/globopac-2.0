@@ -5,6 +5,7 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { useCargasJaMonitoradas, useCargasRastreabilidade } from "@/modules/recepcao/api";
 import { ensureLocalTime } from "../utils/tempo";
+import { dataManaus, horaManaus, isoDeManaus } from "../utils/horaMonitoramento";
 import { formatHidrometro, formatMaskedValue, leituraHerdada, LIMIAR_IMPLAUSIVEL, parseHidrometro } from "./hidrometro";
 import {
   apurar,
@@ -23,7 +24,7 @@ import {
 import { AvisoImplausivel, AvisoPrimeiroDoDia, LogicaCalculo, TOOLTIP_HIDR_ANTERIOR } from "./componentesSpr";
 import { baseDeCargasJaUsadas, baseParaProximo, calcularPeriodo, type CargaDoDia } from "./cargasDoPeriodo";
 import { vereditoAntecipado, vereditoGeral } from "./vereditoVazao";
-import type { CargaProcessada, ChegadaRegistrada, ChillerCarcacasValor, TanqueHidrometro } from "./tiposCompostos";
+import type { CargaProcessada, ChegadaRegistrada, ChillerCarcacasValor, ParadaLinha, TanqueHidrometro } from "./tiposCompostos";
 
 const CONFIG_TANQUE: Record<ChaveTanque, { nome: string; cor: string }> = {
   preChiller: { nome: "Pré-chiller", cor: "#002060" },
@@ -64,6 +65,18 @@ interface ChillerCarcacasFieldProps {
 export function ChillerCarcacasField({ value, onChange, disabled, prevAppointment, diaMonitoramento, horaMonitoramento, modoCompletarPeso }: ChillerCarcacasFieldProps) {
   const disabledGeral = disabled || modoCompletarPeso;
   const [chegada, setChegada] = useState<ChegadaRegistrada | undefined>(value?.chegada);
+  // Pausas da linha de abate (informadas pelo inspetor): a pendura para; as aves já penduradas seguem até o pré-resfriamento.
+  // Herda as pausas já conhecidas do monitoramento anterior e acrescenta as novas.
+  const [paradas, setParadas] = useState<ParadaLinha[]>(value?.paradas ?? prevAppointment?.paradas ?? []);
+  // As pausas do monitoramento anterior podem chegar depois (consulta assíncrona): entram se ainda não há nenhuma.
+  useEffect(() => {
+    const anteriores = prevAppointment?.paradas;
+    if (value?.paradas || !anteriores?.length) return;
+    setParadas((atual) => (atual.length > 0 ? atual : anteriores));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prevAppointment]);
+  const [novaParada, setNovaParada] = useState({ inicio: "", fim: "", aberta: false });
+  const [erroParada, setErroParada] = useState<string | null>(null);
   const [cargas, setCargas] = useState<CargaProcessada[]>(value?.cargas ?? [{ id: crypto.randomUUID(), quantity: "", avgLiveWeight: "" }]);
   const [condenasParcial, setCondenasParcial] = useState(value?.condenasParcial ?? "");
   // Registros antigos só têm o campo `condenas`: ele entra como "totalmente condenadas".
@@ -88,8 +101,27 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
     const lista: CargaDoDia[] = cargasDoDia.map((c) => ({ carga_id: c.carga_id, gta: c.gta, qtd_aves: c.qtd_aves, pendura_inicio_em: c.pendura_inicio_em, peso_medio_kg: c.peso_medio_kg }));
     // Base: o acumulado guardado no monitoramento anterior; sem ele, as cargas já apuradas contam inteiras.
     const base = prevAppointment?.chegada?.acumulado ?? baseDeCargasJaUsadas(lista, jaUsadas);
-    return calcularPeriodo(lista, new Date(horaMonitoramento), base);
-  }, [horaMonitoramento, cargasDoDia, jaUsadas, prevAppointment]);
+    return calcularPeriodo(lista, new Date(horaMonitoramento), base, paradas);
+  }, [horaMonitoramento, cargasDoDia, jaUsadas, prevAppointment, paradas]);
+
+  // As cargas já usadas foram calculadas antes de uma pausa ser informada (ou removida): precisam ser recalculadas.
+  const cargasDesatualizadas =
+    !!chegada && !!periodo && JSON.stringify(chegada.acumulado) !== JSON.stringify(baseParaProximo(periodo.chegada));
+
+  function registrarParada() {
+    if (!horaMonitoramento) return;
+    const dia = dataManaus(new Date(horaMonitoramento));
+    const inicio = isoDeManaus(dia, novaParada.inicio);
+    const fim = novaParada.aberta ? null : isoDeManaus(dia, novaParada.fim);
+    const agoraMs = new Date(horaMonitoramento).getTime();
+    if (!inicio || (!novaParada.aberta && !fim)) return setErroParada("Informe o horário de início e o de fim da pausa.");
+    if (new Date(inicio).getTime() > agoraMs) return setErroParada("A pausa não pode começar depois da hora do monitoramento.");
+    if (fim && new Date(fim).getTime() <= new Date(inicio).getTime()) return setErroParada("O fim da pausa deve ser depois do início.");
+    if (fim && new Date(fim).getTime() > agoraMs + 5 * 60_000) return setErroParada("A pausa não pode terminar depois da hora do monitoramento (use \"linha ainda parada\").");
+    setErroParada(null);
+    setParadas((atual) => [...atual, { inicio, fim }].sort((a, b) => (a.inicio < b.inicio ? -1 : 1)));
+    setNovaParada({ inicio: "", fim: "", aberta: false });
+  }
 
   function usarCargasCalculadas() {
     if (!periodo || periodo.lotes.length === 0) return;
@@ -202,6 +234,7 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
       totalAvesBruto: totalAves,
       pesoMedioCarcaca,
       ...(chegada ? { chegada } : {}),
+      ...(paradas.length > 0 ? { paradas } : {}),
       conformidade: isConforme,
       detalhesRNC:
         detalhes.length > 0
@@ -211,7 +244,7 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
           : null,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cargas, tanques, condenasParcial, condenasTotal, isConforme, chegada, pesoPendente]);
+  }, [cargas, tanques, condenasParcial, condenasTotal, isConforme, chegada, pesoPendente, paradas]);
 
   function adicionarCarga() {
     setCargas((atual) => [...atual, { id: crypto.randomUUID(), quantity: "", avgLiveWeight: "" }]);
@@ -455,6 +488,71 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
             </div>
           )}
 
+          {horaMonitoramento && (
+            <div className="space-y-2 rounded-md border border-dashed border-primary/40 bg-background p-3" data-testid="paradas-linha">
+              <p className="flex items-center gap-2 text-xs font-bold text-primary">
+                <Clock className="h-3.5 w-3.5" /> Pausas da linha de abate
+              </p>
+              {!modoCompletarPeso && (
+                <p className="text-xs text-muted-foreground">
+                  Houve pausa da linha? A pendura para, mas as aves já penduradas seguem até o pré-resfriamento. Informe os horários para o cálculo das cargas descontar o tempo parado.
+                </p>
+              )}
+              {paradas.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Nenhuma pausa informada.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {paradas.map((pa, i) => (
+                    <li key={`${pa.inicio}-${i}`} className="flex flex-wrap items-center justify-between gap-2 rounded border p-2 text-xs">
+                      <span>
+                        {horaManaus(new Date(pa.inicio))} → {pa.fim ? horaManaus(new Date(pa.fim)) : "linha ainda parada"}
+                      </span>
+                      {!disabledGeral && (
+                        <Button type="button" size="sm" variant="ghost" className="text-destructive" aria-label="Remover pausa" onClick={() => setParadas((a) => a.filter((_, j) => j !== i))}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {!disabledGeral && (
+                <div className="flex flex-wrap items-end gap-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="parada-inicio" className="text-xs text-muted-foreground">
+                      Início da pausa
+                    </Label>
+                    <Input id="parada-inicio" type="time" className="w-auto" value={novaParada.inicio} onChange={(e) => setNovaParada((a) => ({ ...a, inicio: e.target.value }))} />
+                  </div>
+                  {!novaParada.aberta && (
+                    <div className="space-y-1">
+                      <Label htmlFor="parada-fim" className="text-xs text-muted-foreground">
+                        Fim da pausa
+                      </Label>
+                      <Input id="parada-fim" type="time" className="w-auto" value={novaParada.fim} onChange={(e) => setNovaParada((a) => ({ ...a, fim: e.target.value }))} />
+                    </div>
+                  )}
+                  <label className="flex items-center gap-1 text-xs">
+                    <input type="checkbox" checked={novaParada.aberta} onChange={(e) => setNovaParada((a) => ({ ...a, aberta: e.target.checked }))} /> linha ainda parada
+                  </label>
+                  <Button type="button" size="sm" variant="outline" onClick={registrarParada}>
+                    <Plus className="h-3.5 w-3.5" /> Informar pausa
+                  </Button>
+                </div>
+              )}
+              {erroParada && (
+                <p role="alert" className="text-xs font-medium text-destructive">
+                  {erroParada}
+                </p>
+              )}
+              {cargasDesatualizadas && !modoCompletarPeso && (
+                <p role="status" data-testid="cargas-desatualizadas" className="rounded border border-warning bg-warning/10 p-2 text-xs font-medium">
+                  As cargas usadas foram calculadas antes desta alteração das pausas: toque em "Usar estas cargas" para atualizar.
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="space-y-2">
             {cargas.map((carga, indice) => (
               <div key={carga.id} className="flex flex-col gap-3 rounded-md border bg-background p-3 sm:flex-row sm:items-end">
@@ -529,7 +627,7 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
         </li>
         <li>
           Cargas do período = aves que já chegaram ao pré-resfriamento na hora do monitoramento: aves penduradas até (hora − trânsito), com o trânsito deduzido da velocidade da linha
-          (aves da carga ÷ tempo até a pendura da seguinte), menos o que já entrou no monitoramento anterior.
+          (aves da carga ÷ tempo andando até a pendura da seguinte, sem as pausas informadas), menos o que já entrou no monitoramento anterior.
         </li>
         <li>Aves no Período = Σ aves das cargas − (carcaças parcialmente aproveitadas + totalmente condenadas).</li>
         <li>Peso médio da carcaça = média ponderada do peso vivo × 0,84 (rendimento fixo de 84%).</li>

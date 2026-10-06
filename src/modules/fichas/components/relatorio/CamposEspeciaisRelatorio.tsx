@@ -185,6 +185,10 @@ const LOGICA_CHUVEIRO = [
   "Vazão apurada (L/carcaça) = água usada ÷ aves no chuveiro final; L/kg = água usada ÷ (aves no chuveiro × peso médio da carcaça do SPR Carcaças). Meta fixa: L/carcaça ≥ 1,5.",
 ];
 
+function horaDeRelatorio(iso: string): string {
+  return new Date(iso).toLocaleTimeString("pt-BR", { timeZone: "America/Manaus", hour: "2-digit", minute: "2-digit" });
+}
+
 function Cabecalho({ titulo, conforme }: { titulo: string; conforme: boolean }) {
   return (
     <div className="mb-2 flex items-center justify-between print:mb-1">
@@ -223,6 +227,21 @@ export function ChillerCarcacasRelatorio({ valor, titulo = "Renovação da Água
             ))}
           </tbody>
         </table>
+      )}
+      {valor.chegada && (
+        <div className="rounded border border-hairline bg-white p-2 text-[10px] print:p-1 print:text-[8px]" data-testid="relatorio-chegada">
+          <strong>Cargas do período pela chegada ao pré-resfriamento:</strong> corte às {horaDeRelatorio(valor.chegada.corteEm)}, trânsito de{" "}
+          {Math.floor(valor.chegada.transitoSegundos / 60)} min {String(valor.chegada.transitoSegundos % 60).padStart(2, "0")} s a{" "}
+          {valor.chegada.velocidadeAvesH.toLocaleString("pt-BR")} aves/h (
+          {valor.chegada.origemVelocidade === "observada" ? "velocidade deduzida da pendura das cargas" : "velocidade nominal da linha"}).
+          {valor.paradas && valor.paradas.length > 0 && (
+            <>
+              {" "}
+              Pausas da linha descontadas:{" "}
+              {valor.paradas.map((p) => `${horaDeRelatorio(p.inicio)} → ${p.fim ? horaDeRelatorio(p.fim) : "ainda parada"}`).join("; ")}.
+            </>
+          )}
+        </div>
       )}
       <TabelaTanques
         tanques={{

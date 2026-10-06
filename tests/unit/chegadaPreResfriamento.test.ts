@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { acumuladoPorCarga, avesDoPeriodo, avesQueChegaram, tempoTransitoSegundos, type CargaDaProgramacao } from "@/modules/fichas/fields/chegadaPreResfriamento";
+import { acumuladoPorCarga, avesDoPeriodo, avesQueChegaram, intervalosDePausa, tempoAndandoMs, tempoTransitoSegundos, type CargaDaProgramacao } from "@/modules/fichas/fields/chegadaPreResfriamento";
 
 // Dia de exemplo (Manaus = UTC-4): pendura começa às 06:00 locais = 10:00Z.
 const z = (hhmm: string, ss = "00") => new Date(`2026-10-06T${hhmm}:${ss}Z`);
@@ -106,3 +106,62 @@ describe("aves do período (acumulado − acumulado do monitoramento anterior)",
     expect(avesDoPeriodo(m, null).total).toBe(m.total);
   });
 });
+
+// ---------------- Pausas da linha ----------------
+// A pendura para; as aves já penduradas seguem até o pré-resfriamento no trânsito normal (corte em tempo de RELÓGIO). A pausa
+// só tira tempo de pendura da duração de cada carga (velocidade real) e do avanço da carga em andamento.
+const min = (m: number) => new Date(inicio + m * MIN).toISOString();
+// c1 em 0, c2 em 43,1 min e c3 em 96,2 min (a carga 2 levou 43,1 min andando + 10 min parada: 06:55–07:05)
+const durAnda = (5000 / 6960) * 60; // 43,1 min
+const comPausa = (n: number, m: number): CargaDaProgramacao => ({ cargaId: `c${n}`, gta: `GTA${n}`, qtdAves: 5000, penduraInicioEm: min(m) });
+const cargasComPausa = [comPausa(1, 0), comPausa(2, durAnda), comPausa(3, 2 * durAnda + 10)];
+const pausaNaCarga2 = [{ inicio: min(55), fim: min(65) }];
+
+describe("pausas da linha de abate", () => {
+  it("tempo andando = intervalo menos as pausas; pausas sobrepostas não contam em dobro; sem fim vale até a hora do monitoramento", () => {
+    const pausas = intervalosDePausa([{ inicio: min(10), fim: min(20) }, { inicio: min(15), fim: min(25) }, { inicio: min(60), fim: null }], inicio + 70 * MIN);
+    expect(pausas).toEqual([[inicio + 10 * MIN, inicio + 25 * MIN], [inicio + 60 * MIN, inicio + 70 * MIN]]);
+    expect(tempoAndandoMs(inicio, inicio + 100 * MIN, pausas)).toBe(75 * MIN);
+    expect(tempoAndandoMs(inicio + 12 * MIN, inicio + 20 * MIN, pausas)).toBe(0);
+  });
+
+  it("a pausa dentro da carga não derruba a velocidade deduzida (sem informá-la, a velocidade sai menor e o trânsito maior)", () => {
+    const em = new Date(inicio + 140 * MIN);
+    const informada = avesQueChegaram(cargasComPausa, em, undefined, pausaNaCarga2);
+    const naoInformada = avesQueChegaram(cargasComPausa, em);
+    expect(informada.velocidadeAvesH).toBe(6960);
+    expect(informada.transitoSegundos).toBe(13 * 60 + 4);
+    expect(naoInformada.velocidadeAvesH).toBeLessThan(5700);
+    expect(naoInformada.transitoSegundos).toBeGreaterThan(informada.transitoSegundos);
+  });
+
+  it("a carga em andamento só avança com a linha andando: pausa de 10 min tira ~1.160 aves da parte que chegou", () => {
+    const semPausaNaTres = avesQueChegaram(cargasComPausa, new Date(inicio + 140 * MIN), undefined, pausaNaCarga2);
+    const pausaNaTres = avesQueChegaram(cargasComPausa, new Date(inicio + 140 * MIN), undefined, [...pausaNaCarga2, { inicio: min(100), fim: min(110) }]);
+    const aves3 = (r: typeof semPausaNaTres) => r.porCarga.find((c) => c.gta === "GTA3")!.aves;
+    expect(aves3(semPausaNaTres) - aves3(pausaNaTres)).toBeGreaterThan(1100);
+    expect(aves3(semPausaNaTres) - aves3(pausaNaTres)).toBeLessThan(1220);
+    // as cargas 1 e 2 já tinham chegado inteiras: a pausa na carga 3 não as altera
+    expect(pausaNaTres.porCarga.filter((c) => c.gta !== "GTA3").every((c) => c.completa)).toBe(true);
+  });
+
+  it("o corte é sempre em tempo de relógio (hora − trânsito): as aves já penduradas seguem até o pré-resfriamento durante a pausa", () => {
+    const em = new Date(inicio + 140 * MIN);
+    for (const paradas of [undefined, pausaNaCarga2, [...pausaNaCarga2, { inicio: min(125), fim: min(135) }]]) {
+      const r = avesQueChegaram(cargasComPausa, em, undefined, paradas);
+      expect(Math.abs(new Date(r.corteEm).getTime() - (em.getTime() - r.transitoSegundos * 1000))).toBeLessThan(1000); // trânsito arredondado a segundos
+    }
+    // uma pausa que acabou de começar (depois do corte) não tira nenhuma ave que já estava a caminho
+    const antes = avesQueChegaram(cargasComPausa, em, undefined, pausaNaCarga2);
+    const depois = avesQueChegaram(cargasComPausa, em, undefined, [...pausaNaCarga2, { inicio: min(130), fim: min(138) }]);
+    expect(depois.total).toBe(antes.total);
+  });
+
+  it("pausa sem fim (linha ainda parada) vale até a hora do monitoramento", () => {
+    const em = new Date(inicio + 140 * MIN);
+    const aberta = avesQueChegaram(cargasComPausa, em, undefined, [{ inicio: min(120), fim: null }]);
+    const fechada = avesQueChegaram(cargasComPausa, em, undefined, [{ inicio: min(120), fim: min(140) }]);
+    expect(aberta.total).toBe(fechada.total);
+  });
+});
+

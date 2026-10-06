@@ -1,6 +1,6 @@
 // Cargas (e aves) que entram no período do monitoramento de vazão do SPR, calculadas pela CHEGADA ao
 // pré-resfriamento (ver chegadaPreResfriamento.ts). Funções PURAS.
-import { avesDoPeriodo, avesQueChegaram, acumuladoPorCarga, type ChegadaAcumulada } from "./chegadaPreResfriamento";
+import { avesDoPeriodo, avesQueChegaram, acumuladoPorCarga, type ChegadaAcumulada, type ParadaDaLinha } from "./chegadaPreResfriamento";
 import { pesoVivoDeHerdado } from "./calculosSpr";
 
 /** Carga do dia como devolvida por `cargas_rastreabilidade_do_dia` (campos usados aqui). */
@@ -45,10 +45,17 @@ export function baseDeCargasJaUsadas(cargas: CargaDoDia[], jaUsadas: ReadonlySet
   return Object.fromEntries(cargas.filter((c) => jaUsadas?.has(c.carga_id)).map((c) => [c.carga_id, c.qtd_aves]));
 }
 
-export function calcularPeriodo(cargas: CargaDoDia[], horaMonitoramento: Date, base: Record<string, number> | null | undefined): PeriodoCalculado {
+export function calcularPeriodo(
+  cargas: CargaDoDia[],
+  horaMonitoramento: Date,
+  base: Record<string, number> | null | undefined,
+  paradas?: ParadaDaLinha[]
+): PeriodoCalculado {
   const chegada = avesQueChegaram(
     cargas.filter((c) => c.pendura_inicio_em).map((c) => ({ cargaId: c.carga_id, gta: c.gta, qtdAves: c.qtd_aves, penduraInicioEm: penduraParaIso(c.pendura_inicio_em!) })),
-    horaMonitoramento
+    horaMonitoramento,
+    undefined,
+    paradas
   );
   const periodo = avesDoPeriodo(chegada, base);
   const porId = new Map(cargas.map((c) => [c.carga_id, c]));

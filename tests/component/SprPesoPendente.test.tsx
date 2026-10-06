@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ChillerCarcacasField } from "@/modules/fichas/fields/ChillerCarcacasField";
 import type { ChillerCarcacasValor } from "@/modules/fichas/fields/tiposCompostos";
@@ -140,4 +140,49 @@ describe("SPR Carcaças: cargas pela chegada ao pré-resfriamento e peso pendent
     expect(screen.queryByTestId("cargas-calculadas")).toBeNull();
     expect(screen.queryByTestId("veredito-antecipado")).toBeNull();
   });
+
+  it("pausas da linha: o inspetor informa os horários, o cálculo desconta o tempo parado e pede para recalcular as cargas", async () => {
+    const user = userEvent.setup();
+    render(<Campo />);
+    const painel = screen.getByTestId("cargas-calculadas");
+    await user.click(within(painel).getByRole("button", { name: /Usar estas cargas/ }));
+    await waitFor(() => expect(lerValor()?.chegada).toBeTruthy());
+    const antes = lerValor()!;
+    expect(antes.paradas).toBeUndefined();
+    expect(screen.queryByTestId("cargas-desatualizadas")).toBeNull();
+
+    // pausa de 06:50 a 07:00 (Manaus), dentro da carga 2
+    const secao = screen.getByTestId("paradas-linha");
+    expect(within(secao).getByText("Nenhuma pausa informada.")).toBeInTheDocument();
+    fireEvent.change(within(secao).getByLabelText("Início da pausa"), { target: { value: "06:50" } });
+    fireEvent.change(within(secao).getByLabelText("Fim da pausa"), { target: { value: "07:00" } });
+    await user.click(within(secao).getByRole("button", { name: /Informar pausa/ }));
+
+    expect(await within(screen.getByTestId("paradas-linha")).findByText(/06:50 → 07:00/)).toBeInTheDocument();
+    await waitFor(() => expect(lerValor()?.paradas).toHaveLength(1));
+    // as cargas usadas foram calculadas sem a pausa: pede para recalcular
+    expect(await screen.findByTestId("cargas-desatualizadas")).toBeInTheDocument();
+
+    await user.click(within(screen.getByTestId("cargas-calculadas")).getByRole("button", { name: /Usar estas cargas/ }));
+    await waitFor(() => expect(screen.queryByTestId("cargas-desatualizadas")).toBeNull());
+    // o tempo parado muda a velocidade deduzida e, com ela, o cálculo
+    expect(lerValor()?.chegada?.velocidadeAvesH).not.toBe(antes.chegada?.velocidadeAvesH);
+  });
+
+  it("pausa inválida é recusada com mensagem (fim antes do início; depois da hora do monitoramento)", async () => {
+    const user = userEvent.setup();
+    render(<Campo />);
+    const secao = screen.getByTestId("paradas-linha");
+    fireEvent.change(within(secao).getByLabelText("Início da pausa"), { target: { value: "07:00" } });
+    fireEvent.change(within(secao).getByLabelText("Fim da pausa"), { target: { value: "06:50" } });
+    await user.click(within(secao).getByRole("button", { name: /Informar pausa/ }));
+    expect(await within(secao).findByRole("alert")).toHaveTextContent(/fim da pausa deve ser depois/i);
+
+    fireEvent.change(within(secao).getByLabelText("Início da pausa"), { target: { value: "09:00" } }); // depois das 08:10
+    fireEvent.change(within(secao).getByLabelText("Fim da pausa"), { target: { value: "09:10" } });
+    await user.click(within(secao).getByRole("button", { name: /Informar pausa/ }));
+    expect(await within(secao).findByRole("alert")).toHaveTextContent(/depois da hora do monitoramento/i);
+    expect(lerValor()?.paradas).toBeUndefined();
+  });
 });
+
