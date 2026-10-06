@@ -23,6 +23,8 @@ export interface Rascunho {
   /** Monitoramento NÃO CONFORME: precisa ser assinado para emitir a RNC/ação corretiva imediata. */
   naoConforme: boolean;
   motivosNc: string[];
+  /** EM_ANDAMENTO: ao assinar vira a etapa 1 de um monitoramento que aguarda o peso (peso por caixa). */
+  statusFicha?: "EM_ANDAMENTO";
   status: StatusRascunho;
   ultimoErro?: string;
 }

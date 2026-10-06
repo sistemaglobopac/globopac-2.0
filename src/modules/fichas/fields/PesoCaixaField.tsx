@@ -6,7 +6,7 @@ import { Label } from "@/shared/ui/label";
 import { Select } from "@/shared/ui/select";
 import { useCargasDoDia, useCargasJaMonitoradas, type CargaAves } from "@/modules/recepcao/api";
 import { ensureLocalTime } from "../utils/tempo";
-import { acimaDoLimite, avaliarPesoCaixa, cargaPesoVazia, LIMITE_PESO_CAIXA_KG, montarValorPesoCaixa, motivosBloqueioPesoCaixa, pesoCaixaVazio, pesoPorCaixa } from "./pesoCaixa";
+import { acimaDoLimite, avaliarPesoCaixa, cargaPesoVazia, cargasSemPeso, LIMITE_PESO_CAIXA_KG, montarValorPesoCaixa, motivosBloqueioPesoCaixa, pesoCaixaVazio, pesoPorCaixa } from "./pesoCaixa";
 import type { CargaPesoCaixa, PesoCaixaValor } from "./tiposCompostos";
 
 interface PesoCaixaFieldProps {
@@ -29,6 +29,9 @@ export function PesoCaixaField({ value, onChange, disabled }: PesoCaixaFieldProp
   const aval = avaliarPesoCaixa(v);
   const escolhidas = new Set(v.cargas.map((c) => c.cargaId).filter(Boolean));
   const completo = motivosBloqueioPesoCaixa(v).length === 0;
+  // Balança ainda não passou o peso de alguma carga: dá para salvar agora e completar depois (etapa 2).
+  const pendentes = cargasSemPeso(v);
+  const aguardandoPeso = pendentes.length > 0 && motivosBloqueioPesoCaixa(v, { permitirSemPeso: true }).length === 0;
 
   useEffect(() => {
     onChange(montarValorPesoCaixa(v));
@@ -51,9 +54,9 @@ export function PesoCaixaField({ value, onChange, disabled }: PesoCaixaFieldProp
 
   return (
     <div className="space-y-5 rounded-lg border p-4" data-testid="peso-caixa">
-      <div className={`flex items-center gap-2 rounded-md p-3 text-sm font-black ${!aval.conformidade ? "bg-destructive/10 text-destructive" : completo ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}>
+      <div className={`flex items-center gap-2 rounded-md p-3 text-sm font-black ${!aval.conformidade ? "bg-destructive/10 text-destructive" : aguardandoPeso ? "bg-warning/15 text-warning-foreground" : completo ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}>
         {!aval.conformidade ? <AlertTriangle className="h-5 w-5" /> : <CheckCircle2 className="h-5 w-5" />}
-        {!aval.conformidade ? "NÃO CONFORME" : completo ? "CONFORME" : "AGUARDANDO PREENCHIMENTO"}
+        {!aval.conformidade ? "NÃO CONFORME" : aguardandoPeso ? "AGUARDANDO O PESO DA BALANÇA" : completo ? "CONFORME" : "AGUARDANDO PREENCHIMENTO"}
         {!aval.conformidade && <span className="ml-2 font-normal">{aval.motivos.join("; ")}</span>}
       </div>
 
@@ -63,6 +66,10 @@ export function PesoCaixaField({ value, onChange, disabled }: PesoCaixaFieldProp
           <Label htmlFor="peso-data">Data da programação</Label>
           <Input id="peso-data" type="date" value={dataProgramacao} onChange={(e) => setDataProgramacao(e.target.value)} />
         </div>
+        <p className="text-xs text-muted-foreground">
+          A balança ainda não passou o peso? Deixe o peso médio em branco e salve: o monitoramento fica <strong>aguardando peso</strong> (já vale para a frequência) e você completa
+          depois, pela lista "Monitoramentos em andamento".
+        </p>
         {(cargasDoDia ?? []).length === 0 && <p className="text-xs text-muted-foreground">Nenhuma carga programada para esta data. Peça ao Administrador/Verificador para cadastrar a GTA.</p>}
 
         {v.cargas.map((c, i) => {
@@ -91,7 +98,7 @@ export function PesoCaixaField({ value, onChange, disabled }: PesoCaixaFieldProp
                   <Input id={`peso-aves-${i}`} inputMode="numeric" value={c.avesPorCaixa} onChange={(e) => atualizarCarga(i, { avesPorCaixa: e.target.value.replace(/\D/g, "") })} />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor={`peso-medio-${i}`}>Peso médio das aves (kg)</Label>
+                  <Label htmlFor={`peso-medio-${i}`}>Peso médio das aves (kg) — opcional agora</Label>
                   <Input id={`peso-medio-${i}`} inputMode="decimal" placeholder="2,850" value={c.pesoMedioKg} onChange={(e) => atualizarCarga(i, { pesoMedioKg: e.target.value.replace(/[^0-9.,]/g, "") })} />
                 </div>
                 <div className="space-y-1">

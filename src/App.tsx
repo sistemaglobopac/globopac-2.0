@@ -14,6 +14,7 @@ import { RelatorioPragasMensalPage } from "@/modules/fichas/RelatorioPragasMensa
 import { CargasAvesPage } from "@/modules/recepcao/CargasAvesPage";
 import { ComunicadosPage } from "@/modules/comunicados/ComunicadosPage";
 import { FinalizarAbsorcaoPage } from "@/modules/fichas/FinalizarAbsorcaoPage";
+import { CompletarPesoPage } from "@/modules/fichas/CompletarPesoPage";
 import { ConstrutorFichasPage } from "@/modules/fichas/ConstrutorFichasPage";
 import { SetoresPage } from "@/modules/admin/SetoresPage";
 import { TrocaSetorInspetorPage } from "@/modules/gestao/TrocaSetorInspetorModal";
@@ -82,6 +83,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute perfisPermitidos={["INSPETOR_QUALIDADE", "ADMIN_MASTER"]}>
               <FinalizarAbsorcaoPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/fichas/peso/:id"
+          element={
+            <ProtectedRoute perfisPermitidos={["INSPETOR_QUALIDADE", "ADMIN_MASTER"]}>
+              <CompletarPesoPage />
             </ProtectedRoute>
           }
         />

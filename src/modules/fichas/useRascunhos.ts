@@ -63,6 +63,7 @@ export async function assinarRascunhosEmLote(
         userId: r.userId,
         setor: r.setor,
         dadosDinamicos: r.dadosDinamicos,
+        statusFicha: r.statusFicha,
         capturadoEm: r.horaMonitoramento,
         enfileiradoEm: r.salvoEm,
         status: "sincronizando",

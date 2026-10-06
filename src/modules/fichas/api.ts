@@ -875,30 +875,53 @@ export interface MonitoramentoEmAndamento {
   user_id: string;
   dados_dinamicos: Record<string, unknown>;
   criado_em: string;
+  hora_monitoramento?: string | null;
   status_ficha: "EM_ANDAMENTO";
 }
 
-const CAMPOS_EM_ANDAMENTO = "id, ficha_template_id, setor, user_id, dados_dinamicos, criado_em, status_ficha";
+const CAMPOS_EM_ANDAMENTO = "id, ficha_template_id, setor, user_id, dados_dinamicos, criado_em, hora_monitoramento, status_ficha";
 
-/** Absorções abertas (só com pesagem inicial) do próprio inspetor. */
-export function useMonitoramentosEmAndamento(userId: string | undefined) {
+/** Monitoramentos em andamento: as absorções abertas (só pesagem inicial) do PRÓPRIO inspetor e os
+ * monitoramentos que aguardam o peso da balança (peso por caixa) de QUALQUER inspetor dos setores dele
+ * — o turno pode ter mudado enquanto o peso não chegava. */
+export function useMonitoramentosEmAndamento(userId: string | undefined, setores: string[] = []) {
   return useQuery({
-    queryKey: ["monitoramentos", "em-andamento", userId],
+    queryKey: ["monitoramentos", "em-andamento", userId, setores],
     meta: { offline: true },
     enabled: !!userId,
     refetchInterval: 30_000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("monitoramentos")
-        .select(CAMPOS_EM_ANDAMENTO)
-        .eq("user_id", userId as string)
-        .eq("status_ficha", "EM_ANDAMENTO")
-        .order("criado_em", { ascending: true })
-        .overrideTypes<MonitoramentoEmAndamento[], { merge: false }>();
-      if (error) throw error;
-      return data ?? [];
+      const [proprios, doSetor] = await Promise.all([
+        supabase
+          .from("monitoramentos")
+          .select(CAMPOS_EM_ANDAMENTO)
+          .eq("user_id", userId as string)
+          .eq("status_ficha", "EM_ANDAMENTO")
+          .order("criado_em", { ascending: true })
+          .overrideTypes<MonitoramentoEmAndamento[], { merge: false }>(),
+        setores.length === 0
+          ? Promise.resolve({ data: [] as MonitoramentoEmAndamento[], error: null })
+          : supabase
+              .from("monitoramentos")
+              .select(CAMPOS_EM_ANDAMENTO)
+              .eq("status_ficha", "EM_ANDAMENTO")
+              .in("setor", setores)
+              .filter("dados_dinamicos->>aguardando_peso", "eq", "true")
+              .order("criado_em", { ascending: true })
+              .overrideTypes<MonitoramentoEmAndamento[], { merge: false }>(),
+      ]);
+      if (proprios.error) throw proprios.error;
+      if (doSetor.error) throw doSetor.error;
+      const porId = new Map<string, MonitoramentoEmAndamento>();
+      for (const m of [...(proprios.data ?? []), ...(doSetor.data ?? [])]) porId.set(m.id, m);
+      return Array.from(porId.values()).sort((a, b) => (a.criado_em < b.criado_em ? -1 : 1));
     },
   });
+}
+
+/** O monitoramento aguarda o peso da balança (etapa 1 do peso por caixa)? */
+export function aguardaPesoDaBalanca(m: Pick<MonitoramentoEmAndamento, "dados_dinamicos">): boolean {
+  return m.dados_dinamicos.aguardando_peso === true;
 }
 
 /** Um registro em andamento (para reabrir na pesagem final). `null` se não existir, já foi
@@ -917,6 +940,27 @@ export function useMonitoramentoEmAndamento(id: string | undefined) {
         .overrideTypes<MonitoramentoEmAndamento | null, { merge: false }>();
       if (error) throw error;
       return data;
+    },
+  });
+}
+
+/** Peso por caixa aguardando o peso: grava os pesos que a balança já passou SEM finalizar (o registro continua
+ * em andamento). O banco só aceita mudar o peso médio das cargas e a avaliação; o resto da etapa 1 é imutável. */
+export function useSalvarPesosParciais() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; dadosDinamicos: Record<string, unknown> }) => {
+      const { data, error } = await supabase
+        .from("monitoramentos")
+        .update({ dados_dinamicos: input.dadosDinamicos })
+        .eq("id", input.id)
+        .eq("status_ficha", "EM_ANDAMENTO")
+        .select("id");
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error("Não foi possível salvar: o registro já foi finalizado ou você não tem acesso a ele.");
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["monitoramentos"] });
     },
   });
 }

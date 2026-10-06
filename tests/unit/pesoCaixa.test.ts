@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { avaliarPesoCaixa, cargaPesoVazia, montarValorPesoCaixa, motivosBloqueioPesoCaixa, pesoCaixaVazio, pesoPorCaixa } from "@/modules/fichas/fields/pesoCaixa";
+import { avaliarPesoCaixa, cargaPesoVazia, cargasSemPeso, montarValorPesoCaixa, motivosBloqueioPesoCaixa, pesoCaixaVazio, pesoPorCaixa } from "@/modules/fichas/fields/pesoCaixa";
 import { desviosEspeciais } from "@/modules/fichas/utils/desviosEspeciais";
 import { motivosDeBloqueioSpr } from "@/modules/fichas/utils/bloqueiosSpr";
 import type { CampoTemplate } from "@/shared/schema-campos";
@@ -44,5 +44,25 @@ describe("peso vivo por caixa de transporte", () => {
     expect(motivosDeBloqueioSpr(campos, { pc: nc })).toEqual([]);
     expect(desviosEspeciais(campos, { pc: nc })[0]).toContain("Peso vivo");
     expect(desviosEspeciais(campos, { pc: montarValorPesoCaixa(valor(carga())) })).toEqual([]);
+  });
+
+  it("etapa 1: peso médio em branco não bloqueia (fica aguardando o peso da balança)", () => {
+    const semPeso = valor(carga({ pesoMedioKg: "" }), carga({ cargaId: "c2", gta: "456", pesoMedioKg: "2,9" }));
+    // exigindo o peso (assinatura normal): bloqueia
+    expect(motivosBloqueioPesoCaixa(semPeso)).toHaveLength(1);
+    // etapa 1: libera, mas continua exigindo carga e aves por caixa
+    expect(motivosBloqueioPesoCaixa(semPeso, { permitirSemPeso: true })).toEqual([]);
+    expect(motivosBloqueioPesoCaixa(valor(carga({ avesPorCaixa: "", pesoMedioKg: "" })), { permitirSemPeso: true })).toHaveLength(1);
+    expect(cargasSemPeso(semPeso).map((c) => c.gta)).toEqual(["123"]);
+    expect(cargasSemPeso(valor(carga()))).toEqual([]);
+    expect(cargasSemPeso(null)).toEqual([]);
+  });
+
+  it("carga sem peso não é avaliada: só as pesadas podem ser não conformes", () => {
+    const v = montarValorPesoCaixa(valor(carga({ pesoMedioKg: "" }), carga({ cargaId: "c2", gta: "456", avesPorCaixa: "10", pesoMedioKg: "3" })));
+    expect(v.conformidade).toBe(false);
+    expect(v.detalhesRNC).toContain("GTA 456");
+    expect(v.detalhesRNC).not.toContain("GTA 123");
+    expect(montarValorPesoCaixa(valor(carga({ pesoMedioKg: "" }))).conformidade).toBe(true);
   });
 });

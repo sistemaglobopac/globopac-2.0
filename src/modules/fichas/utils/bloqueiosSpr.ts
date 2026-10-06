@@ -14,9 +14,15 @@ import { motivosBloqueioDoa } from "../fields/rastreabilidadeDoa";
 import { motivosBloqueioTemperatura } from "../fields/temperaturaResfriamento";
 import { motivosBloqueioPotabilidade } from "../fields/potabilidadeAgua";
 import { motivosBloqueioChecklist } from "../fields/checklistConformidade";
-import type { CaixasVaziasValor, EletronarcoseAvesValor, EsperaAvesValor, OcorrenciaPragasValor, PenduraAvesValor, PesoCaixaValor, RastreabilidadeDoaValor, RecepcaoAvesValor, TemperaturaResfriamentoValor, PotabilidadeAguaValor, ChecklistConformidadeValor } from "../fields/tiposCompostos";
+import { motivosPreenchimentoCarcacas, motivosPreenchimentoChuveiro, motivosPreenchimentoMiudos, motivosPreenchimentoPartes } from "../fields/preenchimentoSpr";
+import type { CaixasVaziasValor, ChillerCarcacasValor, ChillerPartesValor, EletronarcoseAvesValor, LavagemFinalValor, MiniChillersValor, EsperaAvesValor, OcorrenciaPragasValor, PenduraAvesValor, PesoCaixaValor, RastreabilidadeDoaValor, RecepcaoAvesValor, TemperaturaResfriamentoValor, PotabilidadeAguaValor, ChecklistConformidadeValor } from "../fields/tiposCompostos";
 
-export function motivosDeBloqueioSpr(campos: CampoTemplate[], dados: Record<string, unknown>): string[] {
+export function motivosDeBloqueioSpr(
+  campos: CampoTemplate[],
+  dados: Record<string, unknown>,
+  /** Etapa 1 do peso por caixa: o peso médio de alguma carga ainda não chegou da balança. */
+  opcoes: { permitirPesoPendente?: boolean } = {}
+): string[] {
   const motivos: string[] = [];
   for (const campo of campos) {
     if (campo.tipo === "recepcao_aves") {
@@ -44,7 +50,7 @@ export function motivosDeBloqueioSpr(campos: CampoTemplate[], dados: Record<stri
       continue;
     }
     if (campo.tipo === "peso_caixa") {
-      motivos.push(...motivosBloqueioPesoCaixa(dados[campo.chave] as PesoCaixaValor | undefined));
+      motivos.push(...motivosBloqueioPesoCaixa(dados[campo.chave] as PesoCaixaValor | undefined, { permitirSemPeso: opcoes.permitirPesoPendente }));
       continue;
     }
     if (campo.tipo === "caixas_vazias") {
@@ -59,6 +65,27 @@ export function motivosDeBloqueioSpr(campos: CampoTemplate[], dados: Record<stri
       motivos.push(...motivosBloqueioPendura(dados[campo.chave] as PenduraAvesValor | undefined));
       continue;
     }
+    // Widgets de vazão: nenhum campo visível pode ficar em branco (valor ausente = tudo em branco).
+    if (campo.tipo === "chiller_carcacas") {
+      motivos.push(...motivosPreenchimentoCarcacas(dados[campo.chave] as ChillerCarcacasValor | undefined));
+      continue;
+    }
+    if (campo.tipo === "chiller_partes") {
+      motivos.push(...motivosPreenchimentoPartes(dados[campo.chave] as ChillerPartesValor | undefined));
+    }
+    if (campo.tipo === "mini_chillers") {
+      motivos.push(...motivosPreenchimentoMiudos(dados[campo.chave] as MiniChillersValor | undefined));
+    }
+    if (campo.tipo === "lavagem_final") {
+      motivos.push(...motivosPreenchimentoChuveiro(dados[campo.chave] as LavagemFinalValor | undefined));
+    }
+    // Campos simples obrigatórios: o schema Zod aceita texto vazio, então a conferência é feita aqui.
+    if ((campo.tipo === "texto" || campo.tipo === "texto_longo" || campo.tipo === "hora") && campo.obrigatorio) {
+      const texto = dados[campo.chave];
+      if (typeof texto !== "string" || texto.trim() === "") motivos.push(`${campo.label ?? campo.chave}: campo obrigatório sem preencher.`);
+      continue;
+    }
+
     const valor = dados[campo.chave] as Record<string, unknown> | undefined;
     if (!valor || typeof valor !== "object") continue;
 

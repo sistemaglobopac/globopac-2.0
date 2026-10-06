@@ -8,6 +8,9 @@ import { supabase } from "@/lib/supabase";
 import { useAudioAlarm } from "@/modules/fichas/useAudioAlarm";
 import { Button } from "@/shared/ui/button";
 import { rascunhosComoMonitoramentos, useRascunhos } from "@/modules/fichas/useRascunhos";
+import { aguardaPesoDaBalanca, useMonitoramentosEmAndamento } from "@/modules/fichas/api";
+import { ALERTA_PESO_PENDENTE_MIN } from "@/modules/fichas/fields/pesoCaixa";
+import { horaEfetiva } from "@/modules/fichas/utils/horaMonitoramento";
 import {
   PAUSAS_CONFIG,
   calcularFichasAtrasadas,
@@ -47,6 +50,8 @@ export function GlobalInspectorAlerts() {
   const { data: kpis } = useKpisTurno(turnoAtivo ? userId : undefined, userSetores);
   const encerrarFicha = useEncerrarFichaDia();
   const { data: rascunhos } = useRascunhos(userId);
+  // Peso por caixa aguardando o peso da balança há muito tempo: cobra o peso (de qualquer inspetor do setor).
+  const { data: emAndamento } = useMonitoramentosEmAndamento(userId, userSetores);
 
   const [agora, setAgora] = useState(() => new Date());
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
@@ -148,7 +153,18 @@ export function GlobalInspectorAlerts() {
       .map((d) => ({ monitoramentoId: d.monitoramentoId, nomeFicha: kpis.nomesFicha.get(d.fichaTemplateId)?.nome ?? "Ficha" }));
   }, [kpis, agora, dismissed]);
 
-  const isVisible = Boolean(isInspetor && (pausaEstourada || ncSemRnc.length > 0 || rascunhosNc.length > 0 || fichasAtrasadas.length > 0 || rncsCriticas.length > 0));
+  const pesosPendentes = useMemo(
+    () =>
+      (emAndamento ?? []).filter(
+        (m) =>
+          aguardaPesoDaBalanca(m) &&
+          !dismissed.has(`peso_${m.id}`) &&
+          agora.getTime() - new Date(horaEfetiva(m)).getTime() >= ALERTA_PESO_PENDENTE_MIN * 60_000
+      ),
+    [emAndamento, agora, dismissed]
+  );
+
+  const isVisible = Boolean(isInspetor && (pausaEstourada || ncSemRnc.length > 0 || rascunhosNc.length > 0 || pesosPendentes.length > 0 || fichasAtrasadas.length > 0 || rncsCriticas.length > 0));
   useAudioAlarm(isVisible && !minimizado);
 
   useEffect(() => {
@@ -247,6 +263,43 @@ export function GlobalInspectorAlerts() {
                       </Button>
                       <Button type="button" variant="outline" onClick={() => dismiss(`rascunho_nc_${r.id}`)}>
                         Depois
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {pesosPendentes.length > 0 && (
+            <div data-testid="alerta-peso-pendente">
+              <h3 className="mb-2 flex items-center gap-1 text-[0.7rem] font-black uppercase tracking-wider text-muted-foreground">
+                <Clock className="h-3.5 w-3.5 text-primary" /> Peso da balança pendente
+              </h3>
+              <div className="flex flex-col gap-2">
+                {pesosPendentes.map((m) => (
+                  <div key={m.id} className="flex flex-col gap-3 rounded border-l-4 border-primary bg-background p-4 shadow-sm">
+                    <div>
+                      <h4 className="text-sm font-bold text-foreground">Peso por caixa — {m.setor}</h4>
+                      <p className="mt-1 text-[0.7rem] text-muted-foreground">
+                        Aguardando o peso da balança há {Math.floor((agora.getTime() - new Date(horaEfetiva(m)).getTime()) / 60_000)} min. Ligue para a balança e complete o monitoramento:
+                        a vazão e a rastreabilidade dependem desse peso.
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        className="flex-1"
+                        onClick={() => {
+                          dismiss(`peso_${m.id}`);
+                          navigate(`/fichas/peso/${m.id}`);
+                        }}
+                      >
+                        Completar peso
+                      </Button>
+                      <Button type="button" variant="outline" onClick={() => dismiss(`peso_${m.id}`)}>
+                        Ciente
                       </Button>
                     </div>
                   </div>

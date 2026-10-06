@@ -50,7 +50,21 @@ export function montarValorPesoCaixa(v: PesoCaixaValor): PesoCaixaValor {
   return { ...v, conformidade, detalhesRNC: motivos.length ? `Peso vivo acima do limite por caixa — ${motivos.join("; ")}` : null };
 }
 
-export function motivosBloqueioPesoCaixa(v: PesoCaixaValor | undefined | null): string[] {
+/** Chave reservada em dados_dinamicos: o monitoramento foi salvo SEM o peso médio de alguma carga (a balança
+ * ainda não passou) e aguarda a etapa 2. Espelha o banco (guard_fase_absorcao). */
+export const CHAVE_AGUARDANDO_PESO = "aguardando_peso";
+/** Quem completou o peso e quando (etapa 2). */
+export const CHAVE_PESO_COMPLETADO = "peso_completado";
+/** A partir de quantos minutos esperando o peso o alerta fica forte. */
+export const ALERTA_PESO_PENDENTE_MIN = 90;
+
+/** Cargas já selecionadas/preenchidas que ainda não têm o peso médio (a balança não passou). */
+export function cargasSemPeso(v: PesoCaixaValor | undefined | null): CargaPesoCaixa[] {
+  return (v?.cargas ?? []).filter((c) => (c.cargaId || c.avesPorCaixa.trim() || c.pesoMedioKg.trim()) && lerPesoKg(c.pesoMedioKg) === null);
+}
+
+/** Com `permitirSemPeso` (etapa 1) o peso médio não é exigido: o registro fica aguardando o peso. */
+export function motivosBloqueioPesoCaixa(v: PesoCaixaValor | undefined | null, opcoes: { permitirSemPeso?: boolean } = {}): string[] {
   const p = "Peso por caixa";
   if (!v) return [`${p}: selecione a carga e informe aves por caixa e peso médio.`];
   const preenchidas = v.cargas.filter((c) => c.cargaId || c.avesPorCaixa.trim() || c.pesoMedioKg.trim());
@@ -60,7 +74,7 @@ export function motivosBloqueioPesoCaixa(v: PesoCaixaValor | undefined | null): 
     const nome = c.gta ? `GTA ${c.gta}` : `Linha ${i + 1}`;
     if (!c.cargaId) m.push(`${p}: selecione a carga (${nome}).`);
     if (lerInteiroPositivo(c.avesPorCaixa) === null) m.push(`${p}: informe a quantidade de aves por caixa (${nome}).`);
-    if (lerPesoKg(c.pesoMedioKg) === null) m.push(`${p}: informe o peso médio das aves (${nome}).`);
+    if (!opcoes.permitirSemPeso && lerPesoKg(c.pesoMedioKg) === null) m.push(`${p}: informe o peso médio das aves (${nome}).`);
   });
   return m;
 }

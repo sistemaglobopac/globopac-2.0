@@ -11,9 +11,10 @@ import { CHAVE_CONTINUACAO, useCriarMonitoramento, useRegistroContinuavel, useTe
 import { ContinuacaoMonitoramento, MOTIVO_CONTINUACAO_MIN_CARACTERES } from "./components/ContinuacaoMonitoramento";
 import { RascunhosPainel } from "./components/RascunhosPainel";
 import { useAtualizarRascunhos, useRascunhos } from "./useRascunhos";
-import { combinarAnterior } from "./utils/rascunhosAnterior";
+import { cargasEmRascunhos, combinarAnterior } from "./utils/rascunhosAnterior";
 import { CHAVE_HORA_MONITORAMENTO, dataManaus, horaManaus, isoDeManaus, validarHoraMonitoramento } from "./utils/horaMonitoramento";
 import { salvarRascunho } from "@/lib/rascunhos";
+import { CHAVE_AGUARDANDO_PESO, cargasSemPeso } from "./fields/pesoCaixa";
 import { motivosDeBloqueioSpr } from "./utils/bloqueiosSpr";
 import { desviosEspeciais, temNaoConformidade } from "./utils/desviosEspeciais";
 import { ModalAutocorrecao } from "@/modules/autocorrecao/ModalAutocorrecao";
@@ -24,7 +25,7 @@ import { turnoAlvoHeranca } from "./utils/turnoUtils";
 import { useSincronizacaoOffline } from "./useSincronizacaoOffline";
 import { useAudioAlarm } from "./useAudioAlarm";
 import { DynamicField } from "./DynamicField";
-import type { ChillerCarcacasValor } from "./fields/tiposCompostos";
+import type { ChillerCarcacasValor, PesoCaixaValor } from "./fields/tiposCompostos";
 import { Button } from "@/shared/ui/button";
 import { Select } from "@/shared/ui/select";
 import { Input } from "@/shared/ui/input";
@@ -293,7 +294,9 @@ interface FichaFormProps {
 }
 
 function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervaloMin, setor, perfil, onVoltar }: FichaFormProps) {
-  const [sucesso, setSucesso] = useState<"online" | "offline" | "em_andamento" | "rascunho" | "rascunho_nc" | null>(null);
+  const [sucesso, setSucesso] = useState<"online" | "offline" | "em_andamento" | "rascunho" | "rascunho_nc" | "aguardando_peso" | null>(null);
+  // Avisos de carga já NÃO CONFORME ao salvar a etapa 1 do peso por caixa (as demais cargas ainda sem peso).
+  const [avisosEtapa1, setAvisosEtapa1] = useState<string[]>([]);
   // Hora do monitoramento: informada MANUALMENTE (abrir a ficha só para olhar não registra hora).
   const [horaData, setHoraData] = useState(() => dataManaus(new Date()));
   const [horaHora, setHoraHora] = useState("");
@@ -339,6 +342,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
     [continuando, registroContinuavel, rascunhosLocais, codigo, setor]
   );
   const registroPrevio = ultimoRegistro ?? anteriorContinuacao;
+  const cargasEmRascunho = useMemo(() => cargasEmRascunhos(rascunhosLocais, codigo, setor), [rascunhosLocais, codigo, setor]);
   const [motivosBloqueio, setMotivosBloqueio] = useState<string[]>([]);
   const [avisosDesvio, setAvisosDesvio] = useState<string[]>([]);
   // Dados aguardando a confirmação "assinar monitoramento NÃO CONFORME?" (antes do modal de senha).
@@ -376,6 +380,11 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
   // deixa de ser satisfeita, evitando um valor residual contradizendo o campo principal.
   const valoresForm = useWatch({ control }) as Record<string, unknown>;
   const camposVisiveis = campos.filter((campo) => !campo.dependeDe || valoresForm?.[campo.dependeDe.campo] === campo.dependeDe.valor);
+
+  // Peso por caixa: a balança pode não ter passado o peso de alguma carga. Nesse caso o botão salva a ETAPA 1
+  // (aguardando peso: já vale para a frequência) e o peso é completado depois, em "Monitoramentos em andamento".
+  const campoPeso = camposVisiveis.find((c) => c.tipo === "peso_caixa");
+  const pesoPendente = !!campoPeso && cargasSemPeso(valoresForm?.[campoPeso.chave] as PesoCaixaValor | undefined).length > 0;
 
   useEffect(() => {
     for (const campo of campos) {
@@ -421,6 +430,10 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
     const hora = horaValidada();
     if (!hora) return;
     const dados: FieldValues = { ...dadosForm, [CHAVE_HORA_MONITORAMENTO]: hora };
+    if (pesoPendente) {
+      await salvarEtapa1Peso(dados);
+      return;
+    }
     // Dripping em 1ª etapa (sem Retirada/M2): não assina — só "Salvar 1ª etapa do teste" (Enter no formulário não pode furar isso).
     if (drippingFase1) {
       setMotivosBloqueio(['Dripping Test: salve a 1ª etapa do teste. A assinatura só vem depois da Retirada e do M2 (2ª etapa).']);
@@ -483,13 +496,52 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
     }
   }
 
+  /** Marca de continuação (monitoramento pendente de antes de hoje), se for o caso. */
+  function comContinuacao(dados: FieldValues): FieldValues {
+    return continuando && registroPrevio
+      ? { ...dados, [CHAVE_CONTINUACAO]: { registroId: registroPrevio.id, criadoEm: registroPrevio.criado_em, motivo: motivoContinuacao.trim() } }
+      : dados;
+  }
+
+  /** Peso por caixa — ETAPA 1: grava o monitoramento sem o peso médio das cargas que a balança ainda não passou
+   * (EM_ANDAMENTO, assinatura parcial). Já vale para a frequência e para herdar as leituras; o peso é completado
+   * depois e só então o registro é finalizado, assinado e avaliado. */
+  async function salvarEtapa1Peso(dados: FieldValues) {
+    const motivos = motivosDeBloqueioSpr(camposVisiveis, dados, { permitirPesoPendente: true });
+    if (continuando && motivoContinuacao.trim().length < MOTIVO_CONTINUACAO_MIN_CARACTERES) {
+      motivos.push(`Continuação: informe o motivo (mínimo ${MOTIVO_CONTINUACAO_MIN_CARACTERES} caracteres).`);
+    }
+    setMotivosBloqueio(motivos);
+    if (motivos.length > 0) return;
+
+    setSucesso(null);
+    setAvisosEtapa1(desviosEspeciais(camposVisiveis, dados));
+    try {
+      await criarMonitoramento.mutateAsync({
+        fichaTemplateId: templateId,
+        versaoTemplate,
+        userId: perfil.id,
+        setor,
+        statusFicha: "EM_ANDAMENTO",
+        dadosDinamicos: { ...comContinuacao(dados), [CHAVE_AGUARDANDO_PESO]: true },
+      });
+      setContinuando(false);
+      setMotivoContinuacao("");
+      reset(valoresIniciaisDe(campos));
+      setSucesso("aguardando_peso");
+      setTimeout(onVoltar, 3500);
+    } catch {
+      // erro refletido em criarMonitoramento.isError.
+    }
+  }
+
   /** Salva o monitoramento como RASCUNHO neste aparelho (com ou sem internet), para assinar depois em lote.
    * Mesmas validações do "Criar e assinar"; se estiver NÃO CONFORME, avisa na hora. */
   async function aoSalvarRascunho(dadosForm: FieldValues) {
     const hora = horaValidada();
     if (!hora) return;
     const dados: FieldValues = { ...dadosForm, [CHAVE_HORA_MONITORAMENTO]: hora };
-    const motivos = motivosDeBloqueioSpr(camposVisiveis, dados);
+    const motivos = motivosDeBloqueioSpr(camposVisiveis, dados, { permitirPesoPendente: true });
     if (continuando && motivoContinuacao.trim().length < MOTIVO_CONTINUACAO_MIN_CARACTERES) {
       motivos.push(`Continuação: informe o motivo (mínimo ${MOTIVO_CONTINUACAO_MIN_CARACTERES} caracteres).`);
     }
@@ -498,7 +550,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
 
     const avisos = desviosEspeciais(camposVisiveis, dados);
     const naoConforme = avisos.length > 0 || temNaoConformidade(dados);
-    if (naoConforme && navigator.onLine) {
+    if (naoConforme && navigator.onLine && !pesoPendente) {
       // Com internet dá para assinar já e tratar na hora (RNC ou ação corretiva imediata).
       setNcRascunho({ dados, avisos });
       return;
@@ -508,10 +560,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
 
   async function gravarRascunho(dados: FieldValues, naoConforme: boolean, avisos: string[]) {
     setNcRascunho(null);
-    const dadosFinais =
-      continuando && registroPrevio
-        ? { ...dados, [CHAVE_CONTINUACAO]: { registroId: registroPrevio.id, criadoEm: registroPrevio.criado_em, motivo: motivoContinuacao.trim() } }
-        : dados;
+    const dadosFinais = pesoPendente ? { ...comContinuacao(dados), [CHAVE_AGUARDANDO_PESO]: true } : comContinuacao(dados);
     await salvarRascunho({
       id: crypto.randomUUID(),
       fichaTemplateId: templateId,
@@ -524,6 +573,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
       horaMonitoramento: dados[CHAVE_HORA_MONITORAMENTO] as string,
       naoConforme,
       motivosNc: avisos,
+      ...(pesoPendente ? { statusFicha: "EM_ANDAMENTO" as const } : {}),
     });
     void atualizarRascunhos();
     setContinuando(false);
@@ -700,6 +750,8 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
                 control={control}
                 prevAppointment={registroPrevio?.dados_dinamicos}
                 carcacasAtual={carcacasAtual}
+                diaMonitoramento={horaData}
+                cargasEmRascunho={cargasEmRascunho}
                 faseAbsorcao={campoAbsorcao ? "INICIAL" : undefined}
                 aoSalvarPrimeiraEtapaDripping={onVoltar}
               />
@@ -732,6 +784,20 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
               </p>
             )}
             {sucesso === "online" && <p className="text-sm text-success">Ficha criada e assinada com sucesso.</p>}
+            {sucesso === "aguardando_peso" && (
+              <div role="status" className="space-y-1 rounded border border-warning bg-warning/10 p-2 text-sm">
+                <p className="font-medium">
+                  Monitoramento salvo <strong>aguardando o peso da balança</strong>. Já vale para a frequência; quando o peso chegar, complete em "Monitoramentos em andamento".
+                </p>
+                {avisosEtapa1.length > 0 && (
+                  <ul className="list-disc pl-5 font-medium text-destructive">
+                    {avisosEtapa1.map((a) => (
+                      <li key={a}>{a}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
             {sucesso === "rascunho" && (
               <p className="text-sm text-success">Rascunho salvo neste aparelho. Assine pela lista de rascunhos em até 24 h.</p>
             )}
@@ -757,7 +823,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
             ) : (
               <div className="flex flex-wrap gap-2">
                 <Button type="submit" disabled={isSubmitting || criarMonitoramento.isPending}>
-                  {isSubmitting || criarMonitoramento.isPending ? "Salvando e assinando…" : "Criar e assinar"}
+                  {isSubmitting || criarMonitoramento.isPending ? "Salvando…" : pesoPendente ? "Salvar e aguardar o peso" : "Criar e assinar"}
                 </Button>
                 <Button
                   type="button"
