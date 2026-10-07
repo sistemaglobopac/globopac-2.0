@@ -29,6 +29,7 @@ import type {
   TanqueHidrometro,
 } from "@/modules/fichas/fields/tiposCompostos";
 import { formatMaskedValue } from "@/modules/fichas/fields/hidrometro";
+import { pesoVivoMedioDaCarcaca, RENDIMENTO_CARCACA_PERCENTUAL } from "@/modules/fichas/fields/calculosSpr";
 import { pragasPresentes, rotuloDaPraga } from "@/modules/fichas/fields/pragas";
 import { COMPORTAMENTOS_AVES } from "@/modules/fichas/fields/esperaAves";
 import { formatarPctDoa } from "@/modules/fichas/fields/rastreabilidadeDoa";
@@ -162,7 +163,7 @@ const LOGICA_AGUA = "Água usada (L) = (Hidr. Atual − Hidr. Anterior) × 1000 
 
 const LOGICA_CARCACAS = [
   "Aves no período = Σ aves das cargas − (carcaças parcialmente aproveitadas + totalmente condenadas).",
-  "Peso médio da carcaça = média ponderada do peso vivo × 0,84 (rendimento fixo de 84%).",
+  "Peso médio da carcaça = 84% do peso vivo médio, em que o peso vivo médio é a média ponderada do peso vivo das cargas (pelas aves de cada lote); o rendimento de 84% é fixo (16% de perda no abate).",
   LOGICA_AGUA,
   "Renovação apurada (L/carcaça) = água usada ÷ aves no período; L/kg = água usada ÷ (aves no período × peso médio da carcaça). Conforme quando L/carcaça ≥ meta do tanque.",
   "Metas por faixa de peso da carcaça (≤ 2,5 kg / ≤ 5,0 kg / > 5,0 kg): Pré-chiller 1,5 / 1,7 / 2,2 · Chiller 01 1,1 / 1,6 / 2,1 · Chiller 02 1,0 / 1,5 / 2,0 L/carcaça.",
@@ -185,6 +186,12 @@ const LOGICA_CHUVEIRO = [
   "Vazão apurada (L/carcaça) = água usada ÷ aves no chuveiro final; L/kg = água usada ÷ (aves no chuveiro × peso médio da carcaça do SPR Carcaças). Meta fixa: L/carcaça ≥ 1,5.",
 ];
 
+/** Explica de onde vem o peso médio da carcaça: é 84% do peso vivo médio (e quanto este vale). */
+function baseDoPesoDeCarcaca(pesoCarcaca: number): string {
+  if (!(pesoCarcaca > 0)) return `${RENDIMENTO_CARCACA_PERCENTUAL} do peso vivo médio (aguardando o peso das cargas)`;
+  return `${RENDIMENTO_CARCACA_PERCENTUAL} do peso vivo médio de ${pesoVivoMedioDaCarcaca(pesoCarcaca).toFixed(3)} kg`;
+}
+
 function horaDeRelatorio(iso: string): string {
   return new Date(iso).toLocaleTimeString("pt-BR", { timeZone: "America/Manaus", hour: "2-digit", minute: "2-digit" });
 }
@@ -206,7 +213,13 @@ export function ChillerCarcacasRelatorio({ valor, titulo = "Renovação da Água
         <div><span className="text-muted-foreground">Aves no período</span><br /><strong>{valor.totalAves.toLocaleString("pt-BR")}</strong></div>
         <div><span className="text-muted-foreground">Aves bruto</span><br /><strong>{valor.totalAvesBruto.toLocaleString("pt-BR")}</strong></div>
         <div><span className="text-muted-foreground">Condenas</span><br /><strong>{valor.condenasParcial || 0} parcial / {valor.condenasTotal || 0} total</strong></div>
-        <div><span className="text-muted-foreground">Peso médio carcaça</span><br /><strong>{valor.pesoMedioCarcaca.toFixed(3)} kg</strong></div>
+        <div>
+          <span className="text-muted-foreground">Peso médio da carcaça</span>
+          <br />
+          <strong>{valor.pesoMedioCarcaca > 0 ? `${valor.pesoMedioCarcaca.toFixed(3)} kg` : "—"}</strong>
+          <br />
+          <span className="text-muted-foreground" data-testid="relatorio-peso-carcaca-base">{baseDoPesoDeCarcaca(valor.pesoMedioCarcaca)}</span>
+        </div>
       </div>
       {valor.pesoParcial && (
         <p className="rounded border border-warning bg-warning/10 p-1.5 text-[10px] font-semibold print:p-1 print:text-[8px]" data-testid="relatorio-peso-parcial">
@@ -276,7 +289,13 @@ export function ChillerPartesRelatorio({ valor, titulo = "Renovação da Água �
       />
       <div className="grid grid-cols-2 gap-2 text-[10px] print:text-[8px] sm:grid-cols-3">
         <div><span className="text-muted-foreground">Condenações</span><br /><strong>{valor.totalCondenacoes.toLocaleString("pt-BR")}</strong></div>
-        <div><span className="text-muted-foreground">Peso médio carcaça (herdado)</span><br /><strong>{valor.pesoMedioCarcaca.toFixed(3)} kg</strong></div>
+        <div>
+          <span className="text-muted-foreground">Peso médio da carcaça (herdado do SPR Carcaças)</span>
+          <br />
+          <strong>{valor.pesoMedioCarcaca.toFixed(3)} kg</strong>
+          <br />
+          <span className="text-muted-foreground">{baseDoPesoDeCarcaca(valor.pesoMedioCarcaca)}</span>
+        </div>
       </div>
       <ApuracaoAgua linhas={apuracaoPartes(valor)} logica={LOGICA_PARTES} baseTitulo="Massa processada" />
       <NotaDesvio detalhes={valor.detalhesRNC} />

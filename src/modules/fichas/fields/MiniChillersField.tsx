@@ -238,7 +238,7 @@ export function MiniChillersField({ value, onChange, disabled, prevAppointment, 
         <div className="flex items-center gap-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm">
           <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
           <span>
-            <strong>Preencha primeiro o "Renovação da Água do SPR Carcaças":</strong> o Peso do Miúdo (Tabela DE-PARA) depende da Média Carcaça
+            <strong>Preencha primeiro o "Renovação da Água do SPR Carcaças":</strong> o Peso do Miúdo (Tabela DE-PARA) depende do Peso médio da carcaça
             calculada lá.
           </span>
         </div>

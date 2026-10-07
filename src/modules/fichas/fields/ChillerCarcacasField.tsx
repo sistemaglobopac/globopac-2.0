@@ -19,6 +19,8 @@ import {
   metaTanqueCarcacas,
   pesoMedioCarcaca as calcularPesoMedioCarcaca,
   pesoMedioParcial,
+  pesoVivoMedioDaCarcaca,
+  RENDIMENTO_CARCACA_PERCENTUAL,
   totalAvesBruto,
   type ChaveTanqueCarcacas as ChaveTanque,
 } from "./calculosSpr";
@@ -499,12 +501,14 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
               </p>
             </div>
             <div>
-              <p className="text-xs font-bold text-muted-foreground">Média Carcaça (Est.)</p>
+              <p className="text-xs font-bold text-muted-foreground">Peso médio da carcaça</p>
               <p className="text-lg font-black">{formatMaskedValue(pesoMedioCarcaca.toFixed(3))} kg</p>
               {resumoParcial ? (
                 <p className="max-w-[210px] text-xs font-semibold text-warning-foreground" data-testid="peso-parcial-resumo">PARCIAL — {parcial.avesComPeso.toLocaleString("pt-BR")} de {(parcial.avesComPeso + parcial.avesSemPeso).toLocaleString("pt-BR")} aves com peso</p>
               ) : (
-                <p className="max-w-[210px] text-xs text-muted-foreground">carcaças = aves abatidas com 16% de perda de peso (despojos do abate)</p>
+                <p className="max-w-[210px] text-xs text-muted-foreground" data-testid="peso-carcaca-base">
+                  {`${RENDIMENTO_CARCACA_PERCENTUAL} do peso vivo médio${pesoMedioCarcaca > 0 ? ` de ${formatMaskedValue(pesoVivoMedioDaCarcaca(pesoMedioCarcaca).toFixed(3))} kg` : ""} (carcaças = aves abatidas com 16% de perda de peso)`}
+                </p>
               )}
             </div>
           </div>
@@ -746,7 +750,7 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
           (aves da carga ÷ tempo andando até a pendura da seguinte, sem as pausas informadas), menos o que já entrou no monitoramento anterior.
         </li>
         <li>Aves no Período = Σ aves das cargas − (carcaças parcialmente aproveitadas + totalmente condenadas).</li>
-        <li>Peso médio da carcaça = média ponderada do peso vivo × 0,84 (rendimento fixo de 84%).</li>
+        <li>Peso médio da carcaça = 84% do peso vivo médio, em que o peso vivo médio é a média ponderada do peso vivo das cargas (pelas aves de cada lote); o rendimento de 84% é fixo.</li>
         <li>Água usada (L) = (Hidr. Atual − Hidr. Anterior) × 1000 + Gelo Adicionado.</li>
         <li>Renovação apurada (L/ave) = água usada ÷ Aves no Período. Conforme quando a renovação apurada é maior ou igual à meta.</li>
         <li>Metas por faixa de peso da carcaça (≤ 2,5 kg / ≤ 5,0 kg / &gt; 5,0 kg): Pré-chiller 1,5 / 1,7 / 2,2 · Chiller 01 1,1 / 1,6 / 2,1 · Chiller 02 1,0 / 1,5 / 2,0.</li>

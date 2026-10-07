@@ -49,6 +49,14 @@ export function pesoMedioCarcaca(cargas: CargaParaCalculo[]): number {
   return pesoMedioVivo(cargas) * RENDIMENTO_CARCACA;
 }
 
+/** Peso vivo médio de onde veio um peso médio de carcaça (a carcaça é 84% do peso vivo): carcaça ÷ 0,84. */
+export function pesoVivoMedioDaCarcaca(pesoCarcaca: number): number {
+  return pesoCarcaca / RENDIMENTO_CARCACA;
+}
+
+/** "84%" — o rendimento da carcaça em porcentagem, para os rótulos. */
+export const RENDIMENTO_CARCACA_PERCENTUAL = `${Math.round(RENDIMENTO_CARCACA * 100)}%`;
+
 /** Peso médio calculado SÓ com os lotes que já têm peso vivo completo (a balança passou). Os lotes sem peso ficam de fora
  * da média — mas continuam contando nas aves do período. É o cálculo do "peso parcial", escolhido de propósito pelo
  * inspetor e SEMPRE registrado como parcial (aves com peso / aves sem peso). `pesoMedioVivo`/`pesoMedioCarcaca` valem 0 se
