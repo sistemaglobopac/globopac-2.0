@@ -25,7 +25,7 @@ import {
   type ChaveTanqueCarcacas as ChaveTanque,
 } from "./calculosSpr";
 import { AvisoImplausivel, AvisoPrimeiroDoDia, LogicaCalculo, TOOLTIP_HIDR_ANTERIOR } from "./componentesSpr";
-import { baseDeCargasAnteriores, baseParaProximo, calcularPeriodo, type CargaDoDia } from "./cargasDoPeriodo";
+import { baseDeCargasAnteriores, baseParaProximo, calcularPeriodo, corrigirBaseComPendurasConhecidas, type CargaDoDia } from "./cargasDoPeriodo";
 import { vereditoAntecipado, vereditoGeral } from "./vereditoVazao";
 import type { CargaProcessada, ChegadaRegistrada, ChillerCarcacasValor, ParadaLinha, TanqueHidrometro } from "./tiposCompostos";
 
@@ -109,7 +109,7 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
     if (!horaMonitoramento || !cargasDoDia) return null;
     const lista: CargaDoDia[] = cargasDoDia.map((c) => ({ carga_id: c.carga_id, gta: c.gta, qtd_aves: c.qtd_aves, pendura_inicio_em: c.pendura_inicio_em, peso_medio_kg: c.peso_medio_kg }));
     // Base: o acumulado guardado no monitoramento anterior; sem ele, as cargas já apuradas contam inteiras.
-    const base = prevAppointment?.chegada?.acumulado ?? baseDeCargasAnteriores(lista, new Set([...(jaUsadas ?? []), ...(cargasEmRascunho ?? [])]), prevAppointment?.cargas);
+    const base = (prevAppointment?.chegada ? corrigirBaseComPendurasConhecidas(prevAppointment.chegada.acumulado, lista, prevAppointment.chegada.corteEm) : undefined) ?? baseDeCargasAnteriores(lista, new Set([...(jaUsadas ?? []), ...(cargasEmRascunho ?? [])]), prevAppointment?.cargas);
     return calcularPeriodo(lista, new Date(horaMonitoramento), base, paradas);
   }, [horaMonitoramento, cargasDoDia, jaUsadas, cargasEmRascunho, prevAppointment, paradas]);
 

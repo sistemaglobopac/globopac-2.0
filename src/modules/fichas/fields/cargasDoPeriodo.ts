@@ -66,6 +66,27 @@ export function baseDeCargasAnteriores(
   return { ...base, ...doLote };
 }
 
+/** Corrige o acumulado do monitoramento anterior com o que se sabe HOJE. Se na hora daquele monitoramento a pendura de uma
+ * carga ainda não estava registrada, o sistema estimou aves dela pelo andamento da linha; se a pendura registrada depois
+ * mostra que ela só começou DEPOIS do corte daquele monitoramento (a linha tinha parado), nada dela havia chegado: o
+ * que foi estimado sai da base e todas as aves da carga entram no período atual. (O fim da pendura de uma carga é o
+ * início da seguinte.) */
+export function corrigirBaseComPendurasConhecidas(
+  base: Record<string, number>,
+  cargas: CargaDoDia[],
+  corteAnteriorEm: string | undefined
+): Record<string, number> {
+  const corte = corteAnteriorEm ? new Date(corteAnteriorEm).getTime() : NaN;
+  if (!Number.isFinite(corte)) return base;
+  const corrigida = { ...base };
+  for (const c of cargas) {
+    if (!c.pendura_inicio_em || !(c.carga_id in corrigida)) continue;
+    const inicio = new Date(penduraParaIso(c.pendura_inicio_em)).getTime();
+    if (Number.isFinite(inicio) && inicio >= corte) delete corrigida[c.carga_id];
+  }
+  return corrigida;
+}
+
 export function calcularPeriodo(
   cargas: CargaDoDia[],
   horaMonitoramento: Date,
