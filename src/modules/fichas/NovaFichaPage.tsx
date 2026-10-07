@@ -7,7 +7,7 @@ import { AlertTriangle, ArrowLeft, BellRing, CheckCircle2, Clock, Lock, ShieldCh
 import { useSessionStore, type PerfilSessao } from "@/store/session";
 import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/api";
 import { zodFromSchemaCampos, valoresIniciaisDe, type CampoTemplate } from "@/shared/schema-campos";
-import { supabase } from "@/lib/supabase";
+import { conferirSenha } from "@/modules/auth/reautenticar";
 import { CHAVE_CONTINUACAO, buscarRegistrosRecentesFicha, chaveRegistrosRecentes, useCriarMonitoramento, useRegistroContinuavel, useTemplatesAtivos, useTurnoFixoDoUsuario, useUltimoRegistroFicha, useUltimosApontamentosHoje, type TemplateAtivo } from "./api";
 import { ContinuacaoMonitoramento, MOTIVO_CONTINUACAO_MIN_CARACTERES } from "./components/ContinuacaoMonitoramento";
 import { RascunhosPainel } from "./components/RascunhosPainel";
@@ -64,6 +64,11 @@ function FilaOfflinePainel() {
             <Badge variant={item.status === "falha_autenticacao" ? "destructive" : "outline"}>
               {ROTULO_STATUS_FILA[item.status] ?? item.status}
             </Badge>
+            {item.status === "falhou" && /72 horas/.test(item.ultimoErro ?? "") && (
+              <p role="alert" className="basis-full text-xs text-destructive">
+                O prazo de 72 h passou e o servidor não confirmou queda de rede para este aparelho. Os dados continuam salvos aqui — procure o verificador/gestão antes de apagar ou refazer.
+              </p>
+            )}
           </div>
         ))}
       </CardContent>
@@ -618,11 +623,9 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
     setTimeout(onVoltar, naoConforme ? 4000 : 1500);
   }
 
+  // Com ou sem internet o inspetor confirma com a senha: sem rede ela é conferida neste aparelho e a assinatura
+  // oficial sai quando a rede voltar (ADR 0016).
   async function seguirParaAssinatura(dados: FieldValues) {
-    if (!navigator.onLine) {
-      await salvar(dados);
-      return;
-    }
     setDadosPendentes(dados);
   }
 
@@ -638,7 +641,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
     setAvisosDesvio([]);
   }
 
-  async function salvar(dados: FieldValues) {
+  async function salvar(dados: FieldValues, confirmacaoSenha?: { modo: "servidor" | "aparelho"; matricula?: string }) {
     setSucesso(null);
     try {
       const resultado = await criarMonitoramento.mutateAsync({
@@ -646,6 +649,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
         versaoTemplate,
         userId: perfil.id,
         setor,
+        confirmacaoSenha,
         dadosDinamicos:
           continuando && registroPrevio
             ? { ...dados, [CHAVE_CONTINUACAO]: { registroId: registroPrevio.id, criadoEm: registroPrevio.criado_em, motivo: motivoContinuacao.trim() } }
@@ -676,17 +680,12 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
     setErroSenha(null);
     setAutenticando(true);
     try {
-      const { data: userData, error: erroUser } = await supabase.auth.getUser();
-      if (erroUser || !userData.user?.email) {
-        setErroSenha("Não foi possível identificar seu usuário. Faça login novamente.");
+      const conferencia = await conferirSenha(senha);
+      if (!conferencia.ok) {
+        setErroSenha(conferencia.erro);
         return;
       }
-      const { error: erroAuth } = await supabase.auth.signInWithPassword({ email: userData.user.email, password: senha });
-      if (erroAuth) {
-        setErroSenha("Senha incorreta. A assinatura eletrônica falhou.");
-        return;
-      }
-      await salvar(dadosPendentes);
+      await salvar(dadosPendentes, conferencia.modo === "aparelho" ? { modo: "aparelho", matricula: conferencia.matricula } : { modo: "servidor" });
     } finally {
       setAutenticando(false);
       setSenha("");
@@ -845,7 +844,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
             )}
             {sucesso === "offline" && (
               <p className="text-sm text-warning">
-                Sem conexão — ficha salva no dispositivo e será enviada e assinada automaticamente assim que a rede voltar.
+                Sem conexão — ficha confirmada com a sua senha e salva no aparelho. Ela será enviada e assinada automaticamente (assinatura oficial e carimbo de tempo) assim que a rede voltar.
               </p>
             )}
 
@@ -1026,6 +1025,11 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
             <p className="text-sm text-muted-foreground">
               Confirme sua senha (a mesma do login) para assinar eletronicamente este monitoramento.
             </p>
+            {!navigator.onLine && (
+              <p role="status" className="rounded-md border border-warning bg-warning/15 p-2 text-xs text-warning-foreground">
+                Sem conexão: sua senha será conferida neste aparelho e a ficha entra na fila. A assinatura eletrônica oficial (com carimbo de tempo) é concluída automaticamente quando a internet voltar.
+              </p>
+            )}
             <div className="space-y-2">
               <Label htmlFor="senha-assinatura-ficha">Sua senha</Label>
               <Input

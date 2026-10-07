@@ -1,10 +1,14 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { listarFichasEnfileiradas } from "@/lib/offlineQueue";
 import { sincronizarFilaOffline } from "./sincronizacaoOffline";
 
 const INTERVALO_RETENTATIVA_MS = 10_000;
+
+// Guarda por MÓDULO: o hook roda no AppShell (qualquer tela) e também no painel de "Nova ficha" — duas
+// instâncias nunca sincronizam ao mesmo tempo.
+let sincronizandoGlobal = false;
 
 /** Dispara a sincronização da fila offline (ADR 0014) na montagem, quando a rede volta
  * (`online`), quando uma sessão válida é restaurada (reautenticação após
@@ -15,7 +19,6 @@ const INTERVALO_RETENTATIVA_MS = 10_000;
  * para a UI. */
 export function useSincronizacaoOffline() {
   const queryClient = useQueryClient();
-  const sincronizando = useRef(false);
 
   const { data: fila } = useQuery({
     queryKey: ["fila-offline"],
@@ -25,12 +28,12 @@ export function useSincronizacaoOffline() {
 
   useEffect(() => {
     async function tentarSincronizar() {
-      if (sincronizando.current) return;
-      sincronizando.current = true;
+      if (sincronizandoGlobal) return;
+      sincronizandoGlobal = true;
       try {
         await sincronizarFilaOffline();
       } finally {
-        sincronizando.current = false;
+        sincronizandoGlobal = false;
         void queryClient.invalidateQueries({ queryKey: ["fila-offline"] });
         void queryClient.invalidateQueries({ queryKey: ["monitoramentos"] });
       }

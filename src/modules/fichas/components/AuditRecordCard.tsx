@@ -153,6 +153,13 @@ export function AuditRecordCard({
         <p className="text-xs text-muted-foreground">
           Capturado offline em {new Date(appt.capturado_em).toLocaleString("pt-BR")} (informado pelo dispositivo,
           não verificado) — sincronizado em {new Date(appt.criado_em).toLocaleString("pt-BR")}.
+          {appt.confirmacao_offline?.senha_conferida_em === "aparelho" && " Confirmado com a senha do inspetor no aparelho, sem internet; a assinatura oficial foi gerada pelo servidor na sincronização."}
+        </p>
+      )}
+      {appt.fora_do_prazo_offline && (
+        <p role="note" className="flex items-start gap-1.5 rounded border border-warning bg-warning/15 p-2 text-xs font-medium text-warning-foreground" data-testid="aviso-fora-do-prazo-offline">
+          <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          Registro aceito além do prazo de 72 h por contingência de queda de rede: o servidor não recebeu nenhum contato do aparelho do inspetor dentro do prazo. Confira a hora do monitoramento antes de verificar.
         </p>
       )}
 

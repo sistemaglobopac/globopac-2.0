@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Loader2, ShieldCheck, X } from "lucide-react";
-import { reautenticar } from "@/modules/auth/reautenticar";
+import { conferirSenha } from "@/modules/auth/reautenticar";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -11,8 +11,9 @@ interface ModalAssinaturaSenhaProps {
   descricao: string;
   textoConfirmar?: string;
   /** Roda DEPOIS de a senha ser conferida. Pode lançar erro (mostrado no modal). Ao resolver, quem
-   * abriu o modal decide fechá-lo. */
-  onAssinar: () => Promise<void>;
+   * abriu o modal decide fechá-lo. `contexto.modo` diz onde a senha foi conferida: "aparelho" = sem
+   * internet (ADR 0016), a assinatura oficial só sai quando a rede voltar. */
+  onAssinar: (contexto: { modo: "servidor" | "aparelho"; matricula?: string }) => Promise<void>;
   onCancelar: () => void;
   /** Progresso de assinatura em lote ("2/5"): substitui o campo de senha por uma barra. */
   progresso?: { atual: number; total: number } | null;
@@ -23,7 +24,7 @@ interface ModalAssinaturaSenhaProps {
 
 /** Modal ÚNICO de assinatura eletrônica com senha (Lei 14.063/2020, Art. 4º §2º): toda assinatura
  * que exige reconferir a senha do usuário abre este modal — nunca um campo de senha solto na página.
- * A senha é conferida com reautenticar() antes de chamar `onAssinar`. */
+ * A senha é conferida com conferirSenha() antes de chamar `onAssinar`. */
 export function ModalAssinaturaSenha({
   titulo = "Assinatura Eletrônica",
   descricao,
@@ -43,12 +44,12 @@ export function ModalAssinaturaSenha({
     setErro(null);
     setProcessando(true);
     try {
-      const erroSenha = await reautenticar(senha);
-      if (erroSenha) {
-        setErro(erroSenha);
+      const conferencia = await conferirSenha(senha);
+      if (!conferencia.ok) {
+        setErro(conferencia.erro);
         return;
       }
-      await onAssinar();
+      await onAssinar(conferencia.modo === "aparelho" ? { modo: "aparelho", matricula: conferencia.matricula } : { modo: "servidor" });
     } catch (e) {
       setErro(e instanceof Error ? e.message : (e as { message?: string } | null)?.message ?? "Falha ao assinar. Tente novamente.");
     } finally {
@@ -82,6 +83,11 @@ export function ModalAssinaturaSenha({
           ) : (
             <>
               <p className="text-sm text-muted-foreground">{descricao}</p>
+              {!navigator.onLine && (
+                <p role="status" className="rounded-md border border-warning bg-warning/15 p-2 text-xs text-warning-foreground">
+                  Sem conexão: a senha é conferida neste aparelho. A assinatura oficial é concluída quando a internet voltar.
+                </p>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="senha-assinatura-modal">Sua senha (a mesma do login)</Label>
                 <Input

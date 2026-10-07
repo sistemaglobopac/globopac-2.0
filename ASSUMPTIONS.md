@@ -684,3 +684,20 @@ a resposta HTTP voltando normalmente); mover o log para a função `log()` do ha
 aninhado sumia, mas o padrão "logar sempre pela função `log()` do topo, nunca com
 `console.log` solto em uma função auxiliar" evita o problema e é o que as demais Edge Functions
 deste projeto já faziam.
+
+## Premissas do trabalho offline por dias (ADR 0016)
+
+### 68. A confirmação com senha offline substitui a assinatura do inspetor enquanto não há rede
+🟡 **Assumida, aguardando aceite de Qualidade/Jurídico** — aprovada pelo responsável do projeto em 2026-10-07. A assinatura oficial
+(hash do servidor + carimbo de tempo) continua só no servidor e sai na sincronização; offline o inspetor confirma com a senha,
+conferida no aparelho, e a evidência acompanha a ficha. Ver [ADR 0016](docs/adr/0016-trabalho-offline-do-inspetor-por-dias.md).
+
+### 69. 7 dias é o teto do login offline e do prazo estendido por queda de rede
+✅ **Definida pelo responsável do projeto em 2026-10-07.** A queda de rede é provada no servidor (aparelho que não falou com ele nas 73 h
+seguintes à hora do monitoramento), nunca por declaração do aparelho. Limite: prova "o app não falou", não "a internet caiu".
+
+### 70. Validação do que foi escrito sem Docker
+🟡 **Não executado nesta sessão**: a migration `20261007120000_contingencia_offline.sql` e o teste pgTAP
+`0018_contingencia_offline.sql` foram escritos mas **não rodados** (sem Docker/`supabase start` na máquina). O frontend foi
+validado (typecheck, lint, testes de unidade/componente, e um teste manual no navegador do login offline). Rodar
+`npm run db:test` antes de aplicar a migration em qualquer projeto hospedado.

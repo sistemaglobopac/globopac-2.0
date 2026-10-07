@@ -25,6 +25,7 @@ import { useSessionStore } from "@/store/session";
 import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/api";
 import { useEquipamentosCadastrados, useDesviosCadastrados } from "@/modules/gestao/api";
 import { supabase } from "@/lib/supabase";
+import { sair } from "@/modules/auth/acessoOffline";
 import {
   turnoDoDia,
   useTurnoHoje,
@@ -216,7 +217,7 @@ export function PainelBordo() {
           </p>
           <Button
             onClick={async () => {
-              await supabase.auth.signOut();
+              await sair();
               navigate("/login");
             }}
           >

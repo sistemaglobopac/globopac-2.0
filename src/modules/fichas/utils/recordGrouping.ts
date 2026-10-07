@@ -17,6 +17,10 @@ export interface MonitoramentoVerificacao {
   /** Hora em que o monitoramento foi realizado (informada pelo inspetor); nula em registros antigos. */
   hora_monitoramento?: string | null;
   capturado_em: string | null;
+  /** Evidência da confirmação com senha feita no aparelho sem internet (ADR 0016). */
+  confirmacao_offline?: { matricula?: string | null; confirmado_em?: string; dispositivo_id?: string; senha_conferida_em?: string | null } | null;
+  /** Aceito além das 72 h pela contingência de queda de rede (decidido pelo servidor). */
+  fora_do_prazo_offline?: boolean;
   /** Registro original que este aditivo corrige (adendo assinado pelo inspetor). */
   aditivo_de?: string | null;
 }

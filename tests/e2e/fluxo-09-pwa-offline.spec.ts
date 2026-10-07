@@ -39,7 +39,7 @@ test("ficha criada sem rede é enfileirada e sincronizada automaticamente quando
     await assinarComSenha(page, "121072");
 
     await expect(
-      page.getByText("Sem conexão — ficha salva no dispositivo e será enviada e assinada automaticamente")
+      page.getByText("Sem conexão — ficha confirmada com a sua senha e salva no aparelho")
     ).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText(/1 ficha\(s\) aguardando sincronização/)).toBeVisible();
     // "Pendente" ou "Falha ao sincronizar": salvar() volta pra lista de fichas (onVoltar),

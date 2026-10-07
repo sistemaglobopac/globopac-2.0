@@ -6,7 +6,7 @@ import { ModalAssinaturaSenha } from "@/shared/ModalAssinaturaSenha";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
-import { assinarRascunhosEmLote, useAtualizarRascunhos, useRascunhos } from "../useRascunhos";
+import { assinarRascunhosEmLote, confirmarRascunhosOffline, useAtualizarRascunhos, useRascunhos } from "../useRascunhos";
 import { useQueryClient } from "@tanstack/react-query";
 
 const formatar = (iso: string | Date) =>
@@ -30,6 +30,15 @@ export function RascunhosPainel() {
   const online = navigator.onLine;
   const assinaveis = rascunhos.filter((r) => !rascunhoExpirado(r, agora));
   const temNc = rascunhos.some((r) => r.naoConforme);
+
+  async function confirmarSemInternet(confirmacao: { modo: "servidor" | "aparelho"; matricula?: string }) {
+    if (!perfil) return;
+    const r = await confirmarRascunhosOffline(assinaveis, perfil.id, confirmacao);
+    setAssinando(false);
+    void atualizar();
+    void queryClient.invalidateQueries({ queryKey: ["fila-offline"] });
+    setResumo(`${r.enfileirados.length} confirmado(s) com a sua senha e na fila — a assinatura oficial sai quando a internet voltar`);
+  }
 
   async function assinar() {
     if (!perfil) return;
@@ -100,15 +109,14 @@ export function RascunhosPainel() {
         )}
         {resumo && <p className="text-xs text-success">{resumo}</p>}
 
-        {!online ? (
+        {!online && (
           <p className="flex items-center gap-2 text-xs text-warning-foreground">
-            <WifiOff className="h-4 w-4" /> Sem conexão: a assinatura precisa de internet. Os rascunhos continuam salvos neste aparelho.
+            <WifiOff className="h-4 w-4" /> Sem conexão: você pode confirmar com a sua senha agora. Os registros entram na fila e a assinatura oficial (com carimbo de tempo) sai sozinha quando a internet voltar.
           </p>
-        ) : (
-          <Button type="button" disabled={assinaveis.length === 0} onClick={() => { setResumo(null); setAssinando(true); }}>
-            Assinar todos ({assinaveis.length})
-          </Button>
         )}
+        <Button type="button" disabled={assinaveis.length === 0} onClick={() => { setResumo(null); setAssinando(true); }}>
+          {online ? `Assinar todos (${assinaveis.length})` : `Confirmar todos sem internet (${assinaveis.length})`}
+        </Button>
       </CardContent>
 
       {assinando && (
@@ -118,7 +126,7 @@ export function RascunhosPainel() {
           textoConfirmar={`Assinar ${assinaveis.length}`}
           progresso={progresso}
           legendaProgresso="Gravando e assinando…"
-          onAssinar={assinar}
+          onAssinar={(contexto) => (contexto.modo === "aparelho" ? confirmarSemInternet(contexto) : assinar())}
           onCancelar={() => setAssinando(false)}
         />
       )}

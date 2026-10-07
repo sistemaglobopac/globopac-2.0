@@ -80,6 +80,10 @@ interface MonitoramentoRow {
   aditivo_de: string | null;
   criado_em: string;
   capturado_em: string | null;
+  /** Evidência da confirmação com senha feita no aparelho sem internet (ADR 0016) — metadado de auditoria. */
+  confirmacao_offline: Record<string, unknown> | null;
+  /** Aceito além das 72 h pela contingência de queda de rede (decidido só pelo servidor). */
+  fora_do_prazo_offline: boolean;
 }
 
 interface RncRow {

@@ -4,6 +4,11 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { supabase } from "@/lib/supabase";
+import { entrarOffline, mensagemDaRecusaOffline, registrarLoginOnline } from "@/lib/credencialOffline";
+import { useOnline } from "@/lib/useOnline";
+import { WifiOff } from "lucide-react";
+import { abrirSessaoOffline } from "./acessoOffline";
+import { loginNoServidor } from "./loginServidor";
 import { useSessionStore } from "@/store/session";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
@@ -20,23 +25,6 @@ type LoginForm = z.infer<typeof loginSchema>;
 const ERRO_CREDENCIAIS = "Matrícula ou senha inválidos.";
 const ERRO_IP_BLOQUEADO = "Login bloqueado para este IP por excesso de tentativas. Contate um administrador.";
 
-interface RespostaLogin {
-  access_token?: string;
-  refresh_token?: string;
-  erro?: string;
-  flag?: "captcha_necessario" | "ip_bloqueado";
-}
-
-async function lerCorpoErro(error: unknown): Promise<RespostaLogin | null> {
-  const contexto = (error as { context?: Response } | null)?.context;
-  if (!contexto) return null;
-  try {
-    return (await contexto.json()) as RespostaLogin;
-  } catch {
-    return null;
-  }
-}
-
 export function LoginPage() {
   const [erro, setErro] = useState<string | null>(null);
   const [exigeCaptcha, setExigeCaptcha] = useState(false);
@@ -45,6 +33,7 @@ export function LoginPage() {
   const [captchaNonce, setCaptchaNonce] = useState(0);
   const navigate = useNavigate();
   const perfil = useSessionStore((s) => s.perfil);
+  const online = useOnline();
   const {
     register,
     handleSubmit,
@@ -70,35 +59,47 @@ export function LoginPage() {
     // O gate de tentativas por IP (5 falhas -> CAPTCHA, 10 -> bloqueio só desbloqueável por
     // ADMIN_MASTER) só pode ser aplicado no servidor — por isso o login passa pela Edge
     // Function "login" em vez de chamar supabase.auth.signInWithPassword diretamente daqui.
-    // Ver ADR 0015.
-    const { data, error } = await supabase.functions.invoke<RespostaLogin>("login", {
-      body: { matricula: dados.matricula, senha: dados.senha, captcha_token: tokenParaEnviar },
-    });
+    // Ver ADR 0015. Sem internet (ou sem resposta do servidor) cai no acesso offline do inspetor (ADR 0016).
+    const resultado = navigator.onLine ? await loginNoServidor(dados.matricula, dados.senha, tokenParaEnviar) : ({ tipo: "sem_rede" } as const);
 
-    const corpo = data ?? (await lerCorpoErro(error));
-
-    if (corpo?.flag === "ip_bloqueado") {
+    if (resultado.tipo === "sem_rede") {
+      await entrarSemInternet(dados);
+      return;
+    }
+    if (resultado.tipo === "ip_bloqueado") {
       setBloqueado(true);
       setExigeCaptcha(false);
       setErro(ERRO_IP_BLOQUEADO);
       return;
     }
-    if (corpo?.flag === "captcha_necessario") {
+    if (resultado.tipo === "captcha_necessario") {
       setExigeCaptcha(true);
       setErro("Confirme o desafio abaixo para continuar tentando.");
       return;
     }
-    if (error || !corpo?.access_token || !corpo.refresh_token) {
+    if (resultado.tipo !== "ok") {
       setErro(ERRO_CREDENCIAIS);
       return;
     }
 
     setErro(null);
     setExigeCaptcha(false);
-    await supabase.auth.setSession({
-      access_token: corpo.access_token,
-      refresh_token: corpo.refresh_token,
+    const { data: sessao } = await supabase.auth.setSession({
+      access_token: resultado.accessToken,
+      refresh_token: resultado.refreshToken,
     });
+    // Guarda neste aparelho o verificador da senha: é o que permite entrar SEM internet no próximo turno.
+    if (sessao.session) await registrarLoginOnline({ userId: sessao.session.user.id, matricula: dados.matricula, senha: dados.senha });
+  }
+
+  async function entrarSemInternet(dados: LoginForm) {
+    const r = await entrarOffline(dados.matricula, dados.senha);
+    if (!r.ok) {
+      setErro(mensagemDaRecusaOffline(r));
+      return;
+    }
+    setErro(null);
+    await abrirSessaoOffline(r);
   }
 
   return (
@@ -128,6 +129,12 @@ export function LoginPage() {
               <Input id="senha" type="password" autoComplete="current-password" {...register("senha")} />
               {errors.senha && <p className="text-sm text-destructive">{errors.senha.message}</p>}
             </div>
+            {!online && (
+              <p role="status" className="flex items-start gap-2 rounded-md border border-warning bg-warning/15 p-2 text-xs text-warning-foreground">
+                <WifiOff className="mt-0.5 h-4 w-4 shrink-0" />
+                Sem conexão: se você já entrou neste aparelho com internet nos últimos 7 dias, entre normalmente com matrícula e senha.
+              </p>
+            )}
             {exigeCaptcha && !bloqueado && <HCaptchaWidget key={captchaNonce} onToken={setCaptchaToken} />}
             {erro && <p className="text-sm text-destructive">{erro}</p>}
             <Button

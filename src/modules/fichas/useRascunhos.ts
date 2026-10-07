@@ -1,5 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { atualizarStatusRascunho, listarRascunhos, rascunhoExpirado, removerRascunho, type Rascunho } from "@/lib/rascunhos";
+import { enfileirarFicha } from "@/lib/offlineQueue";
+import { montarConfirmacaoOffline } from "@/lib/confirmacaoOffline";
 import { sincronizarUmaFicha } from "./sincronizacaoOffline";
 import type { MonitoramentoHoje } from "@/modules/bordo/api";
 
@@ -77,6 +79,42 @@ export async function assinarRascunhosEmLote(
     }
     feitos += 1;
     aoProgredir?.(feitos, alvo.length);
+  }
+  return resultado;
+}
+
+/** Sem internet: o inspetor confirma os rascunhos com a senha (conferida no aparelho) e eles entram na FILA
+ * offline, de onde são gravados e assinados pelo servidor quando a rede voltar (ADR 0016). Rascunho com o prazo
+ * de 72 h vencido não entra: sem confirmação, a regra de prazo estendido não vale para ele. */
+export async function confirmarRascunhosOffline(
+  rascunhos: Rascunho[],
+  userId: string,
+  confirmacao: { modo: "servidor" | "aparelho"; matricula?: string }
+): Promise<{ enfileirados: string[]; expirados: string[] }> {
+  const resultado = { enfileirados: [] as string[], expirados: [] as string[] };
+  const agora = new Date();
+  for (const r of rascunhos.filter((x) => x.userId === userId)) {
+    if (rascunhoExpirado(r, agora)) {
+      resultado.expirados.push(r.id);
+      continue;
+    }
+    await enfileirarFicha({
+      id: r.id,
+      fichaTemplateId: r.fichaTemplateId,
+      versaoTemplate: r.versaoTemplate,
+      userId: r.userId,
+      setor: r.setor,
+      dadosDinamicos: r.dadosDinamicos,
+      statusFicha: r.statusFicha,
+      capturadoEm: r.horaMonitoramento,
+      confirmacaoOffline: await montarConfirmacaoOffline({
+        dados: { id: r.id, fichaTemplateId: r.fichaTemplateId, versaoTemplate: r.versaoTemplate, userId: r.userId, setor: r.setor, dadosDinamicos: r.dadosDinamicos, capturadoEm: r.horaMonitoramento },
+        senhaConferidaEm: confirmacao.modo,
+        matricula: confirmacao.matricula ?? null,
+      }),
+    });
+    await removerRascunho(r.id);
+    resultado.enfileirados.push(r.id);
   }
   return resultado;
 }

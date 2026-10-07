@@ -1,9 +1,12 @@
 import { useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
-import { garantirCacheDoUsuario, limparConsultas } from "@/lib/offlineCache";
+import { garantirCacheDoUsuario, limparConsultasDoUsuario } from "@/lib/offlineCache";
+import { atualizarPerfilOnline } from "@/lib/credencialOffline";
 import { useSessionStore, type PerfilSessao } from "@/store/session";
 import type { NivelAcesso } from "@/lib/database.types";
+import { ehFalhaDeRede } from "@/lib/rede";
+import { gravarAcessoOffline, gravarPerfilLocal, lerAcessoOffline, lerPerfilLocal } from "./perfilLocal";
 
 interface PerfilUsuarioLinha {
   id: string;
@@ -12,34 +15,9 @@ interface PerfilUsuarioLinha {
   setores_permitidos: string[];
 }
 
-const CHAVE_PERFIL_LOCAL = "globopac:perfil";
 const PRAZO_PERFIL_MS = 8_000;
 
-function lerPerfilLocal(): PerfilSessao | null {
-  try {
-    const bruto = localStorage.getItem(CHAVE_PERFIL_LOCAL);
-    return bruto ? (JSON.parse(bruto) as PerfilSessao) : null;
-  } catch {
-    return null;
-  }
-}
-
-function gravarPerfilLocal(perfil: PerfilSessao | null) {
-  try {
-    if (perfil) localStorage.setItem(CHAVE_PERFIL_LOCAL, JSON.stringify(perfil));
-    else localStorage.removeItem(CHAVE_PERFIL_LOCAL);
-  } catch {
-    // armazenamento bloqueado: só perde a abertura offline, nunca quebra o login online.
-  }
-}
-
-/** Falha de REDE (sem resposta do servidor), diferente de uma resposta de erro do banco/RLS (que
- * traz `code`). Só a primeira justifica abrir com o perfil guardado no aparelho. */
-export function ehFalhaDeRede(erro: { message?: string; code?: string; status?: number } | null | undefined): boolean {
-  if (!erro) return false;
-  if (erro.code) return false;
-  return erro.status === 0 || /fetch|network|timeout|timed out|abort|offline|conex/i.test(erro.message ?? "");
-}
+export { ehFalhaDeRede } from "@/lib/rede";
 
 /**
  * Mantém o perfil (session store) sincronizado com a sessão do Supabase Auth. Chamado uma
@@ -55,6 +33,7 @@ export function ehFalhaDeRede(erro: { message?: string; code?: string; status?: 
 export function useAuthListener() {
   const definirPerfil = useSessionStore((s) => s.definirPerfil);
   const definirCarregando = useSessionStore((s) => s.definirCarregando);
+  const definirAcessoOffline = useSessionStore((s) => s.definirAcessoOffline);
 
   useEffect(() => {
     let ativo = true;
@@ -87,18 +66,35 @@ export function useAuthListener() {
       await garantirCacheDoUsuario(perfil.id, queryClient);
       if (!ativo) return;
       gravarPerfilLocal(perfil);
+      // Perfil lido COM REDE: o servidor confirmou este usuário — renova os 7 dias do acesso offline do
+      // inspetor e encerra o "modo offline" (agora há sessão de verdade).
+      void atualizarPerfilOnline(perfil);
+      gravarAcessoOffline(null);
+      definirAcessoOffline(null);
       definirPerfil(perfil);
     }
 
     supabase.auth.getSession().then(async ({ data, error }) => {
       if (data.session?.user) {
         await carregarPerfil(data.session.user.id);
-      } else if (!navigator.onLine || ehFalhaDeRede(error)) {
-        // Sem rede o Supabase não consegue renovar um token vencido e devolve sessão vazia: o
-        // inspetor continua com o perfil do aparelho (o envio dos registros espera a rede e a
-        // reautenticação, já tratados pela fila offline).
-        const local = lerPerfilLocal();
-        if (ativo && local) definirPerfil(local);
+      } else {
+        const acesso = lerAcessoOffline();
+        const acessoVencido = !!acesso && new Date(acesso.validoAte).getTime() < Date.now();
+        if (acessoVencido) {
+          // O acesso offline (7 dias) venceu enquanto o app estava fechado: volta para o login.
+          gravarAcessoOffline(null);
+          gravarPerfilLocal(null);
+        } else if (!navigator.onLine || ehFalhaDeRede(error) || acesso) {
+          // Sem rede o Supabase não consegue renovar um token vencido e devolve sessão vazia: o
+          // inspetor continua com o perfil do aparelho (o envio dos registros espera a rede e a
+          // reautenticação, já tratados pela fila offline). Idem para quem entrou pelo acesso offline.
+          const local = lerPerfilLocal();
+          if (ativo && local) {
+            await garantirCacheDoUsuario(local.id, queryClient);
+            definirAcessoOffline(acesso);
+            definirPerfil(local);
+          }
+        }
       }
       if (ativo) definirCarregando(false);
     });
@@ -109,8 +105,13 @@ export function useAuthListener() {
         return;
       }
       if (evento === "SIGNED_OUT") {
+        const saindo = useSessionStore.getState().perfil;
         gravarPerfilLocal(null);
-        void limparConsultas();
+        gravarAcessoOffline(null);
+        definirAcessoOffline(null);
+        // O cache do inspetor fica no aparelho (por usuário) para ele entrar offline no próximo turno; o de
+        // quem não trabalha offline é apagado ao sair.
+        if (saindo && saindo.nivelAcesso !== "INSPETOR_QUALIDADE") void limparConsultasDoUsuario(saindo.id);
         queryClient.clear();
         definirPerfil(null);
         return;
@@ -118,6 +119,8 @@ export function useAuthListener() {
       // Sessão vazia SEM saída explícita e sem rede (ex.: token vencido que não renova): não derruba
       // o perfil já carregado do aparelho.
       if (!navigator.onLine) return;
+      // Entrou pelo acesso offline: ainda não há sessão no servidor — não derruba o perfil (o ReconectarModal cuida).
+      if (useSessionStore.getState().acessoOffline) return;
       definirPerfil(null);
     });
 
@@ -125,5 +128,5 @@ export function useAuthListener() {
       ativo = false;
       assinatura.subscription.unsubscribe();
     };
-  }, [definirPerfil, definirCarregando]);
+  }, [definirPerfil, definirCarregando, definirAcessoOffline]);
 }

@@ -48,6 +48,7 @@ export async function sincronizarUmaFicha(item: FichaEnfileirada): Promise<void>
       dados_dinamicos: item.dadosDinamicos,
       ...(item.statusFicha ? { status_ficha: item.statusFicha } : {}),
       capturado_em: item.capturadoEm,
+      ...(item.confirmacaoOffline ? { confirmacao_offline: item.confirmacaoOffline } : {}),
     },
     { onConflict: "id", ignoreDuplicates: true }
   );

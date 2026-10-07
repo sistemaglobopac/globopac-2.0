@@ -4,6 +4,7 @@ import { CAMPOS_AUTOCORRECAO, type AutocorrecaoImediata } from "@/modules/autoco
 import { supabase } from "@/lib/supabase";
 import type { CampoTemplate } from "@/shared/schema-campos";
 import { PRAZO_ONLINE_MS, enfileirarFicha, estaOffline } from "@/lib/offlineQueue";
+import { montarConfirmacaoOffline, type ConfirmacaoOffline } from "@/lib/confirmacaoOffline";
 import { inicioDoDiaManaus } from "@/modules/bordo/api";
 import type { Rnc, StatusRnc } from "@/modules/rnc/api";
 import type { MonitoramentoVerificacao } from "./utils/recordGrouping";
@@ -419,6 +420,8 @@ interface CriarMonitoramentoInput {
   dadosDinamicos: Record<string, unknown>;
   /** Pesagem inicial da absorção (2 fases): grava EM_ANDAMENTO e assina só como INSPETOR_PARCIAL. */
   statusFicha?: "EM_ANDAMENTO";
+  /** Onde a senha foi conferida ao confirmar (ADR 0016): vai como evidência junto da ficha, se ela cair na fila offline. */
+  confirmacaoSenha?: { modo: "servidor" | "aparelho"; matricula?: string };
 }
 
 export type ResultadoCriarMonitoramento = { id: string; modo: "online" | "offline" };
@@ -434,6 +437,14 @@ export function useCriarMonitoramento() {
       const id = crypto.randomUUID();
       const capturadoEm = new Date().toISOString();
 
+      // Evidência da confirmação feita no aparelho: só montada se a ficha for mesmo para a fila.
+      const evidencia = (): Promise<ConfirmacaoOffline> =>
+        montarConfirmacaoOffline({
+          dados: { id, fichaTemplateId: input.fichaTemplateId, versaoTemplate: input.versaoTemplate, userId: input.userId, setor: input.setor, dadosDinamicos: input.dadosDinamicos, capturadoEm },
+          senhaConferidaEm: input.confirmacaoSenha?.modo ?? null,
+          matricula: input.confirmacaoSenha?.matricula ?? null,
+        });
+
       if (!navigator.onLine) {
         await enfileirarFicha({
           id,
@@ -444,6 +455,7 @@ export function useCriarMonitoramento() {
           dadosDinamicos: input.dadosDinamicos,
           statusFicha: input.statusFicha,
           capturadoEm,
+          confirmacaoOffline: await evidencia(),
         });
         return { id, modo: "offline" };
       }
@@ -493,6 +505,7 @@ export function useCriarMonitoramento() {
           dadosDinamicos: input.dadosDinamicos,
           statusFicha: input.statusFicha,
           capturadoEm,
+          confirmacaoOffline: await evidencia(),
         });
         return { id, modo: "offline" };
       }
@@ -624,7 +637,7 @@ export interface FiltrosVerificacao {
 }
 
 const CAMPOS_MONITORAMENTO_VERIFICACAO =
-  "id, ficha_template_id, user_id, setor, dados_dinamicos, conformidade, verificado_por, verificado_em, criado_em, hora_monitoramento, capturado_em, aditivo_de";
+  "id, ficha_template_id, user_id, setor, dados_dinamicos, conformidade, verificado_por, verificado_em, criado_em, hora_monitoramento, capturado_em, confirmacao_offline, fora_do_prazo_offline, aditivo_de";
 
 /** Fila de verificação: pendências (verificado_por IS NULL — fila crônica, qualquer dia) +
  * verificados recentes (últimos 500, qualquer dia — a filtragem por dia local/intervalo

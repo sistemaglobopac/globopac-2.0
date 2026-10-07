@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { QueryClient } from "@tanstack/react-query";
-import { garantirCacheDoUsuario, gravarConsulta, hidratarConsultas, instalarPersistenciaOffline, lerConsultas, limparConsultas } from "@/lib/offlineCache";
+import { garantirCacheDoUsuario, gravarConsulta, hidratarConsultas, instalarPersistenciaOffline, lerConsultas, limparConsultas, limparConsultasDoUsuario } from "@/lib/offlineCache";
 import { ehFalhaDeRede } from "@/modules/auth/useAuthListener";
 
 describe("cache local das consultas de preenchimento (offline)", () => {
@@ -35,15 +35,33 @@ describe("cache local das consultas de preenchimento (offline)", () => {
     expect(chaves).toEqual([JSON.stringify(["marcada"])]);
   });
 
-  it("outro usuário no mesmo aparelho começa com o cache limpo", async () => {
+  it("cada usuário tem o próprio cache: o outro nunca vê os dados dele, e o dele volta ao reentrar", async () => {
     const qc = new QueryClient();
-    await garantirCacheDoUsuario("usuario-1", qc);
+    expect(await garantirCacheDoUsuario("usuario-1", qc)).toBe(false);
     await gravarConsulta(["dados", "usuario-1"], { x: 1 });
     expect(await garantirCacheDoUsuario("usuario-1", qc)).toBe(false);
     expect((await lerConsultas()).length).toBe(1);
 
+    qc.setQueryData(["dados", "usuario-1"], { x: 1 });
     expect(await garantirCacheDoUsuario("usuario-2", qc)).toBe(true);
     expect(await lerConsultas()).toHaveLength(0);
+    expect(qc.getQueryData(["dados", "usuario-1"])).toBeUndefined();
+
+    // o cache do usuário 1 continua guardado e volta quando ele entra de novo (offline inclusive)
+    expect(await garantirCacheDoUsuario("usuario-1", qc)).toBe(true);
+    expect(qc.getQueryData(["dados", "usuario-1"])).toEqual({ x: 1 });
+  });
+
+  it("apagar o cache de um usuário não mexe no dos outros", async () => {
+    const qc = new QueryClient();
+    await garantirCacheDoUsuario("usuario-1", qc);
+    await gravarConsulta(["a"], 1);
+    await garantirCacheDoUsuario("usuario-2", qc);
+    await gravarConsulta(["b"], 2);
+
+    await limparConsultasDoUsuario("usuario-1");
+    expect(await lerConsultas("usuario-1")).toHaveLength(0);
+    expect(await lerConsultas("usuario-2")).toHaveLength(1);
   });
 });
 

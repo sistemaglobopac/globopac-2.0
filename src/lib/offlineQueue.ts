@@ -4,6 +4,7 @@
 // momento da criação (não no momento da sincronização), para que reenviar o mesmo item nunca
 // duplique (idempotência via upsert com ignoreDuplicates — ver useSincronizacaoOffline.ts).
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
+import type { ConfirmacaoOffline } from "@/lib/confirmacaoOffline";
 
 export type StatusFilaOffline = "pendente" | "sincronizando" | "falhou" | "falha_autenticacao";
 
@@ -17,6 +18,8 @@ export interface FichaEnfileirada {
   /** Pesagem inicial da absorção (2 fases): grava EM_ANDAMENTO e assina como INSPETOR_PARCIAL. */
   statusFicha?: "EM_ANDAMENTO";
   capturadoEm: string;
+  /** Evidência da confirmação com senha feita no aparelho (ADR 0016): acompanha a ficha até o servidor. */
+  confirmacaoOffline?: ConfirmacaoOffline;
   enfileiradoEm: string;
   status: StatusFilaOffline;
   ultimoErro?: string;

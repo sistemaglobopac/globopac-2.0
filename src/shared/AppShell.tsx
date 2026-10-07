@@ -2,7 +2,10 @@ import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { useSincronizarSetores } from "@/modules/auth/useSincronizarSetores";
-import { supabase } from "@/lib/supabase";
+import { sair } from "@/modules/auth/acessoOffline";
+import { ReconectarModal } from "@/modules/auth/ReconectarModal";
+import { useContatoServidor } from "@/modules/auth/useContatoServidor";
+import { useSincronizacaoOffline } from "@/modules/fichas/useSincronizacaoOffline";
 import { useSessionStore, type PerfilSessao } from "@/store/session";
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/lib/utils";
@@ -159,7 +162,7 @@ function CabecalhoGlobal({
           variant="outline"
           size="sm"
           className="border-white/30 bg-white/10 text-ondark hover:bg-white/20"
-          onClick={() => supabase.auth.signOut()}
+          onClick={() => void sair()}
         >
           Sair
         </Button>
@@ -221,6 +224,13 @@ function MenuLateral({ itens, onNavegar }: { itens: ItemMenu[]; onNavegar?: () =
   );
 }
 
+/** Envia a fila offline de qualquer tela (não só a de "Nova ficha"): ao voltar a rede, o que o inspetor confirmou
+ * sem internet precisa chegar ao servidor o quanto antes — antes de o prazo de 72 h correr. */
+function SincronizadorOffline() {
+  useSincronizacaoOffline();
+  return null;
+}
+
 export function AppShell() {
   const perfil = useSessionStore((s) => s.perfil);
   const itens = perfil ? (MENU_POR_PERFIL[perfil.nivelAcesso] ?? []) : [];
@@ -231,6 +241,8 @@ export function AppShell() {
   usePresenceTracking(perfil?.id);
   // Troca/cobertura de setor feita pelo administrador/verificador vale sem o inspetor sair do sistema.
   useSincronizarSetores();
+  // Avisa o servidor que este aparelho está online (base do prazo estendido por queda de rede, ADR 0016).
+  useContatoServidor();
 
   // Fecha o drawer sempre que a rota muda (ex.: navegação por trás, botão voltar do navegador)
   // — sem isso um NavLink clicado que não muda de rota (já está na página) deixaria o menu aberto.
@@ -274,6 +286,8 @@ export function AppShell() {
           <Outlet />
         </main>
       </div>
+      {(perfil?.nivelAcesso === "INSPETOR_QUALIDADE" || perfil?.nivelAcesso === "ADMIN_MASTER") && <SincronizadorOffline />}
+      <ReconectarModal />
       <GlobalInspectorAlerts />
       <AlertaComunicado />
       <AlertaRncGestor />
