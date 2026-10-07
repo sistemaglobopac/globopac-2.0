@@ -36,3 +36,25 @@ describe("relatório da vazão: peso médio da carcaça deixa claro a que se ref
     expect(screen.getByTestId("relatorio-peso-carcaca-base")).toHaveTextContent("84% do peso vivo médio (aguardando o peso das cargas)");
   });
 });
+
+describe("relatório da vazão: GTAs das cargas usadas", () => {
+  it("mostra o número da GTA de cada lote, marcando a carga parcial", () => {
+    render(
+      <ChillerCarcacasRelatorio
+        valor={valor({
+          cargas: [
+            { id: "1", quantity: "3591", avgLiveWeight: "2.900", cargaId: "c1", gta: "052610" },
+            { id: "2", quantity: "996", avgLiveWeight: "2.900", cargaId: "c2", gta: "052614", parcial: true },
+          ],
+        })}
+      />
+    );
+    expect(screen.getByTestId("relatorio-lote-1")).toHaveTextContent("GTA 052610");
+    expect(screen.getByTestId("relatorio-lote-2")).toHaveTextContent("GTA 052614 (parcial)");
+  });
+
+  it("lote digitado à mão não tem GTA: avisa em vez de inventar", () => {
+    render(<ChillerCarcacasRelatorio valor={valor()} />);
+    expect(screen.getByTestId("relatorio-lote-1")).toHaveTextContent("Lote 1 (lançado manualmente, sem GTA)");
+  });
+});

@@ -238,7 +238,7 @@ export function ChillerCarcacasRelatorio({ valor, titulo = "Renovação da Água
         <table className="max-sm:block max-sm:overflow-x-auto w-full border-collapse text-[10px] print:text-[8px]">
           <thead>
             <tr className="bg-primary/5 text-left uppercase text-muted-foreground">
-              <th className="border border-hairline p-1.5 print:p-1">Lote</th>
+              <th className="border border-hairline p-1.5 print:p-1">Lote / GTA</th>
               <th className="border border-hairline p-1.5 print:p-1">Aves</th>
               <th className="border border-hairline p-1.5 print:p-1">Peso vivo médio (kg)</th>
             </tr>
@@ -246,7 +246,18 @@ export function ChillerCarcacasRelatorio({ valor, titulo = "Renovação da Água
           <tbody>
             {valor.cargas.map((c, i) => (
               <tr key={c.id}>
-                <td className="border border-hairline p-1.5 print:p-1">Lote {i + 1}</td>
+                <td className="border border-hairline p-1.5 print:p-1" data-testid={`relatorio-lote-${i + 1}`}>
+                  {c.gta ? (
+                    <>
+                      GTA <strong className="font-mono">{c.gta}</strong>
+                      {c.parcial && <span className="text-muted-foreground"> (parcial)</span>}
+                    </>
+                  ) : (
+                    <>
+                      Lote {i + 1} <span className="text-muted-foreground">(lançado manualmente, sem GTA)</span>
+                    </>
+                  )}
+                </td>
                 <td className="border border-hairline p-1.5 font-mono print:p-1">{c.quantity || "—"}</td>
                 <td className="border border-hairline p-1.5 font-mono print:p-1">{c.avgLiveWeight || "—"}</td>
               </tr>
