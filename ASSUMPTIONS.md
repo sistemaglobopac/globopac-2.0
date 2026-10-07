@@ -710,3 +710,20 @@ contam nas aves do período, e o registro fecha e decide a conformidade pela met
 O registro leva `pesoParcial` (aves com peso, aves sem peso, lotes sem peso) dentro do dado assinado, o detalhe da RNC cita "peso médio parcial" e o
 relatório destaca o cálculo parcial. Risco aceito: a faixa de meta (≤ 2,5 kg de carcaça) pode mudar quando as demais cargas tiverem peso; com peso
 vivo de 2,6 a 2,95 kg a carcaça fica entre 2,18 e 2,48 kg, perto do limite de 2,5.
+
+### 72. Painel de BI: aba "Consumo de água" — como o consumo por chiller e por hora é calculado
+🟡 **Assumida em 2026-10-07 (pedido do responsável do projeto), aguardando confirmação com Qualidade/Produção** — o antigo "Painel gerencial" virou
+**Painel de BI**, com uma aba por métrica (`src/modules/bi/DashboardPage.tsx`); a 1ª nova é o consumo de água do pré-resfriamento
+(`src/modules/bi/consumoAgua/`). Regras, todas em funções puras testadas (`tests/unit/consumoAgua.test.ts`):
+- **Só água.** Consumo de um ponto = leitura atual − leitura anterior do hidrômetro (m³) gravada nos 4 monitoramentos de água. O **gelo não entra**
+  (o litro apurado do SPR soma o gelo; aqui não). Pontos: pré-chiller e chillers 01/02 de Carcaças, chillers 01/02 de Partes, 5 mini-chillers de Miúdos
+  (= "total dos chillers somados") e o Chuveiro Final (à parte; entra no total geral). O Pré-chiller foi tratado como chiller.
+- **Mesma regra do SPR:** sem leitura atual ou sem leitura anterior (1º monitoramento do dia) não há consumo; leitura atual menor que a anterior é
+  desconsiderada e avisada na tela (provável erro de digitação).
+- **Por hora é uma estimativa.** O hidrômetro é lido a cada monitoramento, não de hora em hora: o volume entre duas leituras é distribuído
+  **proporcionalmente** nas horas do intervalo (horário de Manaus). Se a leitura anterior foi há mais de 6 h (`INTERVALO_MAXIMO_HORAS`, ex.: continuação
+  do dia anterior), o volume vai inteiro para a hora da leitura. Dia/semana (segunda a domingo)/mês somam essas horas.
+- **Aditivos:** o aditivo é cópia corrigida do original; vale só o aditivo mais recente, para o consumo não contar duas vezes. Registros em andamento
+  (aguardando peso) entram — as leituras já estão assinadas.
+- **Quem vê:** ADMIN_MASTER e GESTOR_SETOR (o que a RLS de `monitoramentos` permite a cada um); Inspetor PCM não vê a aba. Agregação no navegador
+  (mesma ressalva do item 33; a busca é paginada de 1.000 em 1.000). Hora a hora limitada a períodos de até 31 dias.

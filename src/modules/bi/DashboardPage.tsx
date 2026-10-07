@@ -1,17 +1,15 @@
+import { useState } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useMonitoramentosResumo, useOsResumo, useRncResumo, type MonitoramentoResumo, type OsResumo, type RncResumo } from "./api";
 import { baixarCsv, linhasParaCsv } from "@/lib/csv";
 import { Button } from "@/shared/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Card, CardContent } from "@/shared/ui/card";
 import { rotuloSituacao, situacaoDe } from "@/shared/situacaoConformidade";
-
-// Cores literais do design system GloboPac v1.0 (mesmos valores de tailwind.config.ts) —
-// recharts não consome classes Tailwind, só valores de cor diretos.
-const COR_NAVY = "#002060";
-const COR_LIMA = "#8fb524"; // lima escurecido p/ contraste em texto/gráfico sobre fundo claro
-const COR_DOWN = "#cf202f";
-const COR_WARNING = "hsl(38, 92%, 45%)";
-const COR_NEUTRO = "#a4a9b2";
+import { useSessionStore } from "@/store/session";
+import { cn } from "@/lib/utils";
+import { CartaoKpi } from "./CartaoKpi";
+import { ConsumoAguaTab } from "./consumoAgua/ConsumoAguaTab";
+import { COR_DOWN, COR_LIMA, COR_NAVY, COR_NEUTRO, COR_WARNING } from "./cores";
 
 function contarPorChave<T>(linhas: T[], chave: (item: T) => string): { rotulo: string; valor: number }[] {
   const contagem = new Map<string, number>();
@@ -20,17 +18,6 @@ function contarPorChave<T>(linhas: T[], chave: (item: T) => string): { rotulo: s
     contagem.set(k, (contagem.get(k) ?? 0) + 1);
   }
   return Array.from(contagem.entries()).map(([rotulo, valor]) => ({ rotulo, valor }));
-}
-
-function CartaoKpi({ titulo, valor }: { titulo: string; valor: number | string }) {
-  return (
-    <Card className="glass-kpi rounded-xl border-white/65 shadow-md">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-[13px] font-normal text-muted-foreground">{titulo}</CardTitle>
-      </CardHeader>
-      <CardContent className="font-mono text-[26px] font-medium leading-tight text-ink">{valor}</CardContent>
-    </Card>
-  );
 }
 
 function GraficoBarras({ dados, cores }: { dados: { rotulo: string; valor: number }[]; cores: string[] }) {
@@ -54,11 +41,11 @@ function GraficoBarras({ dados, cores }: { dados: { rotulo: string; valor: numbe
   );
 }
 
-/** Painel de BI (seção 7.7) — KPIs e gráficos agregados sobre os mesmos dados que RLS já
- * permite ao usuário ver em outras telas (monitoramentos, RNC, OS): ADMIN_MASTER vê tudo,
- * GESTOR_SETOR só o próprio setor, INSPETOR_PCM só OS. Nenhuma permissão nova — agregação é
- * só uma projeção do que a tela já mostraria em detalhe. */
-export function DashboardPage() {
+/** Aba "Visão geral" — KPIs e gráficos agregados sobre os mesmos dados que RLS já permite ao
+ * usuário ver em outras telas (monitoramentos, RNC, OS): ADMIN_MASTER vê tudo, GESTOR_SETOR só o
+ * próprio setor, INSPETOR_PCM só OS. Nenhuma permissão nova — agregação é só uma projeção do que a
+ * tela já mostraria em detalhe. */
+function VisaoGeralTab() {
   const { data: monitoramentos, isLoading: carregandoMonitoramentos } = useMonitoramentosResumo();
   const { data: rncs, isLoading: carregandoRnc } = useRncResumo();
   const { data: osList, isLoading: carregandoOs } = useOsResumo();
@@ -130,14 +117,11 @@ export function DashboardPage() {
   const carregando = carregandoMonitoramentos || carregandoRnc || carregandoOs;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Painel gerencial</h1>
-        <p className="text-sm text-muted-foreground">
-          Monitoramentos dos últimos 30 dias; RNC e Ordens de Serviço sem corte de data. Cada
-          seção mostra só o que seu perfil já pode ver nas telas correspondentes.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <p className="text-sm text-muted-foreground">
+        Monitoramentos dos últimos 30 dias; RNC e Ordens de Serviço sem corte de data. Cada
+        seção mostra só o que seu perfil já pode ver nas telas correspondentes.
+      </p>
 
       {carregando && <p className="text-muted-foreground">Carregando…</p>}
 
@@ -195,6 +179,66 @@ export function DashboardPage() {
             <GraficoBarras dados={osPorStatus} cores={[COR_NAVY, COR_LIMA, COR_WARNING, COR_DOWN, COR_NEUTRO]} />
           </CardContent>
         </Card>
+      </div>
+    </div>
+  );
+}
+
+type AbaBi = "visao-geral" | "consumo-agua";
+
+interface DefinicaoAba {
+  id: AbaBi;
+  rotulo: string;
+  /** Perfis que veem a aba; ausente = todos os que chegam ao painel. */
+  perfis?: string[];
+}
+
+// Novas métricas do BI entram aqui como novas abas (uma por assunto).
+const ABAS: DefinicaoAba[] = [
+  { id: "visao-geral", rotulo: "Visão geral" },
+  // Os monitoramentos de água são das fichas do pré-resfriamento — não fazem parte do que o Inspetor PCM enxerga.
+  { id: "consumo-agua", rotulo: "Consumo de água", perfis: ["ADMIN_MASTER", "GESTOR_SETOR"] },
+];
+
+/** Painel de BI (seção 7.7) — uma aba por assunto/métrica. Todas leem só o que a RLS já permite ao usuário ver
+ * nas telas correspondentes; nenhuma permissão nova. */
+export function DashboardPage() {
+  const nivel = useSessionStore((s) => s.perfil?.nivelAcesso);
+  const abas = ABAS.filter((a) => !a.perfis || (nivel !== undefined && a.perfis.includes(nivel)));
+  const [abaEscolhida, setAbaEscolhida] = useState<AbaBi>("visao-geral");
+  const aba = abas.find((a) => a.id === abaEscolhida)?.id ?? "visao-geral";
+
+  return (
+    <div className="mx-auto max-w-6xl space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold">Painel de BI</h1>
+        <p className="text-sm text-muted-foreground">Indicadores gerenciais do GloboPac, uma aba por assunto.</p>
+      </div>
+
+      {abas.length > 1 && (
+        <div role="tablist" aria-label="Métricas do Painel de BI" className="flex flex-wrap gap-1 border-b">
+          {abas.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              role="tab"
+              id={`aba-bi-${a.id}`}
+              aria-selected={a.id === aba}
+              aria-controls={`painel-bi-${a.id}`}
+              onClick={() => setAbaEscolhida(a.id)}
+              className={cn(
+                "-mb-px rounded-t-md border-b-2 px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                a.id === aba ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {a.rotulo}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div role="tabpanel" id={`painel-bi-${aba}`} aria-labelledby={`aba-bi-${aba}`}>
+        {aba === "consumo-agua" ? <ConsumoAguaTab /> : <VisaoGeralTab />}
       </div>
     </div>
   );

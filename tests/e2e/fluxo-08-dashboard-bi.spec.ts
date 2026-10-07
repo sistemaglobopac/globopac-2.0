@@ -1,12 +1,12 @@
 import { test, expect } from "@playwright/test";
 import { login, logout, clienteAdminDeTeste, selecionarTemplate, assinarComSenha } from "./helpers";
 
-// Fase 7 (BI/dashboards/exportação de relatórios, seção 7.7) — painel gerencial com KPIs,
+// Fase 7 (BI/dashboards/exportação de relatórios, seção 7.7) — Painel de BI com KPIs,
 // gráficos agregados e exportação CSV, sobre os mesmos dados que RLS já permite ao usuário ver
 // em outras telas. Sem número de fluxo na seção 10 (feature adicionada além do roteiro
 // original) — ver ASSUMPTIONS.md.
 
-test("painel gerencial mostra KPIs e permite exportar CSV de monitoramentos (Fase 7)", async ({ page }) => {
+test("painel de BI mostra KPIs e permite exportar CSV de monitoramentos (Fase 7)", async ({ page }) => {
   const marcador = `E2E-fluxo8-${Date.now()}`;
   const admin = await clienteAdminDeTeste();
 
@@ -32,7 +32,7 @@ test("painel gerencial mostra KPIs e permite exportar CSV de monitoramentos (Fas
   await login(page, "1004", "121072");
   await page.goto("/dashboard");
 
-  await expect(page.getByRole("heading", { name: "Painel gerencial" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Painel de BI" })).toBeVisible();
   // Espera os KPIs carregarem de verdade (não um snapshot prematuro) antes de qualquer asserção.
   await expect(page.getByText("Carregando…")).not.toBeVisible({ timeout: 15_000 });
   await expect(page.getByText("Monitoramentos (30 dias)")).toBeVisible();

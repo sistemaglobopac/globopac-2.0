@@ -241,7 +241,7 @@ o worker do cron e a asserção do teste), resolvido pelo retry automático do P
 legados.
 
 ### Fase 7 (concluída e validada em CI)
-- **Painel gerencial** (`/dashboard`, ADMIN_MASTER/GESTOR_SETOR/INSPETOR_PCM): KPIs e
+- **Painel de BI** (antigo "Painel gerencial"; `/dashboard`, ADMIN_MASTER/GESTOR_SETOR/INSPETOR_PCM; abas por métrica — "Consumo de água": ASSUMPTIONS.md #72): KPIs e
   gráficos (recharts) agregados sobre `monitoramentos` (últimos 30 dias), `rnc` e
   `manutencao_os` — cada perfil só vê o que a RLS de cada tabela já permitiria em qualquer
   outra tela (GESTOR_SETOR só o próprio setor, INSPETOR_PCM só OS, ADMIN_MASTER tudo).
