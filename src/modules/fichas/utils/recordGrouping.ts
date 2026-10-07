@@ -135,12 +135,15 @@ export function groupFichaCards(
   usersMap: Map<string, string>,
   pacPorTemplateId: Map<string, string>,
   codigoPorTemplateId: Map<string, string>,
-  turnoDe: (m: MonitoramentoVerificacao) => string = (m) => turnoDoDia(new Date(instanteDoRegistro(m)))
+  turnoDe: (m: MonitoramentoVerificacao) => string = (m) => turnoDoDia(new Date(instanteDoRegistro(m))),
+  /** `porSetor`: setores diferentes NUNCA entram no mesmo dossiê (painel de verificação). Sem isso, a mesma ficha de setores
+   * diferentes se junta num único card ("A / B"), como nas telas de arquivo e auditoria. */
+  opcoes: { porSetor?: boolean } = {}
 ): { dossies: DossieVerificacao[]; avulsos: AppointmentDisplay[] } {
   const grupos = new Map<string, DossieVerificacao>();
   for (const item of items) {
     const { appt } = item;
-    const chave = chaveDossie(appt, tipoPorTemplate(codigoPorTemplateId), turnoDe);
+    const chave = chaveDossie(appt, tipoPorTemplate(codigoPorTemplateId), turnoDe) + (opcoes.porSetor ? `|${appt.setor}` : "");
 
     let grupo = grupos.get(chave);
     if (!grupo) {
@@ -188,4 +191,27 @@ export function groupFichaCards(
 
   avulsos.sort((a, b) => new Date(instanteDoRegistro(b.appt)).getTime() - new Date(instanteDoRegistro(a.appt)).getTime());
   return { dossies, avulsos };
+}
+
+export interface SecaoDeSetor<D extends { setor: string }, A extends { appt: { setor: string } }> {
+  setor: string;
+  dossies: D[];
+  avulsos: A[];
+}
+
+/** Separa os cards por setor (uma seção por setor, em ordem alfabética), mantendo dentro de cada seção a ordem recebida:
+ * primeiro os dossiês, depois os avulsos. Pressupõe dossiês de um único setor (`groupFichaCards` com `porSetor`). */
+export function agruparPorSetor<D extends { setor: string }, A extends { appt: { setor: string } }>(dossies: D[], avulsos: A[]): SecaoDeSetor<D, A>[] {
+  const secoes = new Map<string, SecaoDeSetor<D, A>>();
+  const secao = (setor: string) => {
+    let s = secoes.get(setor);
+    if (!s) {
+      s = { setor, dossies: [], avulsos: [] };
+      secoes.set(setor, s);
+    }
+    return s;
+  };
+  for (const d of dossies) secao(d.setor).dossies.push(d);
+  for (const a of avulsos) secao(a.appt.setor).avulsos.push(a);
+  return [...secoes.values()].sort((a, b) => a.setor.localeCompare(b.setor, "pt-BR"));
 }

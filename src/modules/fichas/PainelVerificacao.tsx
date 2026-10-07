@@ -12,7 +12,7 @@ import { pacsDoTemplate, useFichasTemplatesTodas, useFilaVerificacao, useUsuario
 import { useTurnoDoRegistro } from "./useTurnoDoRegistro";
 import { diaTurno,turnosBloqueadosMap, turnosPendentes, encerrarTurnoAdmin } from "./utils/turnoUtils";
 import { instanteDoRegistro } from "./utils/horaMonitoramento";
-import { groupFichaCards, calcularOrdemDia, type AppointmentDisplay, type MonitoramentoVerificacao, type StatusVerificacao } from "./utils/recordGrouping";
+import { agruparPorSetor, groupFichaCards, calcularOrdemDia, type AppointmentDisplay, type MonitoramentoVerificacao, type StatusVerificacao } from "./utils/recordGrouping";
 import { ensureLocalTime } from "./utils/tempo";
 import { KpiCard } from "./components/KpiCard";
 import { AuditRecordCard } from "./components/AuditRecordCard";
@@ -162,14 +162,18 @@ export function PainelVerificacao() {
   }, [pendingKey, turnosVersao]);
 
   const { dossies, avulsos } = useMemo(
-    () => groupFichaCards(pendingAppointments, blockedIds, usuarios, pacPorTemplateId, codigoPorTemplateId, turnoDe),
+    () => groupFichaCards(pendingAppointments, blockedIds, usuarios, pacPorTemplateId, codigoPorTemplateId, turnoDe, { porSetor: true }),
     [pendingAppointments, blockedIds, usuarios, pacPorTemplateId, codigoPorTemplateId, turnoDe]
   );
   // Verificados também consolidam: um card VERIFICADO por dossiê (tipo de ficha + turno).
   const { dossies: dossiesVerificados, avulsos: avulsosVerificados } = useMemo(
-    () => groupFichaCards(verifiedToday, new Set(), usuarios, pacPorTemplateId, codigoPorTemplateId, turnoDe),
+    () => groupFichaCards(verifiedToday, new Set(), usuarios, pacPorTemplateId, codigoPorTemplateId, turnoDe, { porSetor: true }),
     [verifiedToday, usuarios, pacPorTemplateId, codigoPorTemplateId, turnoDe]
   );
+
+  // Os cards ficam separados por setor: uma seção por setor, com os dossiês e depois os avulsos daquele setor.
+  const secoesPendentes = useMemo(() => agruparPorSetor(dossies, avulsos), [dossies, avulsos]);
+  const secoesVerificadas = useMemo(() => agruparPorSetor(dossiesVerificados, avulsosVerificados), [dossiesVerificados, avulsosVerificados]);
 
   const kpiAguardando = displayItems.filter((i) => i.status === "aguardando").length;
   const kpiVerificadas = displayItems.filter(
@@ -308,6 +312,62 @@ export function PainelVerificacao() {
 
   if (!perfil) return null;
 
+  // Cards da fila e dos verificados. Nos verificados (somenteLeitura) não há encerramento de turno.
+  const cartaoDossie = (dossie: DossieVerificacao, somenteLeitura: boolean) => (
+    <DossieVerificacaoCard
+      key={dossie.chave}
+      dossie={dossie}
+      selectedIds={selectedIds}
+      toggleSelection={toggleSelection}
+      toggleGroupSelection={toggleGroupSelection}
+      onPreview={(item) => abrirVerificacao([item.id])}
+      onImprimir={(item) => setRelatorioIds([item.id])}
+      onImprimirDossie={(d) => setRelatorioIds(d.ids)}
+      onVerDossie={(d: DossieVerificacao) => abrirVerificacao(d.ids)}
+      pacPorTemplateId={pacPorTemplateId}
+      nomePorTemplateId={nomePorTemplateId}
+      codigoPorTemplateId={codigoPorTemplateId}
+      usersMap={usuarios}
+      isAdmin={Boolean(isAdmin)}
+      rncPorMonitoramento={rncPorMonitoramento}
+      autocorrigidoIds={autocorrigidoIds}
+      onEncerrarTurno={
+        somenteLeitura
+          ? () => undefined
+          : (d) => setEncerrarAlvo({ userIds: d.userIds, dia: diaTurno(instanteDoRegistro(d.items[0]!.appt)), nome: d.inspetorNome })
+      }
+      onEncerrarTurnoItem={
+        somenteLeitura
+          ? () => undefined
+          : (i) => setEncerrarAlvo({ userIds: [i.appt.user_id], dia: diaTurno(instanteDoRegistro(i.appt)), nome: usuarios.get(i.appt.user_id) ?? "inspetor" })
+      }
+    />
+  );
+  const cartaoAvulso = (item: AppointmentDisplay, somenteLeitura: boolean) => (
+    <AuditRecordCard
+      key={item.id}
+      item={item}
+      mode="verificacao"
+      selectedIds={selectedIds}
+      toggleSelection={toggleSelection}
+      onPreview={(i) => abrirVerificacao([i.id])}
+      onImprimir={(i) => setRelatorioIds([i.id])}
+      pacPorTemplateId={pacPorTemplateId}
+      nomePorTemplateId={nomePorTemplateId}
+      codigoPorTemplateId={codigoPorTemplateId}
+      usersMap={usuarios}
+      blockedIds={blockedIds}
+      isAdmin={Boolean(isAdmin)}
+      rncStatus={rncPorMonitoramento?.get(item.id)}
+      autocorrigido={autocorrigidoIds?.has(item.id)}
+      onEncerrarTurno={
+        somenteLeitura
+          ? () => undefined
+          : (i) => setEncerrarAlvo({ userIds: [i.appt.user_id], dia: diaTurno(instanteDoRegistro(i.appt)), nome: usuarios.get(i.appt.user_id) ?? "inspetor" })
+      }
+    />
+  );
+
   return (
     <div className="space-y-6 pb-10">
       <header className="space-y-4 rounded-xl border bg-card p-5">
@@ -388,51 +448,15 @@ export function PainelVerificacao() {
         {!fila.isLoading && dossies.length === 0 && avulsos.length === 0 && (
           <div className="rounded-lg border bg-muted/40 p-8 text-center text-sm text-muted-foreground">Nenhuma ficha aguardando verificação.</div>
         )}
-        {dossies.map((dossie) => (
-          <DossieVerificacaoCard
-            key={dossie.chave}
-            dossie={dossie}
-            selectedIds={selectedIds}
-            toggleSelection={toggleSelection}
-            toggleGroupSelection={toggleGroupSelection}
-            onPreview={(item) => abrirVerificacao([item.id])}
-            onImprimir={(item) => setRelatorioIds([item.id])}
-            onImprimirDossie={(d) => setRelatorioIds(d.ids)}
-            onVerDossie={(d: DossieVerificacao) => abrirVerificacao(d.ids)}
-            pacPorTemplateId={pacPorTemplateId}
-            nomePorTemplateId={nomePorTemplateId}
-            codigoPorTemplateId={codigoPorTemplateId}
-            usersMap={usuarios}
-            isAdmin={Boolean(isAdmin)}
-            rncPorMonitoramento={rncPorMonitoramento}
-            autocorrigidoIds={autocorrigidoIds}
-            onEncerrarTurno={(d) =>
-              setEncerrarAlvo({ userIds: d.userIds, dia: diaTurno(instanteDoRegistro(d.items[0]!.appt)), nome: d.inspetorNome })
-            }
-            onEncerrarTurnoItem={(i) =>
-              setEncerrarAlvo({ userIds: [i.appt.user_id], dia: diaTurno(instanteDoRegistro(i.appt)), nome: usuarios.get(i.appt.user_id) ?? "inspetor" })
-            }
-          />
-        ))}
-        {avulsos.map((item) => (
-          <AuditRecordCard
-            key={item.id}
-            item={item}
-            mode="verificacao"
-            selectedIds={selectedIds}
-            toggleSelection={toggleSelection}
-            onPreview={(item) => abrirVerificacao([item.id])}
-            onImprimir={(i) => setRelatorioIds([i.id])}
-            pacPorTemplateId={pacPorTemplateId}
-            nomePorTemplateId={nomePorTemplateId}
-            codigoPorTemplateId={codigoPorTemplateId}
-            usersMap={usuarios}
-            blockedIds={blockedIds}
-            isAdmin={Boolean(isAdmin)}
-            rncStatus={rncPorMonitoramento?.get(item.id)}
-            autocorrigido={autocorrigidoIds?.has(item.id)}
-            onEncerrarTurno={(i) => setEncerrarAlvo({ userIds: [i.appt.user_id], dia: diaTurno(instanteDoRegistro(i.appt)), nome: usuarios.get(i.appt.user_id) ?? "inspetor" })}
-          />
+        {secoesPendentes.map((secao) => (
+          <section key={secao.setor} className="space-y-3" data-testid={`setor-pendente-${secao.setor}`} aria-label={`Setor ${secao.setor}`}>
+            <h3 className="flex items-center justify-between border-b pb-1 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              <span>{secao.setor}</span>
+              <span className="text-xs font-normal normal-case">{secao.dossies.length + secao.avulsos.length} card(s)</span>
+            </h3>
+            {secao.dossies.map((dossie) => cartaoDossie(dossie, false))}
+            {secao.avulsos.map((item) => cartaoAvulso(item, false))}
+          </section>
         ))}
       </div>
 
@@ -440,47 +464,15 @@ export function PainelVerificacao() {
         <div className="space-y-3">
           <h2 className="text-lg font-medium">Verificadas em {ensureLocalTime(`${dateBase}T12:00:00`).datePt}</h2>
           <div className="space-y-3">
-            {dossiesVerificados.map((dossie) => (
-              <DossieVerificacaoCard
-                key={dossie.chave}
-                dossie={dossie}
-                selectedIds={selectedIds}
-                toggleSelection={toggleSelection}
-                toggleGroupSelection={toggleGroupSelection}
-                onPreview={(item) => abrirVerificacao([item.id])}
-                onImprimir={(item) => setRelatorioIds([item.id])}
-                onImprimirDossie={(d) => setRelatorioIds(d.ids)}
-                onVerDossie={(d: DossieVerificacao) => abrirVerificacao(d.ids)}
-                pacPorTemplateId={pacPorTemplateId}
-                nomePorTemplateId={nomePorTemplateId}
-                codigoPorTemplateId={codigoPorTemplateId}
-                usersMap={usuarios}
-                isAdmin={Boolean(isAdmin)}
-                rncPorMonitoramento={rncPorMonitoramento}
-            autocorrigidoIds={autocorrigidoIds}
-                onEncerrarTurno={() => undefined}
-                onEncerrarTurnoItem={() => undefined}
-              />
-            ))}
-            {avulsosVerificados.map((item) => (
-              <AuditRecordCard
-                key={item.id}
-                item={item}
-                mode="verificacao"
-                selectedIds={selectedIds}
-                toggleSelection={toggleSelection}
-                onPreview={(item) => abrirVerificacao([item.id])}
-                onImprimir={(i) => setRelatorioIds([i.id])}
-                pacPorTemplateId={pacPorTemplateId}
-                nomePorTemplateId={nomePorTemplateId}
-                codigoPorTemplateId={codigoPorTemplateId}
-                usersMap={usuarios}
-                blockedIds={blockedIds}
-                isAdmin={Boolean(isAdmin)}
-                rncStatus={rncPorMonitoramento?.get(item.id)}
-            autocorrigido={autocorrigidoIds?.has(item.id)}
-                onEncerrarTurno={() => undefined}
-              />
+            {secoesVerificadas.map((secao) => (
+              <section key={secao.setor} className="space-y-3" data-testid={`setor-verificado-${secao.setor}`} aria-label={`Setor ${secao.setor}`}>
+                <h3 className="flex items-center justify-between border-b pb-1 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                  <span>{secao.setor}</span>
+                  <span className="text-xs font-normal normal-case">{secao.dossies.length + secao.avulsos.length} card(s)</span>
+                </h3>
+                {secao.dossies.map((dossie) => cartaoDossie(dossie, true))}
+                {secao.avulsos.map((item) => cartaoAvulso(item, true))}
+              </section>
             ))}
           </div>
         </div>
