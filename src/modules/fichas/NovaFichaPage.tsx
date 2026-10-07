@@ -17,7 +17,7 @@ import { cargasEmRascunhoPorTipo, cargasEmRascunhos, combinarAnterior } from "./
 import { CHAVE_HORA_MONITORAMENTO, dataManaus, horaManaus, isoDeManaus, validarHoraMonitoramento } from "./utils/horaMonitoramento";
 import { salvarRascunho } from "@/lib/rascunhos";
 import { listarFichasEnfileiradas } from "@/lib/offlineQueue";
-import { dadosJaRegistrados, chavesDeConfirmacao } from "./utils/dadosDuplicados";
+import { chavesDeConfirmacao, repeteOAnterior, type RegistroComHora } from "./utils/dadosDuplicados";
 import { CHAVE_AGUARDANDO_PESO, cargasSemPeso } from "./fields/pesoCaixa";
 import { lotesSemPeso } from "./fields/preenchimentoSpr";
 import { motivosDeBloqueioSpr } from "./utils/bloqueiosSpr";
@@ -448,19 +448,24 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
     return erro ? null : iso;
   }
 
-  /** Os dados são idênticos aos de um monitoramento já registrado desta ficha+setor (assinado, aguardando sincronização
-   * ou rascunho)? Se sim, abre o aviso e devolve true. Sem rede, vale o último levantamento em cache + a fila + os rascunhos. */
+  /** Os dados são idênticos aos do monitoramento IMEDIATAMENTE ANTERIOR desta ficha+setor (o de hora mais recente entre os
+   * assinados, a fila de sincronização e os rascunhos)? Se sim, abre o aviso e devolve true. Sem rede, vale o último
+   * levantamento em cache + a fila + os rascunhos. */
   async function bloqueadoPorDadosRepetidos(dados: FieldValues): Promise<boolean> {
     const chave = chaveRegistrosRecentes(codigo, setor);
-    let doServidor: Record<string, unknown>[] = [];
+    let doServidor: RegistroComHora[] = [];
     try {
       doServidor = await queryClient.fetchQuery({ queryKey: chave, queryFn: () => buscarRegistrosRecentesFicha(codigo, setor), staleTime: 0, meta: { offline: true } });
     } catch {
-      doServidor = queryClient.getQueryData<Record<string, unknown>[]>(chave) ?? [];
+      doServidor = queryClient.getQueryData<RegistroComHora[]>(chave) ?? [];
     }
-    const daFila = (await listarFichasEnfileiradas().catch(() => [])).filter((f) => f.setor === setor && f.fichaTemplateId === templateId).map((f) => f.dadosDinamicos);
-    const rascunhos = (rascunhosLocais ?? []).filter((r) => r.codigo === codigo && r.setor === setor).map((r) => r.dadosDinamicos);
-    if (!dadosJaRegistrados(dados, [...doServidor, ...daFila, ...rascunhos], chavesDeConfirmacao(campos))) return false;
+    const daFila: RegistroComHora[] = (await listarFichasEnfileiradas().catch(() => []))
+      .filter((f) => f.setor === setor && f.fichaTemplateId === templateId)
+      .map((f) => ({ dados: f.dadosDinamicos, hora: (f.dadosDinamicos[CHAVE_HORA_MONITORAMENTO] as string | undefined) ?? f.capturadoEm }));
+    const rascunhos: RegistroComHora[] = (rascunhosLocais ?? [])
+      .filter((r) => r.codigo === codigo && r.setor === setor)
+      .map((r) => ({ dados: r.dadosDinamicos, hora: r.horaMonitoramento }));
+    if (!repeteOAnterior(dados, [...doServidor, ...daFila, ...rascunhos], chavesDeConfirmacao(campos))) return false;
     setAvisoRepetido(true);
     return true;
   }
@@ -925,9 +930,9 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
             <div role="alert" className="space-y-1 rounded-md border-2 border-destructive bg-destructive/10 p-3 text-sm text-destructive">
               <p className="flex items-center gap-2 font-bold">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
-                Atenção: os dados informados já foram registrados.
+                Atenção: os dados informados são iguais aos do monitoramento anterior.
               </p>
-              <p>Não é possível gravar dois monitoramentos com os mesmos dados. Revise as informações e registre a leitura atual.</p>
+              <p>Não é possível gravar dois monitoramentos seguidos com os mesmos dados. Revise as informações e registre a leitura atual.</p>
             </div>
             <Button type="button" className="w-full" autoFocus onClick={() => setAvisoRepetido(false)}>
               Entendi, voltar e revisar
