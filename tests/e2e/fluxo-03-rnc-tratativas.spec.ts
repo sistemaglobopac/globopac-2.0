@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { login, logout, clienteAdminDeTeste, selecionarTemplate, assinarComSenha, idDoMonitoramentoPorMarcador, localizarCartaoRegistro } from "./helpers";
+import { login, logout, clienteAdminDeTeste, selecionarTemplate, assinarComSenha, encerrarTurnosAbertos, idDoMonitoramentoPorMarcador, localizarCartaoRegistro } from "./helpers";
 
 // Fluxo E2E nº 3 (seção 10 do PROMPT MESTRE), atualizado na Fase 11 (decisão do cliente: o
 // VERIFICADOR atua como revisor de RNC — ver ASSUMPTIONS.md item 22):
@@ -24,6 +24,7 @@ test("verificador reprova, RNC é criada, gestor de setor trata e verificador re
   await assinarComSenha(page, "121072");
   await expect(page.getByText("Ficha criada e assinada com sucesso.")).toBeVisible({ timeout: 15_000 });
   await logout(page);
+  await encerrarTurnosAbertos(admin, "1001");
 
   await login(page, "1002", "121072");
   await page.goto("/verificacao");

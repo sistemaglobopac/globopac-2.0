@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { login, logout, clienteAdminDeTeste, selecionarTemplate, assinarComSenha, idDoMonitoramentoPorMarcador, localizarCartaoRegistro } from "./helpers";
+import { login, logout, clienteAdminDeTeste, selecionarTemplate, assinarComSenha, encerrarTurnosAbertos, idDoMonitoramentoPorMarcador, localizarCartaoRegistro } from "./helpers";
 
 // Fluxos E2E nº 5 e 6 (seção 10 do PROMPT MESTRE):
 // 5) "Acesso ao portal público /verificar com UUID de documento assinado → mostra trilha e
@@ -24,6 +24,7 @@ test("documento liberado aparece com trilha e badge corretos no portal público 
   await assinarComSenha(page, "121072");
   await expect(page.getByText("Ficha criada e assinada com sucesso.")).toBeVisible({ timeout: 15_000 });
   await logout(page);
+  await encerrarTurnosAbertos(admin, "1001");
 
   await login(page, "1002", "121072");
   await page.goto("/verificacao");

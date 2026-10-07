@@ -127,3 +127,13 @@ export async function logout(page: Page) {
   await page.getByRole("button", { name: "Sair" }).click();
   await expect(page).toHaveURL(/\/login$/);
 }
+
+/** O Painel de Bordo abre o turno do inspetor ao entrar, e o painel de verificação só libera o botão "Verificar" depois
+ * que o turno do autor é encerrado (senão mostra só "Prévia"). Os specs de E2E não passam pelo encerramento de turno do
+ * inspetor — fecha pelo service_role os turnos abertos dele antes do verificador entrar. */
+export async function encerrarTurnosAbertos(admin: Awaited<ReturnType<typeof clienteAdminDeTeste>>, matricula: string) {
+  const { data: perfil, error: erroPerfil } = await admin.from("perfis_usuarios").select("id").eq("matricula", matricula).single();
+  if (erroPerfil || !perfil) throw new Error(`perfil da matrícula ${matricula} não encontrado: ${erroPerfil?.message}`);
+  const { error } = await admin.from("turnos_inspetores").update({ fim: new Date().toISOString() }).eq("user_id", perfil.id).is("fim", null);
+  if (error) throw new Error(`falha ao encerrar turnos de ${matricula}: ${error.message}`);
+}

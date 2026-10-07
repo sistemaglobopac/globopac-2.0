@@ -6,6 +6,8 @@ export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
   workers: 1,
+  // Os fluxos encadeiam vários logins + assinaturas (e o de PWA espera a sincronização offline): 30 s (padrão) é curto.
+  timeout: 90_000,
   retries: process.env.CI ? 1 : 0,
   // "github" só anota o run inline; "html" gera o relatório navegável com trace/screenshot
   // que o job de CI publica como artifact em caso de falha — sem ele não há como investigar
