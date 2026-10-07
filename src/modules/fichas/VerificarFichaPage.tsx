@@ -43,6 +43,12 @@ export function VerificarFichaPage() {
   const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
   const [acao, setAcao] = useState<Acao>(null);
   const [mensagemErro, setMensagemErro] = useState<string | null>(null);
+  const [mensagemSucesso, setMensagemSucesso] = useState<string | null>(null);
+
+  // Começar outra ação apaga o aviso da anterior.
+  useEffect(() => {
+    if (acao !== null) setMensagemSucesso(null);
+  }, [acao]);
 
   useEffect(() => {
     if (!dados) return;
@@ -63,6 +69,14 @@ export function VerificarFichaPage() {
 
   function voltarComMensagem(tipo: "success" | "error", texto: string) {
     navigate("/verificacao", { state: { mensagem: { tipo, texto } } });
+  }
+
+  // O adendo NÃO encerra a verificação: o verificador continua na ficha (pode incluir outro adendo, verificar ou rejeitar).
+  // O relatório recarrega sozinho (useAbrirAdendo invalida as consultas) e passa a mostrar o adendo aberto.
+  function adendoEnviado(_tipo: "success" | "error", texto: string) {
+    setMensagemErro(null);
+    setAcao(null);
+    setMensagemSucesso(texto);
   }
 
   if (!perfil) return null;
@@ -89,6 +103,13 @@ export function VerificarFichaPage() {
         <div className="flex items-center gap-2 rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           {mensagemErro}
+        </div>
+      )}
+
+      {mensagemSucesso && (
+        <div role="status" data-testid="adendo-enviado" className="flex items-center gap-2 rounded-md border border-success bg-success/10 p-3 text-sm text-success">
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          {mensagemSucesso}
         </div>
       )}
 
@@ -127,7 +148,7 @@ export function VerificarFichaPage() {
                     dados={dados}
                     verificadorNome={perfil.nomeCompleto}
                     onCancelar={() => setAcao(null)}
-                    onConcluido={voltarComMensagem}
+                    onConcluido={adendoEnviado}
                     onErro={setMensagemErro}
                   />
                 ) : (
@@ -165,7 +186,7 @@ export function VerificarFichaPage() {
                     dados={dados}
                     verificadorNome={perfil.nomeCompleto}
                     onCancelar={() => setAcao(null)}
-                    onConcluido={voltarComMensagem}
+                    onConcluido={adendoEnviado}
                     onErro={setMensagemErro}
                   />
                 )}
@@ -365,7 +386,7 @@ function PainelAdendo({ pendentes, dados, verificadorNome, onCancelar, onConclui
         notes: nota,
         verificadorNome,
       });
-      onConcluido("success", "Adendo aberto — devolvido ao inspetor para assinatura no Painel de Bordo.");
+      onConcluido("success", "Adendo enviado — devolvido ao inspetor para assinatura no Painel de Bordo. Você continua nesta ficha: pode incluir outro adendo, verificar ou rejeitar.");
     } catch (erro) {
       onErro(erro instanceof Error ? erro.message : "Falha ao abrir adendo.");
     }
