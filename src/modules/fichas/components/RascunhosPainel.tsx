@@ -13,7 +13,7 @@ const formatar = (iso: string | Date) =>
   new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Manaus", dateStyle: "short", timeStyle: "short" });
 
 /** Rascunhos de monitoramento deste aparelho: preenchidos no local (com ou sem internet) e ainda NÃO
- * assinados. Assina todos de uma vez, com uma confirmação de senha, em até 24 h da hora do
+ * assinados. Assina todos de uma vez, com uma confirmação de senha, em até 72 h da hora do
  * monitoramento. Um rascunho NÃO é um registro: só vale depois de assinado. */
 export function RascunhosPainel() {
   const perfil = useSessionStore((s) => s.perfil);
@@ -54,7 +54,7 @@ export function RascunhosPainel() {
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         <p className="text-xs text-muted-foreground">
-          Salvos neste aparelho, ainda não são registros. Assine em até 24 h da hora do monitoramento — depois disso o prazo vence e o rascunho não pode mais ser assinado.
+          Salvos neste aparelho, ainda não são registros. Assine em até 72 h da hora do monitoramento — depois disso o prazo vence e o rascunho não pode mais ser assinado.
         </p>
         {rascunhos.map((r) => {
           const expirado = rascunhoExpirado(r, agora);

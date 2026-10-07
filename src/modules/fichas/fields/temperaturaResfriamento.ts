@@ -69,6 +69,16 @@ export function amostrasVazias(): AmostrasProduto {
   return { amostra1: "", amostra2: "" };
 }
 
+/** Marca (ou desmarca) "sem produto no momento": as amostras são descartadas, pois não há o que medir. */
+export function definirSemProduto(a: AmostrasProduto | undefined, semProduto: boolean): AmostrasProduto {
+  return semProduto ? { amostra1: "", amostra2: "", semProduto: true } : { amostra1: a?.amostra1 ?? "", amostra2: a?.amostra2 ?? "" };
+}
+
+/** Todos os produtos marcados como "sem produto no momento". */
+export function todosSemProduto(v: Pick<TemperaturaResfriamentoValor, "produtos">): boolean {
+  return PRODUTOS.every((p) => v.produtos?.[p.chave]?.semProduto === true);
+}
+
 export function temperaturaVazia(): TemperaturaResfriamentoValor {
   return {
     agua: Object.fromEntries(PONTOS_AGUA.map((p) => [p.chave, ""])) as Record<ChaveAguaResfriamento, string>,
@@ -104,7 +114,7 @@ export function avaliarTemperaturas(v: TemperaturaResfriamentoValor): { conformi
   }
   for (const p of PRODUTOS) {
     const limite = LIMITE_PRODUTO_C[p.chave];
-    if (limite === null) continue;
+    if (limite === null || v.produtos[p.chave].semProduto) continue;
     const nome = p.chave === "parte" && v.tipoParte ? `${p.amostra} (${v.tipoParte})` : p.amostra;
     ([["01", v.produtos[p.chave].amostra1], ["02", v.produtos[p.chave].amostra2]] as const).forEach(([n, texto]) => {
       const t = lerTemperatura(texto);
@@ -120,7 +130,8 @@ export function montarValorTemperatura(v: TemperaturaResfriamentoValor): Tempera
   return { ...v, conformidade, detalhesRNC: motivos.length ? `Temperatura acima do limite — ${motivos.join("; ")}` : null };
 }
 
-/** Tudo é obrigatório: 10 temperaturas de água, 2 ambientes, tipo da parte e 2 amostras de cada um dos 7 produtos. */
+/** Tudo é obrigatório: 10 temperaturas de água, 2 ambientes e, para cada um dos 7 produtos, 2 amostras (e o tipo da parte
+ * aferida) — exceto o produto marcado "sem produto no momento", que não tem amostras. */
 export function motivosBloqueioTemperatura(v: TemperaturaResfriamentoValor | undefined | null): string[] {
   const p = "Temperaturas do pré-resfriamento";
   if (!v) return [`${p}: informe as temperaturas da água e dos produtos.`];
@@ -131,9 +142,10 @@ export function motivosBloqueioTemperatura(v: TemperaturaResfriamentoValor | und
   for (const ponto of PONTOS_AMBIENTE) {
     if (lerTemperatura(v.ambiente?.[ponto.chave]) === null) m.push(`${p}: informe a temperatura ambiente da ${ponto.rotulo}.`);
   }
-  if (!v.tipoParte) m.push(`${p}: selecione qual parte foi aferida.`);
+  if (!v.tipoParte && !v.produtos?.parte?.semProduto) m.push(`${p}: selecione qual parte foi aferida.`);
   for (const prod of PRODUTOS) {
     const a = v.produtos?.[prod.chave];
+    if (a?.semProduto) continue;
     (["1", "2"] as const).forEach((n) => {
       if (lerTemperatura(n === "1" ? a?.amostra1 : a?.amostra2) === null) m.push(`${p}: informe a temperatura da amostra ${n} de ${prod.amostra.toLowerCase()}.`);
     });

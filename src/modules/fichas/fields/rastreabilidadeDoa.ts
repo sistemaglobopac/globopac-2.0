@@ -78,7 +78,7 @@ export function calcularCarga<T extends Pick<CargaDoa, "qtdPrevista" | "avesRece
 }
 
 /** Dados herdados de uma carga já gravada em apuração anterior (travada) preferem o que ficou gravado
- * — inclusive correções feitas por adendo (peso médio, placa) —, e só recorrem ao herdado fresco se o
+ * — inclusive correções feitas por adendo (peso médio, placa, início da pendura/hora do abate) —, e só recorrem ao herdado fresco se o
  * gravado estiver vazio. Para a carga ainda editável vale o herdado fresco, com o gravado desta
  * própria ficha como reserva. Assim nenhuma informação já registrada some em apurações seguintes. */
 export function herdarComRegistradas(herdada: CargaHerdadaDoa, anterior?: CargaDoa, propria?: CargaDoa): CargaHerdadaDoa {
@@ -90,6 +90,7 @@ export function herdarComRegistradas(herdada: CargaHerdadaDoa, anterior?: CargaD
     ...herdada,
     placa: escolher(herdada.placa, gravada?.placa, travada),
     pesoMedioKg: escolher(herdada.pesoMedioKg, gravada?.pesoMedioKg, travada),
+    penduraInicioEm: escolher(herdada.penduraInicioEm, gravada?.penduraInicioEm, travada),
   };
 }
 

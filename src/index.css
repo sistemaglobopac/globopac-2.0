@@ -261,6 +261,44 @@ canvas {
     font-size: 16px !important;
   }
 
+  /* Relatório de Rastreabilidade e DOA (uma linha por carga): letras menores para caber em menos folhas.
+     Mesma lista de exceções da escala acima, com .print-compacto para ter mais especificidade. */
+  #relatorio-impressao .print-compacto [class*="text-[7px]"]:not(.cabecalho-relatorio *):not(.rodape-relatorio *):not(.doc-generated-by),
+  #relatorio-impressao .print-compacto [class*="text-[8px]"]:not(.cabecalho-relatorio *):not(.rodape-relatorio *):not(.doc-generated-by),
+  #relatorio-impressao .print-compacto [class*="text-[9px]"]:not(.cabecalho-relatorio *):not(.rodape-relatorio *):not(.doc-generated-by),
+  #relatorio-impressao .print-compacto [class*="text-[10px]"]:not(.cabecalho-relatorio *):not(.rodape-relatorio *):not(.doc-generated-by) {
+    font-size: 9px !important;
+    line-height: 1.25 !important;
+  }
+  #relatorio-impressao .print-compacto [class*="text-[11px]"]:not(.cabecalho-relatorio *):not(.rodape-relatorio *):not(.doc-generated-by),
+  #relatorio-impressao .print-compacto [class*="text-xs"]:not(.cabecalho-relatorio *):not(.rodape-relatorio *):not(.doc-generated-by),
+  #relatorio-impressao .print-compacto [class*="text-sm"]:not(.cabecalho-relatorio *):not(.rodape-relatorio *):not(.doc-generated-by) {
+    font-size: 10px !important;
+    line-height: 1.3 !important;
+  }
+  #relatorio-impressao .print-compacto [class*="text-base"]:not(.cabecalho-relatorio *):not(.rodape-relatorio *):not(.doc-generated-by) {
+    font-size: 11px !important;
+  }
+  #relatorio-impressao .print-compacto .cabecalho-relatorio {
+    zoom: 0.62;
+  }
+  #relatorio-impressao .print-compacto .cabecalho-relatorio [class*="text-[9px]"],
+  #relatorio-impressao .print-compacto .cabecalho-relatorio [class*="text-[10px]"] {
+    font-size: 12px !important;
+  }
+  /* A tabela de cargas pode continuar na folha seguinte (o cabeçalho se repete; as linhas não se partem). */
+  #relatorio-impressao .print-compacto [data-testid="relatorio-rastreabilidade-doa"] {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+  /* Com letras menores cabem as grades de 4 e 5 colunas. */
+  #relatorio-impressao .print-compacto [class*="print:grid-cols-5"] {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  }
+  #relatorio-impressao .print-compacto [class*="print:grid-cols-4"] {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
   /* Com letras maiores, grades de 4 e 5 colunas ficam espremidas na folha A4: usa 3. */
   #relatorio-impressao [class*="print:grid-cols-5"],
   #relatorio-impressao [class*="print:grid-cols-4"] {

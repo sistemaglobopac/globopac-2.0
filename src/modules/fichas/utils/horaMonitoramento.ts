@@ -7,7 +7,7 @@
 /** Chave reservada em dados_dinamicos. */
 export const CHAVE_HORA_MONITORAMENTO = "hora_monitoramento";
 /** Prazo máximo, a partir da hora do monitoramento, para assinar (a internet pode faltar). Espelha o banco. */
-export const PRAZO_ASSINATURA_HORAS = 24;
+export const PRAZO_ASSINATURA_HORAS = 72;
 /** Folga para relógio de aparelho adiantado. Espelha o banco. */
 export const TOLERANCIA_FUTURO_MIN = 5;
 

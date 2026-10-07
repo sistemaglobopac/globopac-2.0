@@ -401,6 +401,9 @@ export type ChaveProdutoResfriamento = "carcaca" | "parte" | "figado" | "moela" 
 export interface AmostrasProduto {
   amostra1: string;
   amostra2: string;
+  /** O monitoramento foi feito, mas não havia este produto saindo do sistema naquele momento (ex.: início do turno):
+   * não há amostras a informar. */
+  semProduto?: boolean;
 }
 
 /** Temperaturas dos Sistemas de Pré-resfriamento (Especial SIF): água de cada tanque e duas

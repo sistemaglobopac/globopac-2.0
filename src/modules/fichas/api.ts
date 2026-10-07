@@ -163,12 +163,40 @@ export function useUltimoRegistroFicha(codigo: string | undefined, setor: string
       if (error) throw error;
       // O "monitoramento anterior" é o mais recente DO MESMO TURNO (ver turnoParaHeranca), pela hora
       // em que foi realizado (criado_em volta já com a hora efetiva).
+      // Empate de hora: o aditivo (correção por adendo) copia a hora do original, mas é gravado depois e traz o dado
+      // corrigido — vale o gravado por último, para o monitoramento seguinte herdar a correção.
       return (data ?? [])
-        .map((m) => ({ id: m.id, dados_dinamicos: m.dados_dinamicos, criado_em: horaEfetiva(m) }))
-        .sort((a, b) => (a.criado_em < b.criado_em ? 1 : -1))
+        .map((m) => ({ id: m.id, dados_dinamicos: m.dados_dinamicos, criado_em: horaEfetiva(m), gravado_em: m.criado_em }))
+        .sort((a, b) => (a.criado_em === b.criado_em ? (a.gravado_em < b.gravado_em ? 1 : -1) : a.criado_em < b.criado_em ? 1 : -1))
+        .map(({ id, dados_dinamicos, criado_em }) => ({ id, dados_dinamicos, criado_em }))
         .find((m) => !turno || turnoParaHeranca(new Date(m.criado_em)) === turno) ?? null;
     },
   });
+}
+
+/** Janela (horas) dos registros comparados pela trava de monitoramento repetido: cobre o prazo de 72 h de assinatura. */
+const JANELA_REPETIDOS_HORAS = 84;
+
+export const chaveRegistrosRecentes = (codigo: string, setor: string) => ["monitoramentos", "registros-recentes", codigo, setor] as const;
+
+/** Dados dos monitoramentos recentes desta ficha+setor (todas as versões da ficha), para a trava de monitoramento
+ * repetido (ver utils/dadosDuplicados.ts). Inclui os aditivos: são dados já registrados também. */
+export async function buscarRegistrosRecentesFicha(codigo: string, setor: string): Promise<Record<string, unknown>[]> {
+  const { data: versoes, error: erroVersoes } = await supabase.rpc("ids_versoes_ficha", { p_codigo: codigo });
+  if (erroVersoes) throw erroVersoes;
+  const ids = (versoes as unknown as string[] | null) ?? [];
+  if (ids.length === 0) return [];
+  const desde = new Date(Date.now() - JANELA_REPETIDOS_HORAS * 3_600_000).toISOString();
+  const { data, error } = await supabase
+    .from("monitoramentos")
+    .select("dados_dinamicos")
+    .in("ficha_template_id", ids)
+    .eq("setor", setor)
+    .or(`hora_monitoramento.gte.${desde},and(hora_monitoramento.is.null,criado_em.gte.${desde})`)
+    .limit(300)
+    .overrideTypes<{ dados_dinamicos: Record<string, unknown> }[], { merge: false }>();
+  if (error) throw error;
+  return (data ?? []).map((m) => m.dados_dinamicos);
 }
 
 /** Janela máxima (horas) para continuar um monitoramento anterior que ficou para trás. */

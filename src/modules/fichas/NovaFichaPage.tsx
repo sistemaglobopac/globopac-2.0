@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useForm, useWatch, type FieldValues } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertTriangle, ArrowLeft, BellRing, CheckCircle2, Clock, Lock, ShieldCheck, X } from "lucide-react";
@@ -7,13 +8,15 @@ import { useSessionStore, type PerfilSessao } from "@/store/session";
 import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/api";
 import { zodFromSchemaCampos, valoresIniciaisDe, type CampoTemplate } from "@/shared/schema-campos";
 import { supabase } from "@/lib/supabase";
-import { CHAVE_CONTINUACAO, useCriarMonitoramento, useRegistroContinuavel, useTemplatesAtivos, useTurnoFixoDoUsuario, useUltimoRegistroFicha, useUltimosApontamentosHoje, type TemplateAtivo } from "./api";
+import { CHAVE_CONTINUACAO, buscarRegistrosRecentesFicha, chaveRegistrosRecentes, useCriarMonitoramento, useRegistroContinuavel, useTemplatesAtivos, useTurnoFixoDoUsuario, useUltimoRegistroFicha, useUltimosApontamentosHoje, type TemplateAtivo } from "./api";
 import { ContinuacaoMonitoramento, MOTIVO_CONTINUACAO_MIN_CARACTERES } from "./components/ContinuacaoMonitoramento";
 import { RascunhosPainel } from "./components/RascunhosPainel";
 import { useAtualizarRascunhos, useRascunhos } from "./useRascunhos";
 import { cargasEmRascunhoPorTipo, cargasEmRascunhos, combinarAnterior } from "./utils/rascunhosAnterior";
 import { CHAVE_HORA_MONITORAMENTO, dataManaus, horaManaus, isoDeManaus, validarHoraMonitoramento } from "./utils/horaMonitoramento";
 import { salvarRascunho } from "@/lib/rascunhos";
+import { listarFichasEnfileiradas } from "@/lib/offlineQueue";
+import { dadosJaRegistrados } from "./utils/dadosDuplicados";
 import { CHAVE_AGUARDANDO_PESO, cargasSemPeso } from "./fields/pesoCaixa";
 import { lotesSemPeso } from "./fields/preenchimentoSpr";
 import { motivosDeBloqueioSpr } from "./utils/bloqueiosSpr";
@@ -305,6 +308,9 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
   // Monitoramento NÃO CONFORME salvo como rascunho: avisa na hora, pois a RNC/ação corretiva imediata só existe depois de assinar.
   const [ncRascunho, setNcRascunho] = useState<{ dados: FieldValues; avisos: string[] } | null>(null);
   const atualizarRascunhos = useAtualizarRascunhos();
+  const queryClient = useQueryClient();
+  // Aviso (modal) de monitoramento com os mesmos dados de outro já registrado (assinado, na fila ou rascunho).
+  const [avisoRepetido, setAvisoRepetido] = useState(false);
   const [dadosPendentes, setDadosPendentes] = useState<FieldValues | null>(null);
   const [senha, setSenha] = useState("");
   const [autenticando, setAutenticando] = useState(false);
@@ -411,10 +417,10 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
    * sem rede, não há como validar a senha contra o servidor, então esse passo é pulado e o
    * registro vai direto para a fila offline (useCriarMonitoramento já assina automaticamente
    * ao sincronizar, seção 7.5/ADR 0002). */
-  /** Valida a hora informada (obrigatória, não futura, dentro de 24 h, posterior à anterior e respeitando o
+  /** Valida a hora informada (obrigatória, não futura, dentro de 72 h, posterior à anterior e respeitando o
    * intervalo mínimo) e a devolve em ISO; null (com a mensagem na tela) se inválida. */
   /** Hora do monitoramento anterior desta ficha+setor: o mais recente entre o anterior herdado e os
-   * rascunhos locais (de qualquer dia, dentro da janela de 24 h). */
+   * rascunhos locais (de qualquer dia, dentro da janela de 72 h). */
   function anteriorParaValidar(): string | null {
     const horas = [registroPrevio?.criado_em, ...(rascunhosLocais ?? []).filter((r) => r.codigo === codigo && r.setor === setor).map((r) => r.horaMonitoramento)].filter(
       (h): h is string => !!h
@@ -432,6 +438,23 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
     });
     setErroHora(erro);
     return erro ? null : iso;
+  }
+
+  /** Os dados são idênticos aos de um monitoramento já registrado desta ficha+setor (assinado, aguardando sincronização
+   * ou rascunho)? Se sim, abre o aviso e devolve true. Sem rede, vale o último levantamento em cache + a fila + os rascunhos. */
+  async function bloqueadoPorDadosRepetidos(dados: FieldValues): Promise<boolean> {
+    const chave = chaveRegistrosRecentes(codigo, setor);
+    let doServidor: Record<string, unknown>[] = [];
+    try {
+      doServidor = await queryClient.fetchQuery({ queryKey: chave, queryFn: () => buscarRegistrosRecentesFicha(codigo, setor), staleTime: 0, meta: { offline: true } });
+    } catch {
+      doServidor = queryClient.getQueryData<Record<string, unknown>[]>(chave) ?? [];
+    }
+    const daFila = (await listarFichasEnfileiradas().catch(() => [])).filter((f) => f.setor === setor && f.fichaTemplateId === templateId).map((f) => f.dadosDinamicos);
+    const rascunhos = (rascunhosLocais ?? []).filter((r) => r.codigo === codigo && r.setor === setor).map((r) => r.dadosDinamicos);
+    if (!dadosJaRegistrados(dados, [...doServidor, ...daFila, ...rascunhos])) return false;
+    setAvisoRepetido(true);
+    return true;
   }
 
   async function aoEnviar(dadosForm: FieldValues) {
@@ -455,6 +478,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
     }
     setMotivosBloqueio(motivos);
     if (motivos.length > 0) return;
+    if (await bloqueadoPorDadosRepetidos(dados)) return;
 
     // Absorção de Água / Dripping Test 'nao-conforme': a ficha é NÃO CONFORME e o aviso de desvio
     // aparece ANTES da assinatura (não bloqueia — o desvio segue o fluxo normal de RNC).
@@ -485,6 +509,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
     const impedimentos = validarFaseInicial(valor?.items ?? []);
     setMotivosBloqueio(impedimentos);
     if (impedimentos.length > 0) return;
+    if (await bloqueadoPorDadosRepetidos({ ...dados, [campoAbsorcao.chave]: { ...valor, fase: "INICIAL" } })) return;
 
     setSucesso(null);
     try {
@@ -521,6 +546,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
     }
     setMotivosBloqueio(motivos);
     if (motivos.length > 0) return;
+    if (await bloqueadoPorDadosRepetidos(dados)) return;
 
     setSucesso(null);
     setAvisosEtapa1(desviosEspeciais(camposVisiveis, dados));
@@ -555,6 +581,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
     }
     setMotivosBloqueio(motivos);
     if (motivos.length > 0) return;
+    if (await bloqueadoPorDadosRepetidos(dados)) return;
 
     const avisos = desviosEspeciais(camposVisiveis, dados);
     const naoConforme = avisos.length > 0 || temNaoConformidade(dados);
@@ -809,7 +836,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
               </div>
             )}
             {sucesso === "rascunho" && (
-              <p className="text-sm text-success">Rascunho salvo neste aparelho. Assine pela lista de rascunhos em até 24 h.</p>
+              <p className="text-sm text-success">Rascunho salvo neste aparelho. Assine pela lista de rascunhos em até 72 h.</p>
             )}
             {sucesso === "rascunho_nc" && (
               <p role="alert" className="rounded border border-destructive bg-destructive/10 p-2 text-sm font-medium text-destructive">
@@ -883,6 +910,23 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
                 Assinar agora e tratar
               </Button>
             </div>
+          </div>
+        </ModalAssinatura>
+      )}
+
+      {avisoRepetido && (
+        <ModalAssinatura titulo="Atenção" onFechar={() => setAvisoRepetido(false)}>
+          <div className="space-y-4" data-testid="aviso-dados-repetidos">
+            <div role="alert" className="space-y-1 rounded-md border-2 border-destructive bg-destructive/10 p-3 text-sm text-destructive">
+              <p className="flex items-center gap-2 font-bold">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                Atenção: os dados informados já foram registrados.
+              </p>
+              <p>Não é possível gravar dois monitoramentos com os mesmos dados. Revise as informações e registre a leitura atual.</p>
+            </div>
+            <Button type="button" className="w-full" autoFocus onClick={() => setAvisoRepetido(false)}>
+              Entendi, voltar e revisar
+            </Button>
           </div>
         </ModalAssinatura>
       )}

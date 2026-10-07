@@ -1,8 +1,9 @@
 // Rascunhos de monitoramento (IndexedDB, só neste aparelho): o inspetor preenche e salva NO LOCAL,
-// mesmo sem internet, e assina todos de uma vez depois (em até 24 h da hora do monitoramento).
+// mesmo sem internet, e assina todos de uma vez depois (em até 72 h da hora do monitoramento: cobre fins de semana e feriados).
 // Diferente da fila offline (offlineQueue.ts), que já está assinada/confirmada e só espera a rede:
 // o rascunho ainda NÃO foi assinado nem enviado — pode ser descartado e não vale como registro.
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
+import { PRAZO_ASSINATURA_HORAS } from "@/modules/fichas/utils/horaMonitoramento";
 
 export type StatusRascunho = "rascunho" | "assinando" | "falhou";
 
@@ -71,10 +72,10 @@ export async function atualizarStatusRascunho(id: string, status: StatusRascunho
 }
 
 /** Prazo para assinar: PRAZO_ASSINATURA_HORAS a partir da hora do monitoramento. */
-export function prazoDoRascunho(r: Pick<Rascunho, "horaMonitoramento">, prazoHoras = 24): Date {
+export function prazoDoRascunho(r: Pick<Rascunho, "horaMonitoramento">, prazoHoras = PRAZO_ASSINATURA_HORAS): Date {
   return new Date(new Date(r.horaMonitoramento).getTime() + prazoHoras * 3_600_000);
 }
 
-export function rascunhoExpirado(r: Pick<Rascunho, "horaMonitoramento">, agora: Date, prazoHoras = 24): boolean {
+export function rascunhoExpirado(r: Pick<Rascunho, "horaMonitoramento">, agora: Date, prazoHoras = PRAZO_ASSINATURA_HORAS): boolean {
   return agora.getTime() > prazoDoRascunho(r, prazoHoras).getTime();
 }

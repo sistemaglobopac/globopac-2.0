@@ -5,6 +5,7 @@ import { Label } from "@/shared/ui/label";
 import { Select } from "@/shared/ui/select";
 import {
   avaliarTemperaturas,
+  definirSemProduto,
   LIMITE_AGUA_C,
   LIMITE_AMBIENTE_C,
   LIMITE_PRODUTO_C,
@@ -16,6 +17,7 @@ import {
   PRODUTOS,
   temperaturaVazia,
   TIPOS_PARTE,
+  todosSemProduto,
 } from "./temperaturaResfriamento";
 import type { ChaveAguaResfriamento, ChaveAmbienteResfriamento, ChaveProdutoResfriamento, TemperaturaResfriamentoValor } from "./tiposCompostos";
 
@@ -49,6 +51,17 @@ export function TemperaturaResfriamentoField({ value, onChange, disabled }: Temp
   }
   function alterarAmostra(chave: ChaveProdutoResfriamento, n: "amostra1" | "amostra2", texto: string) {
     setV((a) => ({ ...a, produtos: { ...a.produtos, [chave]: { ...a.produtos[chave], [n]: apenasTemperatura(texto) } } }));
+  }
+
+  function alterarSemProduto(chave: ChaveProdutoResfriamento, semProduto: boolean) {
+    setV((a) => ({ ...a, produtos: { ...a.produtos, [chave]: definirSemProduto(a.produtos[chave], semProduto) }, ...(chave === "parte" && semProduto ? { tipoParte: "" } : {}) }));
+  }
+  function alterarTodosSemProduto(semProduto: boolean) {
+    setV((a) => ({
+      ...a,
+      produtos: Object.fromEntries(PRODUTOS.map((p) => [p.chave, definirSemProduto(a.produtos[p.chave], semProduto)])) as TemperaturaResfriamentoValor["produtos"],
+      ...(semProduto ? { tipoParte: "" } : {}),
+    }));
   }
 
   const acima = (texto: string, limite: number | null) => {
@@ -116,13 +129,18 @@ export function TemperaturaResfriamentoField({ value, onChange, disabled }: Temp
 
       <fieldset className="space-y-3" disabled={disabled}>
         <legend className="text-xs font-black uppercase tracking-wider text-muted-foreground">Temperatura dos produtos na saída dos sistemas (2 amostras)</legend>
+        <label className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed p-2 text-sm font-semibold">
+          <input type="checkbox" className="h-4 w-4" checked={todosSemProduto(v)} onChange={(e) => alterarTodosSemProduto(e.target.checked)} data-testid="sem-produto-todos" />
+          Nenhum produto saindo dos sistemas neste momento (monitoramento feito, sem produto para aferir)
+        </label>
         {PRODUTOS.map((p) => {
           const limite = LIMITE_PRODUTO_C[p.chave];
+          const semProduto = v.produtos[p.chave].semProduto === true;
           return (
             <div key={p.chave} className="space-y-2 rounded-md border p-3" data-testid={`produto-${p.chave}`}>
               <div className="flex flex-wrap items-center gap-3">
                 <strong className="text-sm">{p.rotulo}</strong>
-                {p.chave === "parte" && (
+                {p.chave === "parte" && !semProduto && (
                   <div className="min-w-[12rem]">
                     <Select aria-label="Qual parte foi aferida" value={v.tipoParte} onChange={(e) => setV((a) => ({ ...a, tipoParte: e.target.value }))}>
                       <option value="">Selecione a parte…</option>
@@ -135,7 +153,14 @@ export function TemperaturaResfriamentoField({ value, onChange, disabled }: Temp
                   </div>
                 )}
                 {limite !== null && <span className="text-[10px] text-muted-foreground">Limite: {limite.toLocaleString("pt-BR")} ºC</span>}
+                <label className="ml-auto flex cursor-pointer items-center gap-1.5 text-xs font-semibold">
+                  <input type="checkbox" className="h-4 w-4" checked={semProduto} onChange={(e) => alterarSemProduto(p.chave, e.target.checked)} data-testid={`sem-produto-${p.chave}`} />
+                  Sem produto no momento
+                </label>
               </div>
+              {semProduto ? (
+                <p className="rounded-md bg-muted p-2 text-xs text-muted-foreground">Sem produto saindo do sistema neste momento: não há amostras a informar.</p>
+              ) : (
               <div className="grid gap-3 sm:grid-cols-2">
                 {(["amostra1", "amostra2"] as const).map((n, i) => {
                   const nc = acima(v.produtos[p.chave][n], limite);
@@ -156,6 +181,7 @@ export function TemperaturaResfriamentoField({ value, onChange, disabled }: Temp
                   );
                 })}
               </div>
+              )}
             </div>
           );
         })}

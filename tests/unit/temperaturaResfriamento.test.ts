@@ -3,8 +3,10 @@ import {
   avaliarTemperaturas,
   lerTemperatura,
   montarValorTemperatura,
+  definirSemProduto,
   motivosBloqueioTemperatura,
   temperaturaVazia,
+  todosSemProduto,
 } from "@/modules/fichas/fields/temperaturaResfriamento";
 import type { TemperaturaResfriamentoValor } from "@/modules/fichas/fields/tiposCompostos";
 
@@ -90,5 +92,46 @@ describe("temperaturas do pré-resfriamento", () => {
     v.produtos.pes.amostra2 = "";
     v.ambiente.salaMiudos = "";
     expect(motivosBloqueioTemperatura(v)).toHaveLength(4);
+  });
+});
+
+describe("temperaturas — sem produto no momento", () => {
+  it("produto marcado sem produto dispensa as amostras e não entra na conformidade", () => {
+    const v = completo();
+    v.produtos.carcaca = definirSemProduto({ amostra1: "9", amostra2: "9" }, true);
+    expect(v.produtos.carcaca).toEqual({ amostra1: "", amostra2: "", semProduto: true });
+    expect(motivosBloqueioTemperatura(v)).toEqual([]);
+    expect(avaliarTemperaturas(v).conformidade).toBe(true);
+  });
+
+  it("sem a marca, amostras vazias continuam bloqueando", () => {
+    const v = completo();
+    v.produtos.carcaca = { amostra1: "", amostra2: "" };
+    expect(motivosBloqueioTemperatura(v)).toHaveLength(2);
+  });
+
+  it("nenhum produto no momento: só a água e o ambiente são exigidos, e o tipo da parte não", () => {
+    const v = completo();
+    for (const k of Object.keys(v.produtos) as (keyof typeof v.produtos)[]) v.produtos[k] = definirSemProduto(v.produtos[k], true);
+    v.tipoParte = "";
+    expect(todosSemProduto(v)).toBe(true);
+    expect(motivosBloqueioTemperatura(v)).toEqual([]);
+    v.agua.chiller1 = "";
+    expect(motivosBloqueioTemperatura(v)).toHaveLength(1);
+  });
+
+  it("desmarcar volta a exigir as amostras", () => {
+    const v = completo();
+    v.produtos.moela = definirSemProduto(v.produtos.moela, true);
+    v.produtos.moela = definirSemProduto(v.produtos.moela, false);
+    expect(v.produtos.moela.semProduto).toBeUndefined();
+    expect(motivosBloqueioTemperatura(v)).toHaveLength(2);
+  });
+
+  it("água acima do limite continua não conforme mesmo sem produto", () => {
+    const v = completo();
+    for (const k of Object.keys(v.produtos) as (keyof typeof v.produtos)[]) v.produtos[k] = definirSemProduto(v.produtos[k], true);
+    v.agua.chiller1 = "6";
+    expect(avaliarTemperaturas(v).conformidade).toBe(false);
   });
 });

@@ -125,6 +125,19 @@ describe("herdarComRegistradas", () => {
     expect(herdarComRegistradas({ ...fresca, pesoMedioKg: "2,5", placa: "BBB2B22" }, anterior)).toMatchObject({ pesoMedioKg: "2,85", placa: "AAA1A11" });
   });
 
+  it("carga já gravada mantém o início da pendura (hora do abate) corrigido por adendo e a ordem segue a hora corrigida", () => {
+    const anterior = { penduraInicioEm: "2026-10-03T07:10" } as CargaDoa;
+    const herdada = herdarComRegistradas({ ...fresca, penduraInicioEm: "2026-10-03T05:40" }, anterior);
+    expect(herdada.penduraInicioEm).toBe("2026-10-03T07:10");
+    const outra = { ...fresca, cargaId: "c2", gta: "G2", penduraInicioEm: "2026-10-03T06:30" };
+    const linhas = montarCargas([herdada, outra], {});
+    expect(linhas.map((l) => l.cargaId)).toEqual(["c2", "c1"]);
+  });
+
+  it("início da pendura gravado vazio usa o herdado fresco", () => {
+    expect(herdarComRegistradas(fresca, { penduraInicioEm: "" } as CargaDoa).penduraInicioEm).toBe("2026-10-03T05:40");
+  });
+
   it("carga travada sem peso gravado usa o herdado fresco", () => {
     expect(herdarComRegistradas({ ...fresca, pesoMedioKg: "2,5" }, { pesoMedioKg: "" } as CargaDoa)).toMatchObject({ pesoMedioKg: "2,5" });
   });

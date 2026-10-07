@@ -426,8 +426,13 @@ export function RelatorioMonitoramento({ ids, dados, turnoDe = (r) => turnoDoDia
   const horarios = records.map((r) => ensureLocalTime(instanteDoRegistro(r)).time).sort();
   const horarioDocumento = horarios.length <= 1 ? horarios[0] ?? "—" : `${horarios[0]}–${horarios[horarios.length - 1]}`;
 
+  // Rastreabilidade e DOA lista uma linha por carga do dia: imprime com letras menores para ocupar o mínimo de folhas.
+  const impressaoCompacta = records.some((r) =>
+    (dados.templatesPorId.get(r.ficha_template_id)?.schema_campos ?? []).some((c) => c.tipo === "rastreabilidade_doa")
+  );
+
   return (
-    <div className={`print-page mx-auto flex w-full max-w-4xl flex-col bg-white font-sans text-ink shadow-2xl print:max-w-[210mm] ${isGrouped ? "" : "print-fit-one-page"}`} style={{ margin: "0 auto" }}>
+    <div className={`print-page mx-auto flex w-full max-w-4xl flex-col bg-white font-sans text-ink shadow-2xl print:max-w-[210mm] ${isGrouped ? "" : "print-fit-one-page"} ${impressaoCompacta ? "print-compacto" : ""}`} style={{ margin: "0 auto" }}>
       {/* Cabeçalho — identificação no topo, título da ficha e uma grade de metadados rotulados
           (antes eram chips soltos + uma seção "Dados Gerais" separada, que repetia data/turno). */}
       <div className="cabecalho-relatorio w-full rounded-t-lg bg-surface-dark p-6 text-ondark">

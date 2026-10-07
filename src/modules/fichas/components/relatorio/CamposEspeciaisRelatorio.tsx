@@ -903,6 +903,14 @@ export function TemperaturaResfriamentoRelatorio({
           {PRODUTOS.map((p) => {
             const a = valor.produtos?.[p.chave];
             const limite = LIMITE_PRODUTO_C[p.chave];
+            if (a?.semProduto) {
+              return (
+                <tr key={p.chave}>
+                  <td className="pr-2">{p.rotulo}</td>
+                  <td colSpan={2} className="italic text-muted-foreground">Sem produto no momento</td>
+                </tr>
+              );
+            }
             return (
               <tr key={p.chave}>
                 <td className="pr-2">{p.chave === "parte" && valor.tipoParte ? `${p.rotulo} (${valor.tipoParte})` : p.rotulo}</td>
