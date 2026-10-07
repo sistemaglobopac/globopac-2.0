@@ -16,7 +16,7 @@ import { cargasEmRascunhoPorTipo, cargasEmRascunhos, combinarAnterior } from "./
 import { CHAVE_HORA_MONITORAMENTO, dataManaus, horaManaus, isoDeManaus, validarHoraMonitoramento } from "./utils/horaMonitoramento";
 import { salvarRascunho } from "@/lib/rascunhos";
 import { listarFichasEnfileiradas } from "@/lib/offlineQueue";
-import { dadosJaRegistrados } from "./utils/dadosDuplicados";
+import { dadosJaRegistrados, chavesDeConfirmacao } from "./utils/dadosDuplicados";
 import { CHAVE_AGUARDANDO_PESO, cargasSemPeso } from "./fields/pesoCaixa";
 import { lotesSemPeso } from "./fields/preenchimentoSpr";
 import { motivosDeBloqueioSpr } from "./utils/bloqueiosSpr";
@@ -457,7 +457,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
     }
     const daFila = (await listarFichasEnfileiradas().catch(() => [])).filter((f) => f.setor === setor && f.fichaTemplateId === templateId).map((f) => f.dadosDinamicos);
     const rascunhos = (rascunhosLocais ?? []).filter((r) => r.codigo === codigo && r.setor === setor).map((r) => r.dadosDinamicos);
-    if (!dadosJaRegistrados(dados, [...doServidor, ...daFila, ...rascunhos])) return false;
+    if (!dadosJaRegistrados(dados, [...doServidor, ...daFila, ...rascunhos], chavesDeConfirmacao(campos))) return false;
     setAvisoRepetido(true);
     return true;
   }
