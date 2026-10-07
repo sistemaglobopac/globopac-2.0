@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Loader2, ShieldCheck, X } from "lucide-react";
 import { conferirSenha } from "@/modules/auth/reautenticar";
+import { useSemVerificadorOffline } from "@/modules/auth/useSemVerificador";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -13,7 +14,7 @@ interface ModalAssinaturaSenhaProps {
   /** Roda DEPOIS de a senha ser conferida. Pode lançar erro (mostrado no modal). Ao resolver, quem
    * abriu o modal decide fechá-lo. `contexto.modo` diz onde a senha foi conferida: "aparelho" = sem
    * internet (ADR 0016), a assinatura oficial só sai quando a rede voltar. */
-  onAssinar: (contexto: { modo: "servidor" | "aparelho"; matricula?: string }) => Promise<void>;
+  onAssinar: (contexto: { modo: "servidor" | "aparelho" | "sem_verificador"; matricula?: string }) => Promise<void>;
   onCancelar: () => void;
   /** Progresso de assinatura em lote ("2/5"): substitui o campo de senha por uma barra. */
   progresso?: { atual: number; total: number } | null;
@@ -38,9 +39,11 @@ export function ModalAssinaturaSenha({
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [processando, setProcessando] = useState(false);
+  // Sem internet e sem o verificador da senha neste aparelho: não há senha para conferir (ver conferirSenha).
+  const semSenha = useSemVerificadorOffline();
 
   async function confirmar() {
-    if (!senha || processando) return;
+    if ((!senha && !semSenha) || processando) return;
     setErro(null);
     setProcessando(true);
     try {
@@ -49,7 +52,9 @@ export function ModalAssinaturaSenha({
         setErro(conferencia.erro);
         return;
       }
-      await onAssinar(conferencia.modo === "aparelho" ? { modo: "aparelho", matricula: conferencia.matricula } : { modo: "servidor" });
+      await onAssinar(
+        conferencia.modo === "aparelho" ? { modo: "aparelho", matricula: conferencia.matricula } : conferencia.modo === "sem_verificador" ? { modo: "sem_verificador" } : { modo: "servidor" }
+      );
     } catch (e) {
       setErro(e instanceof Error ? e.message : (e as { message?: string } | null)?.message ?? "Falha ao assinar. Tente novamente.");
     } finally {
@@ -83,36 +88,45 @@ export function ModalAssinaturaSenha({
           ) : (
             <>
               <p className="text-sm text-muted-foreground">{descricao}</p>
-              {!navigator.onLine && (
-                <p role="status" className="rounded-md border border-warning bg-warning/15 p-2 text-xs text-warning-foreground">
-                  Sem conexão: a senha é conferida neste aparelho. A assinatura oficial é concluída quando a internet voltar.
+              {semSenha ? (
+                <p role="status" data-testid="aviso-sem-verificador" className="rounded-md border border-warning bg-warning/15 p-2 text-xs text-warning-foreground">
+                  Sem conexão e este aparelho ainda não liberou o acesso offline com senha (isso acontece no primeiro login com internet). O registro será salvo na fila
+                  <strong> sem a confirmação com senha</strong> e enviado quando a internet voltar, dentro do prazo normal de 72 h.
                 </p>
+              ) : (
+                <>
+                  {!navigator.onLine && (
+                    <p role="status" className="rounded-md border border-warning bg-warning/15 p-2 text-xs text-warning-foreground">
+                      Sem conexão: a senha é conferida neste aparelho. A assinatura oficial é concluída quando a internet voltar.
+                    </p>
+                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="senha-assinatura-modal">Sua senha (a mesma do login)</Label>
+                    <Input
+                      id="senha-assinatura-modal"
+                      type="password"
+                      value={senha}
+                      autoFocus
+                      disabled={processando}
+                      onChange={(e) => setSenha(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void confirmar();
+                        }
+                      }}
+                    />
+                  </div>
+                </>
               )}
-              <div className="space-y-2">
-                <Label htmlFor="senha-assinatura-modal">Sua senha (a mesma do login)</Label>
-                <Input
-                  id="senha-assinatura-modal"
-                  type="password"
-                  value={senha}
-                  autoFocus
-                  disabled={processando}
-                  onChange={(e) => setSenha(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      void confirmar();
-                    }
-                  }}
-                />
-              </div>
               {erro && <p className="text-sm text-destructive">{erro}</p>}
               <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="outline" className="flex-1" disabled={processando} onClick={onCancelar}>
                   Cancelar
                 </Button>
-                <Button type="button" className="flex-1" disabled={processando || !senha} onClick={() => void confirmar()}>
+                <Button type="button" className="flex-1" disabled={processando || (!senha && !semSenha)} onClick={() => void confirmar()}>
                   {processando ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                  {processando ? "Assinando…" : textoConfirmar}
+                  {processando ? "Assinando…" : semSenha ? "Salvar na fila" : textoConfirmar}
                 </Button>
               </div>
             </>

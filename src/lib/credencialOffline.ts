@@ -188,6 +188,17 @@ export async function validadeDoAcessoOffline(userId: string): Promise<string | 
   }
 }
 
+/** Este aparelho já guarda o verificador da senha do usuário (ele fez login ONLINE depois de o acesso offline existir)? */
+export async function temVerificadorLocal(userId: string): Promise<boolean> {
+  try {
+    const db = await abrirDb();
+    const registro = await db.get("credenciais", userId);
+    return !!(registro?.hash && registro.salt);
+  } catch {
+    return false;
+  }
+}
+
 /** Matrícula guardada para o usuário (para pedir só a senha ao reconectar). */
 export async function matriculaDoUsuario(userId: string): Promise<string | null> {
   try {

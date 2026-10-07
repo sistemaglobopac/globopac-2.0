@@ -421,7 +421,7 @@ interface CriarMonitoramentoInput {
   /** Pesagem inicial da absorção (2 fases): grava EM_ANDAMENTO e assina só como INSPETOR_PARCIAL. */
   statusFicha?: "EM_ANDAMENTO";
   /** Onde a senha foi conferida ao confirmar (ADR 0016): vai como evidência junto da ficha, se ela cair na fila offline. */
-  confirmacaoSenha?: { modo: "servidor" | "aparelho"; matricula?: string };
+  confirmacaoSenha?: { modo: "servidor" | "aparelho" | "sem_verificador"; matricula?: string };
 }
 
 export type ResultadoCriarMonitoramento = { id: string; modo: "online" | "offline" };
@@ -441,7 +441,7 @@ export function useCriarMonitoramento() {
       const evidencia = (): Promise<ConfirmacaoOffline> =>
         montarConfirmacaoOffline({
           dados: { id, fichaTemplateId: input.fichaTemplateId, versaoTemplate: input.versaoTemplate, userId: input.userId, setor: input.setor, dadosDinamicos: input.dadosDinamicos, capturadoEm },
-          senhaConferidaEm: input.confirmacaoSenha?.modo ?? null,
+          senhaConferidaEm: input.confirmacaoSenha && input.confirmacaoSenha.modo !== "sem_verificador" ? input.confirmacaoSenha.modo : null,
           matricula: input.confirmacaoSenha?.matricula ?? null,
         });
 

@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import { conferirSenhaLocal, mensagemDaRecusaOffline } from "@/lib/credencialOffline";
+import { atualizarPerfilOnline, conferirSenhaLocal, mensagemDaRecusaOffline, registrarLoginOnline } from "@/lib/credencialOffline";
 import { ehFalhaDeRede } from "@/lib/rede";
 import { useSessionStore } from "@/store/session";
 
@@ -8,6 +8,9 @@ export type ConfirmacaoSenha =
   | { ok: true; modo: "servidor" }
   /** Sem internet: a senha foi conferida contra o verificador guardado neste aparelho (ADR 0016). */
   | { ok: true; modo: "aparelho"; matricula: string }
+  /** Sem internet e este aparelho ainda não tem o verificador da senha (a sessão é anterior ao acesso offline): a
+   * ficha entra na fila SEM a confirmação com senha — melhor que travar o inspetor. Vale só o prazo normal de 72 h. */
+  | { ok: true; modo: "sem_verificador" }
   | { ok: false; erro: string };
 
 const ERRO_IDENTIFICAR = "Não foi possível identificar seu usuário. Faça login novamente.";
@@ -19,7 +22,8 @@ async function conferirNoAparelho(senha: string): Promise<ConfirmacaoSenha> {
   if (!userId) return { ok: false, erro: ERRO_IDENTIFICAR };
   const r = await conferirSenhaLocal(userId, senha);
   if (r.ok) return { ok: true, modo: "aparelho", matricula: r.matricula };
-  // Quem não tem credencial neste aparelho (gestor, verificador…) precisa de internet para assinar.
+  if (r.motivo === "sem_credencial" && useSessionStore.getState().perfil?.nivelAcesso === "INSPETOR_QUALIDADE") return { ok: true, modo: "sem_verificador" };
+  // Quem não trabalha offline (gestor, verificador…) precisa de internet para assinar.
   if (r.motivo === "sem_credencial" || r.motivo === "perfil_nao_permitido") return { ok: false, erro: ERRO_SEM_REDE };
   if (r.motivo === "senha_invalida") return { ok: false, erro: ERRO_SENHA };
   return { ok: false, erro: mensagemDaRecusaOffline(r) };
@@ -39,6 +43,12 @@ export async function conferirSenha(senha: string): Promise<ConfirmacaoSenha> {
   const { error: erroAuth } = await supabase.auth.signInWithPassword({ email: userData.user.email, password: senha });
   if (erroAuth && ehFalhaDeRede(erroAuth)) return conferirNoAparelho(senha);
   if (erroAuth) return { ok: false, erro: ERRO_SENHA };
+  // A senha acabou de ser conferida pelo servidor: aproveita para guardar o verificador neste aparelho (quem já estava logado
+  // antes de o acesso offline existir ganha o acesso offline na primeira confirmação com internet, sem novo login).
+  const perfil = useSessionStore.getState().perfil;
+  if (perfil?.nivelAcesso === "INSPETOR_QUALIDADE" && perfil.matricula) {
+    void registrarLoginOnline({ userId: perfil.id, matricula: perfil.matricula, senha }).then(() => atualizarPerfilOnline(perfil));
+  }
   return { ok: true, modo: "servidor" };
 }
 

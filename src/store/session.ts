@@ -8,6 +8,8 @@ import type { AcessoOffline } from "@/modules/auth/perfilLocal";
 export interface PerfilSessao {
   id: string;
   nomeCompleto: string;
+  /** Matrícula de login (usada para criar o verificador offline da senha sem novo login). */
+  matricula?: string;
   nivelAcesso: NivelAcesso;
   setoresPermitidos: string[];
 }

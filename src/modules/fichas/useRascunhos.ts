@@ -89,7 +89,7 @@ export async function assinarRascunhosEmLote(
 export async function confirmarRascunhosOffline(
   rascunhos: Rascunho[],
   userId: string,
-  confirmacao: { modo: "servidor" | "aparelho"; matricula?: string }
+  confirmacao: { modo: "servidor" | "aparelho" | "sem_verificador"; matricula?: string }
 ): Promise<{ enfileirados: string[]; expirados: string[] }> {
   const resultado = { enfileirados: [] as string[], expirados: [] as string[] };
   const agora = new Date();
@@ -109,7 +109,7 @@ export async function confirmarRascunhosOffline(
       capturadoEm: r.horaMonitoramento,
       confirmacaoOffline: await montarConfirmacaoOffline({
         dados: { id: r.id, fichaTemplateId: r.fichaTemplateId, versaoTemplate: r.versaoTemplate, userId: r.userId, setor: r.setor, dadosDinamicos: r.dadosDinamicos, capturadoEm: r.horaMonitoramento },
-        senhaConferidaEm: confirmacao.modo,
+        senhaConferidaEm: confirmacao.modo === "sem_verificador" ? null : confirmacao.modo,
         matricula: confirmacao.matricula ?? null,
       }),
     });

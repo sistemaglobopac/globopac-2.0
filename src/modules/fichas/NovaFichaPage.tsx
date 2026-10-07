@@ -8,6 +8,7 @@ import { useSessionStore, type PerfilSessao } from "@/store/session";
 import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/api";
 import { zodFromSchemaCampos, valoresIniciaisDe, type CampoTemplate } from "@/shared/schema-campos";
 import { conferirSenha } from "@/modules/auth/reautenticar";
+import { useSemVerificadorOffline } from "@/modules/auth/useSemVerificador";
 import { CHAVE_CONTINUACAO, buscarRegistrosRecentesFicha, chaveRegistrosRecentes, useCriarMonitoramento, useRegistroContinuavel, useTemplatesAtivos, useTurnoFixoDoUsuario, useUltimoRegistroFicha, useUltimosApontamentosHoje, type TemplateAtivo } from "./api";
 import { ContinuacaoMonitoramento, MOTIVO_CONTINUACAO_MIN_CARACTERES } from "./components/ContinuacaoMonitoramento";
 import { RascunhosPainel } from "./components/RascunhosPainel";
@@ -320,6 +321,8 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
   const [senha, setSenha] = useState("");
   const [autenticando, setAutenticando] = useState(false);
   const [erroSenha, setErroSenha] = useState<string | null>(null);
+  // Sem internet e sem o verificador da senha neste aparelho: não há senha para conferir (ver conferirSenha).
+  const semSenha = useSemVerificadorOffline();
   const criarMonitoramento = useCriarMonitoramento();
   // Leitura anterior herdada: mesmo tipo de ficha, setor e TURNO, criada hoje. O turno fixo do
   // usuário vale; "Ambos" deduz pelo horário de Manaus (05h–17h = 1º Turno). A consulta só roda
@@ -641,7 +644,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
     setAvisosDesvio([]);
   }
 
-  async function salvar(dados: FieldValues, confirmacaoSenha?: { modo: "servidor" | "aparelho"; matricula?: string }) {
+  async function salvar(dados: FieldValues, confirmacaoSenha?: { modo: "servidor" | "aparelho" | "sem_verificador"; matricula?: string }) {
     setSucesso(null);
     try {
       const resultado = await criarMonitoramento.mutateAsync({
@@ -685,7 +688,10 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
         setErroSenha(conferencia.erro);
         return;
       }
-      await salvar(dadosPendentes, conferencia.modo === "aparelho" ? { modo: "aparelho", matricula: conferencia.matricula } : { modo: "servidor" });
+      await salvar(
+        dadosPendentes,
+        conferencia.modo === "aparelho" ? { modo: "aparelho", matricula: conferencia.matricula } : conferencia.modo === "sem_verificador" ? { modo: "sem_verificador" } : { modo: "servidor" }
+      );
     } finally {
       setAutenticando(false);
       setSenha("");
@@ -1022,28 +1028,39 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
                 </ul>
               </div>
             )}
-            <p className="text-sm text-muted-foreground">
-              Confirme sua senha (a mesma do login) para assinar eletronicamente este monitoramento.
-            </p>
-            {!navigator.onLine && (
-              <p role="status" className="rounded-md border border-warning bg-warning/15 p-2 text-xs text-warning-foreground">
-                Sem conexão: sua senha será conferida neste aparelho e a ficha entra na fila. A assinatura eletrônica oficial (com carimbo de tempo) é concluída automaticamente quando a internet voltar.
+            {!semSenha && (
+              <p className="text-sm text-muted-foreground">
+                Confirme sua senha (a mesma do login) para assinar eletronicamente este monitoramento.
               </p>
             )}
-            <div className="space-y-2">
-              <Label htmlFor="senha-assinatura-ficha">Sua senha</Label>
-              <Input
-                id="senha-assinatura-ficha"
-                type="password"
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
-                disabled={autenticando}
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && senha && !autenticando) void confirmarComSenha();
-                }}
-              />
-            </div>
+            {semSenha ? (
+              <p role="status" data-testid="aviso-sem-verificador" className="rounded-md border border-warning bg-warning/15 p-2 text-xs text-warning-foreground">
+                Sem conexão e este aparelho ainda não liberou o acesso offline com senha (isso acontece no primeiro login com internet). A ficha será salva na fila{" "}
+                <strong>sem a confirmação com senha</strong> e enviada e assinada quando a internet voltar, dentro do prazo normal de 72 h.
+              </p>
+            ) : (
+              <>
+                {!navigator.onLine && (
+                  <p role="status" className="rounded-md border border-warning bg-warning/15 p-2 text-xs text-warning-foreground">
+                    Sem conexão: sua senha será conferida neste aparelho e a ficha entra na fila. A assinatura eletrônica oficial (com carimbo de tempo) é concluída automaticamente quando a internet voltar.
+                  </p>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="senha-assinatura-ficha">Sua senha</Label>
+                  <Input
+                    id="senha-assinatura-ficha"
+                    type="password"
+                    value={senha}
+                    onChange={(e) => setSenha(e.target.value)}
+                    disabled={autenticando}
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && senha && !autenticando) void confirmarComSenha();
+                    }}
+                  />
+                </div>
+              </>
+            )}
             {erroSenha && <p className="text-sm text-destructive">{erroSenha}</p>}
             {criarMonitoramento.isError && (
               <p className="text-sm text-destructive">Falha ao criar/assinar a ficha. Tente novamente.</p>
@@ -1055,10 +1072,10 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
               <Button
                 type="button"
                 className="flex-1"
-                disabled={autenticando || !senha || criarMonitoramento.isPending}
+                disabled={autenticando || (!senha && !semSenha) || criarMonitoramento.isPending}
                 onClick={confirmarComSenha}
               >
-                {autenticando || criarMonitoramento.isPending ? "Assinando…" : "Confirmar e Assinar"}
+                {autenticando || criarMonitoramento.isPending ? "Assinando…" : semSenha ? "Salvar na fila" : "Confirmar e Assinar"}
               </Button>
             </div>
           </div>

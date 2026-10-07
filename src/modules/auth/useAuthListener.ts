@@ -10,6 +10,7 @@ import { gravarAcessoOffline, gravarPerfilLocal, lerAcessoOffline, lerPerfilLoca
 
 interface PerfilUsuarioLinha {
   id: string;
+  matricula: string | null;
   nome_completo: string;
   nivel_acesso: NivelAcesso;
   setores_permitidos: string[];
@@ -41,7 +42,7 @@ export function useAuthListener() {
     async function carregarPerfil(userId: string) {
       const { data, error } = await supabase
         .from("perfis_usuarios")
-        .select("id, nome_completo, nivel_acesso, setores_permitidos")
+        .select("id, matricula, nome_completo, nivel_acesso, setores_permitidos")
         .eq("id", userId)
         .abortSignal(AbortSignal.timeout(PRAZO_PERFIL_MS))
         .single()
@@ -60,6 +61,7 @@ export function useAuthListener() {
       const perfil: PerfilSessao = {
         id: data.id,
         nomeCompleto: data.nome_completo,
+        ...(data.matricula ? { matricula: data.matricula } : {}),
         nivelAcesso: data.nivel_acesso,
         setoresPermitidos: data.setores_permitidos,
       };

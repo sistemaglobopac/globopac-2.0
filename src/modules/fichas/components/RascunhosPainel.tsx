@@ -31,7 +31,7 @@ export function RascunhosPainel() {
   const assinaveis = rascunhos.filter((r) => !rascunhoExpirado(r, agora));
   const temNc = rascunhos.some((r) => r.naoConforme);
 
-  async function confirmarSemInternet(confirmacao: { modo: "servidor" | "aparelho"; matricula?: string }) {
+  async function confirmarSemInternet(confirmacao: { modo: "servidor" | "aparelho" | "sem_verificador"; matricula?: string }) {
     if (!perfil) return;
     const r = await confirmarRascunhosOffline(assinaveis, perfil.id, confirmacao);
     setAssinando(false);
@@ -126,7 +126,7 @@ export function RascunhosPainel() {
           textoConfirmar={`Assinar ${assinaveis.length}`}
           progresso={progresso}
           legendaProgresso="Gravando e assinando…"
-          onAssinar={(contexto) => (contexto.modo === "aparelho" ? confirmarSemInternet(contexto) : assinar())}
+          onAssinar={(contexto) => (contexto.modo !== "servidor" ? confirmarSemInternet(contexto) : assinar())}
           onCancelar={() => setAssinando(false)}
         />
       )}
