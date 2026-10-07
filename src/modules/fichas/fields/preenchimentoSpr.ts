@@ -36,6 +36,8 @@ function motivosTanques(prefixo: string, tanques: Record<string, TanqueHidrometr
 
 /** Lotes com aves e sem peso vivo (a balança ainda não passou o peso da carga). */
 export function lotesSemPeso(v: ChillerCarcacasValor | undefined | null): ChillerCarcacasValor["cargas"] {
+  // Peso parcial escolhido pelo inspetor: os lotes sem peso ficam de fora da média e o registro não aguarda mais a balança.
+  if (v?.pesoParcial) return [];
   return (v?.cargas ?? []).filter((c) => (Number.parseFloat(String(c.quantity).replace(",", ".")) || 0) > 0 && !pesoVivoCompleto(c.avgLiveWeight));
 }
 
@@ -52,9 +54,11 @@ export function motivosPreenchimentoCarcacas(v: ChillerCarcacasValor | undefined
     if (cargas.length === 0) m.push(`${p}: informe ao menos um lote.`);
     cargas.forEach((c, i) => {
       if (vazio(c.quantity)) m.push(`${p} — Lote ${i + 1}: informe as Aves (un).`);
-      // Etapa 1 (aguardando o peso da balança): o peso vivo do lote pode ficar em branco.
-      if (!opcoes.permitirPesoPendente && !pesoVivoCompleto(c.avgLiveWeight)) m.push(`${p} — Lote ${i + 1}: informe o Peso Vivo (kg).`);
+      // Etapa 1 (aguardando o peso da balança): o peso vivo do lote pode ficar em branco. Peso parcial: idem, mas só
+      // vale se ao menos um lote tem peso (conferido logo abaixo).
+      if (!opcoes.permitirPesoPendente && !v.pesoParcial && !pesoVivoCompleto(c.avgLiveWeight)) m.push(`${p} — Lote ${i + 1}: informe o Peso Vivo (kg).`);
     });
+    if (v.pesoParcial && !cargas.some((c) => pesoVivoCompleto(c.avgLiveWeight))) m.push(`${p}: o peso parcial precisa de ao menos um lote com peso vivo.`);
     if (vazio(v.condenasParcial)) m.push(`${p}: informe as Carcaças Parcialmente Aproveitadas (use 0 se não houve).`);
     if (vazio(v.condenasTotal ?? v.condenas)) m.push(`${p}: informe as Carcaças Totalmente Condenadas (use 0 se não houve).`);
   }

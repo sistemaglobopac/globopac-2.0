@@ -701,3 +701,12 @@ seguintes à hora do monitoramento), nunca por declaração do aparelho. Limite:
 `0018_contingencia_offline.sql` foram escritos mas **não rodados** (sem Docker/`supabase start` na máquina). O frontend foi
 validado (typecheck, lint, testes de unidade/componente, e um teste manual no navegador do login offline). Rodar
 `npm run db:test` antes de aplicar a migration em qualquer projeto hospedado.
+
+### 71. Peso médio parcial no SPR Carcaças (só com os pesos informados) fecha o registro
+🟡 **Decidida pelo responsável do projeto em 2026-10-07, aguardando aceite de Qualidade** — antes, uma carga sem o peso da balança deixava o
+registro em 1ª etapa (peso médio e meta indefinidos; só o veredito antecipado). Agora o inspetor pode escolher **"Calcular só com os pesos
+informados"**: o peso médio é a média ponderada só dos lotes com peso vivo completo (× 0,84), os lotes sem peso ficam fora da média mas
+contam nas aves do período, e o registro fecha e decide a conformidade pela meta dessa faixa. Nada é estimado: o lote sem peso continua sem peso.
+O registro leva `pesoParcial` (aves com peso, aves sem peso, lotes sem peso) dentro do dado assinado, o detalhe da RNC cita "peso médio parcial" e o
+relatório destaca o cálculo parcial. Risco aceito: a faixa de meta (≤ 2,5 kg de carcaça) pode mudar quando as demais cargas tiverem peso; com peso
+vivo de 2,6 a 2,95 kg a carcaça fica entre 2,18 e 2,48 kg, perto do limite de 2,5.

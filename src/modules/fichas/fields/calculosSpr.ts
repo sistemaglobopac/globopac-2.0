@@ -49,6 +49,30 @@ export function pesoMedioCarcaca(cargas: CargaParaCalculo[]): number {
   return pesoMedioVivo(cargas) * RENDIMENTO_CARCACA;
 }
 
+/** Peso médio calculado SÓ com os lotes que já têm peso vivo completo (a balança passou). Os lotes sem peso ficam de fora
+ * da média — mas continuam contando nas aves do período. É o cálculo do "peso parcial", escolhido de propósito pelo
+ * inspetor e SEMPRE registrado como parcial (aves com peso / aves sem peso). `pesoMedioVivo`/`pesoMedioCarcaca` valem 0 se
+ * nenhum lote tem peso. */
+export function pesoMedioParcial(cargas: (CargaParaCalculo & { quantity: string })[], pesoVivoValido: (p: string) => boolean = pesoVivoCompleto) {
+  let avesComPeso = 0;
+  let avesSemPeso = 0;
+  let lotesSemPeso = 0;
+  let soma = 0;
+  for (const c of cargas) {
+    const aves = parseFloat(c.quantity) || 0;
+    if (aves <= 0) continue;
+    if (pesoVivoValido(c.avgLiveWeight)) {
+      avesComPeso += aves;
+      soma += aves * numero(c.avgLiveWeight);
+    } else {
+      avesSemPeso += aves;
+      lotesSemPeso += 1;
+    }
+  }
+  const pesoMedioVivo = avesComPeso > 0 ? soma / avesComPeso : 0;
+  return { pesoMedioVivo, pesoMedioCarcaca: pesoMedioVivo * RENDIMENTO_CARCACA, avesComPeso, avesSemPeso, lotesSemPeso };
+}
+
 /** Aves no período = max(0, bruto − (parciais + totalmente condenadas)). */
 export function avesNoPeriodo(bruto: number, parciais: number, totalmenteCondenadas: number): number {
   return Math.max(0, bruto - (parciais + totalmenteCondenadas));

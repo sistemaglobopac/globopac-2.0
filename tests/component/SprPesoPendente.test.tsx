@@ -77,6 +77,49 @@ describe("SPR Carcaças: cargas pela chegada ao pré-resfriamento e peso pendent
     expect(screen.getAllByText("Meta: depende do peso das cargas").length).toBeGreaterThan(0);
   });
 
+  it("peso parcial: calcula o peso médio só com as cargas que têm peso, fecha o registro como parcial e a meta deixa de depender do peso", async () => {
+    const user = userEvent.setup();
+    render(<Campo />);
+    await user.click(screen.getByRole("button", { name: "Não houve pausa" }));
+    await user.click(within(screen.getByTestId("cargas-calculadas")).getByRole("button", { name: /Usar estas cargas/ }));
+    await waitFor(() => expect(lerValor()?.cargas.filter((c) => c.cargaId)).toHaveLength(3));
+    expect(lerValor()?.pesoMedioCarcaca).toBe(0);
+    expect(lerValor()?.pesoParcial).toBeUndefined();
+
+    await user.click(screen.getByRole("button", { name: "Calcular só com os pesos informados" }));
+    await waitFor(() => expect(lerValor()?.pesoParcial).toBeDefined());
+    const v = lerValor()!;
+    const [l1, l2, l3] = v.cargas;
+    const a1 = Number(l1!.quantity);
+    const a2 = Number(l2!.quantity);
+    const esperadoVivo = (a1 * 2.9 + a2 * 3.05) / (a1 + a2);
+    expect(v.pesoMedioCarcaca).toBeCloseTo(esperadoVivo * 0.84, 6);
+    expect(v.pesoParcial).toEqual({ avesComPeso: a1 + a2, avesSemPeso: Number(l3!.quantity), lotesSemPeso: 1 });
+    // a carga sem peso continua sem peso (nunca estimado) e conta nas aves do período
+    expect(l3!.avgLiveWeight).toBe("");
+    expect(v.totalAvesBruto).toBe(a1 + a2 + Number(l3!.quantity));
+    // a meta passa a ser calculada (faixa até 2,5 kg) em vez de "depende do peso"
+    expect(screen.queryByText("Meta: depende do peso das cargas")).not.toBeInTheDocument();
+    expect(screen.getByTestId("peso-parcial-resumo")).toHaveTextContent("PARCIAL");
+
+    // voltar a aguardar o peso desfaz o parcial
+    await user.click(screen.getByRole("button", { name: "Voltar a aguardar o peso das demais cargas" }));
+    await waitFor(() => expect(lerValor()?.pesoParcial).toBeUndefined());
+    expect(lerValor()?.pesoMedioCarcaca).toBe(0);
+  });
+
+  it("peso parcial: a conformidade passa a ser decidida pela meta com o peso parcial (não só o veredito antecipado)", async () => {
+    const user = userEvent.setup();
+    render(<Campo />);
+    await user.click(screen.getByRole("button", { name: "Não houve pausa" }));
+    await user.click(within(screen.getByTestId("cargas-calculadas")).getByRole("button", { name: /Usar estas cargas/ }));
+    await user.click(await screen.findByRole("button", { name: "Calcular só com os pesos informados" }));
+    await user.type(hidr()[1]!, "110"); // ≈ 0,88 L/ave, abaixo da meta do pré-chiller (1,5)
+    await waitFor(() => expect(lerValor()?.conformidade).toBe(false));
+    expect(lerValor()?.detalhesRNC).toContain("peso médio parcial");
+    expect(lerValor()?.detalhesRNC).not.toContain("qualquer faixa de peso");
+  });
+
   it("renovação abaixo da meta da faixa mais branda: NÃO CONFORME em qualquer peso, sem esperar a balança", async () => {
     const user = userEvent.setup();
     render(<Campo />);

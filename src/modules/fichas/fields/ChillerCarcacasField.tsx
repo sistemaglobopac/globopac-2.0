@@ -18,6 +18,7 @@ import {
   pesoVivoDeHerdado,
   metaTanqueCarcacas,
   pesoMedioCarcaca as calcularPesoMedioCarcaca,
+  pesoMedioParcial,
   totalAvesBruto,
   type ChaveTanqueCarcacas as ChaveTanque,
 } from "./calculosSpr";
@@ -82,6 +83,8 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
   const [novaParada, setNovaParada] = useState({ inicio: "", fim: "", aberta: false });
   const [erroParada, setErroParada] = useState<string | null>(null);
   const [cargas, setCargas] = useState<CargaProcessada[]>(value?.cargas ?? [{ id: crypto.randomUUID(), quantity: "", avgLiveWeight: "" }]);
+  // Peso parcial: o inspetor escolhe calcular o peso médio só com os lotes que já têm peso (os demais ficam de fora da média).
+  const [usarPesoParcial, setUsarPesoParcial] = useState(!!value?.pesoParcial);
   const [condenasParcial, setCondenasParcial] = useState(value?.condenasParcial ?? "");
   // Registros antigos só têm o campo `condenas`: ele entra como "totalmente condenadas".
   const [condenasTotal, setCondenasTotal] = useState(value?.condenasTotal ?? value?.condenas ?? "");
@@ -199,8 +202,15 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
   // Lote com aves e sem peso vivo: a balança ainda não passou o peso daquela carga. Enquanto isso o peso médio (e a meta) é
   // desconhecido e a conformidade só pode ser ANTECIPADA (vereditoVazao.ts). Nunca se usa peso estimado.
   const lotesPendentes = cargas.filter((c) => (parseFloat(c.quantity) || 0) > 0 && !pesoVivoCompleto(c.avgLiveWeight));
-  const pesoPendente = lotesPendentes.length > 0;
-  const pesoMedioCarcaca = pesoPendente ? 0 : calcularPesoMedioCarcaca(cargas); // já com o rendimento fixo de 84%
+  const parcial = pesoMedioParcial(cargas);
+  // Peso parcial só vale enquanto há lote sem peso E ao menos um lote com peso; se a balança completar tudo, volta ao cálculo normal.
+  const pesoParcialAtivo = usarPesoParcial && !modoCompletarPeso && lotesPendentes.length > 0 && parcial.avesComPeso > 0;
+  const pesoPendente = lotesPendentes.length > 0 && !pesoParcialAtivo;
+  // já com o rendimento fixo de 84%
+  const pesoMedioCarcaca = pesoPendente ? 0 : pesoParcialAtivo ? parcial.pesoMedioCarcaca : calcularPesoMedioCarcaca(cargas);
+  const resumoParcial = pesoParcialAtivo
+    ? `peso médio parcial: ${parcial.avesComPeso.toLocaleString("pt-BR")} de ${(parcial.avesComPeso + parcial.avesSemPeso).toLocaleString("pt-BR")} aves com peso (${parcial.lotesSemPeso} lote(s) sem peso ficaram de fora da média)`
+    : null;
 
   const totalCondenasParcial = parseFloat(condenasParcial) || 0;
   const totalCondenasTotalNum = parseFloat(condenasTotal) || 0;
@@ -256,6 +266,7 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
       totalAves: totalAvesPeriodo,
       totalAvesBruto: totalAves,
       pesoMedioCarcaca,
+      ...(pesoParcialAtivo ? { pesoParcial: { avesComPeso: parcial.avesComPeso, avesSemPeso: parcial.avesSemPeso, lotesSemPeso: parcial.lotesSemPeso } } : {}),
       ...(chegada ? { chegada } : {}),
       ...(paradas.length > 0 ? { paradas } : {}),
       ...(pausaInformada ? { pausaInformada } : {}),
@@ -264,11 +275,11 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
         detalhes.length > 0
           ? pesoPendente
             ? `Vazão Insuficiente em qualquer faixa de peso (peso das cargas ainda não informado): ${detalhes.join("; ")}`
-            : `Vazão Insuficiente: ${detalhes.join("; ")}`
+            : `Vazão Insuficiente${resumoParcial ? ` (${resumoParcial})` : ""}: ${detalhes.join("; ")}`
           : null,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cargas, tanques, condenasParcial, condenasTotal, isConforme, chegada, pesoPendente, paradas, pausaInformada]);
+  }, [cargas, tanques, condenasParcial, condenasTotal, isConforme, chegada, pesoPendente, pesoParcialAtivo, paradas, pausaInformada]);
 
   function adicionarCarga() {
     setCargas((atual) => [...atual, { id: crypto.randomUUID(), quantity: "", avgLiveWeight: "" }]);
@@ -490,7 +501,11 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
             <div>
               <p className="text-xs font-bold text-muted-foreground">Média Carcaça (Est.)</p>
               <p className="text-lg font-black">{formatMaskedValue(pesoMedioCarcaca.toFixed(3))} kg</p>
-              <p className="max-w-[210px] text-xs text-muted-foreground">carcaças = aves abatidas com 16% de perda de peso (despojos do abate)</p>
+              {resumoParcial ? (
+                <p className="max-w-[210px] text-xs font-semibold text-warning-foreground" data-testid="peso-parcial-resumo">PARCIAL — {parcial.avesComPeso.toLocaleString("pt-BR")} de {(parcial.avesComPeso + parcial.avesSemPeso).toLocaleString("pt-BR")} aves com peso</p>
+              ) : (
+                <p className="max-w-[210px] text-xs text-muted-foreground">carcaças = aves abatidas com 16% de perda de peso (despojos do abate)</p>
+              )}
             </div>
           </div>
         )}
@@ -650,6 +665,38 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
               </div>
             ))}
           </div>
+
+          {lotesPendentes.length > 0 && !modoCompletarPeso && (
+            <div className="space-y-2 rounded-md border border-dashed border-warning p-3 text-xs" data-testid="peso-parcial">
+              {pesoParcialAtivo ? (
+                <>
+                  <p className="font-semibold text-warning-foreground">
+                    Peso médio calculado só com os pesos informados: {parcial.avesComPeso.toLocaleString("pt-BR")} de {(parcial.avesComPeso + parcial.avesSemPeso).toLocaleString("pt-BR")} aves
+                    ({parcial.lotesSemPeso} lote(s) sem peso ficam de fora da média, mas contam nas aves do período). O registro fecha como PARCIAL e isso aparece para o verificador.
+                  </p>
+                  {!disabledGeral && (
+                    <Button type="button" size="sm" variant="outline" onClick={() => setUsarPesoParcial(false)}>
+                      Voltar a aguardar o peso das demais cargas
+                    </Button>
+                  )}
+                </>
+              ) : parcial.avesComPeso > 0 ? (
+                <>
+                  <p className="text-muted-foreground">
+                    {lotesPendentes.length} lote(s) ainda sem o peso da balança. Você pode aguardar o peso (salva a 1ª etapa) ou calcular agora só com os pesos já informados ({parcial.avesComPeso.toLocaleString("pt-BR")} de{" "}
+                    {(parcial.avesComPeso + parcial.avesSemPeso).toLocaleString("pt-BR")} aves).
+                  </p>
+                  {!disabledGeral && (
+                    <Button type="button" size="sm" onClick={() => setUsarPesoParcial(true)}>
+                      Calcular só com os pesos informados
+                    </Button>
+                  )}
+                </>
+              ) : (
+                <p className="text-muted-foreground">Nenhum lote tem peso ainda: não há como calcular o peso médio. Aguarde a balança ou informe o peso vivo do lote.</p>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 gap-3 border-t border-dashed pt-3 sm:grid-cols-2">
             <div className="space-y-1">

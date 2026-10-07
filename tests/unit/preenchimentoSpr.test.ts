@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  lotesSemPeso,
   motivosPreenchimentoCarcacas,
   motivosPreenchimentoChuveiro,
   motivosPreenchimentoMiudos,
@@ -164,3 +165,24 @@ describe("pausa da linha obrigatória quando o período é calculado pela chegad
   });
 });
 
+
+describe("SPR Carcaças com peso parcial", () => {
+  const semPeso = { id: "2", quantity: "2000", avgLiveWeight: "" };
+
+  it("sem o peso parcial, lote sem peso bloqueia e fica pendente", () => {
+    const v = carcacas({ cargas: [{ id: "1", quantity: "5000", avgLiveWeight: "2.800" }, semPeso] });
+    expect(motivosPreenchimentoCarcacas(v)).toContain("SPR Carcaças — Lote 2: informe o Peso Vivo (kg).");
+    expect(lotesSemPeso(v)).toHaveLength(1);
+  });
+
+  it("com o peso parcial escolhido, o lote sem peso não bloqueia nem deixa o registro pendente", () => {
+    const v = carcacas({ cargas: [{ id: "1", quantity: "5000", avgLiveWeight: "2.800" }, semPeso], pesoParcial: { avesComPeso: 5000, avesSemPeso: 2000, lotesSemPeso: 1 } });
+    expect(motivosPreenchimentoCarcacas(v)).toEqual([]);
+    expect(lotesSemPeso(v)).toEqual([]);
+  });
+
+  it("peso parcial sem nenhum lote com peso não vale", () => {
+    const v = carcacas({ cargas: [semPeso], pesoParcial: { avesComPeso: 0, avesSemPeso: 2000, lotesSemPeso: 1 } });
+    expect(motivosPreenchimentoCarcacas(v).join(" ")).toContain("ao menos um lote com peso vivo");
+  });
+});

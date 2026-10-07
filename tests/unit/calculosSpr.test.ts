@@ -146,3 +146,35 @@ describe("herança de cargas do Bem-Estar Animal", () => {
     expect(pesoMedioVivo([l1, l2])).toBeCloseTo(2.25, 5);
   });
 });
+
+import { pesoMedioParcial } from "@/modules/fichas/fields/calculosSpr";
+
+describe("peso médio parcial (só com os pesos informados)", () => {
+  it("pondera só os lotes com peso e informa o que ficou de fora", () => {
+    const r = pesoMedioParcial([
+      { quantity: "5000", avgLiveWeight: "2.900" },
+      { quantity: "3000", avgLiveWeight: "3.100" },
+      { quantity: "2000", avgLiveWeight: "" },
+    ]);
+    expect(r.pesoMedioVivo).toBeCloseTo((5000 * 2.9 + 3000 * 3.1) / 8000, 9);
+    expect(r.pesoMedioCarcaca).toBeCloseTo(r.pesoMedioVivo * 0.84, 9);
+    expect(r).toMatchObject({ avesComPeso: 8000, avesSemPeso: 2000, lotesSemPeso: 1 });
+  });
+
+  it("peso pela metade (ainda digitando) conta como lote sem peso", () => {
+    const r = pesoMedioParcial([
+      { quantity: "5000", avgLiveWeight: "2.900" },
+      { quantity: "1000", avgLiveWeight: "0.285" },
+    ]);
+    expect(r).toMatchObject({ avesComPeso: 5000, avesSemPeso: 1000, lotesSemPeso: 1, pesoMedioVivo: 2.9 });
+  });
+
+  it("nenhum lote com peso: média zero (não há como calcular)", () => {
+    const r = pesoMedioParcial([{ quantity: "5000", avgLiveWeight: "" }]);
+    expect(r).toMatchObject({ pesoMedioVivo: 0, pesoMedioCarcaca: 0, avesComPeso: 0, avesSemPeso: 5000 });
+  });
+
+  it("lote sem aves é ignorado", () => {
+    expect(pesoMedioParcial([{ quantity: "", avgLiveWeight: "" }, { quantity: "100", avgLiveWeight: "2.500" }]).lotesSemPeso).toBe(0);
+  });
+});

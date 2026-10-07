@@ -208,6 +208,13 @@ export function ChillerCarcacasRelatorio({ valor, titulo = "Renovação da Água
         <div><span className="text-muted-foreground">Condenas</span><br /><strong>{valor.condenasParcial || 0} parcial / {valor.condenasTotal || 0} total</strong></div>
         <div><span className="text-muted-foreground">Peso médio carcaça</span><br /><strong>{valor.pesoMedioCarcaca.toFixed(3)} kg</strong></div>
       </div>
+      {valor.pesoParcial && (
+        <p className="rounded border border-warning bg-warning/10 p-1.5 text-[10px] font-semibold print:p-1 print:text-[8px]" data-testid="relatorio-peso-parcial">
+          Peso médio PARCIAL: calculado só com {valor.pesoParcial.avesComPeso.toLocaleString("pt-BR")} de{" "}
+          {(valor.pesoParcial.avesComPeso + valor.pesoParcial.avesSemPeso).toLocaleString("pt-BR")} aves (peso informado); {valor.pesoParcial.lotesSemPeso} lote(s) sem
+          peso da balança ficaram de fora da média, mas contam nas aves do período.
+        </p>
+      )}
       {valor.cargas.length > 0 && (
         <table className="max-sm:block max-sm:overflow-x-auto w-full border-collapse text-[10px] print:text-[8px]">
           <thead>

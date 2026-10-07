@@ -60,6 +60,9 @@ export interface ChillerCarcacasValor {
    * mesma ficha (chuveiro final) para recompor a própria base. */
   totalAvesBruto: number;
   pesoMedioCarcaca: number;
+  /** O inspetor optou por calcular o peso médio SÓ com os lotes que já têm peso (a balança ainda não passou nos demais).
+   * O registro fecha assim, marcado como parcial: o verificador e o relatório veem quantas aves ficaram de fora. */
+  pesoParcial?: { avesComPeso: number; avesSemPeso: number; lotesSemPeso: number };
   /** Período calculado pela chegada ao pré-resfriamento; ausente em lotes digitados à mão. */
   chegada?: ChegadaRegistrada;
   /** Resposta à pergunta "houve pausa da linha neste período?" — obrigatória antes de usar as cargas calculadas. */
