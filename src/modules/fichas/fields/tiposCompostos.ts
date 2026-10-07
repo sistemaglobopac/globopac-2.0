@@ -438,6 +438,39 @@ export interface PotabilidadeAguaValor {
   detalhesRNC: string | null;
 }
 
+/** Potabilidade da Água nos pontos de coleta (Especial SIF): o ponto sorteado e o pH e o cloro (ppm) como digitados. */
+export interface PotabilidadePontosValor {
+  ponto: string;
+  ph: string;
+  cloro: string;
+  conformidade: boolean;
+  detalhesRNC: string | null;
+}
+
+export type ChaveTanqueAbsorcao = "preChiller" | "chiller1" | "chiller2";
+
+/** Controle de Absorção (Especial SIF): tempo de permanência no pré-chiller, temperatura da água e
+ * borbulhamento ("moderado" | "intenso") do pré-chiller e dos chillers 1 e 2, como digitados. */
+export interface ControleAbsorcaoValor {
+  tempoPermanenciaMin: string;
+  temperaturas: Record<ChaveTanqueAbsorcao, string>;
+  borbulhamento: Record<ChaveTanqueAbsorcao, string>;
+  observacao: string;
+  conformidade: boolean;
+  detalhesRNC: string | null;
+}
+
+export type ChaveParteMiudo = "cabeca" | "pes" | "moela" | "figado" | "coracao";
+
+/** Qualidade de Miúdos e Pertences (Especial SIF): por parte, a quantidade avaliada e a quantidade com
+ * cada defeito, como digitadas (o percentual é calculado). */
+export interface QualidadeMiudosValor {
+  partes: Record<ChaveParteMiudo, { amostra: string; defeitos: Record<string, string> }>;
+  observacao: string;
+  conformidade: boolean;
+  detalhesRNC: string | null;
+}
+
 export type ChaveSalaChecklist = "carcacas" | "miudos" | "geral";
 
 /** Checklist de conformidade (Águas Residuais e Ventilação) das salas de pré-resfriamento de

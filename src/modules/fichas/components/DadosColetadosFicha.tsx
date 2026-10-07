@@ -23,6 +23,9 @@ import {
   RastreabilidadeDoaRelatorio,
   TemperaturaResfriamentoRelatorio,
   PotabilidadeAguaRelatorio,
+  PotabilidadePontosRelatorio,
+  QualidadeMiudosRelatorio,
+  ControleAbsorcaoRelatorio,
   ChecklistConformidadeRelatorio,
   RecepcaoAvesRelatorio,
 } from "./relatorio/CamposEspeciaisRelatorio";
@@ -43,6 +46,9 @@ import type {
   RastreabilidadeDoaValor,
   TemperaturaResfriamentoValor,
   PotabilidadeAguaValor,
+  PotabilidadePontosValor,
+  QualidadeMiudosValor,
+  ControleAbsorcaoValor,
   ChecklistConformidadeValor,
   RecepcaoAvesValor,
 } from "../fields/tiposCompostos";
@@ -154,11 +160,18 @@ export function DadosColetados({
             return valor ? <TemperaturaResfriamentoRelatorio key={campo.chave} valor={valor as TemperaturaResfriamentoValor} titulo={rotulo} /> : null;
           case "potabilidade_agua":
             return valor ? <PotabilidadeAguaRelatorio key={campo.chave} valor={valor as PotabilidadeAguaValor} titulo={rotulo} /> : null;
+          case "controle_absorcao":
+            return valor ? <ControleAbsorcaoRelatorio key={campo.chave} valor={valor as ControleAbsorcaoValor} titulo={rotulo} /> : null;
+          case "qualidade_miudos":
+            return valor ? <QualidadeMiudosRelatorio key={campo.chave} valor={valor as QualidadeMiudosValor} titulo={rotulo} /> : null;
+          case "potabilidade_pontos":
+            return valor ? <PotabilidadePontosRelatorio key={campo.chave} valor={valor as PotabilidadePontosValor} titulo={rotulo} /> : null;
           case "aguas_residuais":
           case "ventilacao":
           case "higiene_habitos":
           case "pso":
           case "higiene_operacional":
+          case "higiene_colaboradores":
             return valor ? <ChecklistConformidadeRelatorio key={campo.chave} tipo={campo.tipo} valor={valor as ChecklistConformidadeValor} titulo={rotulo} /> : null;
           case "caixas_vazias":
             return valor ? <CaixasVaziasRelatorio key={campo.chave} valor={valor as CaixasVaziasValor} titulo={rotulo} /> : null;

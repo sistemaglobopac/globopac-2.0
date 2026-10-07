@@ -13,9 +13,12 @@ import { motivosBloqueioRecepcao } from "../fields/recepcaoAves";
 import { motivosBloqueioDoa } from "../fields/rastreabilidadeDoa";
 import { motivosBloqueioTemperatura } from "../fields/temperaturaResfriamento";
 import { motivosBloqueioPotabilidade } from "../fields/potabilidadeAgua";
+import { motivosBloqueioPotabilidadePontos } from "../fields/potabilidadePontos";
+import { motivosBloqueioQualidadeMiudos } from "../fields/qualidadeMiudos";
+import { motivosBloqueioControleAbsorcao } from "../fields/controleAbsorcao";
 import { motivosBloqueioChecklist } from "../fields/checklistConformidade";
 import { motivosPreenchimentoCarcacas, motivosPreenchimentoChuveiro, motivosPreenchimentoMiudos, motivosPreenchimentoPartes } from "../fields/preenchimentoSpr";
-import type { CaixasVaziasValor, ChillerCarcacasValor, ChillerPartesValor, EletronarcoseAvesValor, LavagemFinalValor, MiniChillersValor, EsperaAvesValor, OcorrenciaPragasValor, PenduraAvesValor, PesoCaixaValor, RastreabilidadeDoaValor, RecepcaoAvesValor, TemperaturaResfriamentoValor, PotabilidadeAguaValor, ChecklistConformidadeValor } from "../fields/tiposCompostos";
+import type { CaixasVaziasValor, ChillerCarcacasValor, ChillerPartesValor, EletronarcoseAvesValor, LavagemFinalValor, MiniChillersValor, EsperaAvesValor, OcorrenciaPragasValor, PenduraAvesValor, PesoCaixaValor, RastreabilidadeDoaValor, RecepcaoAvesValor, TemperaturaResfriamentoValor, PotabilidadeAguaValor, PotabilidadePontosValor, QualidadeMiudosValor, ControleAbsorcaoValor, ChecklistConformidadeValor } from "../fields/tiposCompostos";
 
 export function motivosDeBloqueioSpr(
   campos: CampoTemplate[],
@@ -33,8 +36,20 @@ export function motivosDeBloqueioSpr(
       motivos.push(...motivosBloqueioDoa(dados[campo.chave] as RastreabilidadeDoaValor | undefined));
       continue;
     }
-    if (campo.tipo === "aguas_residuais" || campo.tipo === "ventilacao" || campo.tipo === "higiene_habitos" || campo.tipo === "pso" || campo.tipo === "higiene_operacional") {
+    if (campo.tipo === "aguas_residuais" || campo.tipo === "ventilacao" || campo.tipo === "higiene_habitos" || campo.tipo === "pso" || campo.tipo === "higiene_operacional" || campo.tipo === "higiene_colaboradores") {
       motivos.push(...motivosBloqueioChecklist(campo.tipo, dados[campo.chave] as ChecklistConformidadeValor | undefined));
+      continue;
+    }
+    if (campo.tipo === "controle_absorcao") {
+      motivos.push(...motivosBloqueioControleAbsorcao(dados[campo.chave] as ControleAbsorcaoValor | undefined));
+      continue;
+    }
+    if (campo.tipo === "qualidade_miudos") {
+      motivos.push(...motivosBloqueioQualidadeMiudos(dados[campo.chave] as QualidadeMiudosValor | undefined));
+      continue;
+    }
+    if (campo.tipo === "potabilidade_pontos") {
+      motivos.push(...motivosBloqueioPotabilidadePontos(dados[campo.chave] as PotabilidadePontosValor | undefined));
       continue;
     }
     if (campo.tipo === "potabilidade_agua") {

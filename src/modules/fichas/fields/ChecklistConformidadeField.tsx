@@ -6,6 +6,7 @@ import {
   avaliarChecklist,
   CHECKLISTS,
   checklistVazio,
+  itensDaSala,
   montarValorChecklist,
   motivosBloqueioChecklist,
   OPCOES_POR_MODO,
@@ -54,9 +55,9 @@ export function ChecklistConformidadeField({ tipo, value, onChange, disabled }: 
         {salasDoChecklist(tipo).map((sala) => (
           <div key={sala.chave} className="space-y-2 rounded-md border bg-muted/20 p-3" data-testid={`sala-${sala.chave}`}>
             {sala.chave !== "geral" && <h4 className="text-sm font-black text-primary">{sala.rotulo}</h4>}
-            {def.itens.map((item, indice) => {
+            {itensDaSala(tipo, sala.chave).map((item, indice, itensSala) => {
               const resposta = v.salas?.[sala.chave]?.[item.chave] ?? "";
-              const novoGrupo = item.grupo && item.grupo !== def.itens[indice - 1]?.grupo;
+              const novoGrupo = item.grupo && item.grupo !== itensSala[indice - 1]?.grupo;
               return (
                 <div key={item.chave} className="space-y-2">
                   {novoGrupo && <h5 className="pt-2 text-xs font-black uppercase tracking-wider text-muted-foreground">{item.grupo}</h5>}

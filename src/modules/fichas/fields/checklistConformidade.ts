@@ -5,7 +5,7 @@
 // CONFORME. Testadas em tests/unit/checklistConformidade.test.ts.
 import type { ChaveSalaChecklist, ChecklistConformidadeValor } from "./tiposCompostos";
 
-export type TipoChecklist = "aguas_residuais" | "ventilacao" | "higiene_habitos" | "pso" | "higiene_operacional";
+export type TipoChecklist = "aguas_residuais" | "ventilacao" | "higiene_habitos" | "pso" | "higiene_operacional" | "higiene_colaboradores";
 
 /** `conforme`: Conforme / Não conforme / Não se aplica. `sim_e_nc`: Sim / Não, em que "Sim" é a não conformidade. */
 export type ModoItem = "conforme" | "sim_e_nc";
@@ -16,6 +16,8 @@ export interface ItemChecklist {
   modo: ModoItem;
   /** Título do bloco em que o item aparece (opcional). */
   grupo?: string;
+  /** Salas em que o item existe; ausente = todas as salas do checklist. */
+  somenteSalas?: ChaveSalaChecklist[];
 }
 
 export interface DefinicaoChecklist {
@@ -57,6 +59,25 @@ export const CHECKLISTS: Record<TipoChecklist, DefinicaoChecklist> = {
       { chave: "calhas", rotulo: "Calhas", modo: "conforme" },
     ],
   },
+  higiene_colaboradores: {
+    titulo: "Monitoramento de Higiene e Hábitos Higiênicos dos Colaboradores",
+    salas: ["geral"],
+    itens: [
+      { chave: "ausenciaRoupasCivis", rotulo: "Ausência de roupas civis sob o uniforme", modo: "conforme" },
+      { chave: "uniformeCompletoLimpo", rotulo: "Uniforme completo e limpo", modo: "conforme" },
+      { chave: "toucaAmarrada", rotulo: "Touca devidamente amarrada", modo: "conforme" },
+      { chave: "botasLimpas", rotulo: "Botas limpas", modo: "conforme" },
+      { chave: "episLimpos", rotulo: "EPIs limpos", modo: "conforme" },
+      { chave: "unhasCurtasLimpas", rotulo: "Unhas curtas e limpas, sem esmalte", modo: "conforme" },
+      { chave: "ausenciaBarba", rotulo: "Homens: ausência de barba", modo: "conforme" },
+      { chave: "cabelosNaoAparentes", rotulo: "Cabelos não aparentes", modo: "conforme" },
+      { chave: "ausenciaAdornos", rotulo: "Ausência de adornos", modo: "conforme" },
+      { chave: "ausenciaCosmeticos", rotulo: "Ausência de uso de cosméticos", modo: "conforme" },
+      { chave: "ausenciaFerimentos", rotulo: "Ausência de ferimentos expostos", modo: "conforme" },
+      { chave: "ausenciaPerfume", rotulo: "Ausência de cheiro de perfume", modo: "conforme" },
+      { chave: "ausenciaEletronicos", rotulo: "Ausência de aparelhos eletrônicos", modo: "conforme" },
+    ],
+  },
   higiene_habitos: {
     titulo: "Higiene e Hábitos Higiênicos dos Colaboradores",
     itens: [
@@ -79,13 +100,13 @@ export const CHECKLISTS: Record<TipoChecklist, DefinicaoChecklist> = {
     titulo: "Monitoramento de Águas Residuais",
     itens: [
       { chave: "excessoAguaPiso", rotulo: "Excesso de água no piso", modo: "sim_e_nc" },
-      { chave: "escoamentoCarcacas", rotulo: "Escoamento de água dos tanques de pré-resfriamento de carcaças", modo: "conforme" },
-      { chave: "escoamentoPartes", rotulo: "Escoamento de água dos tanques de partes", modo: "conforme" },
-      { chave: "escoamentoMiudos", rotulo: "Escoamento de água dos tanques de pré-resfriamento de miúdos", modo: "conforme" },
-      { chave: "escoamentoEmbalagemMiudos", rotulo: "Escoamento de água da máquina de embalar miúdos", modo: "conforme" },
-      { chave: "escoamentoEsteiraCones", rotulo: "Escoamento de água da esteira de frango para as linhas de cone", modo: "conforme" },
-      { chave: "escoamentoPiaMaos", rotulo: "Escoamento de água da pia de higienizar mãos", modo: "conforme" },
-      { chave: "direcionamentoCanaletas", rotulo: "Direcionamento da água para as canaletas", modo: "conforme" },
+      { chave: "escoamentoCarcacas", rotulo: "Escoamento da água dos tanques de pré-resfriamento de carcaças", modo: "conforme", somenteSalas: ["carcacas"] },
+      { chave: "escoamentoPartes", rotulo: "Escoamento da água do tanque de pré-resfriamento de partes", modo: "conforme", somenteSalas: ["carcacas"] },
+      { chave: "escoamentoEsteiraCones", rotulo: "Escoamento da água de auto-higienização da esteira de frango inteiro para linhas de cone", modo: "conforme", somenteSalas: ["carcacas"] },
+      { chave: "escoamentoMiudos", rotulo: "Escoamento da água dos tanques de pré-resfriamento de miúdos", modo: "conforme", somenteSalas: ["miudos"] },
+      { chave: "escoamentoEmbalagemMiudos", rotulo: "Escoamento da água da auto-higienização da máquina de embalar miúdos", modo: "conforme", somenteSalas: ["miudos"] },
+      { chave: "escoamentoPiaMaos", rotulo: "Escoamento da água da pia de higienizar mãos", modo: "conforme", somenteSalas: ["miudos"] },
+      { chave: "direcionamentoCanaletas", rotulo: "Direcionamento da água para canaletas", modo: "conforme" },
       { chave: "canaletasDesobstruidas", rotulo: "Canaletas desobstruídas", modo: "conforme" },
     ],
   },
@@ -119,6 +140,11 @@ export function salasDoChecklist(tipo: TipoChecklist) {
   return SALAS_CHECKLIST.filter((s) => (def.salas ? def.salas.includes(s.chave) : s.chave !== "geral"));
 }
 
+/** Itens que existem na sala (alguns itens são específicos de uma sala). */
+export function itensDaSala(tipo: TipoChecklist, sala: ChaveSalaChecklist): ItemChecklist[] {
+  return CHECKLISTS[tipo].itens.filter((i) => !i.somenteSalas || i.somenteSalas.includes(sala));
+}
+
 export function rotuloResposta(modo: ModoItem, resposta: string | undefined): string {
   return OPCOES_POR_MODO[modo].find((o) => o.valor === resposta)?.rotulo ?? "—";
 }
@@ -128,9 +154,8 @@ export function respostaNaoConforme(modo: ModoItem, resposta: string | undefined
 }
 
 export function checklistVazio(tipo: TipoChecklist): ChecklistConformidadeValor {
-  const itens = () => Object.fromEntries(CHECKLISTS[tipo].itens.map((i) => [i.chave, ""]));
   return {
-    salas: Object.fromEntries(salasDoChecklist(tipo).map((s) => [s.chave, itens()])) as Record<ChaveSalaChecklist, Record<string, string>>,
+    salas: Object.fromEntries(salasDoChecklist(tipo).map((s) => [s.chave, Object.fromEntries(itensDaSala(tipo, s.chave).map((i) => [i.chave, ""]))])) as Record<ChaveSalaChecklist, Record<string, string>>,
     observacao: "",
     conformidade: true,
     detalhesRNC: null,
@@ -141,7 +166,7 @@ export function checklistVazio(tipo: TipoChecklist): ChecklistConformidadeValor 
 export function avaliarChecklist(tipo: TipoChecklist, v: ChecklistConformidadeValor): { conformidade: boolean; motivos: string[] } {
   const motivos: string[] = [];
   for (const sala of salasDoChecklist(tipo)) {
-    for (const i of CHECKLISTS[tipo].itens) {
+    for (const i of itensDaSala(tipo, sala.chave)) {
       if (respostaNaoConforme(i.modo, v.salas?.[sala.chave]?.[i.chave])) {
         motivos.push(`${sala.chave === "geral" ? "" : `${sala.curto} — `}${i.modo === "sim_e_nc" ? i.rotulo : `${i.rotulo}: não conforme`}`);
       }
@@ -161,7 +186,7 @@ export function motivosBloqueioChecklist(tipo: TipoChecklist, v: ChecklistConfor
   if (!v) return [`${def.titulo}: responda todos os itens.`];
   const motivos: string[] = [];
   for (const sala of salasDoChecklist(tipo)) {
-    for (const i of def.itens) {
+    for (const i of itensDaSala(tipo, sala.chave)) {
       if (!OPCOES_POR_MODO[i.modo].some((o) => o.valor === v.salas?.[sala.chave]?.[i.chave])) {
         motivos.push(`${def.titulo}: responda "${i.rotulo}"${sala.chave === "geral" ? "" : ` (${sala.rotulo})`}.`);
       }

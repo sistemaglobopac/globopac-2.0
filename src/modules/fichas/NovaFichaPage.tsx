@@ -346,7 +346,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
   );
   // Continuação de um monitoramento de antes de hoje (turno encerrado antes do lançamento): só é
   // oferecida quando hoje ainda não há registro desta ficha para herdar.
-  const camposComHeranca = campos.some((c) => ["chiller_carcacas", "chiller_partes", "mini_chillers", "lavagem_final", "potabilidade_agua"].includes(c.tipo));
+  const camposComHeranca = campos.some((c) => ["chiller_carcacas", "chiller_partes", "mini_chillers", "lavagem_final", "potabilidade_agua", "potabilidade_pontos"].includes(c.tipo));
   const { data: registroContinuavel } = useRegistroContinuavel(codigo, setor, turnoConhecido && camposComHeranca && ultimoRegistro === null);
   const [continuando, setContinuando] = useState(false);
   const [motivoContinuacao, setMotivoContinuacao] = useState("");

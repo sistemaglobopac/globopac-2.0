@@ -24,6 +24,9 @@ import type {
   RastreabilidadeDoaValor,
   TemperaturaResfriamentoValor,
   PotabilidadeAguaValor,
+  PotabilidadePontosValor,
+  QualidadeMiudosValor,
+  ControleAbsorcaoValor,
   ChecklistConformidadeValor,
   RecepcaoAvesValor,
   TanqueHidrometro,
@@ -35,6 +38,9 @@ import { COMPORTAMENTOS_AVES } from "@/modules/fichas/fields/esperaAves";
 import { formatarPctDoa } from "@/modules/fichas/fields/rastreabilidadeDoa";
 import { CHECKLISTS, respostaNaoConforme, rotuloResposta, salasDoChecklist, type TipoChecklist } from "@/modules/fichas/fields/checklistConformidade";
 import { cloroForaDoLimite, lerMedida, phForaDoLimite, rotuloTanque, SISTEMAS_POTABILIDADE } from "@/modules/fichas/fields/potabilidadeAgua";
+import { cloroPontoForaDoLimite, phPontoForaDoLimite, rotuloPonto } from "@/modules/fichas/fields/potabilidadePontos";
+import { rotuloBorbulhamento, TANQUES_ABSORCAO, temperaturaAbsorcaoAcimaDoLimite } from "@/modules/fichas/fields/controleAbsorcao";
+import { defeitoAcimaDoMaximo, formatarPct, lerContagem, PARTES_MIUDOS, percentualDefeito } from "@/modules/fichas/fields/qualidadeMiudos";
 import { LIMITE_AGUA_C, LIMITE_AMBIENTE_C, LIMITE_PRODUTO_C, lerTemperatura, PONTOS_AGUA, PONTOS_AMBIENTE, PRODUTOS } from "@/modules/fichas/fields/temperaturaResfriamento";
 import { CONDICOES_ANIMAIS, formatarDataHora, formatarDuracao, LIMITE_JEJUM_MAX_H } from "@/modules/fichas/fields/recepcaoAves";
 import {
@@ -990,6 +996,125 @@ export function PotabilidadeAguaRelatorio({
               </tr>
             );
           })}
+        </tbody>
+      </table>
+      {valor.conformidade === false && valor.detalhesRNC && <p className="text-[10px] font-semibold text-destructive print:text-[8px]">{valor.detalhesRNC}</p>}
+    </div>
+  );
+}
+
+export function ControleAbsorcaoRelatorio({ valor, titulo = "Controle de Absorção" }: { valor: ControleAbsorcaoValor; titulo?: string }) {
+  const fmtTemp = (texto: string | undefined) => {
+    const n = lerTemperatura(texto);
+    return n === null ? "—" : `${n.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ºC`;
+  };
+  const tempo = lerMedida(valor.tempoPermanenciaMin);
+  return (
+    <div className="col-span-full space-y-2 rounded-lg border border-hairline bg-gray-50 p-3 print:p-2" data-testid="relatorio-controle-absorcao">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] font-black uppercase tracking-wider text-primary print:text-[9px]">{titulo}</span>
+        <SeloConformidade conforme={valor.conformidade !== false} />
+      </div>
+      <p className="text-[10px] print:text-[8px]">
+        Tempo de permanência das carcaças no pré-chiller: <strong>{tempo === null ? "—" : `${tempo.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} min`}</strong>
+      </p>
+      <table className="w-full text-[10px] print:text-[8px]">
+        <thead>
+          <tr className="text-left text-muted-foreground">
+            <th className="pr-2 font-normal">Tanque</th>
+            <th className="pr-2 font-normal">Temperatura da água</th>
+            <th className="font-normal">Borbulhamento</th>
+          </tr>
+        </thead>
+        <tbody>
+          {TANQUES_ABSORCAO.map((t) => (
+            <tr key={t.chave}>
+              <td className="pr-2">{t.rotulo}</td>
+              <td className={temperaturaAbsorcaoAcimaDoLimite(t.chave, lerTemperatura(valor.temperaturas?.[t.chave])) ? "pr-2 font-black text-destructive" : "pr-2 font-black"}>
+                {fmtTemp(valor.temperaturas?.[t.chave])}
+              </td>
+              <td className="font-black">{rotuloBorbulhamento(valor.borbulhamento?.[t.chave])}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {valor.observacao?.trim() && <p className="text-[10px] italic text-ink print:text-[8px]">Observações: {valor.observacao}</p>}
+      {valor.conformidade === false && valor.detalhesRNC && <p className="text-[10px] font-semibold text-destructive print:text-[8px]">{valor.detalhesRNC}</p>}
+    </div>
+  );
+}
+
+export function QualidadeMiudosRelatorio({ valor, titulo = "Qualidade de Miúdos e Pertences" }: { valor: QualidadeMiudosValor; titulo?: string }) {
+  return (
+    <div className="col-span-full space-y-2 rounded-lg border border-hairline bg-gray-50 p-3 print:p-2" data-testid="relatorio-qualidade-miudos">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] font-black uppercase tracking-wider text-primary print:text-[9px]">{titulo}</span>
+        <SeloConformidade conforme={valor.conformidade !== false} />
+      </div>
+      <table className="w-full text-[10px] print:text-[8px]">
+        <thead>
+          <tr className="text-left text-muted-foreground">
+            <th className="pr-2 font-normal">Parte / defeito</th>
+            <th className="pr-2 font-normal">Avaliadas</th>
+            <th className="pr-2 font-normal">Com defeito</th>
+            <th className="pr-2 font-normal">%</th>
+            <th className="font-normal">Máx.</th>
+          </tr>
+        </thead>
+        <tbody>
+          {PARTES_MIUDOS.map((p) => {
+            const reg = valor.partes?.[p.chave];
+            const amostra = lerContagem(reg?.amostra);
+            return p.defeitos.map((d, i) => {
+              const defeitos = lerContagem(reg?.defeitos?.[d.chave]);
+              const nc = defeitoAcimaDoMaximo(defeitos, amostra, d.maximoPct);
+              return (
+                <tr key={`${p.chave}-${d.chave}`}>
+                  <td className="pr-2">
+                    {i === 0 && <strong>{p.rotulo}: </strong>}
+                    {d.rotulo}
+                  </td>
+                  <td className="pr-2">{i === 0 ? (amostra ?? "—") : ""}</td>
+                  <td className="pr-2">{defeitos ?? "—"}</td>
+                  <td className={nc ? "pr-2 font-black text-destructive" : "pr-2 font-black"}>{formatarPct(percentualDefeito(defeitos, amostra))}</td>
+                  <td>{d.maximoPct.toLocaleString("pt-BR")}%</td>
+                </tr>
+              );
+            });
+          })}
+        </tbody>
+      </table>
+      {valor.observacao?.trim() && <p className="text-[10px] italic text-ink print:text-[8px]">Observações: {valor.observacao}</p>}
+      {valor.conformidade === false && valor.detalhesRNC && <p className="text-[10px] font-semibold text-destructive print:text-[8px]">{valor.detalhesRNC}</p>}
+    </div>
+  );
+}
+
+export function PotabilidadePontosRelatorio({ valor, titulo = "Potabilidade da Água nos Pontos de Coleta" }: { valor: PotabilidadePontosValor; titulo?: string }) {
+  const fmt = (texto: string | undefined) => {
+    const n = lerMedida(texto);
+    return n === null ? "—" : n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+  };
+  return (
+    <div className="col-span-full space-y-2 rounded-lg border border-hairline bg-gray-50 p-3 print:p-2" data-testid="relatorio-potabilidade-pontos">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] font-black uppercase tracking-wider text-primary print:text-[9px]">{titulo}</span>
+        <SeloConformidade conforme={valor.conformidade !== false} />
+      </div>
+      <table className="w-full text-[10px] print:text-[8px]">
+        <thead>
+          <tr className="text-left text-muted-foreground">
+            <th className="pr-2 font-normal">Ponto de coleta</th>
+            <th className="pr-2 font-normal">pH</th>
+            <th className="font-normal">Cloro (ppm)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td className="pr-2">{rotuloPonto(valor.ponto)}</td>
+            <td className={phPontoForaDoLimite(lerMedida(valor.ph)) ? "pr-2 font-black text-destructive" : "pr-2 font-black"}>{fmt(valor.ph)}</td>
+            <td className={cloroPontoForaDoLimite(lerMedida(valor.cloro)) ? "font-black text-destructive" : "font-black"}>{fmt(valor.cloro)}</td>
+          </tr>
         </tbody>
       </table>
       {valor.conformidade === false && valor.detalhesRNC && <p className="text-[10px] font-semibold text-destructive print:text-[8px]">{valor.detalhesRNC}</p>}

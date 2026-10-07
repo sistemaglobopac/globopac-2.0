@@ -61,11 +61,15 @@ type TipoCampo =
   | "rastreabilidade_doa"
   | "temperatura_resfriamento"
   | "potabilidade_agua"
+  | "potabilidade_pontos"
+  | "qualidade_miudos"
+  | "controle_absorcao"
   | "aguas_residuais"
   | "ventilacao"
   | "higiene_habitos"
   | "pso"
   | "higiene_operacional"
+  | "higiene_colaboradores"
   | "assinatura";
 
 const TIPOS_CAMPO: { value: TipoCampo; label: string }[] = [
@@ -97,7 +101,11 @@ const TIPOS_CAMPO: { value: TipoCampo; label: string }[] = [
   { value: "ventilacao", label: "Monitoramento de Ventilação (Especial SIF)" },
   { value: "higiene_habitos", label: "Higiene e Hábitos Higiênicos dos Colaboradores (Especial SIF)" },
   { value: "pso", label: "Procedimentos Sanitários Operacionais: PSO 25, 26 e 28 (Especial SIF)" },
+  { value: "higiene_colaboradores", label: "Monitoramento de Higiene e Hábitos Higiênicos dos Colaboradores: uniforme e conduta pessoal, para vários setores (Especial SIF)" },
   { value: "higiene_operacional", label: "Higiene Operacional das Salas de Pré-resfriamento (Especial SIF)" },
+  { value: "controle_absorcao", label: "Controle de Absorção: permanência no pré-chiller, temperatura da água e borbulhamento (Especial SIF)" },
+  { value: "qualidade_miudos", label: "Qualidade de Miúdos e Pertences: cabeça, pés, moela, fígado e coração (Especial SIF)" },
+  { value: "potabilidade_pontos", label: "Potabilidade da Água nos Pontos de Coleta: pH e Cloro, com sorteio do ponto (Especial SIF)" },
   { value: "potabilidade_agua", label: "Potabilidade da Água: pH e Cloro dos Sistemas de Pré-resfriamento (Especial SIF)" },
   { value: "assinatura", label: "Assinatura Eletrônica (Fim)" },
 ];
@@ -243,6 +251,12 @@ function paraCampoTemplate(campo: CampoForm): CampoTemplate {
       return { ...base, tipo: "rastreabilidade_doa" };
     case "temperatura_resfriamento":
       return { ...base, tipo: "temperatura_resfriamento" };
+    case "controle_absorcao":
+      return { ...base, tipo: "controle_absorcao" };
+    case "qualidade_miudos":
+      return { ...base, tipo: "qualidade_miudos" };
+    case "potabilidade_pontos":
+      return { ...base, tipo: "potabilidade_pontos" };
     case "potabilidade_agua":
       return { ...base, tipo: "potabilidade_agua" };
     case "aguas_residuais":
@@ -255,6 +269,8 @@ function paraCampoTemplate(campo: CampoForm): CampoTemplate {
       return { ...base, tipo: "pso" };
     case "higiene_operacional":
       return { ...base, tipo: "higiene_operacional" };
+    case "higiene_colaboradores":
+      return { ...base, tipo: "higiene_colaboradores" };
     default:
       // Nunca devolver undefined: JSON.stringify o transforma em null dentro do array e a ficha
       // ativa ficaria sem campos (tela em branco para o inspetor).

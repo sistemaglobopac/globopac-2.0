@@ -25,6 +25,7 @@ export const TIPOS_DE_CONFIRMACAO: ReadonlySet<string> = new Set([
   "higiene_habitos",
   "pso",
   "higiene_operacional",
+  "higiene_colaboradores",
 ]);
 
 /** Chaves (dados_dinamicos) dos campos de confirmação de uma ficha: ficam fora da comparação. */

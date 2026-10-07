@@ -22,6 +22,9 @@ import type { CargasEmRascunhoPorTipo } from "./utils/rascunhosAnterior";
 import { RastreabilidadeDoaField } from "./fields/RastreabilidadeDoaField";
 import { TemperaturaResfriamentoField } from "./fields/TemperaturaResfriamentoField";
 import { PotabilidadeAguaField } from "./fields/PotabilidadeAguaField";
+import { PotabilidadePontosField } from "./fields/PotabilidadePontosField";
+import { QualidadeMiudosField } from "./fields/QualidadeMiudosField";
+import { ControleAbsorcaoField } from "./fields/ControleAbsorcaoField";
 import { ChecklistConformidadeField } from "./fields/ChecklistConformidadeField";
 import type {
   AbsorcaoAguaValor,
@@ -39,6 +42,9 @@ import type {
   RastreabilidadeDoaValor,
   TemperaturaResfriamentoValor,
   PotabilidadeAguaValor,
+  PotabilidadePontosValor,
+  QualidadeMiudosValor,
+  ControleAbsorcaoValor,
   ChecklistConformidadeValor,
   RecepcaoAvesValor,
   ParadaEquipamentoValor,
@@ -293,7 +299,37 @@ export function DynamicField({ campo, register, errors, control, prevAppointment
         />
       )}
 
-      {(campo.tipo === "aguas_residuais" || campo.tipo === "ventilacao" || campo.tipo === "higiene_habitos" || campo.tipo === "pso" || campo.tipo === "higiene_operacional") && (
+      {campo.tipo === "controle_absorcao" && (
+        <Controller
+          name={campo.chave}
+          control={control}
+          render={({ field }) => <ControleAbsorcaoField value={field.value as ControleAbsorcaoValor | undefined} onChange={field.onChange} />}
+        />
+      )}
+
+      {campo.tipo === "qualidade_miudos" && (
+        <Controller
+          name={campo.chave}
+          control={control}
+          render={({ field }) => <QualidadeMiudosField value={field.value as QualidadeMiudosValor | undefined} onChange={field.onChange} />}
+        />
+      )}
+
+      {campo.tipo === "potabilidade_pontos" && (
+        <Controller
+          name={campo.chave}
+          control={control}
+          render={({ field }) => (
+            <PotabilidadePontosField
+              value={field.value as PotabilidadePontosValor | undefined}
+              onChange={field.onChange}
+              prevAppointment={prevAppointment?.[campo.chave] as PotabilidadePontosValor | undefined}
+            />
+          )}
+        />
+      )}
+
+      {(campo.tipo === "aguas_residuais" || campo.tipo === "ventilacao" || campo.tipo === "higiene_habitos" || campo.tipo === "pso" || campo.tipo === "higiene_operacional" || campo.tipo === "higiene_colaboradores") && (
         <Controller
           name={campo.chave}
           control={control}

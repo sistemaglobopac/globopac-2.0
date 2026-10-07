@@ -3,6 +3,7 @@ import {
   avaliarChecklist,
   CHECKLISTS,
   checklistVazio,
+  itensDaSala,
   montarValorChecklist,
   motivosBloqueioChecklist,
   respostaNaoConforme,
@@ -13,7 +14,7 @@ import {
 function tudoConforme(tipo: TipoChecklist) {
   const v = checklistVazio(tipo);
   for (const sala of Object.keys(v.salas) as ("carcacas" | "miudos" | "geral")[]) {
-    for (const i of CHECKLISTS[tipo].itens) v.salas[sala][i.chave] = i.modo === "sim_e_nc" ? "nao" : "conforme";
+    for (const i of itensDaSala(tipo, sala)) v.salas[sala][i.chave] = i.modo === "sim_e_nc" ? "nao" : "conforme";
   }
   return v;
 }
@@ -25,6 +26,29 @@ describe("checklists de conformidade", () => {
     expect(CHECKLISTS.ventilacao.itens.map((i) => i.rotulo)).toEqual(["Ausência de odores", "Ausência de condensações", "Ausência de vapores"]);
   });
 
+  it("Águas Residuais: cada sala tem só os seus itens", () => {
+    expect(itensDaSala("aguas_residuais", "carcacas").map((i) => i.chave)).toEqual([
+      "excessoAguaPiso",
+      "escoamentoCarcacas",
+      "escoamentoPartes",
+      "escoamentoEsteiraCones",
+      "direcionamentoCanaletas",
+      "canaletasDesobstruidas",
+    ]);
+    expect(itensDaSala("aguas_residuais", "miudos").map((i) => i.chave)).toEqual([
+      "excessoAguaPiso",
+      "escoamentoMiudos",
+      "escoamentoEmbalagemMiudos",
+      "escoamentoPiaMaos",
+      "direcionamentoCanaletas",
+      "canaletasDesobstruidas",
+    ]);
+    const v = checklistVazio("aguas_residuais");
+    expect(Object.keys(v.salas.carcacas)).not.toContain("escoamentoPiaMaos");
+    expect(Object.keys(v.salas.miudos)).not.toContain("escoamentoPartes");
+    expect(itensDaSala("ventilacao", "miudos")).toHaveLength(3);
+  });
+
   it("excesso de água no piso: Sim é não conforme e Não é conforme", () => {
     expect(respostaNaoConforme("sim_e_nc", "sim")).toBe(true);
     expect(respostaNaoConforme("sim_e_nc", "nao")).toBe(false);
@@ -33,9 +57,9 @@ describe("checklists de conformidade", () => {
     expect(rotuloResposta("conforme", "")).toBe("—");
   });
 
-  it("o item que não existe na sala pode ser marcado 'Não se aplica' e não reprova", () => {
+  it("'Não se aplica' não reprova", () => {
     const v = tudoConforme("aguas_residuais");
-    v.salas.carcacas.escoamentoEmbalagemMiudos = "na";
+    v.salas.carcacas.escoamentoPartes = "na";
     expect(rotuloResposta("conforme", "na")).toBe("Não se aplica");
     expect(respostaNaoConforme("conforme", "na")).toBe(false);
     expect(avaliarChecklist("aguas_residuais", v).conformidade).toBe(true);
@@ -43,7 +67,7 @@ describe("checklists de conformidade", () => {
   });
 
   it("tudo conforme resulta em conforme, sem detalhes de RNC", () => {
-    for (const tipo of ["aguas_residuais", "ventilacao", "higiene_habitos", "pso", "higiene_operacional"] as const) {
+    for (const tipo of ["aguas_residuais", "ventilacao", "higiene_habitos", "pso", "higiene_operacional", "higiene_colaboradores"] as const) {
       expect(montarValorChecklist(tipo, tudoConforme(tipo))).toMatchObject({ conformidade: true, detalhesRNC: null });
     }
   });
@@ -68,7 +92,7 @@ describe("checklists de conformidade", () => {
     expect(motivosBloqueioChecklist("ventilacao", undefined)).toHaveLength(1);
     expect(motivosBloqueioChecklist("aguas_residuais", tudoConforme("aguas_residuais"))).toEqual([]);
     const v = tudoConforme("aguas_residuais");
-    v.salas.carcacas.escoamentoPiaMaos = "";
+    v.salas.carcacas.escoamentoPartes = "";
     v.salas.miudos.excessoAguaPiso = "";
     const m = motivosBloqueioChecklist("aguas_residuais", v);
     expect(m).toHaveLength(2);
@@ -132,5 +156,24 @@ describe("PSO e Higiene Operacional", () => {
     const v = tudoConforme("higiene_operacional");
     v.salas.miudos.calhas = "nao_conforme";
     expect(avaliarChecklist("higiene_operacional", v).motivos).toEqual(["Miúdos — Calhas: não conforme"]);
+  });
+});
+
+describe("Higiene e Hábitos Higiênicos dos Colaboradores (vários setores)", () => {
+  it("tem os 13 itens, sem divisão por sala", () => {
+    const def = CHECKLISTS.higiene_colaboradores;
+    expect(def.itens).toHaveLength(13);
+    expect(def.itens.every((i) => i.modo === "conforme")).toBe(true);
+    expect(Object.keys(checklistVazio("higiene_colaboradores").salas)).toEqual(["geral"]);
+  });
+
+  it("item não conforme reprova e fica sem prefixo de sala; falta de resposta bloqueia", () => {
+    const v = tudoConforme("higiene_colaboradores");
+    v.salas.geral.botasLimpas = "nao_conforme";
+    expect(avaliarChecklist("higiene_colaboradores", v).motivos).toEqual(["Botas limpas: não conforme"]);
+    v.salas.geral.ausenciaBarba = "na";
+    expect(avaliarChecklist("higiene_colaboradores", v).conformidade).toBe(false);
+    v.salas.geral.toucaAmarrada = "";
+    expect(motivosBloqueioChecklist("higiene_colaboradores", v)).toHaveLength(1);
   });
 });
