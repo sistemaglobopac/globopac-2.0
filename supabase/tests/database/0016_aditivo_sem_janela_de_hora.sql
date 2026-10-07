@@ -1,4 +1,4 @@
--- Testes pgTAP — o aditivo (adendo assinado) herda a hora do original sem a janela de 24 h
+-- Testes pgTAP — o aditivo (adendo assinado) herda a hora do original sem a janela de assinatura (72 h)
 -- (20261006180000_aditivo_sem_janela_de_hora.sql); um monitoramento NOVO com hora antiga continua recusado.
 
 create extension if not exists pgtap with schema extensions;
@@ -13,16 +13,16 @@ values ('e9100000-0000-0000-0000-000000000001', 'Insp Aditivo', 'insp.aditivo.te
 insert into fichas_templates (id, codigo, versao, nome, pac_correspondente, schema_campos)
 values ('f9100000-0000-0000-0000-000000000001', 'TEMP-ADITIVO', 1, 'Template Aditivo', 'PAC-000', '[]'::jsonb);
 
--- Original feito ha 3 dias (a hora so e validada ao inserir; aqui entra sem hora e recebe a antiga por update).
+-- Original feito ha 4 dias (alem do prazo de 72 h) (a hora so e validada ao inserir; aqui entra sem hora e recebe a antiga por update).
 insert into monitoramentos (id, ficha_template_id, versao_template, user_id, setor, dados_dinamicos) values
   ('19100000-0000-0000-0000-000000000001', 'f9100000-0000-0000-0000-000000000001', 1, 'e9100000-0000-0000-0000-000000000001', 'S1', '{"campo":1}'::jsonb);
 update monitoramentos
-set dados_dinamicos = jsonb_build_object('campo', 1, 'hora_monitoramento', to_char((now() - interval '3 days') at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'))
+set dados_dinamicos = jsonb_build_object('campo', 1, 'hora_monitoramento', to_char((now() - interval '4 days') at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'))
 where id = '19100000-0000-0000-0000-000000000001';
 
 select throws_ok(
-  $$insert into monitoramentos (ficha_template_id, versao_template, user_id, setor, dados_dinamicos) values ('f9100000-0000-0000-0000-000000000001', 1, 'e9100000-0000-0000-0000-000000000001', 'S1', jsonb_build_object('campo', 2, 'hora_monitoramento', to_char((now() - interval '3 days') at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')))$$,
-  'P0001', null, 'monitoramento NOVO com hora de 3 dias atras continua recusado'
+  $$insert into monitoramentos (ficha_template_id, versao_template, user_id, setor, dados_dinamicos) values ('f9100000-0000-0000-0000-000000000001', 1, 'e9100000-0000-0000-0000-000000000001', 'S1', jsonb_build_object('campo', 2, 'hora_monitoramento', to_char((now() - interval '4 days') at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')))$$,
+  'P0001', null, 'monitoramento NOVO com hora de 4 dias atras continua recusado'
 );
 select lives_ok(
   $$insert into monitoramentos (ficha_template_id, versao_template, user_id, setor, dados_dinamicos, aditivo_de)
