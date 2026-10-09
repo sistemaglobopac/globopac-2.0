@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, BellRing, Clock } from "lucide-react";
+import { AlertTriangle, BellRing, Clock, PauseCircle } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSessionStore } from "@/store/session";
 import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/api";
@@ -22,6 +22,7 @@ import {
   useTurnoHoje,
   type FichaAtrasada,
 } from "./api";
+import { ModalProcessoParado } from "./ModalProcessoParado";
 
 interface RncCritica {
   monitoramentoId: string;
@@ -56,6 +57,7 @@ export function GlobalInspectorAlerts() {
   const [agora, setAgora] = useState(() => new Date());
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [minimizado, setMinimizado] = useState(false);
+  const [paradaDe, setParadaDe] = useState<FichaAtrasada | null>(null);
 
   useEffect(() => {
     const id = setInterval(() => setAgora(new Date()), 15_000);
@@ -73,6 +75,9 @@ export function GlobalInspectorAlerts() {
         void queryClient.invalidateQueries({ queryKey: ["painel-bordo", "kpis"] });
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "fichas_encerradas_dia" }, () => {
+        void queryClient.invalidateQueries({ queryKey: ["painel-bordo", "kpis"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "monitoramentos_processo_parado" }, () => {
         void queryClient.invalidateQueries({ queryKey: ["painel-bordo", "kpis"] });
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "rnc" }, () => {
@@ -109,7 +114,7 @@ export function GlobalInspectorAlerts() {
     const aplicaveis = fichasAplicaveisAoInspetor(kpis.fichasAtivas, userSetores);
     // Rascunho = monitoramento já realizado (só não assinado): não é atraso.
     const feitos = [...kpis.monitoramentosDoSetorHoje, ...rascunhosComoMonitoramentos(rascunhos, userSetores)];
-    return calcularFichasAtrasadas(aplicaveis, feitos, agora, new Set(kpis.fichasEncerradasHoje)).filter(
+    return calcularFichasAtrasadas(aplicaveis, feitos, agora, new Set(kpis.fichasEncerradasHoje), kpis.processosParadosHoje).filter(
       (f) => !dismissed.has(`ficha_${f.ficha.id}`)
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -359,6 +364,16 @@ export function GlobalInspectorAlerts() {
                         Ciente
                       </Button>
                     </div>
+                    {f.ficha.exige_processo_em_andamento && (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        data-testid={`processo-parado-${f.ficha.id}`}
+                        onClick={() => setParadaDe(f)}
+                      >
+                        <PauseCircle className="h-4 w-4" /> Processo parado (justificar)
+                      </Button>
+                    )}
                     {f.ficha.encerravel && (
                       <Button
                         type="button"
@@ -387,6 +402,7 @@ export function GlobalInspectorAlerts() {
           )}
         </div>
       </div>
+      {paradaDe && <ModalProcessoParado atrasada={paradaDe} userSetores={userSetores} onFechar={() => setParadaDe(null)} />}
     </div>
   );
 }

@@ -181,6 +181,8 @@ export interface FichaAtivaResumo {
   /** Ficha que depende de haver abate (tem o campo de espera das aves): pode ser "encerrada" no fim
    * do abate para não gerar atraso. Derivado de schema_campos ao carregar os KPIs. */
   encerravel?: boolean;
+  /** Ficha marcada no Construtor como "só com o processo em andamento": em atraso, aceita a justificativa "processo parado". */
+  exige_processo_em_andamento?: boolean;
 }
 
 type MonitoramentoComHora = MonitoramentoHoje & { hora_monitoramento: string | null };
@@ -212,10 +214,59 @@ export interface FichaAtrasada {
  * card pulsante aparece. */
 export const TOLERANCIA_ATRASO_MIN = 10;
 
+/** Setor em que o inspetor faz esta ficha: o primeiro dos setores dela que o inspetor atende. */
+export function setorDaFicha(ficha: Pick<FichaAtivaResumo, "locais_aplicacao">, userSetores: string[]): string {
+  return ficha.locais_aplicacao?.find((s) => userSetores.includes(s)) ?? userSetores[0] ?? "";
+}
+
 /** Link que abre a ficha direto no setor certo (NovaFichaPage lê ?ficha=&setor=). */
 export function urlNovaFicha(ficha: Pick<FichaAtivaResumo, "id" | "locais_aplicacao">, userSetores: string[]): string {
-  const setor = ficha.locais_aplicacao?.find((s) => userSetores.includes(s)) ?? userSetores[0] ?? "";
-  return `/fichas/nova?ficha=${ficha.id}&setor=${encodeURIComponent(setor)}`;
+  return `/fichas/nova?ficha=${ficha.id}&setor=${encodeURIComponent(setorDaFicha(ficha, userSetores))}`;
+}
+
+/** Motivos oferecidos quando não há catálogo de desvios cadastrado (parada de processo e processo parado). */
+export const MOTIVOS_PARADA_FALLBACK = ["Higiene Operacional", "Manutenção Quebra", "Contaminação", "Falta de Matéria-Prima", "Intervenção SIF"];
+
+/** "Processo parado": justificativa do inspetor para o monitoramento que não foi feito porque o processo
+ * estava parado. Dispensa o período em atraso; a cobrança volta no período seguinte. */
+export interface ProcessoParado {
+  ficha_codigo: string;
+  /** Início do período em atraso dispensado (ISO). */
+  referencia_em: string;
+  motivo?: string;
+  registrado_em?: string;
+}
+
+/** Período em atraso que a justificativa dispensa: o último horário devido (devidoEm + k × intervalo) que já
+ * passou até `agora`. O próximo é cobrado um intervalo depois dele. */
+export function referenciaDoProcessoParado(devidoEm: Date, intervaloMin: number, agora: Date): Date {
+  const passo = intervaloMin * 60_000;
+  const periodos = Math.max(0, Math.floor((agora.getTime() - devidoEm.getTime()) / passo));
+  return new Date(devidoEm.getTime() + periodos * passo);
+}
+
+/** Quando o sistema volta a cobrar a ficha depois do processo parado. */
+export function proximaCobrancaAposParada(referenciaEm: string | Date, intervaloMin: number): Date {
+  return new Date(new Date(referenciaEm).getTime() + intervaloMin * 60_000);
+}
+
+/** Fichas com o processo parado ainda sem cobrança: a justificativa vigente, até chegar o próximo horário devido. */
+export function paradasVigentes(
+  fichasAplicaveis: FichaAtivaResumo[],
+  paradas: readonly ProcessoParado[],
+  agora: Date
+): { ficha: FichaAtivaResumo; parada: ProcessoParado; voltaEm: Date }[] {
+  const resultado: { ficha: FichaAtivaResumo; parada: ProcessoParado; voltaEm: Date }[] = [];
+  for (const ficha of fichasAplicaveis) {
+    const intervalo = ficha.tempo_entre_apontamentos_min;
+    if (!intervalo || intervalo <= 0) continue;
+    const doCodigo = paradas.filter((p) => p.ficha_codigo === ficha.codigo);
+    if (doCodigo.length === 0) continue;
+    const parada = doCodigo.reduce((a, b) => (new Date(b.referencia_em) > new Date(a.referencia_em) ? b : a));
+    const voltaEm = proximaCobrancaAposParada(parada.referencia_em, intervalo);
+    if (agora < voltaEm) resultado.push({ ficha, parada, voltaEm });
+  }
+  return resultado;
 }
 
 export interface ResumoFichasSetor {
@@ -264,7 +315,10 @@ export function calcularFichasAtrasadas(
   monitoramentosHoje: { ficha_template_id: string; criado_em: string }[],
   agora: Date,
   /** Códigos das fichas encerradas hoje ("Encerrar abate"): nunca geram aviso de atraso. */
-  codigosEncerrados: ReadonlySet<string> = new Set()
+  codigosEncerrados: ReadonlySet<string> = new Set(),
+  /** Processo parado justificado: o período dispensado conta como se tivesse sido feito, então a próxima
+   * cobrança vem um intervalo depois dele. */
+  paradas: readonly ProcessoParado[] = []
 ): FichaAtrasada[] {
   const ultimoPorFicha = new Map<string, Date>();
   for (const m of monitoramentosHoje) {
@@ -278,9 +332,14 @@ export function calcularFichasAtrasadas(
   for (const ficha of fichasAplicaveis) {
     if (ficha.tipo_apontamento !== "Recorrente") continue;
     if (codigosEncerrados.has(ficha.codigo)) continue;
-    const ultimo = ultimoPorFicha.get(ficha.id);
+    let ultimo = ultimoPorFicha.get(ficha.id);
     // Sem monitoramento realizado ainda: não há hora devida, logo não há aviso de atraso.
     if (!ultimo) continue;
+    for (const p of paradas) {
+      if (p.ficha_codigo !== ficha.codigo) continue;
+      const referencia = new Date(p.referencia_em);
+      if (referencia > ultimo) ultimo = referencia;
+    }
     // Intervalo 0 (ou ausente): sem aviso de atraso.
     if (ficha.tempo_entre_apontamentos_min != null && ficha.tempo_entre_apontamentos_min > 0) {
       const devidoMs = ultimo.getTime() + ficha.tempo_entre_apontamentos_min * 60 * 1000;
@@ -357,6 +416,8 @@ export interface KpisTurno {
   fichasAtivas: FichaAtivaResumo[];
   /** Códigos das fichas encerradas hoje com "Encerrar abate". */
   fichasEncerradasHoje: string[];
+  /** Justificativas de "processo parado" registradas hoje (de qualquer inspetor). */
+  processosParadosHoje: ProcessoParado[];
   desviosAtivos: DesvioAtivo[];
   adendosPendentes: AdendoPendente[];
   nomesFicha: Map<string, { codigo: string; nome: string }>;
@@ -384,6 +445,7 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
         { data: recentes, error: erroRecentes },
         { data: fichasAtivasBrutas, error: erroFichas },
         { data: encerradas },
+        { data: processosParados },
       ] = await Promise.all([
         supabase
           .from("monitoramentos")
@@ -417,7 +479,7 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
           >(),
         supabase
           .from("fichas_templates")
-          .select("id, codigo, nome, tipo_apontamento, tempo_entre_apontamentos_min, locais_aplicacao, schema_campos")
+          .select("id, codigo, nome, tipo_apontamento, tempo_entre_apontamentos_min, exige_processo_em_andamento, locais_aplicacao, schema_campos")
           .eq("ativo", true)
           .overrideTypes<(FichaAtivaResumo & { schema_campos: { tipo?: string }[] | null })[], { merge: false }>(),
         // Erro aqui (ex.: migração ainda não aplicada) só significa "nenhuma ficha encerrada".
@@ -426,6 +488,12 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
           .select("codigo")
           .eq("dia", diaManaus(new Date()))
           .overrideTypes<{ codigo: string }[], { merge: false }>(),
+        // Idem: sem a migração, ninguém tem processo parado registrado.
+        supabase
+          .from("monitoramentos_processo_parado")
+          .select("ficha_codigo, referencia_em, motivo, registrado_em")
+          .gte("registrado_em", desdeHoje)
+          .overrideTypes<ProcessoParado[], { merge: false }>(),
       ]);
       const fichasAtivas: FichaAtivaResumo[] = (fichasAtivasBrutas ?? []).map(({ schema_campos, ...ficha }) => ({
         ...ficha,
@@ -539,7 +607,7 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
           return versaoAtivaPorTemplate.has(m.ficha_template_id) ? { ...efetivo, ficha_template_id: versaoAtivaPorTemplate.get(m.ficha_template_id)! } : efetivo;
         });
 
-      return { monitoramentosHoje: normalizar(monitoramentosHoje), monitoramentosDoSetorHoje: normalizar(monitoramentosDoSetor), fichasAtivas, fichasEncerradasHoje: (encerradas ?? []).map((e) => e.codigo), desviosAtivos, adendosPendentes, nomesFicha };
+      return { monitoramentosHoje: normalizar(monitoramentosHoje), monitoramentosDoSetorHoje: normalizar(monitoramentosDoSetor), fichasAtivas, fichasEncerradasHoje: (encerradas ?? []).map((e) => e.codigo), processosParadosHoje: processosParados ?? [], desviosAtivos, adendosPendentes, nomesFicha };
     },
   });
 }
@@ -563,6 +631,25 @@ export function useReabrirFichaDia() {
   return useMutation({
     mutationFn: async (codigo: string) => {
       const { error } = await supabase.from("fichas_encerradas_dia").delete().eq("codigo", codigo).eq("dia", diaManaus(new Date()));
+      if (error) throw error;
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["painel-bordo", "kpis"] }),
+  });
+}
+
+/** "Processo parado": o inspetor justifica por que o monitoramento em atraso não foi feito. A cobrança só volta
+ * no período seguinte (ver referenciaDoProcessoParado). Registro de auditoria — só insere. */
+export function useRegistrarProcessoParado() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { fichaCodigo: string; setor: string | null; referenciaEm: Date; motivo: string; detalhes: string | null }) => {
+      const { error } = await supabase.from("monitoramentos_processo_parado").insert({
+        ficha_codigo: input.fichaCodigo,
+        setor: input.setor,
+        referencia_em: input.referenciaEm.toISOString(),
+        motivo: input.motivo,
+        detalhes: input.detalhes,
+      });
       if (error) throw error;
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["painel-bordo", "kpis"] }),

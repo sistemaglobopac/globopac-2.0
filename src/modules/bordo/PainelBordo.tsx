@@ -19,6 +19,7 @@ import {
   LogOut,
   ShieldCheck,
   CheckCircle2,
+  PauseCircle,
   X,
 } from "lucide-react";
 import { useSessionStore } from "@/store/session";
@@ -40,6 +41,8 @@ import {
   useKpisTurno,
   useAssinarAdendo,
   PAUSAS_CONFIG,
+  MOTIVOS_PARADA_FALLBACK,
+  paradasVigentes,
   fichasAplicaveisAoInspetor,
   calcularFichasAtrasadas,
   resumoFichasPorSetor,
@@ -52,14 +55,13 @@ import {
   type DesvioAtivo,
   type AdendoPendente,
 } from "./api";
+import { ModalProcessoParado } from "./ModalProcessoParado";
 import { Button } from "@/shared/ui/button";
 import { rascunhosComoMonitoramentos, useRascunhos } from "@/modules/fichas/useRascunhos";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Select } from "@/shared/ui/select";
 import { Textarea } from "@/shared/ui/textarea";
-
-const MOTIVOS_PARADA_FALLBACK = ["Higiene Operacional", "Manutenção Quebra", "Contaminação", "Falta de Matéria-Prima", "Intervenção SIF"];
 
 type CategoriaKpi = "monitoramentos" | "fichasAtivas" | "fichasAtrasadas" | "rnc";
 
@@ -125,6 +127,7 @@ export function PainelBordo() {
   const [showConfirmTurno, setShowConfirmTurno] = useState(false);
   const [pausaParaConfirmar, setPausaParaConfirmar] = useState<TipoPausa | null>(null);
   const [showModalParada, setShowModalParada] = useState(false);
+  const [processoParadoDe, setProcessoParadoDe] = useState<FichaAtrasada | null>(null);
   const [categoriaKpiModal, setCategoriaKpiModal] = useState<CategoriaKpi | null>(null);
   const [desvioDetalhe, setDesvioDetalhe] = useState<DesvioAtivo | null>(null);
   const [autocorrigindo, setAutocorrigindo] = useState<{ monitoramentoId: string; fichaNome: string } | null>(null);
@@ -247,7 +250,8 @@ export function PainelBordo() {
   const fichasIniciadas = fichasAplicaveis.filter((f) => fichasIniciadasNoTurno.has(f.id));
   const codigosEncerrados = new Set(kpis?.fichasEncerradasHoje ?? []);
   const fichasEncerradas = fichasAplicaveis.filter((f) => f.encerravel && codigosEncerrados.has(f.codigo));
-  const fichasAtrasadas = turnoHoje ? calcularFichasAtrasadas(fichasAplicaveis, [...(kpis?.monitoramentosDoSetorHoje ?? []), ...rascunhosComoMonitoramentos(rascunhosLocais, userSetores)], agora, codigosEncerrados) : [];
+  const fichasAtrasadas = turnoHoje ? calcularFichasAtrasadas(fichasAplicaveis, [...(kpis?.monitoramentosDoSetorHoje ?? []), ...rascunhosComoMonitoramentos(rascunhosLocais, userSetores)], agora, codigosEncerrados, kpis?.processosParadosHoje) : [];
+  const processosParados = paradasVigentes(fichasAplicaveis, kpis?.processosParadosHoje ?? [], agora);
   const desviosComRnc = (kpis?.desviosAtivos ?? []).filter((d) => d.rnc !== null);
   const bloqueadoPorPausa = pausaAtiva != null;
 
@@ -405,6 +409,18 @@ export function PainelBordo() {
                   {a.devidoEm && <> · devido às {formatarHoraManaus(a.devidoEm)}</>}
                 </span>
               </button>
+              {a.ficha.exige_processo_em_andamento && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={bloqueadoPorPausa}
+                  data-testid={`processo-parado-${a.ficha.id}`}
+                  onClick={() => setProcessoParadoDe(a)}
+                >
+                  <PauseCircle className="h-4 w-4" /> Processo parado (justificar)
+                </Button>
+              )}
               {a.ficha.encerravel && (
                 <Button
                   type="button"
@@ -420,6 +436,20 @@ export function PainelBordo() {
               </div>
             ))}
           </div>
+        </section>
+      )}
+
+      {processosParados.length > 0 && (
+        <section className="space-y-2 rounded-xl border bg-muted/40 p-4" data-testid="processos-parados">
+          <h2 className="text-sm font-black uppercase tracking-wider text-muted-foreground">Processo parado — monitoramento dispensado</h2>
+          {processosParados.map(({ ficha, parada, voltaEm }) => (
+            <p key={ficha.id} className="text-sm">
+              {ficha.codigo} · {ficha.nome}{" "}
+              <span className="text-muted-foreground">
+                ({parada.motivo ?? "processo parado"}) — volta a ser cobrado às {formatarHoraManaus(voltaEm.toISOString())}
+              </span>
+            </p>
+          ))}
         </section>
       )}
 
@@ -716,6 +746,15 @@ export function PainelBordo() {
           <LogOut className="h-4 w-4" />
           FINALIZAR TURNO
         </Button>
+      )}
+
+      {processoParadoDe && (
+        <ModalProcessoParado
+          atrasada={processoParadoDe}
+          userSetores={userSetores}
+          onFechar={() => setProcessoParadoDe(null)}
+          onRegistrado={() => setMensagem({ tipo: "success", texto: "Processo parado registrado. O monitoramento só será cobrado no próximo período." })}
+        />
       )}
 
       {showModalParada && (

@@ -308,6 +308,7 @@ export interface FichaTemplateAdmin {
   frequencia: "Diário" | "Por Turno" | null;
   tempo_entre_apontamentos_min: number | null;
   tempo_edicao_min: number | null;
+  exige_processo_em_andamento: boolean;
   locais_aplicacao: string[];
   versao: number;
   ativo: boolean;
@@ -317,7 +318,7 @@ export interface FichaTemplateAdmin {
 
 const COLUNAS_FICHA_TEMPLATE_ADMIN =
   "id, codigo, nome, pac_correspondente, tipo_apontamento, frequencia, tempo_entre_apontamentos_min, " +
-  "tempo_edicao_min, locais_aplicacao, versao, ativo, atualizado_em, schema_campos";
+  "tempo_edicao_min, exige_processo_em_andamento, locais_aplicacao, versao, ativo, atualizado_em, schema_campos";
 
 /** Fichas ativas com todos os campos usados pelo Construtor de Fichas (painel administrativo,
  * distinto de useTemplatesAtivos que só traz o essencial para o preenchimento). */
@@ -350,6 +351,7 @@ export interface SalvarFichaTemplateInput {
   frequencia: "Diário" | "Por Turno" | null;
   tempoEntreApontamentosMin: number | null;
   tempoEdicaoMin: number | null;
+  exigeProcessoEmAndamento: boolean;
   locaisAplicacao: string[];
   schemaCampos: CampoTemplate[];
   criadoPor: string;
@@ -380,6 +382,7 @@ export function useSalvarFichaTemplate() {
           frequencia: input.frequencia,
           tempo_entre_apontamentos_min: input.tempoEntreApontamentosMin,
           tempo_edicao_min: input.tempoEdicaoMin,
+          exige_processo_em_andamento: input.exigeProcessoEmAndamento,
           locais_aplicacao: input.locaisAplicacao,
           versao: input.versaoBase + 1,
           ativo: true,

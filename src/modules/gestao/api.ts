@@ -476,7 +476,7 @@ export function useMonitoramentosHojeDetalhado() {
     refetchInterval: 20_000,
     queryFn: async (): Promise<MonitoramentosHojeDetalhado> => {
       const desde = inicioDoDiaManaus(new Date()).toISOString();
-      const [{ data: hoje, error: erroHoje }, { data: fichas, error: erroFichas }] = await Promise.all([
+      const [{ data: hoje, error: erroHoje }, { data: fichas, error: erroFichas }, { data: paradas }] = await Promise.all([
         supabase
           .from("monitoramentos")
           .select("id, setor, ficha_template_id, user_id, criado_em, conformidade, situacao_conformidade")
@@ -488,6 +488,12 @@ export function useMonitoramentosHojeDetalhado() {
           .select("id, codigo, nome, tipo_apontamento, frequencia, tempo_entre_apontamentos_min, locais_aplicacao")
           .eq("ativo", true)
           .overrideTypes<FichaAtrasoInfo[], { merge: false }>(),
+        // "Processo parado" justificado pelo inspetor dispensa o período em atraso. Erro (migração ausente) = nenhuma.
+        supabase
+          .from("monitoramentos_processo_parado")
+          .select("ficha_codigo, referencia_em")
+          .gte("registrado_em", desde)
+          .overrideTypes<{ ficha_codigo: string; referencia_em: string }[], { merge: false }>(),
       ]);
       if (erroHoje) throw erroHoje;
       if (erroFichas) throw erroFichas;
@@ -513,7 +519,8 @@ export function useMonitoramentosHojeDetalhado() {
           if (ficha.frequencia === "Diário") continue;
           if (ficha.tempo_entre_apontamentos_min != null && ficha.tempo_entre_apontamentos_min > 0 && registrosSetor.length > 0) {
             const ultimoReg = registrosSetor.reduce((max, m) => (new Date(m.criado_em) > new Date(max.criado_em) ? m : max));
-            const ultimo = new Date(ultimoReg.criado_em).getTime();
+            let ultimo = new Date(ultimoReg.criado_em).getTime();
+            for (const p of paradas ?? []) if (p.ficha_codigo === ficha.codigo) ultimo = Math.max(ultimo, new Date(p.referencia_em).getTime());
             if (agora - ultimo > ficha.tempo_entre_apontamentos_min * 60_000) {
               atrasados.push({
                 fichaTemplateId: ficha.id,

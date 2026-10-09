@@ -57,6 +57,7 @@ interface FichaTemplateRow {
   frequencia: "Diário" | "Por Turno" | null;
   tempo_entre_apontamentos_min: number | null;
   tempo_edicao_min: number | null;
+  exige_processo_em_andamento: boolean;
   locais_aplicacao: string[];
   atualizado_em: string;
 }

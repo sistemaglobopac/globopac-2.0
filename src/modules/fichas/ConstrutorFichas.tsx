@@ -136,6 +136,7 @@ interface FormularioFicha {
   frequencia: "Diário" | "Por Turno";
   tempoEntreApontamentosMin: number | null;
   tempoEdicaoMin: number | null;
+  exigeProcessoEmAndamento: boolean;
   locaisAplicacao: string[];
   campos: CampoForm[];
 }
@@ -151,6 +152,7 @@ function formularioVazio(): FormularioFicha {
     frequencia: "Diário",
     tempoEntreApontamentosMin: null,
     tempoEdicaoMin: null,
+    exigeProcessoEmAndamento: false,
     locaisAplicacao: [],
     campos: [],
   };
@@ -306,6 +308,7 @@ export function ConstrutorFichas({ setoresDisponiveis }: ConstrutorFichasProps) 
       frequencia: ficha.frequencia ?? "Diário",
       tempoEntreApontamentosMin: ficha.tempo_entre_apontamentos_min,
       tempoEdicaoMin: ficha.tempo_edicao_min,
+      exigeProcessoEmAndamento: ficha.exige_processo_em_andamento ?? false,
       locaisAplicacao: ficha.locais_aplicacao ?? [],
       campos: ficha.schema_campos.map(paraCampoForm),
     });
@@ -324,6 +327,7 @@ export function ConstrutorFichas({ setoresDisponiveis }: ConstrutorFichasProps) 
       frequencia: ficha.frequencia ?? "Diário",
       tempoEntreApontamentosMin: ficha.tempo_entre_apontamentos_min,
       tempoEdicaoMin: ficha.tempo_edicao_min,
+      exigeProcessoEmAndamento: ficha.exige_processo_em_andamento ?? false,
       locaisAplicacao: ficha.locais_aplicacao ?? [],
       campos: ficha.schema_campos.map(paraCampoForm),
     });
@@ -453,6 +457,7 @@ export function ConstrutorFichas({ setoresDisponiveis }: ConstrutorFichasProps) 
         frequencia: formData.tipoApontamento === "Recorrente" ? formData.frequencia : null,
         tempoEntreApontamentosMin: formData.tempoEntreApontamentosMin,
         tempoEdicaoMin: formData.tempoEdicaoMin,
+        exigeProcessoEmAndamento: formData.tipoApontamento === "Recorrente" && formData.exigeProcessoEmAndamento,
         locaisAplicacao: formData.locaisAplicacao,
         schemaCampos,
         criadoPor: perfil.id,
@@ -610,6 +615,23 @@ export function ConstrutorFichas({ setoresDisponiveis }: ConstrutorFichasProps) 
                   />
                 </div>
               </div>
+
+              {formData.tipoApontamento === "Recorrente" && (
+                <label className="flex cursor-pointer items-start gap-2 rounded-md bg-canvas px-2 py-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-4 w-4"
+                    checked={formData.exigeProcessoEmAndamento}
+                    onChange={(e) => setFormData((a) => ({ ...a, exigeProcessoEmAndamento: e.target.checked }))}
+                  />
+                  <span>
+                    Só pode ser feito com o processo em andamento
+                    <span className="block text-xs text-muted-foreground">
+                      Se o monitoramento atrasar, o inspetor poderá justificar "processo parado" e o sistema só volta a cobrá-lo no próximo período.
+                    </span>
+                  </span>
+                </label>
+              )}
             </div>
 
             <div className="space-y-2 rounded-lg border border-primary/10 bg-primary/5 p-4">
@@ -804,6 +826,7 @@ function FichaCard({ ficha, onEdit, onDuplicate, onInativar }: FichaCardProps) {
             <Clock className="h-3.5 w-3.5" />
             {ficha.tempo_entre_apontamentos_min != null ? `${ficha.tempo_entre_apontamentos_min} min` : "Sem intervalo definido"}
           </p>
+          {ficha.exige_processo_em_andamento && <p className="font-medium text-primary">Exige processo em andamento</p>}
         </div>
 
         <div className="flex flex-wrap gap-2 items-center justify-between border-t pt-3">
