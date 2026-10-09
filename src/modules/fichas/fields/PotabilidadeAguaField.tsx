@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, Droplets, RefreshCw } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Droplets, PauseCircle, RefreshCw, Undo2 } from "lucide-react";
+import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import {
@@ -12,8 +13,11 @@ import {
   motivosBloqueioPotabilidade,
   phForaDoLimite,
   potabilidadeInicial,
+  reiniciarSorteio,
   rotuloTanque,
   SISTEMAS_POTABILIDADE,
+  sortearOutroTanque,
+  todosTanquesParados,
 } from "./potabilidadeAgua";
 import type { ChaveSistemaPotabilidade, PotabilidadeAguaValor } from "./tiposCompostos";
 
@@ -52,6 +56,18 @@ export function PotabilidadeAguaField({ value, onChange, disabled, prevAppointme
     setV((a) => ({ ...a, sistemas: { ...a.sistemas, [sistema]: { ...a.sistemas[sistema], [campo]: apenasMedida(texto) } } }));
   }
 
+  /** O tanque da vez está parado: refaz o sorteio (pula os parados e o do monitoramento anterior). */
+  function sortearOutro(sistema: ChaveSistemaPotabilidade) {
+    editou.current = true;
+    setV((a) => ({ ...a, sistemas: { ...a.sistemas, [sistema]: sortearOutroTanque(sistema, a.sistemas[sistema], prevAppointment?.sistemas?.[sistema]?.tanque) } }));
+  }
+
+  /** O tanque voltou a funcionar: desfaz o novo sorteio e volta ao tanque da vez. */
+  function desfazerSorteio(sistema: ChaveSistemaPotabilidade) {
+    editou.current = true;
+    setV((a) => ({ ...a, sistemas: { ...a.sistemas, [sistema]: reiniciarSorteio(sistema, prevAppointment?.sistemas?.[sistema]?.tanque) } }));
+  }
+
   return (
     <div className="space-y-5 rounded-lg border p-4" data-testid="potabilidade-agua">
       <div
@@ -83,6 +99,21 @@ export function PotabilidadeAguaField({ value, onChange, disabled, prevAppointme
                 </span>
                 {anterior && <span className="text-[10px] text-muted-foreground">anterior: {rotuloTanque(s.chave, anterior)}</span>}
               </div>
+              {(t.tanquesParados?.length ?? 0) > 0 && (
+                <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground" data-testid={`parados-${s.chave}`}>
+                  <PauseCircle className="h-3.5 w-3.5" />
+                  Processo parado: {t.tanquesParados!.map((x) => rotuloTanque(s.chave, x)).join(", ")} — sorteio refeito.
+                  <button type="button" className="inline-flex items-center gap-1 font-semibold text-primary underline" onClick={() => desfazerSorteio(s.chave)} data-testid={`desfazer-${s.chave}`}>
+                    <Undo2 className="h-3 w-3" /> Voltou a funcionar (desfazer)
+                  </button>
+                </p>
+              )}
+              {t.semTeste ? (
+                <p className="rounded-md bg-muted p-2 text-xs text-muted-foreground" data-testid={`sem-teste-${s.chave}`}>
+                  Todos os tanques deste sistema estão com o processo parado: não há o que testar agora (sem pH nem cloro).
+                </p>
+              ) : (
+              <>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1">
                   <Label htmlFor={`ph-${s.chave}`}>pH</Label>
@@ -93,6 +124,15 @@ export function PotabilidadeAguaField({ value, onChange, disabled, prevAppointme
                   <Input id={`cloro-${s.chave}`} inputMode="decimal" placeholder="1,0" value={t.cloro} className={cloroNc ? "border-destructive text-destructive" : ""} onChange={(e) => alterar(s.chave, "cloro", e.target.value)} />
                 </div>
               </div>
+              <Button type="button" variant="outline" size="sm" onClick={() => sortearOutro(s.chave)} disabled={disabled} data-testid={`sortear-outro-${s.chave}`}>
+                <PauseCircle className="h-3.5 w-3.5" />
+                {`${rotuloTanque(s.chave, t.tanque)} está parado — sortear outro tanque`}
+              </Button>
+              {todosTanquesParados(s.chave, { ...t, tanquesParados: [...(t.tanquesParados ?? []), t.tanque] }) && (
+                <p className="text-[10px] text-muted-foreground">Se este for o último tanque funcionando e também estiver parado, o sistema fica sem teste.</p>
+              )}
+              </>
+              )}
             </div>
           );
         })}

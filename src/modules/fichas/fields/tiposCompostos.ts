@@ -433,6 +433,10 @@ export interface TesteTanque {
   tanque: string;
   ph: string;
   cloro: string;
+  /** Tanques sorteados antes que estavam com o processo parado (o sorteio foi refeito), na ordem em que foram pulados. */
+  tanquesParados?: string[];
+  /** Todos os tanques do sistema estavam parados: não há o que testar neste sistema (sem pH nem cloro). */
+  semTeste?: boolean;
 }
 
 /** Potabilidade da Água (Especial SIF): um tanque testado em cada um dos 3 sistemas de pré-resfriamento. */

@@ -1018,9 +1018,24 @@ export function PotabilidadeAguaRelatorio({
             return (
               <tr key={s.chave}>
                 <td className="pr-2">{s.rotulo.replace("Pré-resfriamento de ", "")}</td>
-                <td className="pr-2">{t ? rotuloTanque(s.chave, t.tanque) : "—"}</td>
-                <td className={phForaDoLimite(lerMedida(t?.ph)) ? "pr-2 font-black text-destructive" : "pr-2 font-black"}>{fmt(t?.ph)}</td>
-                <td className={cloroForaDoLimite(lerMedida(t?.cloro)) ? "font-black text-destructive" : "font-black"}>{fmt(t?.cloro)}</td>
+                <td className="pr-2">
+                  {t?.semTeste ? "—" : t ? rotuloTanque(s.chave, t.tanque) : "—"}
+                  {(t?.tanquesParados?.length ?? 0) > 0 && (
+                    <span className="block text-[9px] italic text-muted-foreground print:text-[7px]">
+                      Processo parado: {t!.tanquesParados!.map((x) => rotuloTanque(s.chave, x)).join(", ")} (sorteio refeito)
+                    </span>
+                  )}
+                </td>
+                {t?.semTeste ? (
+                  <td colSpan={2} className="italic text-muted-foreground">
+                    Todos os tanques parados — sem teste
+                  </td>
+                ) : (
+                  <>
+                    <td className={phForaDoLimite(lerMedida(t?.ph)) ? "pr-2 font-black text-destructive" : "pr-2 font-black"}>{fmt(t?.ph)}</td>
+                    <td className={cloroForaDoLimite(lerMedida(t?.cloro)) ? "font-black text-destructive" : "font-black"}>{fmt(t?.cloro)}</td>
+                  </>
+                )}
               </tr>
             );
           })}

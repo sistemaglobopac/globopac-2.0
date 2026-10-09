@@ -51,6 +51,37 @@ export function proximoTanque(sistema: ChaveSistemaPotabilidade, anterior: strin
   return tanques[(indice + 1) % tanques.length]!.chave;
 }
 
+/** Tanques do sistema que ainda podem ser sorteados (os que não foram marcados como parados). */
+function tanquesEmFuncionamento(sistema: ChaveSistemaPotabilidade, parados: string[] | undefined): string[] {
+  const todos = SISTEMAS_POTABILIDADE.find((s) => s.chave === sistema)!.tanques.map((t) => t.chave);
+  return todos.filter((t) => !(parados ?? []).includes(t));
+}
+
+/** Refaz o sorteio quando o tanque da vez está com o processo parado: marca o atual como parado e passa para o seguinte do
+ * rodízio que esteja funcionando, preferindo um que não seja o do monitoramento anterior. Sem nenhum tanque funcionando,
+ * o sistema fica "sem teste". As medidas digitadas são descartadas (eram de outro tanque). */
+export function sortearOutroTanque(sistema: ChaveSistemaPotabilidade, t: TesteTanque, anterior?: string | null): TesteTanque {
+  const parados = [...(t.tanquesParados ?? []), ...((t.tanquesParados ?? []).includes(t.tanque) ? [] : [t.tanque])];
+  const todos = SISTEMAS_POTABILIDADE.find((s) => s.chave === sistema)!.tanques.map((x) => x.chave);
+  const disponiveis = tanquesEmFuncionamento(sistema, parados);
+  if (disponiveis.length === 0) return { tanque: t.tanque, ph: "", cloro: "", tanquesParados: parados, semTeste: true };
+  // Ordem do rodízio a partir do tanque que acabou de ser pulado.
+  const inicio = todos.indexOf(t.tanque);
+  const emOrdem = [...todos.slice(inicio + 1), ...todos.slice(0, inicio + 1)].filter((x) => disponiveis.includes(x));
+  const escolhido = emOrdem.find((x) => x !== anterior) ?? emOrdem[0]!;
+  return { tanque: escolhido, ph: "", cloro: "", tanquesParados: parados };
+}
+
+/** Todos os tanques do sistema já foram marcados como parados? */
+export function todosTanquesParados(sistema: ChaveSistemaPotabilidade, t: TesteTanque | undefined): boolean {
+  return tanquesEmFuncionamento(sistema, t?.tanquesParados).length === 0;
+}
+
+/** Desfaz o sorteio refeito (o tanque voltou a funcionar): volta ao tanque da vez do rodízio. */
+export function reiniciarSorteio(sistema: ChaveSistemaPotabilidade, anterior?: string | null): TesteTanque {
+  return testeVazio(proximoTanque(sistema, anterior));
+}
+
 export function testeVazio(tanque: string): TesteTanque {
   return { tanque, ph: "", cloro: "" };
 }
@@ -85,6 +116,7 @@ export function avaliarPotabilidade(v: PotabilidadeAguaValor): { conformidade: b
   const motivos: string[] = [];
   for (const s of SISTEMAS_POTABILIDADE) {
     const t = v.sistemas[s.chave];
+    if (t.semTeste) continue;
     const nome = `${s.rotulo.replace("Pré-resfriamento de ", "")} — ${rotuloTanque(s.chave, t.tanque)}`;
     const ph = lerMedida(t.ph);
     const cloro = lerMedida(t.cloro);
@@ -99,13 +131,14 @@ export function montarValorPotabilidade(v: PotabilidadeAguaValor): PotabilidadeA
   return { ...v, conformidade, detalhesRNC: motivos.length ? `Potabilidade da água fora do limite — ${motivos.join("; ")}` : null };
 }
 
-/** Os 3 sistemas precisam de pH e cloro informados. */
+/** Os 3 sistemas precisam de pH e cloro informados (exceto o sistema com todos os tanques parados). */
 export function motivosBloqueioPotabilidade(v: PotabilidadeAguaValor | undefined | null): string[] {
   const p = "Potabilidade da água";
   if (!v?.sistemas) return [`${p}: informe o pH e o cloro dos 3 sistemas de pré-resfriamento.`];
   const m: string[] = [];
   for (const s of SISTEMAS_POTABILIDADE) {
     const t = v.sistemas[s.chave];
+    if (t?.semTeste) continue;
     const nome = `${s.rotulo.replace("Pré-resfriamento de ", "")} (${rotuloTanque(s.chave, t?.tanque ?? "")})`;
     if (lerMedida(t?.ph) === null) m.push(`${p}: informe o pH de ${nome}.`);
     if (lerMedida(t?.cloro) === null) m.push(`${p}: informe o cloro de ${nome}.`);
