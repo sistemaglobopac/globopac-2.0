@@ -8,7 +8,8 @@ import { supabase } from "@/lib/supabase";
 import { useAudioAlarm } from "@/modules/fichas/useAudioAlarm";
 import { Button } from "@/shared/ui/button";
 import { rascunhosComoMonitoramentos, useRascunhos } from "@/modules/fichas/useRascunhos";
-import { aguardaPesoDaBalanca, useMonitoramentosEmAndamento } from "@/modules/fichas/api";
+import { aguardaChiller2, aguardaPesoDaBalanca, useMonitoramentosEmAndamento } from "@/modules/fichas/api";
+import { ALERTA_CHILLER2_MIN } from "@/modules/fichas/fields/controleAbsorcao";
 import { ALERTA_PESO_PENDENTE_MIN } from "@/modules/fichas/fields/pesoCaixa";
 import { horaEfetiva } from "@/modules/fichas/utils/horaMonitoramento";
 import {
@@ -169,7 +170,20 @@ export function GlobalInspectorAlerts() {
     [emAndamento, agora, dismissed]
   );
 
-  const isVisible = Boolean(isInspetor && (pausaEstourada || ncSemRnc.length > 0 || rascunhosNc.length > 0 || pesosPendentes.length > 0 || fichasAtrasadas.length > 0 || rncsCriticas.length > 0));
+  // Controle de absorção com a etapa 1 salva e o chiller 02 ainda não informado há muito tempo: só o inspetor que abriu completa.
+  const chiller2Pendentes = useMemo(
+    () =>
+      (emAndamento ?? []).filter(
+        (m) =>
+          aguardaChiller2(m) &&
+          m.user_id === userId &&
+          !dismissed.has(`chiller2_${m.id}`) &&
+          agora.getTime() - new Date(horaEfetiva(m)).getTime() >= ALERTA_CHILLER2_MIN * 60_000
+      ),
+    [emAndamento, agora, dismissed, userId]
+  );
+
+  const isVisible = Boolean(isInspetor && (pausaEstourada || chiller2Pendentes.length > 0 || ncSemRnc.length > 0 || rascunhosNc.length > 0 || pesosPendentes.length > 0 || fichasAtrasadas.length > 0 || rncsCriticas.length > 0));
   useAudioAlarm(isVisible && !minimizado);
 
   useEffect(() => {
@@ -304,6 +318,42 @@ export function GlobalInspectorAlerts() {
                         Completar peso
                       </Button>
                       <Button type="button" variant="outline" onClick={() => dismiss(`peso_${m.id}`)}>
+                        Ciente
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {chiller2Pendentes.length > 0 && (
+            <div data-testid="alerta-chiller2-pendente">
+              <h3 className="mb-2 flex items-center gap-1 text-[0.7rem] font-black uppercase tracking-wider text-muted-foreground">
+                <Clock className="h-3.5 w-3.5 text-primary" /> Chiller 02 pendente
+              </h3>
+              <div className="flex flex-col gap-2">
+                {chiller2Pendentes.map((m) => (
+                  <div key={m.id} className="flex flex-col gap-3 rounded border-l-4 border-primary bg-background p-4 shadow-sm">
+                    <div>
+                      <h4 className="text-sm font-bold text-foreground">Controle de absorção — {m.setor}</h4>
+                      <p className="mt-1 text-[0.7rem] text-muted-foreground">
+                        Etapa 1 feita há {Math.floor((agora.getTime() - new Date(horaEfetiva(m)).getTime()) / 60_000)} min. Informe a temperatura e o borbulhamento do chiller 02 para concluir o monitoramento.
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        className="flex-1"
+                        onClick={() => {
+                          dismiss(`chiller2_${m.id}`);
+                          navigate(`/fichas/chiller2/${m.id}`);
+                        }}
+                      >
+                        Informar chiller 02
+                      </Button>
+                      <Button type="button" variant="outline" onClick={() => dismiss(`chiller2_${m.id}`)}>
                         Ciente
                       </Button>
                     </div>

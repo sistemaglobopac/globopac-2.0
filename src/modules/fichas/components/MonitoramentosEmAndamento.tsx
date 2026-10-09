@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, Hourglass, Scale } from "lucide-react";
+import { AlertTriangle, Hourglass, Scale, Waves } from "lucide-react";
 import { useSessionStore } from "@/store/session";
 import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/api";
-import { aguardaPesoDaBalanca, useFichasTemplatesTodas, useMonitoramentosEmAndamento, useTemplatesPorIds } from "../api";
+import { aguardaChiller2, aguardaPesoDaBalanca, useFichasTemplatesTodas, useMonitoramentosEmAndamento, useTemplatesPorIds } from "../api";
 import { ALERTA_PESAGEM_FINAL_MIN, minutosAguardandoPesoFinal } from "../fields/calculosAbsorcao";
 import { ALERTA_PESO_PENDENTE_MIN } from "../fields/pesoCaixa";
+import { ALERTA_CHILLER2_MIN } from "../fields/controleAbsorcao";
 import { ensureLocalTime } from "../utils/tempo";
 import { horaEfetiva } from "../utils/horaMonitoramento";
 
@@ -42,27 +43,33 @@ export function MonitoramentosEmAndamento() {
       <div className="grid gap-2 sm:grid-cols-2">
         {emAndamento.map((m) => {
           const peso = aguardaPesoDaBalanca(m);
+          const chiller2 = aguardaChiller2(m);
           const inicio = horaEfetiva(m);
           const minutos = minutosAguardandoPesoFinal(inicio, agora);
-          const atrasado = minutos >= (peso ? ALERTA_PESO_PENDENTE_MIN : ALERTA_PESAGEM_FINAL_MIN);
+          const atrasado = minutos >= (chiller2 ? ALERTA_CHILLER2_MIN : peso ? ALERTA_PESO_PENDENTE_MIN : ALERTA_PESAGEM_FINAL_MIN);
           return (
             <button
               key={m.id}
               type="button"
-              data-testid={peso ? "aguardando-peso" : "aguardando-pesagem-final"}
-              onClick={() => navigate(peso ? `/fichas/peso/${m.id}` : `/fichas/continuar/${m.id}`)}
+              data-testid={chiller2 ? "aguardando-chiller2" : peso ? "aguardando-peso" : "aguardando-pesagem-final"}
+              onClick={() => navigate(chiller2 ? `/fichas/chiller2/${m.id}` : peso ? `/fichas/peso/${m.id}` : `/fichas/continuar/${m.id}`)}
               className={`rounded-lg border-2 p-3 text-left transition-colors ${
                 atrasado ? "border-destructive bg-destructive/10 hover:bg-destructive/20" : "border-primary/30 bg-background hover:bg-primary/5"
               }`}
             >
-              <span className="block text-sm font-bold">{nomePorId.get(m.ficha_template_id) ?? (peso ? "Peso por caixa" : "Absorção de água")}</span>
+              <span className="block text-sm font-bold">{nomePorId.get(m.ficha_template_id) ?? (chiller2 ? "Controle de absorção" : peso ? "Peso por caixa" : "Absorção de água")}</span>
               <span className="block text-xs text-muted-foreground">
-                {m.setor} · {peso ? "monitoramento realizado" : "pesagem inicial"} às {ensureLocalTime(inicio).time}
+                {m.setor} · {chiller2 ? "etapa 1 (pré-chiller e chiller 01)" : peso ? "monitoramento realizado" : "pesagem inicial"} às {ensureLocalTime(inicio).time}
               </span>
               <span className={`mt-1 flex items-center gap-1.5 text-xs font-semibold ${atrasado ? "text-destructive" : "text-primary"}`}>
                 {atrasado && <AlertTriangle className="h-3.5 w-3.5 animate-pulse" />}
-                {peso && <Scale className="h-3.5 w-3.5" />}
-                {peso ? `Aguardando o peso da balança há ${duracao(minutos)} — toque para completar` : `Aguardando peso final há ${duracao(minutos)} — toque para pesar`}
+                {chiller2 && <Waves className="h-3.5 w-3.5" />}
+                {peso && !chiller2 && <Scale className="h-3.5 w-3.5" />}
+                {chiller2
+                  ? `Aguardando o chiller 02 há ${duracao(minutos)} — toque para informar`
+                  : peso
+                    ? `Aguardando o peso da balança há ${duracao(minutos)} — toque para completar`
+                    : `Aguardando peso final há ${duracao(minutos)} — toque para pesar`}
               </span>
             </button>
           );

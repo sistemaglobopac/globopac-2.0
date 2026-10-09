@@ -19,6 +19,7 @@ import { salvarRascunho } from "@/lib/rascunhos";
 import { listarFichasEnfileiradas } from "@/lib/offlineQueue";
 import { chavesDeConfirmacao, repeteOAnterior, type RegistroComHora } from "./utils/dadosDuplicados";
 import { CHAVE_AGUARDANDO_PESO, cargasSemPeso } from "./fields/pesoCaixa";
+import { CHAVE_AGUARDANDO_CHILLER2 } from "./fields/controleAbsorcao";
 import { lotesSemPeso } from "./fields/preenchimentoSpr";
 import { motivosDeBloqueioSpr } from "./utils/bloqueiosSpr";
 import { desviosEspeciais, temNaoConformidade } from "./utils/desviosEspeciais";
@@ -304,7 +305,7 @@ interface FichaFormProps {
 }
 
 function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervaloMin, setor, perfil, onVoltar }: FichaFormProps) {
-  const [sucesso, setSucesso] = useState<"online" | "offline" | "em_andamento" | "rascunho" | "rascunho_nc" | "aguardando_peso" | null>(null);
+  const [sucesso, setSucesso] = useState<"online" | "offline" | "em_andamento" | "rascunho" | "rascunho_nc" | "aguardando_peso" | "aguardando_chiller2" | null>(null);
   // Avisos de carga já NÃO CONFORME ao salvar a etapa 1 do peso por caixa (as demais cargas ainda sem peso).
   const [avisosEtapa1, setAvisosEtapa1] = useState<string[]>([]);
   // Hora do monitoramento: informada MANUALMENTE (abrir a ficha só para olhar não registra hora).
@@ -406,6 +407,9 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
   const pesoPendente =
     (!!campoPeso && cargasSemPeso(valoresForm?.[campoPeso.chave] as PesoCaixaValor | undefined).length > 0) ||
     (!!campoCarcacasForm && lotesSemPeso(valoresForm?.[campoCarcacasForm.chave] as ChillerCarcacasValor | undefined).length > 0);
+  // Controle de absorção: SEMPRE em duas etapas — pré-chiller e chiller 1 agora; o chiller 2 depois (em andamento).
+  const etapa1Chiller2 = camposVisiveis.some((c) => c.tipo === "controle_absorcao");
+  const opcoesBloqueio = { permitirPesoPendente: true, permitirChiller2Pendente: etapa1Chiller2 };
   const horaMonitoramentoIso = isoDeManaus(horaData, horaHora) ?? undefined;
 
   useEffect(() => {
@@ -474,6 +478,10 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
     const hora = horaValidada();
     if (!hora) return;
     const dados: FieldValues = { ...dadosForm, [CHAVE_HORA_MONITORAMENTO]: hora };
+    if (etapa1Chiller2) {
+      await salvarEtapa1Chiller2(dados);
+      return;
+    }
     if (pesoPendente) {
       await salvarEtapa1Peso(dados);
       return;
@@ -553,7 +561,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
    * (EM_ANDAMENTO, assinatura parcial). Já vale para a frequência e para herdar as leituras; o peso é completado
    * depois e só então o registro é finalizado, assinado e avaliado. */
   async function salvarEtapa1Peso(dados: FieldValues) {
-    const motivos = motivosDeBloqueioSpr(camposVisiveis, dados, { permitirPesoPendente: true });
+    const motivos = motivosDeBloqueioSpr(camposVisiveis, dados, opcoesBloqueio);
     if (continuando && motivoContinuacao.trim().length < MOTIVO_CONTINUACAO_MIN_CARACTERES) {
       motivos.push(`Continuação: informe o motivo (mínimo ${MOTIVO_CONTINUACAO_MIN_CARACTERES} caracteres).`);
     }
@@ -582,13 +590,45 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
     }
   }
 
+  /** Controle de absorção — ETAPA 1: grava o monitoramento só com o pré-chiller e o chiller 1 (EM_ANDAMENTO, assinatura parcial).
+   * O chiller 2 é informado na etapa 2, quando o registro é finalizado e assinado por inteiro. */
+  async function salvarEtapa1Chiller2(dados: FieldValues) {
+    const motivos = motivosDeBloqueioSpr(camposVisiveis, dados, opcoesBloqueio);
+    if (continuando && motivoContinuacao.trim().length < MOTIVO_CONTINUACAO_MIN_CARACTERES) {
+      motivos.push(`Continuação: informe o motivo (mínimo ${MOTIVO_CONTINUACAO_MIN_CARACTERES} caracteres).`);
+    }
+    setMotivosBloqueio(motivos);
+    if (motivos.length > 0) return;
+    if (await bloqueadoPorDadosRepetidos(dados)) return;
+
+    setSucesso(null);
+    setAvisosEtapa1(desviosEspeciais(camposVisiveis, dados));
+    try {
+      await criarMonitoramento.mutateAsync({
+        fichaTemplateId: templateId,
+        versaoTemplate,
+        userId: perfil.id,
+        setor,
+        statusFicha: "EM_ANDAMENTO",
+        dadosDinamicos: { ...comContinuacao(dados), [CHAVE_AGUARDANDO_CHILLER2]: true },
+      });
+      setContinuando(false);
+      setMotivoContinuacao("");
+      reset(valoresIniciaisDe(campos));
+      setSucesso("aguardando_chiller2");
+      setTimeout(onVoltar, 3500);
+    } catch {
+      // erro refletido em criarMonitoramento.isError.
+    }
+  }
+
   /** Salva o monitoramento como RASCUNHO neste aparelho (com ou sem internet), para assinar depois em lote.
    * Mesmas validações do "Criar e assinar"; se estiver NÃO CONFORME, avisa na hora. */
   async function aoSalvarRascunho(dadosForm: FieldValues) {
     const hora = horaValidada();
     if (!hora) return;
     const dados: FieldValues = { ...dadosForm, [CHAVE_HORA_MONITORAMENTO]: hora };
-    const motivos = motivosDeBloqueioSpr(camposVisiveis, dados, { permitirPesoPendente: true });
+    const motivos = motivosDeBloqueioSpr(camposVisiveis, dados, opcoesBloqueio);
     if (continuando && motivoContinuacao.trim().length < MOTIVO_CONTINUACAO_MIN_CARACTERES) {
       motivos.push(`Continuação: informe o motivo (mínimo ${MOTIVO_CONTINUACAO_MIN_CARACTERES} caracteres).`);
     }
@@ -598,7 +638,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
 
     const avisos = desviosEspeciais(camposVisiveis, dados);
     const naoConforme = avisos.length > 0 || temNaoConformidade(dados);
-    if (naoConforme && navigator.onLine && !pesoPendente) {
+    if (naoConforme && navigator.onLine && !pesoPendente && !etapa1Chiller2) {
       // Com internet dá para assinar já e tratar na hora (RNC ou ação corretiva imediata).
       setNcRascunho({ dados, avisos });
       return;
@@ -608,7 +648,11 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
 
   async function gravarRascunho(dados: FieldValues, naoConforme: boolean, avisos: string[]) {
     setNcRascunho(null);
-    const dadosFinais = pesoPendente ? { ...comContinuacao(dados), [CHAVE_AGUARDANDO_PESO]: true } : comContinuacao(dados);
+    const dadosFinais = etapa1Chiller2
+      ? { ...comContinuacao(dados), [CHAVE_AGUARDANDO_CHILLER2]: true }
+      : pesoPendente
+        ? { ...comContinuacao(dados), [CHAVE_AGUARDANDO_PESO]: true }
+        : comContinuacao(dados);
     await salvarRascunho({
       id: crypto.randomUUID(),
       fichaTemplateId: templateId,
@@ -621,7 +665,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
       horaMonitoramento: dados[CHAVE_HORA_MONITORAMENTO] as string,
       naoConforme,
       motivosNc: avisos,
-      ...(pesoPendente ? { statusFicha: "EM_ANDAMENTO" as const } : {}),
+      ...(pesoPendente || etapa1Chiller2 ? { statusFicha: "EM_ANDAMENTO" as const } : {}),
     });
     void atualizarRascunhos();
     setContinuando(false);
@@ -845,6 +889,20 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
                 )}
               </div>
             )}
+            {sucesso === "aguardando_chiller2" && (
+              <div role="status" className="space-y-1 rounded border border-warning bg-warning/10 p-2 text-sm" data-testid="aguardando-chiller2-salvo">
+                <p className="font-medium">
+                  Etapa 1 salva (pré-chiller e chiller 01). Informe o <strong>chiller 02</strong> na etapa 2, em "Monitoramentos em andamento".
+                </p>
+                {avisosEtapa1.length > 0 && (
+                  <ul className="list-disc pl-5 font-medium text-destructive">
+                    {avisosEtapa1.map((a) => (
+                      <li key={a}>{a}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
             {sucesso === "rascunho" && (
               <p className="text-sm text-success">Rascunho salvo neste aparelho. Assine pela lista de rascunhos em até 72 h.</p>
             )}
@@ -870,7 +928,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
             ) : (
               <div className="flex flex-wrap gap-2">
                 <Button type="submit" disabled={isSubmitting || criarMonitoramento.isPending}>
-                  {isSubmitting || criarMonitoramento.isPending ? "Salvando…" : pesoPendente ? "Salvar e aguardar o peso" : "Criar e assinar"}
+                  {isSubmitting || criarMonitoramento.isPending ? "Salvando…" : etapa1Chiller2 ? "Salvar etapa 1 (chiller 02 depois)" : pesoPendente ? "Salvar e aguardar o peso" : "Criar e assinar"}
                 </Button>
                 <Button
                   type="button"

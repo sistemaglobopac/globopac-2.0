@@ -16,6 +16,7 @@ import { ConferenciaCargasPage } from "@/modules/recepcao/ConferenciaCargasPage"
 import { ComunicadosPage } from "@/modules/comunicados/ComunicadosPage";
 import { FinalizarAbsorcaoPage } from "@/modules/fichas/FinalizarAbsorcaoPage";
 import { CompletarPesoPage } from "@/modules/fichas/CompletarPesoPage";
+import { CompletarChiller2Page } from "@/modules/fichas/CompletarChiller2Page";
 import { ConstrutorFichasPage } from "@/modules/fichas/ConstrutorFichasPage";
 import { SetoresPage } from "@/modules/admin/SetoresPage";
 import { TrocaSetorInspetorPage } from "@/modules/gestao/TrocaSetorInspetorModal";
@@ -92,6 +93,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute perfisPermitidos={["INSPETOR_QUALIDADE", "ADMIN_MASTER"]}>
               <CompletarPesoPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/fichas/chiller2/:id"
+          element={
+            <ProtectedRoute perfisPermitidos={["INSPETOR_QUALIDADE", "ADMIN_MASTER"]}>
+              <CompletarChiller2Page />
             </ProtectedRoute>
           }
         />

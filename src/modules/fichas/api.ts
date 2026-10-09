@@ -972,6 +972,11 @@ export function aguardaPesoDaBalanca(m: Pick<MonitoramentoEmAndamento, "dados_di
   return m.dados_dinamicos.aguardando_peso === true;
 }
 
+/** O monitoramento aguarda o chiller 02 (etapa 1 do controle de absorção)? */
+export function aguardaChiller2(m: Pick<MonitoramentoEmAndamento, "dados_dinamicos">): boolean {
+  return m.dados_dinamicos.aguardando_chiller2 === true;
+}
+
 /** Um registro em andamento (para reabrir na pesagem final). `null` se não existir, já foi
  * finalizado ou a RLS não deixa ver. */
 export function useMonitoramentoEmAndamento(id: string | undefined) {

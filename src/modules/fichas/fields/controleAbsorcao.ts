@@ -15,6 +15,17 @@ export const TANQUES_ABSORCAO: { chave: ChaveTanqueAbsorcao; rotulo: string }[] 
   { chave: "chiller2", rotulo: "Chiller 02" },
 ];
 
+/** Etapa 1: pré-chiller e chiller 1 (na hora). Etapa 2: chiller 2 (depois). */
+export const TANQUES_ETAPA1: ChaveTanqueAbsorcao[] = ["preChiller", "chiller1"];
+export const TANQUE_ETAPA2: ChaveTanqueAbsorcao = "chiller2";
+
+/** Marca em dados_dinamicos: o registro foi salvo só com a etapa 1 e aguarda o chiller 2. Espelha o banco (guard_fase_absorcao). */
+export const CHAVE_AGUARDANDO_CHILLER2 = "aguardando_chiller2";
+/** Quem completou o chiller 2 e quando (etapa 2). */
+export const CHAVE_CHILLER2_COMPLETADO = "chiller2_completado";
+/** A partir de quantos minutos esperando o chiller 2 o alerta fica forte. */
+export const ALERTA_CHILLER2_MIN = 60;
+
 export const BORBULHAMENTO: { valor: string; rotulo: string }[] = [
   { valor: "moderado", rotulo: "Moderado" },
   { valor: "intenso", rotulo: "Intenso" },
@@ -51,17 +62,24 @@ export function montarValorControleAbsorcao(v: ControleAbsorcaoValor): ControleA
   return { ...v, conformidade, detalhesRNC: motivos.length ? `Controle de absorção — temperatura acima do limite — ${motivos.join("; ")}` : null };
 }
 
-/** Tempo de permanência (maior que zero), as 3 temperaturas e o borbulhamento dos 3 tanques são obrigatórios. */
-export function motivosBloqueioControleAbsorcao(v: ControleAbsorcaoValor | undefined | null): string[] {
+/** O chiller 2 ainda não foi informado (temperatura e borbulhamento)? */
+export function chiller2Pendente(v: ControleAbsorcaoValor | undefined | null): boolean {
+  return lerTemperatura(v?.temperaturas?.chiller2) === null || !BORBULHAMENTO.some((b) => b.valor === v?.borbulhamento?.chiller2);
+}
+
+/** Tempo de permanência (maior que zero), a temperatura e o borbulhamento dos tanques indicados são obrigatórios.
+ * `etapa` 1 = só pré-chiller e chiller 1; 2 = só o chiller 2; omitido = os 3 tanques (registro completo). */
+export function motivosBloqueioControleAbsorcao(v: ControleAbsorcaoValor | undefined | null, etapa?: 1 | 2): string[] {
   const p = "Controle de absorção";
-  if (!v) return [`${p}: informe o tempo de permanência, as temperaturas e o borbulhamento.`];
+  const tanques = TANQUES_ABSORCAO.filter((t) => (etapa === 1 ? TANQUES_ETAPA1.includes(t.chave) : etapa === 2 ? t.chave === TANQUE_ETAPA2 : true));
+  if (!v) return [`${p}: informe ${etapa === 2 ? "a temperatura e o borbulhamento do chiller 02" : "o tempo de permanência, as temperaturas e o borbulhamento"}.`];
   const m: string[] = [];
   const tempo = lerMedida(v.tempoPermanenciaMin);
-  if (tempo === null || tempo <= 0) m.push(`${p}: informe o tempo de permanência das carcaças no pré-chiller (minutos).`);
-  for (const t of TANQUES_ABSORCAO) {
+  if (etapa !== 2 && (tempo === null || tempo <= 0)) m.push(`${p}: informe o tempo de permanência das carcaças no pré-chiller (minutos).`);
+  for (const t of tanques) {
     if (lerTemperatura(v.temperaturas?.[t.chave]) === null) m.push(`${p}: informe a temperatura da água do ${t.rotulo}.`);
   }
-  for (const t of TANQUES_ABSORCAO) {
+  for (const t of tanques) {
     if (!BORBULHAMENTO.some((b) => b.valor === v.borbulhamento?.[t.chave])) m.push(`${p}: informe o borbulhamento do ${t.rotulo}.`);
   }
   return m;

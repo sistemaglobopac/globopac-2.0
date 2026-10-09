@@ -24,7 +24,7 @@ export function motivosDeBloqueioSpr(
   campos: CampoTemplate[],
   dados: Record<string, unknown>,
   /** Etapa 1 do peso por caixa: o peso médio de alguma carga ainda não chegou da balança. */
-  opcoes: { permitirPesoPendente?: boolean } = {}
+  opcoes: { permitirPesoPendente?: boolean; /** Etapa 1 do controle de absorção: o chiller 02 só entra na etapa 2. */ permitirChiller2Pendente?: boolean } = {}
 ): string[] {
   const motivos: string[] = [];
   for (const campo of campos) {
@@ -41,7 +41,7 @@ export function motivosDeBloqueioSpr(
       continue;
     }
     if (campo.tipo === "controle_absorcao") {
-      motivos.push(...motivosBloqueioControleAbsorcao(dados[campo.chave] as ControleAbsorcaoValor | undefined));
+      motivos.push(...motivosBloqueioControleAbsorcao(dados[campo.chave] as ControleAbsorcaoValor | undefined, opcoes.permitirChiller2Pendente ? 1 : undefined));
       continue;
     }
     if (campo.tipo === "qualidade_miudos") {

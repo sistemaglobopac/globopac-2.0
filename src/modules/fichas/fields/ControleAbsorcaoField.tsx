@@ -12,6 +12,7 @@ import {
   montarValorControleAbsorcao,
   motivosBloqueioControleAbsorcao,
   TANQUES_ABSORCAO,
+  TANQUES_ETAPA1,
   temperaturaAbsorcaoAcimaDoLimite,
 } from "./controleAbsorcao";
 import type { ChaveTanqueAbsorcao, ControleAbsorcaoValor } from "./tiposCompostos";
@@ -20,6 +21,8 @@ interface ControleAbsorcaoFieldProps {
   value: ControleAbsorcaoValor | undefined | null;
   onChange: (valor: ControleAbsorcaoValor) => void;
   disabled?: boolean;
+  /** Etapa 1 (padrão): só o pré-chiller e o chiller 1; o chiller 02 é informado na etapa 2, depois. */
+  somenteEtapa1?: boolean;
 }
 
 const apenasMedida = (t: string) => t.replace(/[^0-9.,]/g, "");
@@ -28,10 +31,11 @@ const apenasTemperatura = (t: string) => t.replace(/[^0-9.,-]/g, "");
 
 /** Controle de Absorção: tempo de permanência das carcaças no pré-chiller, temperatura da água e
  * borbulhamento (moderado ou intenso) do pré-chiller, do chiller 1 e do chiller 2. */
-export function ControleAbsorcaoField({ value, onChange, disabled }: ControleAbsorcaoFieldProps) {
+export function ControleAbsorcaoField({ value, onChange, disabled, somenteEtapa1 = true }: ControleAbsorcaoFieldProps) {
   const [v, setV] = useState<ControleAbsorcaoValor>(() => ({ ...controleAbsorcaoVazio(), ...(value ?? {}) }));
   const aval = avaliarControleAbsorcao(v);
-  const completo = motivosBloqueioControleAbsorcao(v).length === 0;
+  const tanques = somenteEtapa1 ? TANQUES_ABSORCAO.filter((t) => TANQUES_ETAPA1.includes(t.chave)) : TANQUES_ABSORCAO;
+  const completo = motivosBloqueioControleAbsorcao(v, somenteEtapa1 ? 1 : undefined).length === 0;
 
   useEffect(() => {
     onChange(montarValorControleAbsorcao(v));
@@ -52,7 +56,7 @@ export function ControleAbsorcaoField({ value, onChange, disabled }: ControleAbs
         className={`flex flex-wrap items-center gap-2 rounded-md p-3 text-sm font-black ${!aval.conformidade ? "bg-destructive/10 text-destructive" : completo ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}
       >
         {!aval.conformidade ? <AlertTriangle className="h-5 w-5" /> : completo ? <CheckCircle2 className="h-5 w-5" /> : <Waves className="h-5 w-5" />}
-        {!aval.conformidade ? "NÃO CONFORME" : completo ? "CONFORME" : "AGUARDANDO PREENCHIMENTO"}
+        {!aval.conformidade ? "NÃO CONFORME" : completo ? (somenteEtapa1 ? "ETAPA 1 PRONTA — CHILLER 02 NA ETAPA 2" : "CONFORME") : "AGUARDANDO PREENCHIMENTO"}
         {!aval.conformidade && <span className="ml-2 font-normal">{aval.motivos.join("; ")}</span>}
       </div>
 
@@ -69,7 +73,7 @@ export function ControleAbsorcaoField({ value, onChange, disabled }: ControleAbs
           />
         </div>
 
-        {TANQUES_ABSORCAO.map((t) => {
+        {tanques.map((t) => {
           const temp = v.temperaturas?.[t.chave] ?? "";
           const nc = temperaturaAbsorcaoAcimaDoLimite(t.chave, lerTemperatura(temp));
           const limite = LIMITE_AGUA_C[t.chave];
@@ -108,6 +112,13 @@ export function ControleAbsorcaoField({ value, onChange, disabled }: ControleAbs
             </div>
           );
         })}
+
+        {somenteEtapa1 && (
+          <p className="rounded-md border border-primary/30 bg-primary/5 p-2 text-xs text-muted-foreground" data-testid="aviso-etapa2-chiller2">
+            Etapa 1: informe o pré-chiller e o chiller 01 e salve. A temperatura e o borbulhamento do <strong>chiller 02</strong> são informados na etapa 2, em
+            "Monitoramentos em andamento".
+          </p>
+        )}
 
         <div className="space-y-1 pt-1">
           <Label htmlFor="observacao-controle-absorcao">Observações (opcional)</Label>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   avaliarControleAbsorcao,
+  chiller2Pendente,
   controleAbsorcaoVazio,
   montarValorControleAbsorcao,
   motivosBloqueioControleAbsorcao,
@@ -56,5 +57,47 @@ describe("controle de absorção", () => {
     v.temperaturas.chiller1 = "";
     v.borbulhamento.chiller2 = "";
     expect(motivosBloqueioControleAbsorcao(v)).toHaveLength(3);
+  });
+
+  describe("duas etapas", () => {
+    function etapa1() {
+      const v = preenchido();
+      v.temperaturas.chiller2 = "";
+      v.borbulhamento.chiller2 = "";
+      return v;
+    }
+
+    it("etapa 1 exige tempo, pré-chiller e chiller 1 — sem o chiller 2", () => {
+      expect(motivosBloqueioControleAbsorcao(etapa1(), 1)).toEqual([]);
+      expect(chiller2Pendente(etapa1())).toBe(true);
+      const vazio = controleAbsorcaoVazio();
+      // tempo + 2 temperaturas + 2 borbulhamentos
+      expect(motivosBloqueioControleAbsorcao(vazio, 1)).toHaveLength(5);
+      expect(motivosBloqueioControleAbsorcao(vazio, 1).join(" ")).not.toMatch(/Chiller 02/);
+    });
+
+    it("registro completo continua exigindo os 3 tanques (a etapa 1 sozinha não basta)", () => {
+      expect(motivosBloqueioControleAbsorcao(etapa1())).toHaveLength(2);
+    });
+
+    it("etapa 2 exige só a temperatura e o borbulhamento do chiller 2", () => {
+      const v = etapa1();
+      expect(motivosBloqueioControleAbsorcao(v, 2)).toHaveLength(2);
+      v.temperaturas.chiller2 = "3,5";
+      v.borbulhamento.chiller2 = "moderado";
+      expect(motivosBloqueioControleAbsorcao(v, 2)).toEqual([]);
+      expect(chiller2Pendente(v)).toBe(false);
+    });
+
+    it("a conformidade da etapa 1 considera só o que já foi medido; a etapa 2 reavalia com o chiller 2", () => {
+      const v = etapa1();
+      expect(montarValorControleAbsorcao(v).conformidade).toBe(true);
+      v.temperaturas.chiller1 = "5";
+      expect(montarValorControleAbsorcao(v).conformidade).toBe(false);
+      const outra = etapa1();
+      outra.temperaturas.chiller2 = "4,5";
+      outra.borbulhamento.chiller2 = "intenso";
+      expect(avaliarControleAbsorcao(outra).motivos).toEqual(["Água do Chiller 02: 4,5 ºC (limite 4 ºC)"]);
+    });
   });
 });
