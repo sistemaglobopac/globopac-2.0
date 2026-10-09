@@ -40,7 +40,7 @@ import { CHECKLISTS, respostaNaoConforme, rotuloResposta, salasDoChecklist, type
 import { cloroForaDoLimite, lerMedida, phForaDoLimite, rotuloTanque, SISTEMAS_POTABILIDADE } from "@/modules/fichas/fields/potabilidadeAgua";
 import { cloroPontoForaDoLimite, phPontoForaDoLimite, rotuloPonto } from "@/modules/fichas/fields/potabilidadePontos";
 import { rotuloBorbulhamento, TANQUES_ABSORCAO, temperaturaAbsorcaoAcimaDoLimite } from "@/modules/fichas/fields/controleAbsorcao";
-import { defeitoAcimaDoMaximo, formatarPct, lerContagem, PARTES_MIUDOS, percentualDefeito } from "@/modules/fichas/fields/qualidadeMiudos";
+import { defeitoAcimaDoMaximo, formatarPct, lerContagem, PARTES_MIUDOS, parteExiste, percentualDefeito } from "@/modules/fichas/fields/qualidadeMiudos";
 import { LIMITE_AGUA_C, LIMITE_AMBIENTE_C, LIMITE_PRODUTO_C, lerTemperatura, PONTOS_AGUA, PONTOS_AMBIENTE, PRODUTOS } from "@/modules/fichas/fields/temperaturaResfriamento";
 import { CONDICOES_ANIMAIS, formatarDataHora, formatarDuracao, LIMITE_JEJUM_MAX_H } from "@/modules/fichas/fields/recepcaoAves";
 import {
@@ -1076,6 +1076,18 @@ export function QualidadeMiudosRelatorio({ valor, titulo = "Qualidade de Miúdos
           {PARTES_MIUDOS.map((p) => {
             const reg = valor.partes?.[p.chave];
             const amostra = lerContagem(reg?.amostra);
+            if (parteExiste(reg) === false) {
+              return (
+                <tr key={p.chave}>
+                  <td className="pr-2">
+                    <strong>{p.rotulo}: </strong>
+                  </td>
+                  <td colSpan={4} className="italic text-muted-foreground">
+                    Não há {p.rotulo.toLowerCase()} no setor — não monitorada
+                  </td>
+                </tr>
+              );
+            }
             return p.defeitos.map((d, i) => {
               const defeitos = lerContagem(reg?.defeitos?.[d.chave]);
               const nc = defeitoAcimaDoMaximo(defeitos, amostra, d.maximoPct);

@@ -6,6 +6,7 @@ import {
   montarValorQualidadeMiudos,
   motivosBloqueioQualidadeMiudos,
   PARTES_MIUDOS,
+  parteExiste,
   percentualDefeito,
   qualidadeMiudosVazio,
 } from "@/modules/fichas/fields/qualidadeMiudos";
@@ -13,6 +14,7 @@ import {
 function preenchido(amostra = "100") {
   const v = qualidadeMiudosVazio();
   for (const p of PARTES_MIUDOS) {
+    v.partes[p.chave].existe = "sim";
     v.partes[p.chave].amostra = amostra;
     for (const d of p.defeitos) v.partes[p.chave].defeitos[d.chave] = "0";
   }
@@ -83,5 +85,39 @@ describe("qualidade de miúdos e pertences", () => {
     expect(m[1]).toContain("não pode passar");
     const semAmostra = preenchido("0");
     expect(motivosBloqueioQualidadeMiudos(semAmostra)).toHaveLength(5);
+  });
+
+  it("exige responder se há cada parte no setor", () => {
+    const v = preenchido();
+    v.partes.moela.existe = "";
+    v.partes.moela.amostra = "";
+    expect(parteExiste(v.partes.moela)).toBeNull();
+    expect(motivosBloqueioQualidadeMiudos(v)).toEqual(["Qualidade de miúdos: informe se há moela no setor."]);
+  });
+
+  it("parte que não existe no setor não é monitorada: nada é exigido nem avaliado", () => {
+    const v = qualidadeMiudosVazio();
+    for (const p of PARTES_MIUDOS) v.partes[p.chave].existe = p.chave === "figado" ? "sim" : "nao";
+    expect(motivosBloqueioQualidadeMiudos(v)).toHaveLength(1);
+    expect(motivosBloqueioQualidadeMiudos(v)[0]).toContain("fígado");
+    v.partes.figado.amostra = "10";
+    for (const d of PARTES_MIUDOS.find((p) => p.chave === "figado")!.defeitos) v.partes.figado.defeitos[d.chave] = "0";
+    expect(motivosBloqueioQualidadeMiudos(v)).toEqual([]);
+    expect(montarValorQualidadeMiudos(v)).toMatchObject({ conformidade: true, detalhesRNC: null });
+  });
+
+  it("defeito digitado numa parte marcada como inexistente é ignorado", () => {
+    const v = preenchido();
+    v.partes.pes.defeitos.corteIrregular = "50";
+    expect(avaliarQualidadeMiudos(v).conformidade).toBe(false);
+    v.partes.pes.existe = "nao";
+    expect(avaliarQualidadeMiudos(v)).toEqual({ conformidade: true, motivos: [] });
+  });
+
+  it("ficha antiga (sem 'existe') com amostra conta como parte existente", () => {
+    const v = preenchido();
+    delete v.partes.cabeca.existe;
+    expect(parteExiste(v.partes.cabeca)).toBe(true);
+    expect(motivosBloqueioQualidadeMiudos(v)).toEqual([]);
   });
 });

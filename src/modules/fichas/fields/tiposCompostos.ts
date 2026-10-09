@@ -462,10 +462,11 @@ export interface ControleAbsorcaoValor {
 
 export type ChaveParteMiudo = "cabeca" | "pes" | "moela" | "figado" | "coracao";
 
-/** Qualidade de Miúdos e Pertences (Especial SIF): por parte, a quantidade avaliada e a quantidade com
- * cada defeito, como digitadas (o percentual é calculado). */
+/** Qualidade de Miúdos e Pertences (Especial SIF): por parte, se há o produto no setor (`existe`; sem
+ * produto não há monitoramento) e, havendo, a quantidade avaliada e a quantidade com cada defeito, como
+ * digitadas (o percentual é calculado). Fichas antigas não têm `existe`: com amostra, a parte existia. */
 export interface QualidadeMiudosValor {
-  partes: Record<ChaveParteMiudo, { amostra: string; defeitos: Record<string, string> }>;
+  partes: Record<ChaveParteMiudo, { existe?: "sim" | "nao" | ""; amostra: string; defeitos: Record<string, string> }>;
   observacao: string;
   conformidade: boolean;
   detalhesRNC: string | null;
