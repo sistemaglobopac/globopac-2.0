@@ -33,6 +33,8 @@ function statusDoItem(m: MonitoramentoVerificacao, adendosConcluidos: Set<string
   return "aguardando";
 }
 
+type PeriodoPendentes = "todos" | "dia" | "outros";
+
 function hojeManaus(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "America/Manaus" });
 }
@@ -54,6 +56,8 @@ export function PainelVerificacao() {
   const [filtroPac, setFiltroPac] = useState<string | null>(null);
   const [filtroStatus, setFiltroStatus] = useState<StatusVerificacao | null>(null);
   const [filtroInspetor, setFiltroInspetor] = useState<string | null>(null);
+  // Pendentes do dia selecionado x pendentes que sobraram de outros dias (turnos já fechados).
+  const [filtroPeriodo, setFiltroPeriodo] = useState<PeriodoPendentes>("todos");
   const [showFilters, setShowFilters] = useState(false);
   const [showTrocaSetor, setShowTrocaSetor] = useState(false);
 
@@ -133,12 +137,21 @@ export function PainelVerificacao() {
     });
   }, [displayItems, filtroStatus, filtroInspetor, usuarios]);
 
-  const pendingAppointments = useMemo(
+  const pendentesOrdenados = useMemo(
     () =>
       filtrados
         .filter((i) => i.status !== "verificado")
         .sort((a, b) => PESO_STATUS[a.status] - PESO_STATUS[b.status] || new Date(instanteDoRegistro(b.appt)).getTime() - new Date(instanteDoRegistro(a.appt)).getTime()),
     [filtrados]
+  );
+  // O dia do monitoramento é o da hora em que foi realizado (a mesma regra dos verificados abaixo).
+  const ehDoDia = (i: AppointmentDisplay) => ensureLocalTime(instanteDoRegistro(i.appt)).isoLocal === dateBase;
+  const qtdPendentesDoDia = pendentesOrdenados.filter(ehDoDia).length;
+  const qtdPendentesOutrosDias = pendentesOrdenados.length - qtdPendentesDoDia;
+  const pendingAppointments = useMemo(
+    () => (filtroPeriodo === "todos" ? pendentesOrdenados : pendentesOrdenados.filter((i) => ehDoDia(i) === (filtroPeriodo === "dia"))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pendentesOrdenados, filtroPeriodo, dateBase]
   );
   const verifiedToday = useMemo(
     () => filtrados.filter((i) => i.status === "verificado" && ensureLocalTime(i.appt.verificado_em ?? i.appt.criado_em).isoLocal === dateBase),
@@ -189,7 +202,7 @@ export function PainelVerificacao() {
   // procedente não fica "não conforme" — fica TRATADO.
   const { data: rncPorMonitoramento } = useRncsDosMonitoramentos(displayItems.filter((i) => i.appt.conformidade === false).map((i) => i.id));
 
-  const filtrosAtivos = Boolean(filtroSetor || filtroPac || filtroStatus || filtroInspetor || dateBase !== hojeManaus());
+  const filtrosAtivos = Boolean(filtroSetor || filtroPac || filtroStatus || filtroInspetor || filtroPeriodo !== "todos" || dateBase !== hojeManaus());
 
   const verificarLote = useVerificarLote();
 
@@ -198,7 +211,14 @@ export function PainelVerificacao() {
     setFiltroPac(null);
     setFiltroStatus(null);
     setFiltroInspetor(null);
+    setFiltroPeriodo("todos");
     setDateBase(hojeManaus());
+  }
+
+  function escolherPeriodo(periodo: PeriodoPendentes) {
+    setFiltroPeriodo(periodo);
+    // A seleção para o lote só vale para o que está na tela: trocar o período não deixa fichas ocultas selecionadas.
+    setSelectedIds(new Set());
   }
 
   function alterarDia(delta: number) {
@@ -441,6 +461,20 @@ export function PainelVerificacao() {
         <Button type="button" variant="outline" size="sm" onClick={selecionarPendentes}>
           Selecionar Pendentes
         </Button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Período dos pendentes" data-testid="filtro-periodo">
+        {(
+          [
+            ["todos", "Todos", pendentesOrdenados.length],
+            ["dia", `Do dia ${ensureLocalTime(`${dateBase}T12:00:00`).datePt}`, qtdPendentesDoDia],
+            ["outros", "De outros dias / turnos fechados", qtdPendentesOutrosDias],
+          ] as const
+        ).map(([valor, rotulo, qtd]) => (
+          <Button key={valor} type="button" size="sm" variant={filtroPeriodo === valor ? "default" : "outline"} aria-pressed={filtroPeriodo === valor} onClick={() => escolherPeriodo(valor)}>
+            {rotulo} <span className="ml-1 rounded-full bg-white/20 px-1.5 text-[10px]">{qtd}</span>
+          </Button>
+        ))}
       </div>
 
       <div className="space-y-3" data-testid="fila-pendente">
