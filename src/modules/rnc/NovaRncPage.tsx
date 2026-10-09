@@ -60,6 +60,11 @@ export function NovaRncPage() {
   const abrirRnc = useAbrirRnc();
 
   const monitoramentoVinculo = searchParams.get("vinculo");
+  // Inspetor registra o que fez na hora para conter o desvio; Verificador/Administrador abrem a RNC para que o
+  // setor a trate e sane a não conformidade, sem ação imediata própria.
+  const exigeAcaoImediata = perfil?.nivelAcesso === "INSPETOR_QUALIDADE";
+  const voltarPara = searchParams.get("voltar");
+  const destinoFinal = voltarPara && /^\/[A-Za-z0-9/_-]*$/.test(voltarPara) ? voltarPara : exigeAcaoImediata ? "/painel" : "/verificacao";
   const { data: vinculo } = useFichaDoMonitoramento(monitoramentoVinculo);
   const { data: masterSetores } = useSetoresCadastrados();
   const setoresDoUsuario = resolverSetoresEfetivos(perfil?.setoresPermitidos ?? [], masterSetores);
@@ -99,7 +104,7 @@ export function NovaRncPage() {
       setMensagem({ tipo: "error", texto: "Descreva o desvio antes de abrir a RNC." });
       return;
     }
-    if (!acaoImediata.trim()) {
+    if (exigeAcaoImediata && !acaoImediata.trim()) {
       setMensagem({ tipo: "error", texto: "Informe a ação imediata tomada antes de abrir a RNC." });
       return;
     }
@@ -108,7 +113,7 @@ export function NovaRncPage() {
       const criada = await abrirRnc.mutateAsync({
         monitoramentoId: monitoramentoVinculo,
         descricao: descricao.trim(),
-        acaoImediata: acaoImediata.trim(),
+        acaoImediata: acaoImediata.trim() || null,
         setor,
         severidade,
         abertoPor: perfil.id,
@@ -119,7 +124,7 @@ export function NovaRncPage() {
         tipo: falhasFoto > 0 ? "error" : "success",
         texto: falhasFoto > 0 ? `RNC aberta, mas ${falhasFoto} foto(s) não foram enviadas. Anexe de novo pela tela da RNC.` : "RNC aberta com sucesso.",
       });
-      setTimeout(() => navigate("/painel"), falhasFoto > 0 ? 3500 : 1200);
+      setTimeout(() => navigate(destinoFinal), falhasFoto > 0 ? 3500 : 1200);
     } catch (erro) {
       setMensagem({ tipo: "error", texto: erro instanceof Error ? erro.message : "Falha ao abrir a RNC." });
     }
@@ -193,10 +198,10 @@ export function NovaRncPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="acaoImediataRnc">Ação Imediata (obrigatório)</Label>
+              <Label htmlFor="acaoImediataRnc">{exigeAcaoImediata ? "Ação Imediata (obrigatório)" : "Ação Imediata (opcional)"}</Label>
               <Textarea
                 id="acaoImediataRnc"
-                required
+                required={exigeAcaoImediata}
                 placeholder="Descreva o que foi feito imediatamente para conter o desvio…"
                 value={acaoImediata}
                 onChange={(e) => setAcaoImediata(e.target.value)}

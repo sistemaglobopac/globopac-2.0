@@ -5,7 +5,11 @@
 // CamposEspeciaisRelatorio; sem isto, cada tela reimplementava (ou esquecia de implementar) a
 // mesma lógica de rótulo/tipo, e um valor de widget composto caía direto em `String(valor)` →
 // "[object Object]".
+import { Fragment } from "react";
+import { FileWarning, PenLine, ShieldAlert } from "lucide-react";
 import type { CampoTemplate } from "@/shared/schema-campos";
+import { Button } from "@/shared/ui/button";
+import { valorNaoConforme } from "../utils/desviosEspeciais";
 import {
   AbsorcaoAguaRelatorio,
   CaixasVaziasRelatorio,
@@ -96,15 +100,52 @@ function pesoCarcacaDaFicha(campos: CampoTemplate[], dados: Record<string, unkno
   return (dados[campo?.chave ?? ""] as ChillerCarcacasValor | undefined)?.pesoMedioCarcaca ?? 0;
 }
 
+/** Ações do Verificador/Administrador sobre um campo não conforme, mostradas numa barra acima dele (nunca na impressão). */
+export interface AcoesNaoConformidade {
+  /** Incluir adendo para corrigir o campo; ausente quando o registro não aceita mais adendo. */
+  onAdendo?: (chaveCampo: string) => void;
+  /** Abrir a RNC do monitoramento; ausente quando já existe RNC ou autocorreção. */
+  onAbrirRnc?: (chaveCampo: string) => void;
+}
+
+function BarraNaoConformidade({ chave, rotulo, acoes }: { chave: string; rotulo: string; acoes: AcoesNaoConformidade }) {
+  if (!acoes.onAdendo && !acoes.onAbrirRnc) return null;
+  return (
+    <div
+      className="col-span-full flex flex-wrap items-center justify-between gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 print:hidden"
+      data-testid={`nc-acoes-${chave}`}
+    >
+      <span className="flex items-center gap-1.5 text-xs font-black uppercase text-destructive">
+        <ShieldAlert className="h-4 w-4" /> {rotulo} — não conforme
+      </span>
+      <div className="flex flex-wrap gap-2">
+        {acoes.onAdendo && (
+          <Button type="button" size="sm" variant="outline" data-testid={`nc-adendo-${chave}`} onClick={() => acoes.onAdendo?.(chave)}>
+            <PenLine className="h-3.5 w-3.5" /> Incluir adendo
+          </Button>
+        )}
+        {acoes.onAbrirRnc && (
+          <Button type="button" size="sm" variant="destructive" data-testid={`nc-rnc-${chave}`} onClick={() => acoes.onAbrirRnc?.(chave)}>
+            <FileWarning className="h-3.5 w-3.5" /> Abrir RNC
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** "Dados Coletados em Campo" de UM registro: itera schema_campos na ordem real da ficha e
  * delega os 7 widgets "Especial SIF" para CamposEspeciaisRelatorio. */
 export function DadosColetados({
   dadosDinamicos,
   campos,
   registro,
+  acoesNaoConformidade,
 }: {
   dadosDinamicos: Record<string, unknown>;
   campos: CampoTemplate[];
+  /** Só na tela de verificação: barra com "Incluir adendo"/"Abrir RNC" sobre cada campo não conforme. */
+  acoesNaoConformidade?: AcoesNaoConformidade;
   /** Horas do servidor do registro (início = criado_em, fim = finalizado_em) — mostradas na absorção de água. */
   registro?: { criado_em: string; finalizado_em: string | null; assinado_em?: string | null };
 }) {
@@ -117,7 +158,10 @@ export function DadosColetados({
       {campos.map((campo) => {
         const valor = dadosDinamicos[campo.chave];
         const rotulo = campo.label ?? campo.chave;
+        const barraNc =
+          acoesNaoConformidade && valorNaoConforme(valor) ? <BarraNaoConformidade chave={campo.chave} rotulo={rotulo} acoes={acoesNaoConformidade} /> : null;
 
+        const elemento = (() => {
         switch (campo.tipo) {
           case "chiller_carcacas":
             return valor ? <ChillerCarcacasRelatorio key={campo.chave} valor={valor as ChillerCarcacasValor} titulo={rotulo} /> : null;
@@ -193,6 +237,15 @@ export function DadosColetados({
             return <CampoSimples key={campo.chave} label={rotulo} tipo={ROTULO_TIPO[campo.tipo] ?? "Variável"} valor={valor} />;
           }
         }
+        })();
+        return barraNc ? (
+          <Fragment key={campo.chave}>
+            {barraNc}
+            {elemento}
+          </Fragment>
+        ) : (
+          elemento
+        );
       })}
     </div>
   );

@@ -1,10 +1,11 @@
-import { Eye, Lock, Printer, ShieldAlert, ShieldCheck, Unlock } from "lucide-react";
+import { Eye, FileWarning, Lock, Printer, ShieldAlert, ShieldCheck, Unlock } from "lucide-react";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { instanteDoRegistro } from "../utils/horaMonitoramento";
 import { ensureLocalTime } from "../utils/tempo";
 import type { AppointmentDisplay } from "../utils/recordGrouping";
 import type { StatusRnc } from "@/modules/rnc/api";
+import { temNaoConformidade } from "../utils/desviosEspeciais";
 
 const STATUS_ROTULO: Record<AppointmentDisplay["status"], string> = {
   aguardando: "Aguardando verificação",
@@ -44,6 +45,8 @@ export interface AuditRecordCardProps {
   rncStatus?: StatusRnc;
   /** Monitoramento com autocorreção imediata do inspetor (alternativa à RNC). */
   autocorrigido?: boolean;
+  /** Abre a RNC vinculada a este monitoramento não conforme (Verificador/Administrador). */
+  onAbrirRnc?: (item: AppointmentDisplay) => void;
   onEncerrarTurno: (item: AppointmentDisplay) => void;
 }
 
@@ -63,6 +66,7 @@ export function AuditRecordCard({
   isAdmin,
   rncStatus,
   autocorrigido,
+  onAbrirRnc,
   onEncerrarTurno,
 }: AuditRecordCardProps) {
   const { appt } = item;
@@ -73,6 +77,9 @@ export function AuditRecordCard({
   const pac = pacPorTemplateId.get(appt.ficha_template_id) ?? "—";
   const codigo = codigoPorTemplateId.get(appt.ficha_template_id);
   const inspetorNome = usersMap.get(appt.user_id) ?? "Inspetor";
+  // Não conforme no preenchimento (ou já reprovado) e ainda sem RNC nem autocorreção: dá para abrir a RNC daqui.
+  const naoConforme = appt.conformidade === false || temNaoConformidade(appt.dados_dinamicos);
+  const podeAbrirRnc = Boolean(onAbrirRnc) && naoConforme && !rncStatus && !autocorrigido;
 
   return (
     <div
@@ -103,6 +110,7 @@ export function AuditRecordCard({
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-1.5">
+          {naoConforme && !rncStatus && !autocorrigido && <Badge variant="destructive">NÃO CONFORME</Badge>}
           {autocorrigido && <Badge className="border-transparent bg-lime text-primary">AUTOCORRIGIDO</Badge>}
           {rncStatus === "FECHADA" && <Badge className="border-transparent bg-lime text-primary">TRATADO</Badge>}
           {rncStatus && rncStatus !== "FECHADA" && <Badge variant="warning">RNC em andamento</Badge>}
@@ -125,6 +133,12 @@ export function AuditRecordCard({
             <Button type="button" size="sm" variant="outline" onClick={() => onEncerrarTurno(item)}>
               <Unlock className="h-3.5 w-3.5" />
               Encerrar turno
+            </Button>
+          )}
+          {podeAbrirRnc && (
+            <Button type="button" size="sm" variant="destructive" data-testid={`abrir-rnc-${item.id}`} onClick={() => onAbrirRnc?.(item)}>
+              <FileWarning className="h-3.5 w-3.5" />
+              Abrir RNC
             </Button>
           )}
           <Button type="button" size="sm" variant="ghost" onClick={() => onImprimir(item)}>

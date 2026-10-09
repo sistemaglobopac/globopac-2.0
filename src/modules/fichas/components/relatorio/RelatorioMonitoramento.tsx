@@ -15,6 +15,7 @@ import { ensureLocalTime } from "../../utils/tempo";
 import { instanteDoRegistro } from "../../utils/horaMonitoramento";
 import { computarHashMonitoramento, resumoHash } from "../../utils/hashDocumento";
 import { DadosColetados } from "../DadosColetadosFicha";
+import type { AcoesNaoConformidade } from "../DadosColetadosFicha";
 
 // Razão social/SIF fixos — mesma planta/cliente do v1, só trocou de sistema (confirmado com o
 // usuário). Não há hoje um app_config para isso; se um dia mudar, esse é o único lugar a tocar.
@@ -244,6 +245,7 @@ interface RegistroUnicoProps {
   template: TemplateRelatorio | undefined;
   dados: DadosRelatorio;
   hashesAoVivo: Map<string, string>;
+  acoesNaoConformidade?: (record: MonitoramentoRelatorio, jaTemRncOuAutocorrecao: boolean) => AcoesNaoConformidade | undefined;
 }
 
 export type SituacaoRegistro = "conforme" | "tratado" | "autocorrigido" | "nao-conforme" | "desvio-pendente" | "aguardando";
@@ -281,7 +283,7 @@ const CLASSE_SELO: Record<SituacaoRegistro, string> = {
   aguardando: "text-muted-foreground",
 };
 
-function RegistroUnico({ record, ordem, template, dados, hashesAoVivo }: RegistroUnicoProps) {
+function RegistroUnico({ record, ordem, template, dados, hashesAoVivo, acoesNaoConformidade }: RegistroUnicoProps) {
   const inspetorAssinatura = assinaturaDe(dados.assinaturas, record.id, "INSPETOR");
   const verificadorAssinatura = assinaturaDe(dados.assinaturas, record.id, "VERIFICADOR");
   const hashReferencia = verificadorAssinatura?.hash_documento ?? inspetorAssinatura?.hash_documento;
@@ -312,7 +314,7 @@ function RegistroUnico({ record, ordem, template, dados, hashesAoVivo }: Registr
         </span>
       </div>
 
-      <DadosColetados dadosDinamicos={record.dados_dinamicos} campos={camposSemHora} registro={{ criado_em: record.criado_em, finalizado_em: record.finalizado_em, assinado_em: inspetorAssinatura?.criado_em }} />
+      <DadosColetados dadosDinamicos={record.dados_dinamicos} campos={camposSemHora} acoesNaoConformidade={acoesNaoConformidade?.(record, Boolean(rnc || autocorrecao))} registro={{ criado_em: record.criado_em, finalizado_em: record.finalizado_em, assinado_em: inspetorAssinatura?.criado_em }} />
 
       {rnc && (
         <BlocoRnc
@@ -363,12 +365,14 @@ export interface RelatorioMonitoramentoProps {
   dados: DadosRelatorio;
   /** Turno de cada monitoramento (considera o turno aberto do inspetor); sem ele vale o relógio. */
   turnoDe?: (m: MonitoramentoRelatorio) => string;
+  /** Só na tela de verificação: ações do Verificador/Administrador sobre cada campo não conforme. */
+  acoesNaoConformidade?: (record: MonitoramentoRelatorio, jaTemRncOuAutocorrecao: boolean) => AcoesNaoConformidade | undefined;
 }
 
 /** Relatório oficial — um único registro OU um dossiê consolidado (vários `ids` do mesmo
  * grupo: mesmo inspetor/dia/turno/PAC/setor, ver DossieVerificacaoCard). Renderizado dentro de
  * #relatorio-impressao pelo RelatorioModal, que é o que de fato vira a página impressa. */
-export function RelatorioMonitoramento({ ids, dados, turnoDe = (r) => turnoDoDia(new Date(instanteDoRegistro(r))) }: RelatorioMonitoramentoProps) {
+export function RelatorioMonitoramento({ ids, dados, turnoDe = (r) => turnoDoDia(new Date(instanteDoRegistro(r))), acoesNaoConformidade }: RelatorioMonitoramentoProps) {
   // Sempre em ordem cronológica: "Apuração 1" é o 1º monitoramento do dia, independentemente da
   // ordem em que os ids chegaram na URL.
   const records = ids
@@ -547,6 +551,7 @@ export function RelatorioMonitoramento({ ids, dados, turnoDe = (r) => turnoDoDia
                 template={dados.templatesPorId.get(record.ficha_template_id)}
                 dados={dados}
                 hashesAoVivo={hashesAoVivo}
+                acoesNaoConformidade={acoesNaoConformidade}
               />
             ))}
           </div>

@@ -7,6 +7,7 @@ import { instanteDoRegistro } from "../utils/horaMonitoramento";
 import { ensureLocalTime } from "../utils/tempo";
 import type { StatusRnc } from "@/modules/rnc/api";
 import { AuditRecordCard } from "./AuditRecordCard";
+import { temNaoConformidade } from "../utils/desviosEspeciais";
 
 interface DossieVerificacaoCardProps {
   dossie: DossieVerificacao;
@@ -26,6 +27,7 @@ interface DossieVerificacaoCardProps {
   rncPorMonitoramento?: Map<string, StatusRnc>;
   /** Monitoramentos com autocorrecao imediata do inspetor. */
   autocorrigidoIds?: Set<string>;
+  onAbrirRnc?: (item: AppointmentDisplay) => void;
   onEncerrarTurno: (dossie: DossieVerificacao) => void;
   onEncerrarTurnoItem: (item: AppointmentDisplay) => void;
 }
@@ -53,6 +55,7 @@ export function DossieVerificacaoCard({
   isAdmin,
   rncPorMonitoramento,
   autocorrigidoIds,
+  onAbrirRnc,
   onEncerrarTurno,
   onEncerrarTurnoItem,
 }: DossieVerificacaoCardProps) {
@@ -63,6 +66,9 @@ export function DossieVerificacaoCard({
   const ultimoItem = dossie.items.at(-1);
   const primeiraHora = primeiroItem ? ensureLocalTime(instanteDoRegistro(primeiroItem.appt)).time : "—";
   const ultimaHora = ultimoItem ? ensureLocalTime(instanteDoRegistro(ultimoItem.appt)).time : "—";
+  const semRnc = dossie.items.filter(
+    (i) => (i.appt.conformidade === false || temNaoConformidade(i.appt.dados_dinamicos)) && !rncPorMonitoramento?.has(i.id) && !autocorrigidoIds?.has(i.id)
+  ).length;
   const nomeFicha = primeiroItem ? nomePorTemplateId.get(primeiroItem.appt.ficha_template_id) ?? dossie.codigo : dossie.codigo;
 
   return (
@@ -90,6 +96,11 @@ export function DossieVerificacaoCard({
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
               <Badge variant="secondary">{dossie.items.length} Monitoramentos</Badge>
+              {semRnc > 0 && (
+                <Badge variant="destructive" data-testid="dossie-nc-sem-rnc">
+                  {semRnc} não conforme{semRnc > 1 ? "s" : ""} sem RNC — veja em "Apurações"
+                </Badge>
+              )}
               {!dossie.verificado && (
                 <Badge variant={dossie.bloqueado ? "warning" : "success"}>
                   {dossie.bloqueado && <Lock className="mr-1 h-3 w-3" />}
@@ -156,6 +167,7 @@ export function DossieVerificacaoCard({
               isAdmin={isAdmin}
               rncStatus={rncPorMonitoramento?.get(item.id)}
               autocorrigido={autocorrigidoIds?.has(item.id)}
+              onAbrirRnc={onAbrirRnc}
               onEncerrarTurno={onEncerrarTurnoItem}
             />
           ))}

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, Lock, PenLine, ShieldAlert, ShieldCheck } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, FileWarning, Loader2, Lock, PenLine, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useSessionStore } from "@/store/session";
 import { useAbrirAdendo, useDadosRelatorio, useVerificarMonitoramento, type MonitoramentoRelatorio } from "./api";
 import { turnosBloqueadosMap } from "./utils/turnoUtils";
@@ -9,6 +9,9 @@ import { instanteDoRegistro } from "./utils/horaMonitoramento";
 import { useTurnoDoRegistro } from "./useTurnoDoRegistro";
 import { ensureLocalTime } from "./utils/tempo";
 import { alvosDoCampo } from "./utils/adendoCampos";
+import { temNaoConformidade } from "./utils/desviosEspeciais";
+import { urlAbrirRnc, useRncsDosMonitoramentos } from "@/modules/rnc/api";
+import { useAutocorrigidos } from "@/modules/autocorrecao/api";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { ModalAssinaturaSenha } from "@/shared/ModalAssinaturaSenha";
@@ -42,12 +45,16 @@ export function VerificarFichaPage() {
   const turnoDe = useTurnoDoRegistro();
   const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
   const [acao, setAcao] = useState<Acao>(null);
+  // Adendo pedido direto sobre um campo não conforme do relatório: abre o formulário já com registro e campo escolhidos.
+  const [adendoAlvo, setAdendoAlvo] = useState<{ registroId: string; campo: string } | null>(null);
+  const painelAcaoRef = useRef<HTMLDivElement>(null);
   const [mensagemErro, setMensagemErro] = useState<string | null>(null);
   const [mensagemSucesso, setMensagemSucesso] = useState<string | null>(null);
 
-  // Começar outra ação apaga o aviso da anterior.
+  // Começar outra ação apaga o aviso da anterior; ao fechar a ação, o adendo pré-selecionado também sai.
   useEffect(() => {
     if (acao !== null) setMensagemSucesso(null);
+    else setAdendoAlvo(null);
   }, [acao]);
 
   useEffect(() => {
@@ -62,6 +69,14 @@ export function VerificarFichaPage() {
   }, [dados]);
 
   const pendentes = useMemo(() => dados?.monitoramentos.filter((m) => !m.verificado_por) ?? [], [dados]);
+  // Monitoramentos não conformes (no preenchimento ou já reprovados) ainda sem RNC nem autocorreção: o verificador pode abrir a RNC daqui.
+  const naoConformes = useMemo(
+    () => (dados?.monitoramentos ?? []).filter((m) => m.conformidade === false || temNaoConformidade(m.dados_dinamicos)),
+    [dados]
+  );
+  const { data: rncDosNc } = useRncsDosMonitoramentos(naoConformes.map((m) => m.id));
+  const { data: autocorrigidosNc } = useAutocorrigidos(naoConformes.map((m) => m.id));
+  const ncSemRnc = naoConformes.filter((m) => !rncDosNc?.has(m.id) && !autocorrigidosNc?.has(m.id));
   const jaVerificado = Boolean(dados) && dados!.monitoramentos.length > 0 && pendentes.length === 0;
   // Só os pendentes contam pra bloqueio de turno — um já verificado não precisa mais do turno
   // encerrado (a decisão já foi tomada).
@@ -80,6 +95,21 @@ export function VerificarFichaPage() {
   }
 
   if (!perfil) return null;
+
+  const podeAgir = perfil.nivelAcesso === "VERIFICADOR" || perfil.nivelAcesso === "ADMIN_MASTER";
+  // Barra sobre cada campo não conforme do relatório: incluir adendo (só enquanto o registro está pendente) ou abrir a RNC (só sem RNC/autocorreção).
+  const acoesNaoConformidade = podeAgir
+    ? (registro: MonitoramentoRelatorio, jaTemRncOuAutocorrecao: boolean) => ({
+        onAdendo: registro.verificado_por
+          ? undefined
+          : (campo: string) => {
+              setAdendoAlvo({ registroId: registro.id, campo });
+              setAcao("adendo");
+              setTimeout(() => painelAcaoRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+            },
+        onAbrirRnc: jaTemRncOuAutocorrecao ? undefined : () => navigate(urlAbrirRnc(registro.id)),
+      })
+    : undefined;
 
   return (
     <div className="mx-auto max-w-5xl pb-16">
@@ -115,9 +145,30 @@ export function VerificarFichaPage() {
 
       {dados && dados.monitoramentos.length > 0 && (
         <>
-          <RelatorioMonitoramento ids={ids} dados={dados} turnoDe={turnoDe} />
+          <RelatorioMonitoramento ids={ids} dados={dados} turnoDe={turnoDe} acoesNaoConformidade={acoesNaoConformidade} />
 
-          <div className="mx-auto max-w-4xl rounded-xl border bg-card p-6 shadow-sm">
+          {ncSemRnc.length > 0 && (
+            <div className="mx-auto max-w-4xl space-y-3 rounded-xl border-2 border-destructive/50 bg-destructive/5 p-4" data-testid="nc-sem-rnc">
+              <div>
+                <p className="flex items-center gap-2 font-semibold text-destructive">
+                  <ShieldAlert className="h-5 w-5" /> Não conformidade sem RNC
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Abra a RNC para que o setor trate e sane a não conformidade. O monitoramento passa a TRATADO quando a RNC for fechada.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {ncSemRnc.map((m) => (
+                  <Button key={m.id} type="button" variant="destructive" data-testid={`abrir-rnc-${m.id}`} onClick={() => navigate(urlAbrirRnc(m.id))}>
+                    <FileWarning className="h-4 w-4" />
+                    Abrir RNC{ncSemRnc.length > 1 ? ` — ${ensureLocalTime(instanteDoRegistro(m)).time}` : ""}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div ref={painelAcaoRef} className="mx-auto max-w-4xl rounded-xl border bg-card p-6 shadow-sm">
             {jaVerificado ? (
               <div className="flex items-start gap-3 rounded-lg border border-success bg-success/10 p-4">
                 <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-success" />
@@ -144,6 +195,9 @@ export function VerificarFichaPage() {
                 </div>
                 {acao === "adendo" ? (
                   <PainelAdendo
+                    key={`${adendoAlvo?.registroId}-${adendoAlvo?.campo}`}
+                    registroInicial={adendoAlvo?.registroId}
+                    campoInicial={adendoAlvo?.campo}
                     pendentes={pendentes}
                     dados={dados}
                     verificadorNome={perfil.nomeCompleto}
@@ -182,6 +236,9 @@ export function VerificarFichaPage() {
                 )}
                 {acao === "adendo" && (
                   <PainelAdendo
+                    key={`${adendoAlvo?.registroId}-${adendoAlvo?.campo}`}
+                    registroInicial={adendoAlvo?.registroId}
+                    campoInicial={adendoAlvo?.campo}
                     pendentes={pendentes}
                     dados={dados}
                     verificadorNome={perfil.nomeCompleto}
@@ -352,12 +409,15 @@ function PainelRejeitar({ pendentes, onCancelar, onConcluido, onErro }: PainelAc
 interface PainelAdendoProps extends PainelAcaoProps {
   dados: { templatesPorId: Map<string, { schema_campos: { chave: string; label?: string; tipo?: string }[] }> };
   verificadorNome: string;
+  /** Registro e campo já escolhidos (adendo pedido direto sobre o campo não conforme do relatório). */
+  registroInicial?: string;
+  campoInicial?: string;
 }
 
-function PainelAdendo({ pendentes, dados, verificadorNome, onCancelar, onConcluido, onErro }: PainelAdendoProps) {
+function PainelAdendo({ pendentes, dados, verificadorNome, registroInicial, campoInicial, onCancelar, onConcluido, onErro }: PainelAdendoProps) {
   const abrirAdendo = useAbrirAdendo();
-  const [registroId, setRegistroId] = useState(pendentes.length === 1 ? pendentes[0]!.id : "");
-  const [campo, setCampo] = useState("");
+  const [registroId, setRegistroId] = useState(registroInicial ?? (pendentes.length === 1 ? pendentes[0]!.id : ""));
+  const [campo, setCampo] = useState(campoInicial ?? "");
   const [alvoCaminho, setAlvoCaminho] = useState("");
   const [valorNovo, setValorNovo] = useState("");
   const [nota, setNota] = useState("");

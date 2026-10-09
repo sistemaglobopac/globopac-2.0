@@ -80,13 +80,19 @@ export function useRncsFechadasRecentes() {
  * SLA por severidade usada em useReabrirRnc. `monitoramentoId` é opcional: a matriz de
  * permissões já previa INSPETOR_QUALIDADE abrindo RNC "em campo", vinculada a um monitoramento
  * ou avulsa. */
+/** Abre a tela de RNC já vinculada ao monitoramento (usada pelo Painel de Verificação); ao terminar volta para `voltar`. */
+export function urlAbrirRnc(monitoramentoId: string, voltar = "/verificacao"): string {
+  return `/nova-rnc?vinculo=${monitoramentoId}&voltar=${encodeURIComponent(voltar)}`;
+}
+
 export function useAbrirRnc() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: {
       monitoramentoId: string | null;
       descricao: string;
-      acaoImediata: string;
+      /** Obrigatória para o inspetor (contenção na hora); o Verificador/Administrador pode abrir sem ela. */
+      acaoImediata: string | null;
       setor: string;
       severidade: SeveridadeRnc;
       abertoPor: string;

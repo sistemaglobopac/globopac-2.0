@@ -97,7 +97,7 @@ function AppRoutes() {
         <Route
           path="/nova-rnc"
           element={
-            <ProtectedRoute perfisPermitidos={["INSPETOR_QUALIDADE", "ADMIN_MASTER"]}>
+            <ProtectedRoute perfisPermitidos={["INSPETOR_QUALIDADE", "VERIFICADOR", "ADMIN_MASTER"]}>
               <NovaRncPage />
             </ProtectedRoute>
           }

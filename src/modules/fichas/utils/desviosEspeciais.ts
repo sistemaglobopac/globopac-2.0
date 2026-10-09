@@ -86,11 +86,14 @@ export function desviosEspeciais(campos: CampoTemplate[], dados: Record<string, 
  * definida pelo Verificador — antes disso é null —, então o Painel de Bordo usa isto para avisar o
  * inspetor logo após a assinatura, sem esperar a verificação. */
 export function temNaoConformidade(dados: Record<string, unknown> | null | undefined): boolean {
-  return Object.values(dados ?? {}).some((valor) => {
-    if (!valor || typeof valor !== "object" || Array.isArray(valor)) return false;
-    const v = valor as { conformidade?: unknown; status?: unknown };
-    return v.conformidade === false || v.status === "nao-conforme";
-  });
+  return Object.values(dados ?? {}).some(valorNaoConforme);
+}
+
+/** O valor de UM campo está não conforme no preenchimento (widget com `conformidade` falsa ou `status` "nao-conforme")? */
+export function valorNaoConforme(valor: unknown): boolean {
+  if (!valor || typeof valor !== "object" || Array.isArray(valor)) return false;
+  const v = valor as { conformidade?: unknown; status?: unknown };
+  return v.conformidade === false || v.status === "nao-conforme";
 }
 
 export interface CampoNaoConforme {

@@ -3,10 +3,11 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, ClipboardCheck, Filter, Layers, Loader2, Sparkles, X } from "lucide-react";
 import { useSessionStore } from "@/store/session";
 import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/api";
-import { useRncsAbertas, useRncsDosMonitoramentos } from "@/modules/rnc/api";
+import { urlAbrirRnc, useRncsAbertas, useRncsDosMonitoramentos } from "@/modules/rnc/api";
 import { CartaoRnc } from "@/modules/rnc/CartaoRnc";
 import { supabase } from "@/lib/supabase";
 import { useAutocorrigidos } from "@/modules/autocorrecao/api";
+import { temNaoConformidade } from "./utils/desviosEspeciais";
 import { idsAdendosConcluidos, temAdendoPendente } from "./utils/adendosPendentes";
 import { pacsDoTemplate, useFichasTemplatesTodas, useFilaVerificacao, useUsuariosMap, useVerificarLote } from "./api";
 import { useTurnoDoRegistro } from "./useTurnoDoRegistro";
@@ -159,7 +160,7 @@ export function PainelVerificacao() {
   );
 
   const pendingKey = pendingAppointments.map((i) => i.id).join(",");
-  const { data: autocorrigidoIds } = useAutocorrigidos(pendingAppointments.map((i) => i.id));
+  const { data: autocorrigidoIds } = useAutocorrigidos([...pendingAppointments, ...verifiedToday].map((i) => i.id));
   // Encerrar o turno não muda a lista de pendentes, só o estado dos turnos — sem este contador
   // o efeito abaixo não reexecutava e o botão "Verificar" ficava travado com o bloqueio antigo.
   const [turnosVersao, setTurnosVersao] = useState(0);
@@ -200,7 +201,9 @@ export function PainelVerificacao() {
   const kpiRncTratativa = rncsParaJulgar.length;
   // Status da RNC de cada monitoramento com desvio (inclui FECHADA): um monitoramento com RNC
   // procedente não fica "não conforme" — fica TRATADO.
-  const { data: rncPorMonitoramento } = useRncsDosMonitoramentos(displayItems.filter((i) => i.appt.conformidade === false).map((i) => i.id));
+  const { data: rncPorMonitoramento } = useRncsDosMonitoramentos(
+    displayItems.filter((i) => i.appt.conformidade === false || temNaoConformidade(i.appt.dados_dinamicos)).map((i) => i.id)
+  );
 
   const filtrosAtivos = Boolean(filtroSetor || filtroPac || filtroStatus || filtroInspetor || filtroPeriodo !== "todos" || dateBase !== hojeManaus());
 
@@ -351,6 +354,7 @@ export function PainelVerificacao() {
       isAdmin={Boolean(isAdmin)}
       rncPorMonitoramento={rncPorMonitoramento}
       autocorrigidoIds={autocorrigidoIds}
+      onAbrirRnc={(i) => navigate(urlAbrirRnc(i.id))}
       onEncerrarTurno={
         somenteLeitura
           ? () => undefined
@@ -380,6 +384,7 @@ export function PainelVerificacao() {
       isAdmin={Boolean(isAdmin)}
       rncStatus={rncPorMonitoramento?.get(item.id)}
       autocorrigido={autocorrigidoIds?.has(item.id)}
+      onAbrirRnc={(i) => navigate(urlAbrirRnc(i.id))}
       onEncerrarTurno={
         somenteLeitura
           ? () => undefined

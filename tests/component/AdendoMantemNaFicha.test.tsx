@@ -32,6 +32,11 @@ vi.mock("@/modules/fichas/api", () => ({
   useAbrirAdendo: () => ({ mutateAsync: abrirAdendo, isPending: false }),
   useVerificarMonitoramento: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
+vi.mock("@/modules/rnc/api", () => ({
+  urlAbrirRnc: (id: string) => `/nova-rnc?vinculo=${id}`,
+  useRncsDosMonitoramentos: () => ({ data: new Map<string, string>() }),
+}));
+vi.mock("@/modules/autocorrecao/api", () => ({ useAutocorrigidos: () => ({ data: new Set<string>() }) }));
 vi.mock("@/modules/fichas/components/relatorio/RelatorioMonitoramento", () => ({ RelatorioMonitoramento: () => <div>RELATORIO</div> }));
 vi.mock("@/modules/fichas/useTurnoDoRegistro", () => ({ useTurnoDoRegistro: () => () => "1º Turno" }));
 vi.mock("@/modules/fichas/utils/turnoUtils", () => ({ turnosBloqueadosMap: async () => new Set<string>() }));
