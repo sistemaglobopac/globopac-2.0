@@ -242,3 +242,44 @@ describe("consumo de água — buckets de tempo", () => {
     expect(rotuloDoBucket(manaus("2026-10-01 00:00"), "mes")).toBe("out/2026");
   });
 });
+
+describe("dias excluídos do BI", () => {
+  const eventos = calcularEventos(
+    [
+      registro("2026-10-05 08:00", { pre: ["", "500"] }),
+      registro("2026-10-05 10:00", { pre: ["500", "900"] }), // leitura fora da realidade
+      registro("2026-10-07 08:00", { pre: ["", "900"] }),
+      registro("2026-10-07 09:00", { pre: ["900", "901"] }),
+    ],
+    templates
+  ).eventos;
+  const de = manaus("2026-10-05 00:00");
+  const ate = manaus("2026-10-08 00:00");
+  const excluir5 = new Set([manaus("2026-10-05 00:00")]);
+
+  it("o dia excluído some do eixo, dos totais e da contagem de dias", () => {
+    const r = agregar(eventos, "dia", de, ate, [], excluir5);
+    expect(r.buckets.map((b) => b.rotulo)).toEqual(["06/10/2026", "07/10/2026"]);
+    expect(r.total).toBeCloseTo(1, 6);
+    expect(r.diasComConsumo).toBe(1);
+    expect(r.leituras).toBe(1);
+  });
+
+  it("sem exclusão o dia continua entrando (o comportamento padrão não muda)", () => {
+    const r = agregar(eventos, "dia", de, ate);
+    expect(r.buckets).toHaveLength(3);
+    expect(r.total).toBeGreaterThan(300);
+  });
+
+  it("por semana e por hora, só o dia excluído sai", () => {
+    const semana = agregar(eventos, "semana", de, ate, [], excluir5);
+    expect(semana.total).toBeCloseTo(1, 6);
+    const hora = agregar(eventos, "hora", de, ate, [], excluir5);
+    expect(hora.buckets.every((b) => !b.rotulo.startsWith("05/10"))).toBe(true);
+  });
+
+  it("leituras descartadas do dia excluído não são avisadas", () => {
+    expect(agregar(eventos, "dia", de, ate, [manaus("2026-10-05 09:00")], excluir5).descartadas).toBe(0);
+    expect(agregar(eventos, "dia", de, ate, [manaus("2026-10-06 09:00")], excluir5).descartadas).toBe(1);
+  });
+});

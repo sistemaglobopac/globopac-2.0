@@ -19,6 +19,25 @@ import {
   type SistemaAgua,
 } from "./calculo";
 
+/** Dias fora do BI (AAAA-MM-DD, Manaus). Padrão: 05/10/2026, dia com leituras fora da realidade que escondia os demais dias. */
+const DIAS_OCULTOS_PADRAO = ["2026-10-05"];
+const CHAVE_DIAS_OCULTOS = "bi-consumo-agua-dias-ocultos";
+
+function lerDiasOcultos(): string[] {
+  try {
+    const bruto = window.localStorage.getItem(CHAVE_DIAS_OCULTOS);
+    if (bruto === null) return DIAS_OCULTOS_PADRAO;
+    const lista: unknown = JSON.parse(bruto);
+    return Array.isArray(lista) ? lista.filter((d): d is string => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d)) : DIAS_OCULTOS_PADRAO;
+  } catch {
+    return DIAS_OCULTOS_PADRAO;
+  }
+}
+
+function formatarDia(dia: string): string {
+  return dia.split("-").reverse().join("/");
+}
+
 type Unidade = "m3" | "L";
 type Preset = "hoje" | "7d" | "30d" | "mes" | "personalizado";
 
@@ -89,6 +108,18 @@ export function ConsumoAguaTab() {
   const [intervalo, setIntervalo] = useState(() => intervaloDoPreset("7d", hoje));
   const [granularidade, setGranularidade] = useState<Granularidade>("dia");
   const [unidade, setUnidade] = useState<Unidade>("m3");
+  const [diasOcultos, setDiasOcultos] = useState<string[]>(lerDiasOcultos);
+  const [novoOculto, setNovoOculto] = useState("");
+
+  function alterarDiasOcultos(lista: string[]) {
+    const ordenada = [...new Set(lista)].sort();
+    setDiasOcultos(ordenada);
+    try {
+      window.localStorage.setItem(CHAVE_DIAS_OCULTOS, JSON.stringify(ordenada));
+    } catch {
+      // sem armazenamento (janela privada): vale só nesta tela.
+    }
+  }
 
   const periodoValido = /^\d{4}-\d{2}-\d{2}$/.test(intervalo.de) && /^\d{4}-\d{2}-\d{2}$/.test(intervalo.ate) && intervalo.de <= intervalo.ate;
   // Manaus é UTC−4 fixo; o fim é exclusivo (dia seguinte, 00h) para incluir o último dia inteiro.
@@ -100,8 +131,11 @@ export function ConsumoAguaTab() {
   const { dados, carregando, erro } = useRegistrosAgua(deMs, ateMs, periodoValido);
   const eventos = useMemo(() => (dados ? calcularEventos(dados.registros, dados.templates) : null), [dados]);
   const resultado = useMemo(
-    () => (eventos && periodoValido && !horaMuitoLonga ? agregar(eventos.eventos, granularidade, deMs, ateMs, eventos.descartadasEm) : null),
-    [eventos, granularidade, deMs, ateMs, periodoValido, horaMuitoLonga]
+    () =>
+      eventos && periodoValido && !horaMuitoLonga
+        ? agregar(eventos.eventos, granularidade, deMs, ateMs, eventos.descartadasEm, new Set(diasOcultos.map((d) => Date.parse(`${d}T00:00:00-04:00`))))
+        : null,
+    [eventos, granularidade, deMs, ateMs, periodoValido, horaMuitoLonga, diasOcultos]
   );
 
   const fator = unidade === "m3" ? 1 : 1000;
@@ -190,6 +224,38 @@ export function ConsumoAguaTab() {
               valor={unidade}
               onChange={setUnidade}
             />
+          </div>
+          <div className="space-y-1" data-testid="dias-ocultos">
+            <p className="text-xs font-medium text-muted-foreground">Dias fora do BI (não entram nos totais nem nos gráficos)</p>
+            <div className="flex flex-wrap items-center gap-2">
+              {diasOcultos.length === 0 && <span className="text-xs text-muted-foreground">Nenhum dia oculto.</span>}
+              {diasOcultos.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  className="flex items-center gap-1 rounded-full border bg-muted px-2.5 py-1 text-xs font-semibold hover:bg-muted/70"
+                  title="Voltar a mostrar este dia"
+                  data-testid={`dia-oculto-${d}`}
+                  onClick={() => alterarDiasOcultos(diasOcultos.filter((x) => x !== d))}
+                >
+                  {formatarDia(d)} <span aria-hidden>×</span>
+                  <span className="sr-only">Voltar a mostrar {formatarDia(d)}</span>
+                </button>
+              ))}
+              <Input type="date" className="w-40" aria-label="Ocultar o dia" value={novoOculto} max={hoje} onChange={(e) => setNovoOculto(e.target.value)} />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={!/^\d{4}-\d{2}-\d{2}$/.test(novoOculto)}
+                onClick={() => {
+                  alterarDiasOcultos([...diasOcultos, novoOculto]);
+                  setNovoOculto("");
+                }}
+              >
+                Ocultar dia
+              </Button>
+            </div>
           </div>
           {!periodoValido && <p className="text-sm text-destructive">Informe um período válido (a data inicial não pode ser depois da final).</p>}
           {horaMuitoLonga && <p className="text-sm text-destructive">Para ver hora a hora, escolha um período de até {LIMITE_DIAS_POR_HORA} dias.</p>}
@@ -351,6 +417,7 @@ export function ConsumoAguaTab() {
             horas do intervalo (horário de Manaus). O 1º monitoramento do dia não tem leitura anterior e não gera consumo.
           </p>
           <p>• Registros corrigidos por aditivo contam uma só vez (vale a versão corrigida).</p>
+          {diasOcultos.length > 0 && <p>• Dias ocultos nesta tela: {diasOcultos.map(formatarDia).join(", ")} (toque no dia acima para voltar a mostrá-lo).</p>}
           {resultado && resultado.leiturasSemIntervalo > 0 && (
             <p className="text-warning">
               • {resultado.leiturasSemIntervalo} leitura(s) sem leitura anterior nas últimas {INTERVALO_MAXIMO_HORAS} h tiveram o volume lançado na hora da própria leitura.

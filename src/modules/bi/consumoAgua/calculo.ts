@@ -284,9 +284,12 @@ export function agregar(
   granularidade: Granularidade,
   deMs: number,
   ateMs: number,
-  descartadasEm: number[] = []
+  descartadasEm: number[] = [],
+  /** Dias (início do dia em Manaus, ms) fora do BI: não entram em nenhum total, gráfico ou tabela. */
+  diasExcluidos: ReadonlySet<number> = new Set()
 ): ResultadoConsumo {
   const buckets = new Map<number, Bucket>();
+  const excluido = (instanteMs: number) => diasExcluidos.size > 0 && diasExcluidos.has(inicioDoBucket(instanteMs, "dia"));
   const dias = new Set<number>();
   let leituras = 0;
   let leiturasSemIntervalo = 0;
@@ -301,17 +304,21 @@ export function agregar(
   };
 
   if (granularidade !== "hora") {
-    for (let inicio = inicioDoBucket(deMs, granularidade); inicio < ateMs; inicio = proximoBucket(inicio, granularidade)) bucketDe(inicio);
+    for (let inicio = inicioDoBucket(deMs, granularidade); inicio < ateMs; inicio = proximoBucket(inicio, granularidade)) {
+      // Por dia, o dia excluído nem aparece no eixo (não vira uma barra zerada).
+      if (granularidade === "dia" && excluido(inicio)) continue;
+      bucketDe(inicio);
+    }
   }
 
   for (const evento of eventos) {
-    if (evento.fim < deMs || evento.fim >= ateMs) continue;
+    if (evento.fim < deMs || evento.fim >= ateMs || excluido(evento.fim)) continue;
     const ponto = PONTO_POR_ID.get(evento.pontoId);
     if (!ponto) continue;
     leituras += 1;
     if (evento.inicio === null) leiturasSemIntervalo += 1;
     for (const { hora, m3 } of fatiasPorHora(evento)) {
-      if (hora < deMs || hora >= ateMs) continue;
+      if (hora < deMs || hora >= ateMs || excluido(hora)) continue;
       const bucket = bucketDe(inicioDoBucket(hora, granularidade));
       bucket.porPonto[ponto.id] = (bucket.porPonto[ponto.id] ?? 0) + m3;
       bucket.porSistema[ponto.sistema] += m3;
@@ -333,6 +340,6 @@ export function agregar(
     chillers += b.chillers;
     chuveiro += b.chuveiro;
   }
-  const descartadas = descartadasEm.filter((t) => t >= deMs && t < ateMs).length;
+  const descartadas = descartadasEm.filter((t) => t >= deMs && t < ateMs && !excluido(t)).length;
   return { buckets: ordenados, totaisPorPonto, totaisPorSistema, chillers, chuveiro, total: chillers + chuveiro, diasComConsumo: dias.size, leituras, leiturasSemIntervalo, descartadas };
 }
