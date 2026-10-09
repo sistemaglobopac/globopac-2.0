@@ -214,6 +214,8 @@ export interface BoxEsperaAves {
  * temperatura ambiente e estado de aspersores/ventiladores. Com aves ofegantes, a ação corretiva é
  * ligar os dois equipamentos. */
 export interface EsperaAvesValor {
+  /** Não há veículos (cargas) nos boxes: não há o que monitorar e nada mais é exigido. Fichas antigas não têm o campo. */
+  semVeiculos?: boolean;
   boxes: BoxEsperaAves[];
   /** Temperatura ambiente (°C), como digitada. */
   temperaturaC: string;

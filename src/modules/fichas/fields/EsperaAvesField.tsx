@@ -79,6 +79,16 @@ export function EsperaAvesField({ value, onChange, disabled }: EsperaAvesFieldPr
       </div>
 
       <fieldset className="space-y-3" disabled={disabled}>
+        <legend className="text-xs font-black uppercase tracking-wider text-muted-foreground">Veículos nos boxes</legend>
+        <label className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold ${v.semVeiculos ? "border-primary bg-primary/10 text-primary" : ""}`}>
+          <input type="checkbox" checked={Boolean(v.semVeiculos)} onChange={(e) => atualizar({ semVeiculos: e.target.checked })} data-testid="sem-veiculos" />
+          Não há veículos nos boxes
+        </label>
+        {v.semVeiculos && <p className="text-xs italic text-muted-foreground">Sem veículos nos boxes não há o que monitorar neste momento — pode assinar.</p>}
+      </fieldset>
+
+      {!v.semVeiculos && (<>
+      <fieldset className="space-y-3" disabled={disabled}>
         <legend className="text-xs font-black uppercase tracking-wider text-muted-foreground">1. Cargas nos boxes e comportamento das aves</legend>
         <div className="space-y-1 sm:w-48">
           <Label htmlFor="espera-data">Data da programação</Label>
@@ -188,6 +198,7 @@ export function EsperaAvesField({ value, onChange, disabled }: EsperaAvesFieldPr
           )}
         </div>
       )}
+      </>)}
     </div>
   );
 }

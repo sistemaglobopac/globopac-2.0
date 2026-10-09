@@ -560,6 +560,9 @@ export function EsperaAvesRelatorio({ valor, titulo = "Bem-Estar Animal — Áre
         <span className="text-[10px] font-black uppercase tracking-wider text-primary print:text-[9px]">{titulo}</span>
         <SeloConformidade conforme={valor.conformidade !== false} />
       </div>
+      {valor.semVeiculos ? (
+        <p className="text-[10px] font-semibold print:text-[8px]">Não há veículos nos boxes — sem monitoramento neste horário.</p>
+      ) : (<>
       <table className="max-sm:block max-sm:overflow-x-auto w-full text-[10px] print:text-[8px]">
         <thead>
           <tr className="text-left text-muted-foreground">
@@ -607,6 +610,7 @@ export function EsperaAvesRelatorio({ valor, titulo = "Bem-Estar Animal — Áre
           )}
         </p>
       )}
+      </>)}
       {valor.conformidade === false && valor.detalhesRNC && (
         <p className="text-[10px] font-semibold text-destructive print:text-[8px]">{valor.detalhesRNC}</p>
       )}

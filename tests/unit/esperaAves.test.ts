@@ -90,4 +90,16 @@ describe("espera de aves — bem-estar animal", () => {
     expect(desviosEspeciais(campos, { esp: v })[0]).toContain("Aves ofegantes");
     expect(desviosEspeciais(campos, { esp: montarValorEspera(completo()) })).toEqual([]);
   });
+
+  it("sem veículos nos boxes: dispensa boxes, ambiente e ação corretiva, e é conforme", () => {
+    const v = { ...esperaVazia(), semVeiculos: true };
+    expect(motivosBloqueioEspera(v)).toEqual([]);
+    const emitido = montarValorEspera({ ...completo({ boxes: [box({ comportamento: "ofegantes" })] }), semVeiculos: true });
+    expect(emitido).toMatchObject({ semVeiculos: true, boxes: [], conformidade: true, detalhesRNC: null, houveOfegantes: false, acaoCorretiva: false });
+    expect(acaoCorretivaPendente({ ...completo({ boxes: [box({ comportamento: "ofegantes" })] }), semVeiculos: true })).toBe(false);
+  });
+
+  it("sem marcar 'sem veículos', continua exigindo o preenchimento completo", () => {
+    expect(motivosBloqueioEspera(esperaVazia()).length).toBeGreaterThan(0);
+  });
 });

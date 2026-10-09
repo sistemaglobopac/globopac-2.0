@@ -17,6 +17,7 @@ export function boxVazio(): BoxEsperaAves {
 
 export function esperaVazia(): EsperaAvesValor {
   return {
+    semVeiculos: false,
     boxes: [boxVazio()],
     temperaturaC: "",
     aspersoresLigados: null,
@@ -48,7 +49,7 @@ export function equipamentosLigados(v: Pick<EsperaAvesValor, "aspersoresLigados"
 
 /** Ação corretiva pendente: há aves ofegantes e aspersores/ventiladores não estão ambos ligados. */
 export function acaoCorretivaPendente(v: EsperaAvesValor): boolean {
-  return boxesOfegantes(v).length > 0 && !equipamentosLigados(v);
+  return !v.semVeiculos && boxesOfegantes(v).length > 0 && !equipamentosLigados(v);
 }
 
 function nomeBox(b: BoxEsperaAves): string {
@@ -70,6 +71,10 @@ export function avaliarEspera(v: EsperaAvesValor): { conformidade: boolean; moti
 /** Aplica conformidade e a marcação de ofegantes sobre o valor digitado — é o que o widget emite. A
  * ação corretiva só vale enquanto houver aves ofegantes. */
 export function montarValorEspera(v: EsperaAvesValor): EsperaAvesValor {
+  // Sem veículos nos boxes não há monitoramento: nada de boxes, ambiente ou ação corretiva no registro.
+  if (v.semVeiculos) {
+    return { ...esperaVazia(), semVeiculos: true, boxes: [], conformidade: true, detalhesRNC: null };
+  }
   const houveOfegantes = boxesOfegantes(v).length > 0;
   const { conformidade, motivos } = avaliarEspera(v);
   return {
@@ -82,10 +87,11 @@ export function montarValorEspera(v: EsperaAvesValor): EsperaAvesValor {
   };
 }
 
-/** Motivos que impedem assinar. */
+/** Motivos que impedem assinar (com "sem veículos nos boxes" marcado, nada é exigido). */
 export function motivosBloqueioEspera(v: EsperaAvesValor | undefined | null): string[] {
   const prefixo = "Área de espera";
   if (!v) return [`${prefixo}: informe as cargas nos boxes e preencha o monitoramento.`];
+  if (v.semVeiculos) return [];
   const m: string[] = [];
   const preenchidos = v.boxes.filter((b) => b.box.trim() || b.cargaId);
   if (preenchidos.length === 0) m.push(`${prefixo}: informe ao menos um box com a GTA da carga.`);
