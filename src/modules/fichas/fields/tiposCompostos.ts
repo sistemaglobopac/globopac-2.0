@@ -415,6 +415,8 @@ export interface AmostrasProduto {
  * amostras de cada produto na saída dos sistemas. */
 export interface TemperaturaResfriamentoValor {
   agua: Record<ChaveAguaResfriamento, string>;
+  /** Tanques com o processo parado (o chiller não estava funcionando): não têm temperatura a informar nem entram na conformidade. */
+  aguaParada?: Partial<Record<ChaveAguaResfriamento, boolean>>;
   /** Temperatura ambiente das salas de pré-resfriamento (ºC, como digitado). */
   ambiente: Record<ChaveAmbienteResfriamento, string>;
   produtos: Record<ChaveProdutoResfriamento, AmostrasProduto>;
@@ -455,6 +457,8 @@ export type ChaveTanqueAbsorcao = "preChiller" | "chiller1" | "chiller2";
  * borbulhamento ("moderado" | "intenso") do pré-chiller e dos chillers 1 e 2, como digitados. */
 export interface ControleAbsorcaoValor {
   tempoPermanenciaMin: string;
+  /** Tanques com o processo parado (não estava funcionando): sem temperatura nem borbulhamento a informar. */
+  tanquesParados?: Partial<Record<ChaveTanqueAbsorcao, boolean>>;
   temperaturas: Record<ChaveTanqueAbsorcao, string>;
   borbulhamento: Record<ChaveTanqueAbsorcao, string>;
   observacao: string;

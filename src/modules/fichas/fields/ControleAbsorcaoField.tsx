@@ -8,11 +8,13 @@ import {
   avaliarControleAbsorcao,
   BORBULHAMENTO,
   controleAbsorcaoVazio,
+  definirTanqueParado,
   lerTemperatura,
   montarValorControleAbsorcao,
   motivosBloqueioControleAbsorcao,
   TANQUES_ABSORCAO,
   TANQUES_ETAPA1,
+  tanqueParado,
   temperaturaAbsorcaoAcimaDoLimite,
 } from "./controleAbsorcao";
 import type { ChaveTanqueAbsorcao, ControleAbsorcaoValor } from "./tiposCompostos";
@@ -46,6 +48,10 @@ export function ControleAbsorcaoField({ value, onChange, disabled, somenteEtapa1
     setV((a) => ({ ...a, temperaturas: { ...a.temperaturas, [tanque]: apenasTemperatura(texto) } }));
   }
 
+  function alterarParado(tanque: ChaveTanqueAbsorcao, parado: boolean) {
+    setV((a) => definirTanqueParado(a, tanque, parado));
+  }
+
   function alterarBorbulhamento(tanque: ChaveTanqueAbsorcao, valor: string) {
     setV((a) => ({ ...a, borbulhamento: { ...a.borbulhamento, [tanque]: valor } }));
   }
@@ -75,11 +81,21 @@ export function ControleAbsorcaoField({ value, onChange, disabled, somenteEtapa1
 
         {tanques.map((t) => {
           const temp = v.temperaturas?.[t.chave] ?? "";
-          const nc = temperaturaAbsorcaoAcimaDoLimite(t.chave, lerTemperatura(temp));
+          const parado = tanqueParado(v, t.chave);
+          const nc = !parado && temperaturaAbsorcaoAcimaDoLimite(t.chave, lerTemperatura(temp));
           const limite = LIMITE_AGUA_C[t.chave];
           return (
             <div key={t.chave} className="space-y-3 rounded-md border p-3" data-testid={`absorcao-${t.chave}`}>
-              <strong className="text-sm">{t.rotulo}</strong>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <strong className="text-sm">{t.rotulo}</strong>
+                <label className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold">
+                  <input type="checkbox" className="h-4 w-4" checked={parado} onChange={(e) => alterarParado(t.chave, e.target.checked)} data-testid={`parado-${t.chave}`} />
+                  Processo parado
+                </label>
+              </div>
+              {parado ? (
+                <p className="rounded-md bg-muted p-2 text-xs text-muted-foreground">Processo parado (tanque sem funcionar): não há temperatura nem borbulhamento a informar.</p>
+              ) : (
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1">
                   <Label htmlFor={`temp-absorcao-${t.chave}`}>
@@ -109,6 +125,7 @@ export function ControleAbsorcaoField({ value, onChange, disabled, somenteEtapa1
                   </div>
                 </div>
               </div>
+              )}
             </div>
           );
         })}

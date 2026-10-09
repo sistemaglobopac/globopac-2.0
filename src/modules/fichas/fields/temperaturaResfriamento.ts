@@ -74,6 +74,19 @@ export function definirSemProduto(a: AmostrasProduto | undefined, semProduto: bo
   return semProduto ? { amostra1: "", amostra2: "", semProduto: true } : { amostra1: a?.amostra1 ?? "", amostra2: a?.amostra2 ?? "" };
 }
 
+/** O ponto de água está com o processo parado (chiller/tanque sem funcionar)? Não tem temperatura a informar. */
+export function pontoParado(v: Pick<TemperaturaResfriamentoValor, "aguaParada"> | undefined | null, chave: ChaveAguaResfriamento): boolean {
+  return v?.aguaParada?.[chave] === true;
+}
+
+/** Marca (ou desmarca) o processo parado de um ponto: a temperatura digitada é descartada, pois não há o que medir. */
+export function definirPontoParado(v: TemperaturaResfriamentoValor, chave: ChaveAguaResfriamento, parado: boolean): TemperaturaResfriamentoValor {
+  const aguaParada = { ...(v.aguaParada ?? {}) };
+  if (parado) aguaParada[chave] = true;
+  else delete aguaParada[chave];
+  return { ...v, aguaParada, agua: { ...v.agua, ...(parado ? { [chave]: "" } : {}) } };
+}
+
 /** Todos os produtos marcados como "sem produto no momento". */
 export function todosSemProduto(v: Pick<TemperaturaResfriamentoValor, "produtos">): boolean {
   return PRODUTOS.every((p) => v.produtos?.[p.chave]?.semProduto === true);
@@ -103,6 +116,7 @@ const fmt = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 2 
 export function avaliarTemperaturas(v: TemperaturaResfriamentoValor): { conformidade: boolean; motivos: string[] } {
   const motivos: string[] = [];
   for (const p of PONTOS_AGUA) {
+    if (pontoParado(v, p.chave)) continue;
     const limite = LIMITE_AGUA_C[p.chave];
     const t = lerTemperatura(v.agua[p.chave]);
     if (limite !== null && t !== null && t > limite) motivos.push(`${p.rotulo.replace("T ºC ", "Água do ")}: ${fmt(t)} ºC (limite ${fmt(limite)} ºC)`);
@@ -130,13 +144,14 @@ export function montarValorTemperatura(v: TemperaturaResfriamentoValor): Tempera
   return { ...v, conformidade, detalhesRNC: motivos.length ? `Temperatura acima do limite — ${motivos.join("; ")}` : null };
 }
 
-/** Tudo é obrigatório: 10 temperaturas de água, 2 ambientes e, para cada um dos 7 produtos, 2 amostras (e o tipo da parte
+/** Tudo é obrigatório (processo parado dispensa a temperatura do tanque): 10 temperaturas de água, 2 ambientes e, para cada um dos 7 produtos, 2 amostras (e o tipo da parte
  * aferida) — exceto o produto marcado "sem produto no momento", que não tem amostras. */
 export function motivosBloqueioTemperatura(v: TemperaturaResfriamentoValor | undefined | null): string[] {
   const p = "Temperaturas do pré-resfriamento";
   if (!v) return [`${p}: informe as temperaturas da água e dos produtos.`];
   const m: string[] = [];
   for (const ponto of PONTOS_AGUA) {
+    if (pontoParado(v, ponto.chave)) continue;
     if (lerTemperatura(v.agua?.[ponto.chave]) === null) m.push(`${p}: informe ${ponto.rotulo}.`);
   }
   for (const ponto of PONTOS_AMBIENTE) {

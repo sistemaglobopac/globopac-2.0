@@ -35,6 +35,23 @@ export function rotuloBorbulhamento(valor: string | undefined): string {
   return BORBULHAMENTO.find((b) => b.valor === valor)?.rotulo ?? "—";
 }
 
+/** O tanque está com o processo parado (não estava funcionando)? Sem temperatura nem borbulhamento a informar. */
+export function tanqueParado(v: Pick<ControleAbsorcaoValor, "tanquesParados"> | undefined | null, tanque: ChaveTanqueAbsorcao): boolean {
+  return v?.tanquesParados?.[tanque] === true;
+}
+
+/** Marca (ou desmarca) o processo parado de um tanque: temperatura e borbulhamento digitados são descartados. */
+export function definirTanqueParado(v: ControleAbsorcaoValor, tanque: ChaveTanqueAbsorcao, parado: boolean): ControleAbsorcaoValor {
+  const tanquesParados = { ...(v.tanquesParados ?? {}) };
+  if (parado) tanquesParados[tanque] = true;
+  else delete tanquesParados[tanque];
+  return {
+    ...v,
+    tanquesParados,
+    ...(parado ? { temperaturas: { ...v.temperaturas, [tanque]: "" }, borbulhamento: { ...v.borbulhamento, [tanque]: "" } } : {}),
+  };
+}
+
 export function controleAbsorcaoVazio(): ControleAbsorcaoValor {
   const porTanque = () => Object.fromEntries(TANQUES_ABSORCAO.map((t) => [t.chave, ""])) as Record<ChaveTanqueAbsorcao, string>;
   return { tempoPermanenciaMin: "", temperaturas: porTanque(), borbulhamento: porTanque(), observacao: "", conformidade: true, detalhesRNC: null };
@@ -51,6 +68,7 @@ export function temperaturaAbsorcaoAcimaDoLimite(tanque: ChaveTanqueAbsorcao, t:
 export function avaliarControleAbsorcao(v: ControleAbsorcaoValor): { conformidade: boolean; motivos: string[] } {
   const motivos: string[] = [];
   for (const t of TANQUES_ABSORCAO) {
+    if (tanqueParado(v, t.chave)) continue;
     const temp = lerTemperatura(v.temperaturas?.[t.chave]);
     if (temperaturaAbsorcaoAcimaDoLimite(t.chave, temp)) motivos.push(`Água do ${t.rotulo}: ${fmt(temp!)} ºC (limite ${fmt(LIMITE_AGUA_C[t.chave]!)} ºC)`);
   }
@@ -64,6 +82,7 @@ export function montarValorControleAbsorcao(v: ControleAbsorcaoValor): ControleA
 
 /** O chiller 2 ainda não foi informado (temperatura e borbulhamento)? */
 export function chiller2Pendente(v: ControleAbsorcaoValor | undefined | null): boolean {
+  if (tanqueParado(v, "chiller2")) return false;
   return lerTemperatura(v?.temperaturas?.chiller2) === null || !BORBULHAMENTO.some((b) => b.valor === v?.borbulhamento?.chiller2);
 }
 
@@ -77,9 +96,11 @@ export function motivosBloqueioControleAbsorcao(v: ControleAbsorcaoValor | undef
   const tempo = lerMedida(v.tempoPermanenciaMin);
   if (etapa !== 2 && (tempo === null || tempo <= 0)) m.push(`${p}: informe o tempo de permanência das carcaças no pré-chiller (minutos).`);
   for (const t of tanques) {
+    if (tanqueParado(v, t.chave)) continue;
     if (lerTemperatura(v.temperaturas?.[t.chave]) === null) m.push(`${p}: informe a temperatura da água do ${t.rotulo}.`);
   }
   for (const t of tanques) {
+    if (tanqueParado(v, t.chave)) continue;
     if (!BORBULHAMENTO.some((b) => b.valor === v.borbulhamento?.[t.chave])) m.push(`${p}: informe o borbulhamento do ${t.rotulo}.`);
   }
   return m;

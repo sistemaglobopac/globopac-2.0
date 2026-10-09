@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   avaliarTemperaturas,
+  definirPontoParado,
   lerTemperatura,
   montarValorTemperatura,
   definirSemProduto,
@@ -133,5 +134,37 @@ describe("temperaturas — sem produto no momento", () => {
     for (const k of Object.keys(v.produtos) as (keyof typeof v.produtos)[]) v.produtos[k] = definirSemProduto(v.produtos[k], true);
     v.agua.chiller1 = "6";
     expect(avaliarTemperaturas(v).conformidade).toBe(false);
+  });
+});
+
+describe("temperaturas do pré-resfriamento — processo parado", () => {
+  it("chiller parado dispensa a temperatura: não bloqueia a assinatura e não reprova", () => {
+    const v = completo();
+    v.agua.chiller2 = "";
+    expect(motivosBloqueioTemperatura(v)).toHaveLength(1);
+    const parado = definirPontoParado(v, "chiller2", true);
+    expect(motivosBloqueioTemperatura(parado)).toEqual([]);
+    expect(avaliarTemperaturas(parado).conformidade).toBe(true);
+  });
+
+  it("marcar parado descarta a temperatura digitada (mesmo acima do limite) e desmarcar volta a exigir", () => {
+    const v = completo();
+    v.agua.chiller1 = "9";
+    expect(avaliarTemperaturas(v).conformidade).toBe(false);
+    const parado = definirPontoParado(v, "chiller1", true);
+    expect(parado.agua.chiller1).toBe("");
+    expect(avaliarTemperaturas(parado).conformidade).toBe(true);
+    const desmarcado = definirPontoParado(parado, "chiller1", false);
+    expect(desmarcado.aguaParada?.chiller1).toBeUndefined();
+    expect(motivosBloqueioTemperatura(desmarcado)).toHaveLength(1);
+  });
+
+  it("só o ponto marcado é dispensado", () => {
+    const v = completo();
+    v.agua.chiller1 = "";
+    v.agua.chiller2 = "";
+    const m = motivosBloqueioTemperatura(definirPontoParado(v, "chiller2", true));
+    expect(m).toHaveLength(1);
+    expect(m[0]).toMatch(/Chiller 01/);
   });
 });

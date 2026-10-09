@@ -5,6 +5,7 @@ import { Label } from "@/shared/ui/label";
 import { Select } from "@/shared/ui/select";
 import {
   avaliarTemperaturas,
+  definirPontoParado,
   definirSemProduto,
   LIMITE_AGUA_C,
   LIMITE_AMBIENTE_C,
@@ -13,6 +14,7 @@ import {
   montarValorTemperatura,
   motivosBloqueioTemperatura,
   PONTOS_AGUA,
+  pontoParado,
   PONTOS_AMBIENTE,
   PRODUTOS,
   temperaturaVazia,
@@ -43,6 +45,9 @@ export function TemperaturaResfriamentoField({ value, onChange, disabled }: Temp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [v]);
 
+  function alterarParado(chave: ChaveAguaResfriamento, parado: boolean) {
+    setV((a) => definirPontoParado(a, chave, parado));
+  }
   function alterarAgua(chave: ChaveAguaResfriamento, texto: string) {
     setV((a) => ({ ...a, agua: { ...a.agua, [chave]: apenasTemperatura(texto) } }));
   }
@@ -84,18 +89,24 @@ export function TemperaturaResfriamentoField({ value, onChange, disabled }: Temp
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {PONTOS_AGUA.map((p) => {
             const limite = LIMITE_AGUA_C[p.chave];
-            const nc = acima(v.agua[p.chave], limite);
+            const parado = pontoParado(v, p.chave);
+            const nc = !parado && acima(v.agua[p.chave], limite);
             return (
               <div key={p.chave} className="space-y-1">
                 <Label htmlFor={`temp-agua-${p.chave}`}>{p.rotulo}</Label>
                 <Input
                   id={`temp-agua-${p.chave}`}
                   inputMode="decimal"
-                  placeholder="0,0"
+                  placeholder={parado ? "Processo parado" : "0,0"}
                   value={v.agua[p.chave]}
+                  disabled={parado}
                   className={nc ? "border-destructive text-destructive" : ""}
                   onChange={(e) => alterarAgua(p.chave, e.target.value)}
                 />
+                <label className="flex cursor-pointer items-center gap-1.5 text-[11px] font-semibold">
+                  <input type="checkbox" className="h-3.5 w-3.5" checked={parado} onChange={(e) => alterarParado(p.chave, e.target.checked)} data-testid={`parado-${p.chave}`} />
+                  Processo parado
+                </label>
                 {limite !== null && <p className={`text-[10px] ${nc ? "font-bold text-destructive" : "text-muted-foreground"}`}>Limite: {limite.toLocaleString("pt-BR")} ºC</p>}
               </div>
             );

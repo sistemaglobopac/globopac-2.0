@@ -3,6 +3,7 @@ import {
   avaliarControleAbsorcao,
   chiller2Pendente,
   controleAbsorcaoVazio,
+  definirTanqueParado,
   montarValorControleAbsorcao,
   motivosBloqueioControleAbsorcao,
   rotuloBorbulhamento,
@@ -98,6 +99,34 @@ describe("controle de absorção", () => {
       outra.temperaturas.chiller2 = "4,5";
       outra.borbulhamento.chiller2 = "intenso";
       expect(avaliarControleAbsorcao(outra).motivos).toEqual(["Água do Chiller 02: 4,5 ºC (limite 4 ºC)"]);
+    });
+  });
+
+  describe("processo parado (tanque sem funcionar)", () => {
+    it("tanque parado dispensa temperatura e borbulhamento e sai da conformidade", () => {
+      let v = preenchido();
+      v.temperaturas.chiller2 = "9";
+      expect(avaliarControleAbsorcao(v).conformidade).toBe(false);
+      v = definirTanqueParado(v, "chiller2", true);
+      expect(v.temperaturas.chiller2).toBe("");
+      expect(v.borbulhamento.chiller2).toBe("");
+      expect(avaliarControleAbsorcao(v)).toEqual({ conformidade: true, motivos: [] });
+      expect(motivosBloqueioControleAbsorcao(v)).toEqual([]);
+      expect(chiller2Pendente(v)).toBe(false);
+    });
+
+    it("só o tanque marcado é dispensado; os demais continuam exigidos", () => {
+      const v = definirTanqueParado(controleAbsorcaoVazio(), "chiller1", true);
+      v.tempoPermanenciaMin = "15";
+      const m = motivosBloqueioControleAbsorcao(v, 1);
+      expect(m.join(" ")).toMatch(/Pré-chiller/);
+      expect(m.join(" ")).not.toMatch(/Chiller 01/);
+    });
+
+    it("desmarcar volta a exigir o tanque", () => {
+      const v = definirTanqueParado(definirTanqueParado(preenchido(), "chiller2", true), "chiller2", false);
+      expect(v.tanquesParados?.chiller2).toBeUndefined();
+      expect(motivosBloqueioControleAbsorcao(v, 2)).toHaveLength(2);
     });
   });
 });

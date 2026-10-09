@@ -15,12 +15,14 @@ import {
   CHAVE_AGUARDANDO_CHILLER2,
   CHAVE_CHILLER2_COMPLETADO,
   controleAbsorcaoVazio,
+  definirTanqueParado,
   lerTemperatura,
   montarValorControleAbsorcao,
   motivosBloqueioControleAbsorcao,
   rotuloBorbulhamento,
   TANQUES_ETAPA1,
   TANQUES_ABSORCAO,
+  tanqueParado,
   temperaturaAbsorcaoAcimaDoLimite,
 } from "./fields/controleAbsorcao";
 import { LIMITE_AGUA_C } from "./fields/temperaturaResfriamento";
@@ -64,12 +66,14 @@ export function CompletarChiller2Page() {
   const [temperatura, setTemperatura] = useState("");
   const [borbulhamento, setBorbulhamento] = useState("");
   const [observacao, setObservacao] = useState("");
+  const [parado, setParado] = useState(false);
   const [iniciado, setIniciado] = useState(false);
   useEffect(() => {
     if (original && !iniciado) {
       setTemperatura(original.temperaturas?.chiller2 ?? "");
       setBorbulhamento(original.borbulhamento?.chiller2 ?? "");
       setObservacao(original.observacao ?? "");
+      setParado(tanqueParado(original, "chiller2"));
       setIniciado(true);
     }
   }, [original, iniciado]);
@@ -86,19 +90,25 @@ export function CompletarChiller2Page() {
   const valor: ControleAbsorcaoValor | undefined = useMemo(
     () =>
       original
-        ? montarValorControleAbsorcao({
-            ...original,
-            temperaturas: { ...original.temperaturas, chiller2: temperatura },
-            borbulhamento: { ...original.borbulhamento, chiller2: borbulhamento },
-            observacao,
-          })
+        ? montarValorControleAbsorcao(
+            definirTanqueParado(
+              {
+                ...original,
+                temperaturas: { ...original.temperaturas, chiller2: temperatura },
+                borbulhamento: { ...original.borbulhamento, chiller2: borbulhamento },
+                observacao,
+              },
+              "chiller2",
+              parado
+            )
+          )
         : undefined,
-    [original, temperatura, borbulhamento, observacao]
+    [original, temperatura, borbulhamento, observacao, parado]
   );
   const faltas = motivosBloqueioControleAbsorcao(valor, 2);
   const completo = !!valor && faltas.length === 0;
   const naoConforme = !!valor && !valor.conformidade;
-  const ncChiller2 = temperaturaAbsorcaoAcimaDoLimite("chiller2", lerTemperatura(temperatura));
+  const ncChiller2 = !parado && temperaturaAbsorcaoAcimaDoLimite("chiller2", lerTemperatura(temperatura));
 
   async function assinarFinal() {
     if (!registro || !campo || !valor || !perfil) return;
@@ -177,9 +187,18 @@ export function CompletarChiller2Page() {
           </div>
 
           <div className="space-y-3 rounded-md border p-3" data-testid="absorcao-chiller2">
-            <strong className="flex items-center gap-2 text-sm">
-              <Waves className="h-4 w-4 text-primary" /> Chiller 02
-            </strong>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <strong className="flex items-center gap-2 text-sm">
+                <Waves className="h-4 w-4 text-primary" /> Chiller 02
+              </strong>
+              <label className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold">
+                <input type="checkbox" className="h-4 w-4" checked={parado} disabled={finalizar.isPending} onChange={(e) => setParado(e.target.checked)} data-testid="parado-chiller2" />
+                Processo parado
+              </label>
+            </div>
+            {parado ? (
+              <p className="rounded-md bg-muted p-2 text-xs text-muted-foreground">Processo parado (chiller 02 sem funcionar): não há temperatura nem borbulhamento a informar.</p>
+            ) : (
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label htmlFor="temp-chiller2">
@@ -210,6 +229,7 @@ export function CompletarChiller2Page() {
                 </div>
               </div>
             </div>
+            )}
           </div>
 
           <div className="space-y-1">
@@ -228,7 +248,7 @@ export function CompletarChiller2Page() {
           <Button type="button" disabled={!completo || finalizar.isPending} onClick={() => setPedirSenha(true)} data-testid="finalizar-chiller2">
             <Waves className="h-4 w-4" /> Finalizar e assinar
           </Button>
-          {!completo && <p className="text-xs text-muted-foreground">Informe a temperatura e o borbulhamento do chiller 02 para finalizar.</p>}
+          {!completo && <p className="text-xs text-muted-foreground">Informe a temperatura e o borbulhamento do chiller 02 (ou marque "Processo parado") para finalizar.</p>}
         </CardContent>
       </Card>
 

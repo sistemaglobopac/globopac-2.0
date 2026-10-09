@@ -922,11 +922,12 @@ export function TemperaturaResfriamentoRelatorio({
         <tbody>
           {PONTOS_AGUA.map((p) => {
             const texto = valor.agua?.[p.chave];
-            const nc = acima(texto, LIMITE_AGUA_C[p.chave]);
+            const parado = valor.aguaParada?.[p.chave] === true;
+            const nc = !parado && acima(texto, LIMITE_AGUA_C[p.chave]);
             return (
               <tr key={p.chave}>
                 <td className="pr-2">{p.rotulo}</td>
-                <td className={nc ? "font-black text-destructive" : "font-black"}>{fmtTemp(texto)}</td>
+                <td className={nc ? "font-black text-destructive" : "font-black"}>{parado ? <em className="font-normal text-muted-foreground">Processo parado</em> : fmtTemp(texto)}</td>
               </tr>
             );
           })}
@@ -1054,15 +1055,24 @@ export function ControleAbsorcaoRelatorio({ valor, titulo = "Controle de Absorç
           </tr>
         </thead>
         <tbody>
-          {TANQUES_ABSORCAO.map((t) => (
-            <tr key={t.chave}>
-              <td className="pr-2">{t.rotulo}</td>
-              <td className={temperaturaAbsorcaoAcimaDoLimite(t.chave, lerTemperatura(valor.temperaturas?.[t.chave])) ? "pr-2 font-black text-destructive" : "pr-2 font-black"}>
-                {fmtTemp(valor.temperaturas?.[t.chave])}
-              </td>
-              <td className="font-black">{rotuloBorbulhamento(valor.borbulhamento?.[t.chave])}</td>
-            </tr>
-          ))}
+          {TANQUES_ABSORCAO.map((t) =>
+            valor.tanquesParados?.[t.chave] ? (
+              <tr key={t.chave}>
+                <td className="pr-2">{t.rotulo}</td>
+                <td colSpan={2} className="italic text-muted-foreground">
+                  Processo parado
+                </td>
+              </tr>
+            ) : (
+              <tr key={t.chave}>
+                <td className="pr-2">{t.rotulo}</td>
+                <td className={temperaturaAbsorcaoAcimaDoLimite(t.chave, lerTemperatura(valor.temperaturas?.[t.chave])) ? "pr-2 font-black text-destructive" : "pr-2 font-black"}>
+                  {fmtTemp(valor.temperaturas?.[t.chave])}
+                </td>
+                <td className="font-black">{rotuloBorbulhamento(valor.borbulhamento?.[t.chave])}</td>
+              </tr>
+            )
+          )}
         </tbody>
       </table>
       {valor.observacao?.trim() && <p className="text-[10px] italic text-ink print:text-[8px]">Observações: {valor.observacao}</p>}
