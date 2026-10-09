@@ -163,12 +163,13 @@ export function LavagemFinalField({ value, onChange, disabled, prevAppointment, 
                 <Label className="flex items-center gap-1 text-xs text-muted-foreground">
                   Hidr. Anterior (m³) <Lock className="h-3 w-3" />
                 </Label>
-                <Input disabled readOnly title={TOOLTIP_HIDR_ANTERIOR} value={formatHidrometro(chuveiro.prev)} className="font-mono" placeholder="Ex: 3718,72" />
+                <Input inputMode="decimal" disabled readOnly title={TOOLTIP_HIDR_ANTERIOR} value={formatHidrometro(chuveiro.prev)} className="font-mono" placeholder="Ex: 3718,72" />
               </div>
             )}
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Hidr. Atual (m³)</Label>
               <Input
+ inputMode="decimal"
                 disabled={disabled}
                 value={formatHidrometro(chuveiro.cur)}
                 onChange={(e) => setChuveiro((atual) => ({ ...atual, cur: parseHidrometro(e.target.value) }))}

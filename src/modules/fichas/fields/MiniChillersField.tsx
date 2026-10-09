@@ -142,6 +142,7 @@ export function MiniChillersField({ value, onChange, disabled, prevAppointment, 
                   Hidr. Anterior (m³) {prevTravado[chave] && <Lock className="h-3 w-3" />}
                 </Label>
                 <Input
+ inputMode="decimal"
                   disabled={disabled || prevTravado[chave]}
                   title={prevTravado[chave] ? TOOLTIP_HIDR_ANTERIOR : undefined}
                   value={formatHidrometro(tanque.prev)}
@@ -154,6 +155,7 @@ export function MiniChillersField({ value, onChange, disabled, prevAppointment, 
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Hidr. Atual (m³)</Label>
               <Input
+ inputMode="decimal"
                 disabled={disabled}
                 value={formatHidrometro(tanque.cur)}
                 onChange={(e) => alterarTanque(chave, "cur", parseHidrometro(e.target.value))}
@@ -165,6 +167,7 @@ export function MiniChillersField({ value, onChange, disabled, prevAppointment, 
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Gelo Adicionado (kg)</Label>
                 <Input
+ inputMode="decimal"
                   disabled={disabled}
                   value={formatHidrometro(tanque.ice)}
                   onChange={(e) => alterarTanque(chave, "ice", parseHidrometro(e.target.value))}

@@ -194,13 +194,13 @@ export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraE
               <div key={item.id} className="flex flex-wrap items-end gap-2 rounded-lg border bg-background p-2 shadow-sm xl:flex-nowrap xl:items-center">
                 <span className="flex h-6 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold">{i + 1}</span>
                 <label className="flex min-w-[40%] flex-1 flex-col gap-0.5 xl:min-w-[50px] xl:flex-[1.5]"><span className="text-[10px] font-bold uppercase text-muted-foreground xl:hidden">Lacre</span><Input className="h-8 text-xs" value={item.seal} onChange={(e) => alterarItem(i, "seal", e.target.value)} disabled={disabled || travaPrimeiraEtapa} placeholder="Lacre" /></label>
-                <label className="relative flex min-w-[40%] flex-1 flex-col gap-0.5 xl:min-w-[100px] xl:flex-[1.6]"><span className="text-[10px] font-bold uppercase text-muted-foreground xl:hidden">M0 (g)</span><Input className="h-8 font-mono text-xs" type="number" step="0.001" value={item.m0} onChange={(e) => alterarItem(i, "m0", e.target.value)} disabled={disabled || travaPrimeiraEtapa} placeholder="M0" />
+                <label className="relative flex min-w-[40%] flex-1 flex-col gap-0.5 xl:min-w-[100px] xl:flex-[1.6]"><span className="text-[10px] font-bold uppercase text-muted-foreground xl:hidden">M0 (g)</span><Input className="h-8 font-mono text-xs" type="number" inputMode="decimal" step="0.001" value={item.m0} onChange={(e) => alterarItem(i, "m0", e.target.value)} disabled={disabled || travaPrimeiraEtapa} placeholder="M0" />
                   {minimoExigido !== null && (
                     <span className="pointer-events-none absolute -bottom-3.5 left-0 w-full text-center text-[9px] font-bold text-violet-600">{minimoExigido}min</span>
                   )}
                 </label>
-                <label className="flex min-w-[40%] flex-1 flex-col gap-0.5 xl:min-w-[90px] xl:flex-[1.4]"><span className="text-[10px] font-bold uppercase text-muted-foreground xl:hidden">M1 (g)</span><Input className="h-8 font-mono text-xs" type="number" step="0.001" value={item.m1} onChange={(e) => alterarItem(i, "m1", e.target.value)} disabled={disabled || travaPrimeiraEtapa} placeholder="M1" /></label>
-                <label className="flex min-w-[40%] flex-1 flex-col gap-0.5 xl:min-w-[90px] xl:flex-[1.4]"><span className="text-[10px] font-bold uppercase text-muted-foreground xl:hidden">M3 (g)</span><Input className="h-8 font-mono text-xs" type="number" step="0.001" value={item.m3} onChange={(e) => alterarItem(i, "m3", e.target.value)} disabled={disabled || travaPrimeiraEtapa} placeholder="M3" /></label>
+                <label className="flex min-w-[40%] flex-1 flex-col gap-0.5 xl:min-w-[90px] xl:flex-[1.4]"><span className="text-[10px] font-bold uppercase text-muted-foreground xl:hidden">M1 (g)</span><Input className="h-8 font-mono text-xs" type="number" inputMode="decimal" step="0.001" value={item.m1} onChange={(e) => alterarItem(i, "m1", e.target.value)} disabled={disabled || travaPrimeiraEtapa} placeholder="M1" /></label>
+                <label className="flex min-w-[40%] flex-1 flex-col gap-0.5 xl:min-w-[90px] xl:flex-[1.4]"><span className="text-[10px] font-bold uppercase text-muted-foreground xl:hidden">M3 (g)</span><Input className="h-8 font-mono text-xs" type="number" inputMode="decimal" step="0.001" value={item.m3} onChange={(e) => alterarItem(i, "m3", e.target.value)} disabled={disabled || travaPrimeiraEtapa} placeholder="M3" /></label>
                 <label className="flex min-w-[40%] flex-1 flex-col gap-0.5 xl:w-20 xl:min-w-0 xl:flex-none xl:shrink-0"><span className="text-[10px] font-bold uppercase text-muted-foreground xl:hidden">Retirada</span><Input
                   className={`h-8 w-full text-[10px] font-bold ${item.timeNc ? "border-destructive bg-destructive/10 text-destructive" : "border-amber-300 bg-amber-50"}`}
                   type="time"
@@ -214,7 +214,7 @@ export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraE
                 /></label>
                 <label className="flex min-w-[40%] flex-1 flex-col gap-0.5 xl:min-w-[100px] xl:flex-[1.6]"><span className="text-[10px] font-bold uppercase text-muted-foreground xl:hidden">M2 (g)</span><Input
                   className="h-8 border-amber-300 bg-amber-50 font-mono text-xs"
-                  type="number"
+                  type="number" inputMode="decimal"
                   step="0.001"
                   value={item.m2}
                   onChange={(e) => alterarItem(i, "m2", e.target.value)}

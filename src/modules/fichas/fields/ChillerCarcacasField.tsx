@@ -321,6 +321,7 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
                   Hidr. Anterior (m³) {prevTravado[chave] && <Lock className="h-3 w-3" />}
                 </Label>
                 <Input
+ inputMode="decimal"
                   disabled={disabledGeral || prevTravado[chave]}
                   title={prevTravado[chave] ? TOOLTIP_HIDR_ANTERIOR : undefined}
                   value={formatHidrometro(tanque.prev)}
@@ -333,6 +334,7 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Hidr. Atual (m³)</Label>
               <Input
+ inputMode="decimal"
                 disabled={disabledGeral}
                 value={formatHidrometro(tanque.cur)}
                 onChange={(e) => alterarTanque(chave, "cur", parseHidrometro(e.target.value))}
@@ -344,6 +346,7 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Gelo Adicionado (kg)</Label>
                 <Input
+ inputMode="decimal"
                   disabled={disabledGeral}
                   value={formatHidrometro(tanque.ice)}
                   onChange={(e) => alterarTanque(chave, "ice", parseHidrometro(e.target.value))}

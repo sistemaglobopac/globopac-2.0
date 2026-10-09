@@ -73,7 +73,7 @@ export function AbsorcaoAguaField({ value, onChange, disabled, fase = "UMA_VEZ" 
               />
               <Input
                 className="flex-[1.2] font-mono"
-                type="number"
+                type="number" inputMode="decimal"
                 step="0.001"
                 value={item.initial}
                 onChange={(e) => alterarItem(i, "initial", e.target.value)}
@@ -84,7 +84,7 @@ export function AbsorcaoAguaField({ value, onChange, disabled, fase = "UMA_VEZ" 
               {mostraFinal && (
                 <Input
                   className="flex-[1.2] font-mono"
-                  type="number"
+                  type="number" inputMode="decimal"
                   step="0.001"
                   value={item.final}
                   onChange={(e) => alterarItem(i, "final", e.target.value)}

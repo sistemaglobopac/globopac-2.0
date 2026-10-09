@@ -98,13 +98,13 @@ export function DynamicField({ campo, register, errors, control, prevAppointment
       </Label>
 
       {campo.tipo === "numero" && (
-        <Input id={campo.chave} type="number" step="any" {...register(campo.chave, { valueAsNumber: true })} />
+        <Input id={campo.chave} type="number" inputMode="decimal" step="any" {...register(campo.chave, { valueAsNumber: true })} />
       )}
       {campo.tipo === "inteiro" && (
-        <Input id={campo.chave} type="number" step="1" {...register(campo.chave, { valueAsNumber: true })} />
+        <Input id={campo.chave} type="number" inputMode="numeric" step="1" {...register(campo.chave, { valueAsNumber: true })} />
       )}
       {campo.tipo === "decimal" && (
-        <Input id={campo.chave} type="number" step="any" {...register(campo.chave, { valueAsNumber: true })} />
+        <Input id={campo.chave} type="number" inputMode="decimal" step="any" {...register(campo.chave, { valueAsNumber: true })} />
       )}
       {(campo.tipo === "texto" || campo.tipo === "hora") && (
         <Input id={campo.chave} type={campo.tipo === "hora" ? "time" : "text"} {...register(campo.chave)} />
