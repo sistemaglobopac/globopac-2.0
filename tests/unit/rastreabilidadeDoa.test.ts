@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   doaPercentual,
+  cargaAguardando,
   doaVazio,
   herdarComRegistradas,
   montarCargas,
@@ -60,15 +61,18 @@ describe("DOA — montagem das cargas do dia", () => {
 
   it("ordena pela hora de início da pendura e numera 1, 2…", () => {
     const linhas = montarCargas(herdadas, { A: { avesRecebidas: "1000", avesMortas: "5" } });
-    expect(linhas.map((l) => [l.gta, l.ordemPendura])).toEqual([["GTA-A", 1], ["GTA-B", 2]]);
+    expect(linhas.map((l) => [l.gta, l.ordemPendura])).toEqual([["GTA-A", 1], ["GTA-B", 2], ["GTA-C", null]]);
   });
 
-  it("carga sem recepção fica de fora, a menos que o inspetor já tenha digitado algo", () => {
-    expect(montarCargas(herdadas, {}).some((l) => l.cargaId === "C")).toBe(false);
-    const linhas = montarCargas(herdadas, { C: { avesRecebidas: "10", avesMortas: "" } });
+  it("todas as cargas programadas entram; a que não chegou fica no fim, aguardando chegada", () => {
+    const linhas = montarCargas(herdadas, {});
+    expect(linhas.map((l) => l.cargaId)).toEqual(["A", "B", "C"]);
     const c = linhas.find((l) => l.cargaId === "C")!;
     expect(c.ordemPendura).toBeNull();
-    expect(linhas[linhas.length - 1]!.cargaId).toBe("C");
+    expect(cargaAguardando(c)).toBe(true);
+    expect(cargaAguardando(linhas[0]!)).toBe(false);
+    const digitada = montarCargas(herdadas, { C: { avesRecebidas: "10", avesMortas: "" } }).find((l) => l.cargaId === "C")!;
+    expect(cargaAguardando(digitada)).toBe(false);
   });
 
   it("herda GTA, veículo, início e previstas; calcula % e nota por carga", () => {
@@ -96,6 +100,22 @@ describe("DOA — bloqueio de assinatura", () => {
   it("sem nenhuma carga bloqueia", () => {
     expect(motivosBloqueioDoa(doaVazio("2026-10-02"))).toHaveLength(1);
     expect(motivosDeBloqueioSpr(campos, { doa: null })).toHaveLength(1);
+  });
+
+  it("carga aguardando chegada não trava o que já foi apurado, mas sem nenhuma chegada não há o que assinar", () => {
+    const programadas = [carga("A", "2026-10-02T05:10"), carga("C", "")];
+    const parcial = montarValorDoa("2026-10-02", montarCargas(programadas, { A: { avesRecebidas: "1000", avesMortas: "2" } }));
+    expect(parcial.cargas).toHaveLength(2);
+    expect(motivosBloqueioDoa(parcial)).toEqual([]);
+    const nenhuma = montarValorDoa("2026-10-02", montarCargas([carga("C", "")], {}));
+    expect(motivosBloqueioDoa(nenhuma)).toHaveLength(1);
+    expect(motivosBloqueioDoa(nenhuma)[0]).toMatch(/nenhuma carga chegou/);
+  });
+
+  it("carga que chegou mas ficou pela metade continua travando", () => {
+    const v = montarValorDoa("2026-10-02", montarCargas([carga("A", "2026-10-02T05:10"), carga("C", "")], { C: { avesRecebidas: "10", avesMortas: "" } }));
+    // A (pendurada, sem nada digitado): 2 faltas; C (recebidas sem mortas): 1 falta.
+    expect(motivosBloqueioDoa(v)).toHaveLength(3);
   });
 
   it("exige recebidas e mortas (zero vale) em cada carga listada", () => {

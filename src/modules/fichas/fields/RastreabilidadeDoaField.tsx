@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, FileWarning } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardList, Clock, FileWarning } from "lucide-react";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { useCargasRastreabilidade, useDoaCargasRegistradas } from "@/modules/recepcao/api";
 import { ensureLocalTime } from "../utils/tempo";
 import { formatarDataHora } from "./recepcaoAves";
-import { doaVazio, formatarPctDoa, herdarComRegistradas, lerContagem, montarCargas, montarValorDoa, motivosBloqueioDoa, type CargaHerdadaDoa, type EntradaDoa } from "./rastreabilidadeDoa";
+import { cargaAguardando, doaVazio, formatarPctDoa, herdarComRegistradas, lerContagem, montarCargas, montarValorDoa, motivosBloqueioDoa, type CargaHerdadaDoa, type EntradaDoa } from "./rastreabilidadeDoa";
 import type { RastreabilidadeDoaValor } from "./tiposCompostos";
 
 import type { CargasEmRascunhoPorTipo } from "../utils/rascunhosAnterior";
@@ -37,7 +37,13 @@ export function RastreabilidadeDoaField({ value, onChange, disabled, cargasUsada
     const proprias = new Set(dataAbate === inicial.current.dataAbate ? inicial.current.cargas.map((c) => c.cargaId) : []);
     // Do servidor (assinadas) + dos rascunhos locais (ainda não assinados); o rascunho mais recente vale.
     const doRascunho = cargasUsadasEmRascunho?.doa ?? [];
-    return new Map([...(registradas ?? []), ...doRascunho].filter((c) => !proprias.has(c.cargaId)).map((c) => [c.cargaId, c]));
+    // Só vale como "já registrada" a carga com aves recebidas informadas: linhas em branco (carga que ainda não tinha chegado)
+    // não travam a carga para a próxima apuração.
+    return new Map(
+      [...(registradas ?? []), ...doRascunho]
+        .filter((c) => !proprias.has(c.cargaId) && lerContagem(c.avesRecebidas) !== null)
+        .map((c) => [c.cargaId, c])
+    );
   }, [registradas, dataAbate, cargasUsadasEmRascunho]);
 
   const herdadas = useMemo<CargaHerdadaDoa[]>(() => {
@@ -72,6 +78,8 @@ export function RastreabilidadeDoaField({ value, onChange, disabled, cargasUsada
   const faltas = motivosBloqueioDoa(valor);
   const completo = faltas.length === 0;
   const notas = valor.cargas.filter((c) => c.notaSaldo);
+  const aguardando = valor.cargas.filter(cargaAguardando).length;
+  const apuradas = valor.cargas.filter((c) => lerContagem(c.avesRecebidas) !== null && lerContagem(c.avesMortas) !== null).length;
 
   useEffect(() => {
     onChange(valor);
@@ -91,6 +99,17 @@ export function RastreabilidadeDoaField({ value, onChange, disabled, cargasUsada
         {completo ? "PREENCHIDO" : "AGUARDANDO PREENCHIMENTO"}
         <span className="ml-auto font-black text-foreground">DOA do dia: {formatarPctDoa(valor.doaTotalPct)}</span>
       </div>
+      {valor.cargas.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/40 p-2 text-xs" data-testid="progresso-doa">
+          <span>
+            <strong>{apuradas}</strong> de <strong>{valor.cargas.length}</strong> cargas programadas apuradas
+            {aguardando > 0 ? ` · ${aguardando} aguardando chegada` : ""}
+          </span>
+          <a className="flex items-center gap-1 font-semibold text-primary underline" href={`/conferencia-cargas?data=${dataAbate}`} target="_blank" rel="noreferrer">
+            <ClipboardList className="h-3.5 w-3.5" /> Conferência das cargas do dia
+          </a>
+        </div>
+      )}
 
       <fieldset className="space-y-3" disabled={disabled}>
         <legend className="text-xs font-black uppercase tracking-wider text-muted-foreground">Rastreabilidade e controle de DOA por carga</legend>
@@ -103,14 +122,19 @@ export function RastreabilidadeDoaField({ value, onChange, disabled, cargasUsada
         {isError && <p className="text-xs text-destructive">Não foi possível carregar as cargas do dia (sem conexão?).</p>}
         {!isLoading && !isError && valor.cargas.length === 0 && (
           <p className="text-xs text-muted-foreground">
-            Nenhuma carga com a pendura iniciada nesta data. As cargas entram aqui assim que a recepção de aves registra o início da pendura.
+            Nenhuma carga programada nesta data. Cadastre a programação em "Cargas e Veículos" ou escolha outra data.
           </p>
         )}
 
         {valor.cargas.map((c) => (
-          <div key={c.cargaId} className="space-y-3 rounded-md border p-3" data-testid={`carga-doa-${c.gta}`}>
+          <div key={c.cargaId} className={`space-y-3 rounded-md border p-3 ${cargaAguardando(c) ? "border-dashed bg-muted/30" : ""}`} data-testid={`carga-doa-${c.gta}`}>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
               <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-black text-primary">{c.ordemPendura ? `${c.ordemPendura}ª a pendurar` : "Sem pendura"}</span>
+              {cargaAguardando(c) && (
+                <span className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-bold text-muted-foreground" data-testid={`aguardando-${c.gta}`}>
+                  <Clock className="h-3 w-3" /> Aguardando chegada
+                </span>
+              )}
               <strong>GTA {c.gta}</strong>
               <span className="text-muted-foreground">
                 {c.integrado} · Aviário {c.aviario}
@@ -141,6 +165,15 @@ export function RastreabilidadeDoaField({ value, onChange, disabled, cargasUsada
             </div>
             {lerContagem(c.avesMortas) !== null && lerContagem(c.avesRecebidas) !== null && lerContagem(c.avesMortas)! > lerContagem(c.avesRecebidas)! && (
               <p className="text-xs font-semibold text-destructive" role="alert">As aves mortas não podem ser mais que as aves que vieram na carga.</p>
+            )}
+            {!cargaAguardando(c) && (!c.penduraInicioEm || !c.pesoMedioKg) && (
+              <p className="flex items-start gap-2 rounded-md border border-warning bg-warning/10 p-2 text-xs font-semibold" role="note" data-testid={`falta-dado-${c.gta}`}>
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                {[!c.penduraInicioEm ? "Falta o início da pendura (registre a Recepção de Aves desta GTA)" : "", !c.pesoMedioKg ? "Falta o peso médio (registre o Peso por Caixa desta GTA)" : ""]
+                  .filter(Boolean)
+                  .join(" · ")}
+                . O relatório completa sozinho assim que forem registrados.
+              </p>
             )}
             {c.notaSaldo && (
               <p className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs font-semibold" role="alert" data-testid={`nota-saldo-${c.gta}`}>

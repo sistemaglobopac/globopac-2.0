@@ -12,6 +12,7 @@ import { PainelVerificacao } from "@/modules/fichas/PainelVerificacao";
 import { VerificarFichaPage } from "@/modules/fichas/VerificarFichaPage";
 import { RelatorioPragasMensalPage } from "@/modules/fichas/RelatorioPragasMensalPage";
 import { CargasAvesPage } from "@/modules/recepcao/CargasAvesPage";
+import { ConferenciaCargasPage } from "@/modules/recepcao/ConferenciaCargasPage";
 import { ComunicadosPage } from "@/modules/comunicados/ComunicadosPage";
 import { FinalizarAbsorcaoPage } from "@/modules/fichas/FinalizarAbsorcaoPage";
 import { CompletarPesoPage } from "@/modules/fichas/CompletarPesoPage";
@@ -131,6 +132,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute perfisPermitidos={["VERIFICADOR", "ADMIN_MASTER"]}>
               <ComunicadosPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/conferencia-cargas"
+          element={
+            <ProtectedRoute perfisPermitidos={["INSPETOR_QUALIDADE", "VERIFICADOR", "GESTOR_SETOR", "ADMIN_MASTER"]}>
+              <ConferenciaCargasPage />
             </ProtectedRoute>
           }
         />

@@ -94,17 +94,21 @@ export function herdarComRegistradas(herdada: CargaHerdadaDoa, anterior?: CargaD
   };
 }
 
+/** Carga programada que ainda não chegou: sem pendura iniciada e nada digitado. Aparece no DOA como
+ * "aguardando chegada" e não trava a assinatura do que já foi apurado. */
+export function cargaAguardando(c: Pick<CargaDoa, "penduraInicioEm" | "avesRecebidas" | "avesMortas">): boolean {
+  return !c.penduraInicioEm && !c.avesRecebidas.trim() && !c.avesMortas.trim();
+}
+
 /** Monta as linhas do monitoramento: dados herdados (frescos, da recepção) + o que o inspetor já
- * digitou. Ordem de pendura = ordem crescente de início da pendura. Entram as cargas que já
- * começaram a ser penduradas ou que já têm algo digitado; cargas ainda sem recepção ficam fora.
- * Linhas salvas antes que não voltaram da consulta (carga removida da programação) são mantidas. */
+ * digitou. TODAS as cargas programadas do dia entram, para o DOA refletir a programação inteira: as que
+ * já começaram a ser penduradas vêm primeiro, em ordem crescente de início da pendura; as que ainda
+ * não chegaram ficam depois, "aguardando chegada". Linhas salvas antes que não voltaram da consulta
+ * (carga removida da programação) são mantidas. */
 export function montarCargas(herdadas: CargaHerdadaDoa[], entradas: Record<string, EntradaDoa>, salvas: CargaDoa[] = []): CargaDoa[] {
   const comPendura = herdadas.filter((h) => h.penduraInicioEm).sort((a, b) => a.penduraInicioEm.localeCompare(b.penduraInicioEm));
   const ordem = new Map(comPendura.map((h, i) => [h.cargaId, i + 1]));
-  const digitou = (id: string) => !!(entradas[id]?.avesRecebidas.trim() || entradas[id]?.avesMortas.trim());
-
   const linhas: CargaDoa[] = herdadas
-    .filter((h) => h.penduraInicioEm || digitou(h.cargaId))
     .map((h) =>
       calcularCarga({
         cargaId: h.cargaId,
@@ -126,6 +130,7 @@ export function montarCargas(herdadas: CargaHerdadaDoa[], entradas: Record<strin
   const orfas = salvas.filter((s) => !idsAtuais.has(s.cargaId)).map((s) => calcularCarga({ ...s, ...(entradas[s.cargaId] ?? {}) }));
 
   const ordenadas = [...linhas, ...orfas];
+  // Estável: as sem pendura (ordem nula) ficam no fim, na ordem em que a programação as devolveu.
   ordenadas.sort((a, b) => (a.ordemPendura ?? Infinity) - (b.ordemPendura ?? Infinity));
   return ordenadas;
 }
@@ -152,14 +157,20 @@ export function montarValorDoa(dataAbate: string, cargas: CargaDoa[]): Rastreabi
   };
 }
 
-/** Motivos que impedem assinar: toda carga listada precisa de aves recebidas e mortas coerentes. */
+/** Motivos que impedem assinar: toda carga que já chegou (pendura iniciada ou algo digitado) precisa de aves
+ * recebidas e mortas coerentes. Carga "aguardando chegada" não trava, mas ao menos uma carga precisa ter
+ * chegado para haver o que apurar. */
 export function motivosBloqueioDoa(v: RastreabilidadeDoaValor | undefined | null): string[] {
   const p = "DOA";
   if (!v || !v.cargas || v.cargas.length === 0) {
-    return [`${p}: nenhuma carga com pendura iniciada para o dia — registre a recepção de aves ou escolha outra data.`];
+    return [`${p}: nenhuma carga programada para esta data — cadastre a programação ou escolha outra data.`];
+  }
+  const chegadas = v.cargas.filter((c) => !cargaAguardando(c));
+  if (chegadas.length === 0) {
+    return [`${p}: nenhuma carga chegou ainda (sem pendura iniciada) — registre a recepção de aves ou aguarde a chegada.`];
   }
   const m: string[] = [];
-  for (const c of v.cargas) {
+  for (const c of chegadas) {
     const nome = `GTA ${c.gta || "?"}`;
     const recebidas = lerContagem(c.avesRecebidas);
     const mortas = lerContagem(c.avesMortas);

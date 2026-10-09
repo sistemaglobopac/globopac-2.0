@@ -661,8 +661,18 @@ export function RastreabilidadeDoaRelatorio({ valor, titulo = "Rastreabilidade e
   // Peso médio vem do monitoramento de Densidade nas Caixas, que pode ser feito DEPOIS desta apuração:
   // se não ficou gravado, completa na exibição com o herdado atual (sem alterar o registro assinado).
   const { data: herdadas } = useCargasRastreabilidade(valor.dataAbate);
-  const pesoHerdado = new Map((herdadas ?? []).map((h) => [h.carga_id, h.peso_medio_kg ?? ""]));
-  const cargas = (valor.cargas ?? []).map((c) => ({ ...c, pesoMedioKg: c.pesoMedioKg || pesoHerdado.get(c.cargaId) || "" }));
+  // O mesmo vale para o início da pendura e o veículo (Recepção de Aves): o relatório sai com todos os pesos e
+  // horários já conhecidos, mesmo os registrados depois desta apuração.
+  const herdadaPorId = new Map((herdadas ?? []).map((h) => [h.carga_id, h]));
+  const cargas = (valor.cargas ?? []).map((c) => {
+    const h = herdadaPorId.get(c.cargaId);
+    return {
+      ...c,
+      pesoMedioKg: c.pesoMedioKg || h?.peso_medio_kg || "",
+      penduraInicioEm: c.penduraInicioEm || h?.pendura_inicio_em || "",
+      placa: c.placa || h?.placa || "",
+    };
+  });
   const comNota = cargas.filter((c) => c.notaSaldo);
   return (
     <div className="col-span-full space-y-2 rounded-lg border border-hairline bg-gray-50 p-3 print:p-2" data-testid="relatorio-rastreabilidade-doa">
@@ -699,9 +709,11 @@ export function RastreabilidadeDoaRelatorio({ valor, titulo = "Rastreabilidade e
               </td>
               <td className="pr-2">{c.pesoMedioKg || "—"}</td>
               <td className="pr-2">{c.qtdPrevista.toLocaleString("pt-BR")}</td>
-              <td className="pr-2">{c.avesRecebidas || "—"}</td>
-              <td className="pr-2">{c.avesMortas || "—"}</td>
-              <td className="font-black">{formatarPctDoa(c.doaPct)}</td>
+              <td className="pr-2" colSpan={!c.avesRecebidas && !c.avesMortas ? 3 : 1}>
+                {!c.avesRecebidas && !c.avesMortas ? <em className="text-muted-foreground">{c.penduraInicioEm ? "Sem apuração nesta ficha" : "Aguardando chegada"}</em> : c.avesRecebidas || "—"}
+              </td>
+              {(c.avesRecebidas || c.avesMortas) && <td className="pr-2">{c.avesMortas || "—"}</td>}
+              {(c.avesRecebidas || c.avesMortas) && <td className="font-black">{formatarPctDoa(c.doaPct)}</td>}
             </tr>
           ))}
         </tbody>

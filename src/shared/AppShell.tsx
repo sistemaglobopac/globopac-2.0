@@ -54,12 +54,14 @@ const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
   INSPETOR_QUALIDADE: [
     { rota: "/painel", rotulo: "Painel de Bordo" },
     { rota: "/nova-rnc", rotulo: "Abrir RNC" },
+    { rota: "/conferencia-cargas", rotulo: "Conferência de Cargas" },
   ],
   VERIFICADOR: [
     { rota: "/verificacao", rotulo: "Painel de Verificação" },
     { rota: "/rnc", rotulo: "Revisão de RNC" },
     { rota: "/comunicados", rotulo: "Comunicados" },
     { rota: "/gestao/cargas-aves", rotulo: "Cargas e Veículos" },
+    { rota: "/conferencia-cargas", rotulo: "Conferência de Cargas" },
     { rota: "/trocar-setor", rotulo: "Trocar Setor / Cobertura" },
     { rota: "/sif/liberar", rotulo: "Painel de Arquivo" },
   ],
@@ -77,6 +79,7 @@ const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
     { rota: "/gestao", rotulo: "Painel de Gestão" },
     { rota: "/painel", rotulo: "Painel de Bordo" },
     { rota: "/verificacao", rotulo: "Painel de Verificação" },
+    { rota: "/conferencia-cargas", rotulo: "Conferência de Cargas" },
     { rota: "/rnc", rotulo: "Tratativas RNC" },
     { rota: "/pcm", rotulo: "Ordens de Serviço" },
     { rota: "/pcm/nova", rotulo: "Nova OS" },
