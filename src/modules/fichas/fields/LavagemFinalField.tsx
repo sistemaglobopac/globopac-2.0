@@ -4,7 +4,7 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { formatHidrometro, formatMaskedValue, leituraHerdada, LIMIAR_IMPLAUSIVEL, parseHidrometro } from "./hidrometro";
 import { apurar, avesNoChuveiro, detalheDesvio, META_L_CARCACA } from "./calculosSpr";
-import { AvisoImplausivel, AvisoPrimeiroDoDia, CampoBloqueado, LogicaCalculo, TOOLTIP_HIDR_ANTERIOR } from "./componentesSpr";
+import { AvisoImplausivel, AvisoPrimeiroDoDia, AvisoSemProducao, CampoBloqueado, ChaveSemProducao, LogicaCalculo, TOOLTIP_HIDR_ANTERIOR } from "./componentesSpr";
 import type { ChillerCarcacasValor, LavagemFinalValor } from "./tiposCompostos";
 
 interface LavagemFinalFieldProps {
@@ -25,6 +25,7 @@ export function LavagemFinalField({ value, onChange, disabled, prevAppointment, 
     prev: value?.chuveiro?.prev ?? leituraHerdada(prevAppointment?.chuveiro),
     cur: value?.chuveiro.cur ?? "",
   });
+  const [semProducao, setSemProducao] = useState(value?.semProducao === true);
   const [prevTravado, setPrevTravado] = useState(!!(value?.chuveiro?.prev || leituraHerdada(prevAppointment?.chuveiro)));
 
   useEffect(() => {
@@ -38,11 +39,11 @@ export function LavagemFinalField({ value, onChange, disabled, prevAppointment, 
   const condenacoesParciaisNum = parseFloat(condenacoesParciais) || 0;
   const totalAves = avesNoChuveiro(totalAvesBruto, condenasTotalSPR, condenacoesParciaisNum);
   // Só bloqueia fora do 1º monitoramento do dia.
-  const avesIndisponivel = prevTravado && !totalAvesBruto;
+  const avesIndisponivel = prevTravado && !totalAvesBruto && !semProducao;
 
   const valorApurado = apurar(chuveiro.prev, chuveiro.cur, 0, totalAves); // sem gelo
   const hasCurData = !!chuveiro.cur;
-  const confChuveiro = !chuveiro.cur ? true : totalAves === 0 ? true : (valorApurado ?? 0) >= META_L_CARCACA;
+  const confChuveiro = semProducao || !chuveiro.cur ? true : totalAves === 0 ? true : (valorApurado ?? 0) >= META_L_CARCACA;
   const isConforme = !hasCurData || confChuveiro;
   const naoConforme = !!chuveiro.cur && totalAves > 0 && (valorApurado ?? 0) < META_L_CARCACA;
   const implausivel = !!chuveiro.cur && totalAves > 0 && (valorApurado ?? 0) > META_L_CARCACA * LIMIAR_IMPLAUSIVEL;
@@ -55,6 +56,7 @@ export function LavagemFinalField({ value, onChange, disabled, prevAppointment, 
     }
     onChange({
       chuveiro,
+      ...(semProducao ? { semProducao: true } : {}),
       condenacoesParciais,
       totalAvesBruto,
       condenasTotalSPR,
@@ -64,15 +66,28 @@ export function LavagemFinalField({ value, onChange, disabled, prevAppointment, 
       detalhesRNC: detalhes.length > 0 ? `Vazão Insuficiente (Chuveiro Final): ${detalhes.join("; ")}` : null,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chuveiro, condenacoesParciais, totalAvesBruto, condenasTotalSPR, isConforme, avesIndisponivel]);
+  }, [chuveiro, semProducao, condenacoesParciais, totalAvesBruto, condenasTotalSPR, isConforme, avesIndisponivel]);
+
+  // Sem produção: a leitura atual e as condenações parciais são descartadas; a anterior fica para o próximo monitoramento.
+  function alterarSemProducao(marcado: boolean) {
+    setSemProducao(marcado);
+    if (marcado) {
+      setChuveiro((atual) => ({ ...atual, cur: "" }));
+      setCondenacoesParciais("");
+    }
+  }
 
   return (
     <div className="space-y-4 rounded-lg border p-4">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-muted/40 p-4">
         <div>
           <p className="text-xs font-bold uppercase text-muted-foreground">Status de Conformidade</p>
-          <p className={`mt-1 flex items-center gap-2 text-lg font-black ${!hasCurData ? "text-primary" : !isConforme ? "text-destructive" : "text-success"}`}>
-            {!hasCurData ? (
+          <p className={`mt-1 flex items-center gap-2 text-lg font-black ${semProducao || !hasCurData ? "text-primary" : !isConforme ? "text-destructive" : "text-success"}`}>
+            {semProducao ? (
+              <>
+                <Info className="h-5 w-5" /> SEM PRODUÇÃO
+              </>
+            ) : !hasCurData ? (
               <>
                 <Info className="h-5 w-5" /> AGUARDANDO LEITURA
               </>
@@ -87,7 +102,7 @@ export function LavagemFinalField({ value, onChange, disabled, prevAppointment, 
             )}
           </p>
         </div>
-        {totalAves > 0 && (
+        {!semProducao && totalAves > 0 && (
           <div className="text-right">
             <p className="text-xs font-bold text-muted-foreground">Aves no Chuveiro Final</p>
             <p className="text-lg font-black">{totalAves.toLocaleString("pt-BR")} un</p>
@@ -103,7 +118,7 @@ export function LavagemFinalField({ value, onChange, disabled, prevAppointment, 
           </span>
         </div>
       )}
-      {!avesIndisponivel && totalAvesBruto > 0 && (
+      {!semProducao && !avesIndisponivel && totalAvesBruto > 0 && (
         <div className="flex items-center gap-3 rounded-md border border-primary/30 bg-primary/5 p-3 text-sm">
           <Info className="h-4 w-4 shrink-0 text-primary" />
           <span>
@@ -122,7 +137,7 @@ export function LavagemFinalField({ value, onChange, disabled, prevAppointment, 
         </div>
       )}
 
-      {prevTravado ? (
+      {semProducao ? null : prevTravado ? (
         <div className="space-y-3 rounded-md border border-primary/20 bg-primary/5 p-4">
           <h4 className="text-sm font-bold text-primary">Base de Cálculo — Aves no Chuveiro Final</h4>
           <div className="flex flex-wrap items-end gap-4 rounded-md border bg-background p-3">
@@ -154,9 +169,14 @@ export function LavagemFinalField({ value, onChange, disabled, prevAppointment, 
       <div className="overflow-hidden rounded-lg border-2" style={{ borderColor: naoConforme ? "#dc2626" : "hsl(var(--primary) / 0.25)" }}>
         <div className="flex flex-wrap gap-2 items-center justify-between bg-primary px-3 py-2 text-sm font-black text-primary-foreground">
           CHUVEIRO FINAL
-          {totalAves > 0 && <span className="text-xs opacity-90">Meta: {formatMaskedValue(META_L_CARCACA.toFixed(3))} L/carcaça</span>}
+          <ChaveSemProducao marcado={semProducao} onChange={alterarSemProducao} disabled={disabled} testId="sem-producao-chuveiro" />
+          {!semProducao && totalAves > 0 && <span className="text-xs opacity-90">Meta: {formatMaskedValue(META_L_CARCACA.toFixed(3))} L/carcaça</span>}
         </div>
         <div className="space-y-3 p-4">
+          {semProducao ? (
+            <AvisoSemProducao ponto="Chuveiro final" />
+          ) : (
+            <>
           <div className={`grid gap-3 ${!prevTravado ? "grid-cols-1" : "sm:grid-cols-2"}`}>
             {prevTravado && (
               <div className="space-y-1">
@@ -200,6 +220,8 @@ export function LavagemFinalField({ value, onChange, disabled, prevAppointment, 
           </div>
 
           {implausivel && <AvisoImplausivel apurado={valorApurado ?? 0} meta={META_L_CARCACA} />}
+            </>
+          )}
         </div>
       </div>
 

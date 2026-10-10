@@ -81,10 +81,10 @@ export function ChaveSemProducao({ marcado, onChange, disabled, testId }: { marc
 }
 
 /** No lugar dos campos do tanque marcado como sem produção. */
-export function AvisoSemProducao() {
+export function AvisoSemProducao({ ponto = "Tanque" }: { ponto?: string }) {
   return (
     <p className="rounded-md bg-muted p-2 text-xs text-muted-foreground" data-testid="aviso-sem-producao">
-      Tanque sem produção neste período: não há leitura de hidrômetro nem vazão a informar. A leitura anterior fica guardada para o próximo monitoramento.
+      {ponto} sem produção neste período: não há leitura de hidrômetro nem vazão a informar. A leitura anterior fica guardada para o próximo monitoramento.
     </p>
   );
 }

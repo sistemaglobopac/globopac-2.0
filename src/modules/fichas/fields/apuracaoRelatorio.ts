@@ -186,6 +186,7 @@ export function apuracaoChuveiro(valor: LavagemFinalValor, pesoCarcaca = 0): Lin
       kg: valor.totalAves * pesoCarcaca,
       unidadeMeta: "L/carcaça",
       meta: META_L_CARCACA,
+      semProducao: valor.semProducao === true,
     }),
   ];
 }

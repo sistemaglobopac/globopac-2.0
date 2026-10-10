@@ -340,7 +340,7 @@ export function LavagemFinalRelatorio({
   return (
     <div className="col-span-full space-y-2 rounded-lg border border-hairline bg-gray-50 p-3 print:p-2">
       <Cabecalho titulo={titulo} conforme={valor.conformidade} />
-      <TabelaTanques tanques={{ chuveiro: { ...valor.chuveiro, rotulo: "Chuveiro Final" } }} />
+      <TabelaTanques tanques={{ chuveiro: { ...valor.chuveiro, rotulo: "Chuveiro Final", semProducao: valor.semProducao === true } }} />
       <div className="grid grid-cols-2 gap-2 text-[10px] print:text-[8px] sm:grid-cols-3">
         <div><span className="text-muted-foreground">Aves no período</span><br /><strong>{valor.totalAves.toLocaleString("pt-BR")}</strong></div>
         <div><span className="text-muted-foreground">Aves bruto (SPR)</span><br /><strong>{valor.totalAvesBruto.toLocaleString("pt-BR")}</strong></div>

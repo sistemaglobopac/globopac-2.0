@@ -99,6 +99,8 @@ export interface ChillerPartesValor {
 export interface LavagemFinalValor {
   /** O Chuveiro Final NÃO tem gelo — só as leituras do hidrômetro. */
   chuveiro: { prev: string; cur: string };
+  /** O chuveiro não funcionou no período: não há leitura atual nem vazão a apurar (a anterior fica guardada para o próximo). */
+  semProducao?: boolean;
   condenacoesParciais: string;
   totalAvesBruto: number;
   condenasTotalSPR: number;

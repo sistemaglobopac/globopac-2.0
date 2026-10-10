@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { definirSemProducao, marcasParaGravar, tanqueSemProducao } from "@/modules/fichas/fields/tanqueSemProducao";
-import { motivosPreenchimentoCarcacas, motivosPreenchimentoMiudos, motivosPreenchimentoPartes } from "@/modules/fichas/fields/preenchimentoSpr";
-import { apuracaoCarcacas, apuracaoMiudos, apuracaoPartes } from "@/modules/fichas/fields/apuracaoRelatorio";
+import { motivosPreenchimentoCarcacas, motivosPreenchimentoChuveiro, motivosPreenchimentoMiudos, motivosPreenchimentoPartes } from "@/modules/fichas/fields/preenchimentoSpr";
+import { apuracaoCarcacas, apuracaoChuveiro, apuracaoMiudos, apuracaoPartes } from "@/modules/fichas/fields/apuracaoRelatorio";
 import { leituraHerdada } from "@/modules/fichas/fields/hidrometro";
-import type { ChillerCarcacasValor, ChillerPartesValor, MiniChillersValor } from "@/modules/fichas/fields/tiposCompostos";
+import type { ChillerCarcacasValor, ChillerPartesValor, LavagemFinalValor, MiniChillersValor } from "@/modules/fichas/fields/tiposCompostos";
 
 const t = (prev: string, cur: string, ice = "0") => ({ prev, cur, ice });
 
@@ -89,6 +89,32 @@ describe("tanque sem produção — preenchimento", () => {
     };
     expect(motivosPreenchimentoMiudos(miudos)).toHaveLength(1);
     expect(motivosPreenchimentoMiudos({ ...miudos, tanquesSemProducao: { pes: true } })).toEqual([]);
+  });
+});
+
+const chuveiro = (prev: string, cur: string, over: Partial<LavagemFinalValor> = {}): LavagemFinalValor => ({
+  chuveiro: { prev, cur },
+  condenacoesParciais: "",
+  totalAvesBruto: 1000,
+  condenasTotalSPR: 0,
+  totalAves: 1000,
+  avesIndisponivel: false,
+  conformidade: true,
+  detalhesRNC: null,
+  ...over,
+});
+
+describe("chuveiro final sem produção", () => {
+  it("sem a marca exige a leitura atual e as parciais; com a marca não exige nada", () => {
+    expect(motivosPreenchimentoChuveiro(chuveiro("4", ""))).toHaveLength(2);
+    expect(motivosPreenchimentoChuveiro(chuveiro("4", "", { semProducao: true }))).toEqual([]);
+  });
+
+  it("a apuração do relatório marca o chuveiro como sem produção", () => {
+    const linha = apuracaoChuveiro(chuveiro("4", "", { semProducao: true }))[0];
+    expect(linha.semProducao).toBe(true);
+    expect(linha.apurada).toBe(false);
+    expect(linha.conforme).toBeNull();
   });
 });
 

@@ -2,8 +2,9 @@ import { useState } from "react";
 import { describe, expect, it } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { ChillerPartesField } from "@/modules/fichas/fields/ChillerPartesField";
+import { LavagemFinalField } from "@/modules/fichas/fields/LavagemFinalField";
 import { MiniChillersField } from "@/modules/fichas/fields/MiniChillersField";
-import type { ChillerCarcacasValor, ChillerPartesValor, MiniChillersValor } from "@/modules/fichas/fields/tiposCompostos";
+import type { ChillerCarcacasValor, ChillerPartesValor, LavagemFinalValor, MiniChillersValor } from "@/modules/fichas/fields/tiposCompostos";
 
 const carcacas = { totalAves: 1000, totalAvesBruto: 1000, pesoMedioCarcaca: 2.3, condenasParcial: "10" } as unknown as ChillerCarcacasValor;
 const anteriorPartes = { tanques: { chiller1: { prev: "10", cur: "20", ice: "332" }, chiller2: { prev: "30", cur: "40", ice: "332" } } } as unknown as ChillerPartesValor;
@@ -43,6 +44,43 @@ function HarnessMiudos() {
     />
   );
 }
+
+const anteriorChuveiro = { chuveiro: { prev: "5", cur: "6" } } as unknown as LavagemFinalValor;
+let ultimoChuveiro: LavagemFinalValor | undefined;
+
+function HarnessChuveiro() {
+  const [valor, setValor] = useState<LavagemFinalValor | undefined>();
+  return (
+    <LavagemFinalField
+      value={valor}
+      prevAppointment={anteriorChuveiro}
+      carcacasAtual={carcacas}
+      onChange={(v) => {
+        ultimoChuveiro = v;
+        setValor(v);
+      }}
+    />
+  );
+}
+
+describe("Chuveiro final sem produção", () => {
+  it("marcar esconde a leitura, descarta o que foi digitado e grava a marca; desmarcar volta", () => {
+    render(<HarnessChuveiro />);
+    expect(screen.getByText("Hidr. Atual (m³)")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("sem-producao-chuveiro"));
+    expect(screen.queryByText("Hidr. Atual (m³)")).toBeNull();
+    expect(screen.getByTestId("aviso-sem-producao")).toBeTruthy();
+    expect(ultimoChuveiro?.semProducao).toBe(true);
+    expect(ultimoChuveiro?.chuveiro.cur).toBe("");
+    expect(ultimoChuveiro?.chuveiro.prev).toBe("6");
+    expect(ultimoChuveiro?.conformidade).toBe(true);
+
+    fireEvent.click(screen.getByTestId("sem-producao-chuveiro"));
+    expect(screen.getByText("Hidr. Atual (m³)")).toBeTruthy();
+    expect(ultimoChuveiro?.semProducao).toBeUndefined();
+  });
+});
 
 describe("Sem produção por tanque", () => {
   it("Partes: marcar o chiller 2 esconde os campos dele, descarta a leitura e grava a marca", () => {

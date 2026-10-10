@@ -88,6 +88,8 @@ export function motivosPreenchimentoMiudos(v: MiniChillersValor | undefined | nu
 export function motivosPreenchimentoChuveiro(v: LavagemFinalValor | undefined | null): string[] {
   const p = "Chuveiro Final";
   if (!v) return [`${p}: preencha o monitoramento.`];
+  // Chuveiro sem produção: não há leitura nem condenações a informar.
+  if (v.semProducao) return [];
   const m: string[] = [];
   // A leitura anterior vem travada; com ela aparecem também as carcaças parcialmente condenadas.
   const primeiroDoDia = vazio(v.chuveiro?.prev);
