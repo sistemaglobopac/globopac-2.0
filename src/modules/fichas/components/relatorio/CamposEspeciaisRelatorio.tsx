@@ -33,6 +33,7 @@ import type {
 } from "@/modules/fichas/fields/tiposCompostos";
 import { formatMaskedValue } from "@/modules/fichas/fields/hidrometro";
 import { pesoVivoMedioDaCarcaca, RENDIMENTO_CARCACA_PERCENTUAL } from "@/modules/fichas/fields/calculosSpr";
+import { tanqueSemProducao } from "@/modules/fichas/fields/tanqueSemProducao";
 import { pragasPresentes, rotuloDaPraga } from "@/modules/fichas/fields/pragas";
 import { COMPORTAMENTOS_AVES } from "@/modules/fichas/fields/esperaAves";
 import { formatarPctDoa } from "@/modules/fichas/fields/rastreabilidadeDoa";
@@ -72,7 +73,7 @@ function NotaDesvio({ detalhes }: { detalhes: string | null }) {
   );
 }
 
-function TabelaTanques({ tanques }: { tanques: Record<string, Omit<TanqueHidrometro, "ice"> & { ice?: string; rotulo: string }> }) {
+function TabelaTanques({ tanques }: { tanques: Record<string, Omit<TanqueHidrometro, "ice"> & { ice?: string; rotulo: string; semProducao?: boolean }> }) {
   // O Chuveiro Final não tem gelo: sem a coluna quando nenhuma linha traz esse campo.
   const temGelo = Object.values(tanques).some((t) => t.ice !== undefined);
   return (
@@ -90,8 +91,14 @@ function TabelaTanques({ tanques }: { tanques: Record<string, Omit<TanqueHidrome
           <tr key={chave}>
             <td className="border border-hairline p-1.5 font-bold print:p-1">{t.rotulo}</td>
             <td className="border border-hairline p-1.5 font-mono print:p-1">{formatMaskedValue(t.prev) || "—"}</td>
-            <td className="border border-hairline p-1.5 font-mono print:p-1">{formatMaskedValue(t.cur) || "—"}</td>
-            {temGelo && <td className="border border-hairline p-1.5 font-mono print:p-1">{formatMaskedValue(t.ice) || "—"}</td>}
+            {t.semProducao ? (
+              <td colSpan={temGelo ? 2 : 1} className="border border-hairline p-1.5 font-bold uppercase text-muted-foreground print:p-1">Sem produção</td>
+            ) : (
+              <>
+                <td className="border border-hairline p-1.5 font-mono print:p-1">{formatMaskedValue(t.cur) || "—"}</td>
+                {temGelo && <td className="border border-hairline p-1.5 font-mono print:p-1">{formatMaskedValue(t.ice) || "—"}</td>}
+              </>
+            )}
           </tr>
         ))}
       </tbody>
@@ -136,7 +143,7 @@ function ApuracaoAgua({ linhas, logica, baseTitulo }: { linhas: LinhaApuracao[];
                 {nf(l.meta)} {l.unidadeMeta}
               </td>
               <td className={`border border-hairline p-1.5 font-black uppercase print:p-1 ${l.conforme === null ? "text-muted-foreground" : l.conforme ? "text-success" : "text-down"}`}>
-                {l.conforme === null ? "Sem apuração" : l.conforme ? "Conforme" : "Abaixo da meta"}
+                {l.semProducao ? "Sem produção" : l.conforme === null ? "Sem apuração" : l.conforme ? "Conforme" : "Abaixo da meta"}
               </td>
             </tr>
           ))}
@@ -283,9 +290,9 @@ export function ChillerCarcacasRelatorio({ valor, titulo = "Renovação da Água
       )}
       <TabelaTanques
         tanques={{
-          preChiller: { ...valor.tanques.preChiller, rotulo: "Pré-chiller" },
-          chiller1: { ...valor.tanques.chiller1, rotulo: "Chiller 01" },
-          chiller2: { ...valor.tanques.chiller2, rotulo: "Chiller 02" },
+          preChiller: { ...valor.tanques.preChiller, rotulo: "Pré-chiller", semProducao: tanqueSemProducao(valor.tanquesSemProducao, "preChiller") },
+          chiller1: { ...valor.tanques.chiller1, rotulo: "Chiller 01", semProducao: tanqueSemProducao(valor.tanquesSemProducao, "chiller1") },
+          chiller2: { ...valor.tanques.chiller2, rotulo: "Chiller 02", semProducao: tanqueSemProducao(valor.tanquesSemProducao, "chiller2") },
         }}
       />
       <ApuracaoAgua linhas={apuracaoCarcacas(valor)} logica={LOGICA_CARCACAS} baseTitulo="Aves no período" />
@@ -300,8 +307,8 @@ export function ChillerPartesRelatorio({ valor, titulo = "Renovação da Água �
       <Cabecalho titulo={titulo} conforme={valor.conformidade} />
       <TabelaTanques
         tanques={{
-          chiller1: { ...valor.tanques.chiller1, rotulo: "Chiller 01 Partes" },
-          chiller2: { ...valor.tanques.chiller2, rotulo: "Chiller 02 Partes" },
+          chiller1: { ...valor.tanques.chiller1, rotulo: "Chiller 01 Partes", semProducao: tanqueSemProducao(valor.tanquesSemProducao, "chiller1") },
+          chiller2: { ...valor.tanques.chiller2, rotulo: "Chiller 02 Partes", semProducao: tanqueSemProducao(valor.tanquesSemProducao, "chiller2") },
         }}
       />
       <div className="grid grid-cols-2 gap-2 text-[10px] print:text-[8px] sm:grid-cols-3">
@@ -349,7 +356,7 @@ const ROTULO_MIUDO: Record<string, string> = { coracao: "Coração", moela: "Moe
 
 export function MiniChillersRelatorio({ valor, titulo = "Renovação da Água — Mini-Chillers de Miúdos" }: { valor: MiniChillersValor; titulo?: string }) {
   const tanques = Object.fromEntries(
-    Object.entries(valor.tanques).map(([chave, t]) => [chave, { ...t, rotulo: ROTULO_MIUDO[chave] ?? chave }])
+    Object.entries(valor.tanques).map(([chave, t]) => [chave, { ...t, rotulo: ROTULO_MIUDO[chave] ?? chave, semProducao: tanqueSemProducao(valor.tanquesSemProducao, chave as keyof MiniChillersValor["tanques"]) }])
   );
   return (
     <div className="col-span-full space-y-2 rounded-lg border border-hairline bg-gray-50 p-3 print:p-2">

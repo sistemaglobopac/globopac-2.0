@@ -14,6 +14,7 @@ import {
   type ChaveMiudo,
   type ChaveTanqueCarcacas,
 } from "./calculosSpr";
+import { tanqueSemProducao } from "./tanqueSemProducao";
 import type { ChillerCarcacasValor, ChillerPartesValor, LavagemFinalValor, MiniChillersValor, TanqueHidrometro } from "./tiposCompostos";
 
 export interface LinhaApuracao {
@@ -31,6 +32,8 @@ export interface LinhaApuracao {
   apurado: number | null;
   meta: number;
   conforme: boolean | null;
+  /** O tanque não produziu no período: sem vazão a apurar. */
+  semProducao?: boolean;
   /** "(atual − anterior) × 1000 + gelo = … L ÷ base = …" — a conta com os números do registro. */
   memoria: string;
 }
@@ -51,8 +54,15 @@ function montarLinha(args: {
   kg: number;
   unidadeMeta: "L/carcaça" | "L/kg";
   meta: number;
+  semProducao?: boolean;
 }): LinhaApuracao {
   const { ponto, tanque, temGelo, base, baseUnidade, aves, kg, unidadeMeta, meta } = args;
+  if (args.semProducao) {
+    return {
+      ponto, apurada: false, aguaL: 0, base, baseUnidade, litrosPorCarcaca: null, litrosPorKg: null, unidadeMeta, apurado: null, meta, conforme: null,
+      semProducao: true, memoria: "Tanque sem produção neste período — sem vazão a apurar.",
+    };
+  }
   const cur = numero(tanque.cur);
   const prev = numero(tanque.prev);
   const gelo = temGelo ? numero(tanque.ice ?? "") : 0;
@@ -117,6 +127,7 @@ export function apuracaoCarcacas(valor: ChillerCarcacasValor): LinhaApuracao[] {
       kg: aves * peso,
       unidadeMeta: "L/carcaça",
       meta: metaTanqueCarcacas(chave, peso),
+      semProducao: tanqueSemProducao(valor.tanquesSemProducao, chave),
     })
   );
 }
@@ -135,6 +146,7 @@ export function apuracaoPartes(valor: ChillerPartesValor): LinhaApuracao[] {
       kg,
       unidadeMeta: "L/kg",
       meta: META_L_KG,
+      semProducao: tanqueSemProducao(valor.tanquesSemProducao, chave),
     })
   );
 }
@@ -155,6 +167,7 @@ export function apuracaoMiudos(valor: MiniChillersValor): LinhaApuracao[] {
       kg,
       unidadeMeta: "L/kg",
       meta: META_L_KG,
+      semProducao: tanqueSemProducao(valor.tanquesSemProducao, chave),
     });
   });
 }

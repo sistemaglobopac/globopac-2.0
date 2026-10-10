@@ -49,6 +49,8 @@ export interface ChillerCarcacasValor {
     chiller1: TanqueHidrometro;
     chiller2: TanqueHidrometro;
   };
+  /** Tanques sem produção neste monitoramento: não há vazão a apurar nem leitura atual a informar (a anterior fica guardada para o próximo). */
+  tanquesSemProducao?: Partial<Record<"preChiller" | "chiller1" | "chiller2", boolean>>;
   condenasParcial: string;
   condenasTotal: string;
   /** Campo legado de registros antigos: se só existir `condenas`, ele entra como "totalmente
@@ -82,6 +84,8 @@ export interface ChillerPartesValor {
     chiller1: TanqueHidrometro;
     chiller2: TanqueHidrometro;
   };
+  /** Tanques sem produção neste monitoramento: não há vazão a apurar nem leitura atual a informar (a anterior fica guardada para o próximo). */
+  tanquesSemProducao?: Partial<Record<"chiller1" | "chiller2", boolean>>;
   totalCondenacoes: number;
   pesoMedioCarcaca: number;
   /** true quando o SPR Carcaças desta ficha ainda não foi preenchido — bloqueia o envio. */
@@ -115,6 +119,8 @@ export interface MiniChillersValor {
     cabeca: TanqueHidrometro;
     pes: TanqueHidrometro;
   };
+  /** Tanques sem produção neste monitoramento: não há vazão a apurar nem leitura atual a informar (a anterior fica guardada para o próximo). */
+  tanquesSemProducao?: Partial<Record<"coracao" | "moela" | "figado" | "cabeca" | "pes", boolean>>;
   totalAves: number;
   pesoCarcaca: number;
   avesIndisponivel: boolean;

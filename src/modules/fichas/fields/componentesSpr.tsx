@@ -68,3 +68,23 @@ export function LogicaCalculo({ titulo, children }: { titulo: string; children: 
     </div>
   );
 }
+
+/** Caixa "Sem produção" no cabeçalho colorido do tanque: o tanque não processou nada no período, então não há leitura de
+ * hidrômetro nem vazão a informar (ver tanqueSemProducao.ts). */
+export function ChaveSemProducao({ marcado, onChange, disabled, testId }: { marcado: boolean; onChange: (marcado: boolean) => void; disabled?: boolean; testId: string }) {
+  return (
+    <label className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold">
+      <input type="checkbox" className="h-4 w-4" checked={marcado} disabled={disabled} onChange={(e) => onChange(e.target.checked)} data-testid={testId} />
+      Sem produção
+    </label>
+  );
+}
+
+/** No lugar dos campos do tanque marcado como sem produção. */
+export function AvisoSemProducao() {
+  return (
+    <p className="rounded-md bg-muted p-2 text-xs text-muted-foreground" data-testid="aviso-sem-producao">
+      Tanque sem produção neste período: não há leitura de hidrômetro nem vazão a informar. A leitura anterior fica guardada para o próximo monitoramento.
+    </p>
+  );
+}

@@ -5,6 +5,7 @@
 // "Visível" segue a tela: no 1º monitoramento do dia (nenhum tanque com leitura anterior) só aparece a
 // leitura atual; nos demais aparecem também a leitura anterior, o gelo e a base de cálculo.
 import { pesoVivoCompleto } from "./calculosSpr";
+import { tanqueSemProducao } from "./tanqueSemProducao";
 import type { ChillerCarcacasValor, ChillerPartesValor, LavagemFinalValor, MiniChillersValor, TanqueHidrometro } from "./tiposCompostos";
 
 const vazio = (texto: string | number | undefined | null) => String(texto ?? "").trim() === "";
@@ -20,11 +21,18 @@ const NOMES_TANQUE: Record<string, string> = {
   pes: "Pés",
 };
 
-function motivosTanques(prefixo: string, tanques: Record<string, TanqueHidrometro | undefined> | undefined, nomes: string[]): string[] {
+function motivosTanques(
+  prefixo: string,
+  tanques: Record<string, TanqueHidrometro | undefined> | undefined,
+  nomes: string[],
+  semProducao?: Partial<Record<string, boolean>>
+): string[] {
   const m: string[] = [];
   // 1º do dia: nenhum tanque tem leitura anterior. Tanque ausente no valor conta como todo em branco.
   const primeiroDoDia = nomes.every((n) => vazio(tanques?.[n]?.prev));
   for (const n of nomes) {
+    // Tanque sem produção: não há leitura a informar (a anterior fica guardada para o próximo monitoramento).
+    if (tanqueSemProducao(semProducao, n)) continue;
     const t = tanques?.[n];
     const rotulo = `${prefixo} — ${NOMES_TANQUE[n] ?? n}`;
     if (!primeiroDoDia && vazio(t?.prev)) m.push(`${rotulo}: informe o Hidr. Anterior.`);
@@ -45,7 +53,7 @@ export function motivosPreenchimentoCarcacas(v: ChillerCarcacasValor | undefined
   const p = "SPR Carcaças";
   const nomes = ["preChiller", "chiller1", "chiller2"];
   if (!v) return [`${p}: preencha o monitoramento.`];
-  const m = motivosTanques(p, v.tanques as unknown as Record<string, TanqueHidrometro>, nomes);
+  const m = motivosTanques(p, v.tanques as unknown as Record<string, TanqueHidrometro>, nomes, v.tanquesSemProducao);
   // Período calculado pela chegada ao pré-resfriamento: a pausa da linha muda quais aves entram, então a pergunta é obrigatória.
   if (v.chegada && !v.pausaInformada) m.push(`${p}: informe se houve pausa da linha neste período.`);
   const primeiroDoDia = nomes.every((n) => vazio((v.tanques as unknown as Record<string, TanqueHidrometro | undefined>)?.[n]?.prev));
@@ -68,13 +76,13 @@ export function motivosPreenchimentoCarcacas(v: ChillerCarcacasValor | undefined
 export function motivosPreenchimentoPartes(v: ChillerPartesValor | undefined | null): string[] {
   const p = "SPR Partes";
   if (!v) return [`${p}: preencha o monitoramento.`];
-  return motivosTanques(p, v.tanques as unknown as Record<string, TanqueHidrometro>, ["chiller1", "chiller2"]);
+  return motivosTanques(p, v.tanques as unknown as Record<string, TanqueHidrometro>, ["chiller1", "chiller2"], v.tanquesSemProducao);
 }
 
 export function motivosPreenchimentoMiudos(v: MiniChillersValor | undefined | null): string[] {
   const p = "SPR Miúdos";
   if (!v) return [`${p}: preencha o monitoramento.`];
-  return motivosTanques(p, v.tanques as unknown as Record<string, TanqueHidrometro>, ["coracao", "moela", "figado", "cabeca", "pes"]);
+  return motivosTanques(p, v.tanques as unknown as Record<string, TanqueHidrometro>, ["coracao", "moela", "figado", "cabeca", "pes"], v.tanquesSemProducao);
 }
 
 export function motivosPreenchimentoChuveiro(v: LavagemFinalValor | undefined | null): string[] {

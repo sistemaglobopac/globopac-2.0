@@ -24,7 +24,8 @@ import {
   totalAvesBruto,
   type ChaveTanqueCarcacas as ChaveTanque,
 } from "./calculosSpr";
-import { AvisoImplausivel, AvisoPrimeiroDoDia, LogicaCalculo, TOOLTIP_HIDR_ANTERIOR } from "./componentesSpr";
+import { AvisoImplausivel, AvisoPrimeiroDoDia, AvisoSemProducao, ChaveSemProducao, LogicaCalculo, TOOLTIP_HIDR_ANTERIOR } from "./componentesSpr";
+import { definirSemProducao, marcasParaGravar, tanqueSemProducao, type MarcasSemProducao } from "./tanqueSemProducao";
 import { baseDeCargasAnteriores, baseParaProximo, calcularPeriodo, corrigirBaseComPendurasConhecidas, type CargaDoDia } from "./cargasDoPeriodo";
 import { vereditoAntecipado, vereditoGeral } from "./vereditoVazao";
 import type { CargaProcessada, ChegadaRegistrada, ChillerCarcacasValor, ParadaLinha, TanqueHidrometro } from "./tiposCompostos";
@@ -95,6 +96,7 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
     chiller1: value?.tanques?.chiller1 ?? tanqueVazio("chiller1", leituraHerdada(prevAppointment?.tanques?.chiller1)),
     chiller2: value?.tanques?.chiller2 ?? tanqueVazio("chiller2", leituraHerdada(prevAppointment?.tanques?.chiller2)),
   });
+  const [semProducao, setSemProducao] = useState<MarcasSemProducao<ChaveTanque>>(value?.tanquesSemProducao ?? {});
   const [prevTravado, setPrevTravado] = useState({
     preChiller: !!(value?.tanques?.preChiller?.prev || leituraHerdada(prevAppointment?.tanques?.preChiller)),
     chiller1: !!(value?.tanques?.chiller1?.prev || leituraHerdada(prevAppointment?.tanques?.chiller1)),
@@ -234,7 +236,7 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
   // Tanque sem leitura atual, ou sem base de cálculo, é tratado como conforme; igual à meta
   // também é conforme (apurado >= meta).
   const conformeTanque = (chave: ChaveTanque) =>
-    !tanques[chave].cur ? true : totalAvesPeriodo === 0 ? true : (apurado[chave] ?? 0) >= metas[chave];
+    tanqueSemProducao(semProducao, chave) || !tanques[chave].cur ? true : totalAvesPeriodo === 0 ? true : (apurado[chave] ?? 0) >= metas[chave];
   const confPreChiller = conformeTanque("preChiller");
   const confChiller1 = conformeTanque("chiller1");
   const confChiller2 = conformeTanque("chiller2");
@@ -263,6 +265,7 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
     onChange({
       cargas,
       tanques,
+      ...marcasParaGravar(semProducao),
       condenasParcial,
       condenasTotal,
       totalAves: totalAvesPeriodo,
@@ -281,7 +284,7 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
           : null,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cargas, tanques, condenasParcial, condenasTotal, isConforme, chegada, pesoPendente, pesoParcialAtivo, paradas, pausaInformada]);
+  }, [cargas, tanques, semProducao, condenasParcial, condenasTotal, isConforme, chegada, pesoPendente, pesoParcialAtivo, paradas, pausaInformada]);
 
   function adicionarCarga() {
     setCargas((atual) => [...atual, { id: crypto.randomUUID(), quantity: "", avgLiveWeight: "" }]);
@@ -296,7 +299,14 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
     setTanques((atual) => ({ ...atual, [chave]: { ...atual[chave], [campo]: valor } }));
   }
 
+  function alterarSemProducao(chave: ChaveTanque, marcado: boolean) {
+    const r = definirSemProducao(tanques, semProducao, chave, marcado, GELO_PADRAO_CARCACAS[chave]);
+    setTanques(r.tanques);
+    setSemProducao(r.marcas);
+  }
+
   function renderTanque(chave: ChaveTanque) {
+    const semProd = tanqueSemProducao(semProducao, chave);
     const cor = CONFIG_TANQUE[chave].cor;
     const tanque = tanques[chave];
     const meta = metas[chave];
@@ -309,11 +319,16 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
       <div key={chave} className="overflow-hidden rounded-lg border-2" style={{ borderColor: naoConforme ? "#dc2626" : `${cor}40` }}>
         <div className="flex flex-wrap gap-2 items-center justify-between px-3 py-2 text-sm font-black text-white" style={{ background: cor }}>
           {CONFIG_TANQUE[chave].nome.toUpperCase()}
-          {totalAves > 0 && (
+          <ChaveSemProducao marcado={semProd} onChange={(m) => alterarSemProducao(chave, m)} disabled={disabledGeral} testId={`sem-producao-${chave}`} />
+          {!semProd && totalAves > 0 && (
             <span className="text-xs opacity-90">{pesoPendente ? "Meta: depende do peso das cargas" : `Meta: ${formatMaskedValue(meta.toFixed(3))} L/c`}</span>
           )}
         </div>
         <div className="space-y-3 p-4">
+          {semProd ? (
+            <AvisoSemProducao />
+          ) : (
+            <>
           <div className="grid grid-cols-1 gap-3">
             {!isPrimeiroDoDia && (
               <div className="space-y-1">
@@ -378,6 +393,8 @@ export function ChillerCarcacasField({ value, onChange, disabled, prevAppointmen
           </div>
 
           {implausivel && <AvisoImplausivel apurado={valorApurado ?? 0} meta={meta} />}
+            </>
+          )}
         </div>
       </div>
     );

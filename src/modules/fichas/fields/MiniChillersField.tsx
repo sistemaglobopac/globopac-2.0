@@ -4,7 +4,8 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { formatHidrometro, formatMaskedValue, leituraHerdada, LIMIAR_IMPLAUSIVEL, parseHidrometro } from "./hidrometro";
 import { apurar, detalheDesvio, GELO_PADRAO_MIUDOS, META_L_KG, pesosMiudosPorCarcaca, type ChaveMiudo } from "./calculosSpr";
-import { AvisoImplausivel, AvisoPrimeiroDoDia, CampoBloqueado, LogicaCalculo, TOOLTIP_HIDR_ANTERIOR } from "./componentesSpr";
+import { AvisoImplausivel, AvisoPrimeiroDoDia, AvisoSemProducao, CampoBloqueado, ChaveSemProducao, LogicaCalculo, TOOLTIP_HIDR_ANTERIOR } from "./componentesSpr";
+import { definirSemProducao, marcasParaGravar, tanqueSemProducao, type MarcasSemProducao } from "./tanqueSemProducao";
 import type { ChillerCarcacasValor, MiniChillersValor, TanqueHidrometro } from "./tiposCompostos";
 
 const CONFIG_PARTE: Record<ChaveMiudo, { nome: string; cor: string }> = {
@@ -38,6 +39,7 @@ export function MiniChillersField({ value, onChange, disabled, prevAppointment, 
     cabeca: value?.tanques?.cabeca ?? tanqueVazio(leituraHerdada(prevAppointment?.tanques?.cabeca)),
     pes: value?.tanques?.pes ?? tanqueVazio(leituraHerdada(prevAppointment?.tanques?.pes)),
   });
+  const [semProducao, setSemProducao] = useState<MarcasSemProducao<ChaveMiudo>>(value?.tanquesSemProducao ?? {});
   const [prevTravado, setPrevTravado] = useState({
     coracao: !!(value?.tanques?.coracao?.prev || leituraHerdada(prevAppointment?.tanques?.coracao)),
     moela: !!(value?.tanques?.moela?.prev || leituraHerdada(prevAppointment?.tanques?.moela)),
@@ -83,7 +85,7 @@ export function MiniChillersField({ value, onChange, disabled, prevAppointment, 
   };
   const hasCurData = Object.values(tanques).some((t) => !!t.cur);
   const conformeParte = (chave: ChaveMiudo) => {
-    if (!tanques[chave].cur) return true;
+    if (tanqueSemProducao(semProducao, chave) || !tanques[chave].cur) return true;
     if (numAves === 0 || pesoCarcaca === 0) return true;
     return (apurado[chave] ?? 0) >= META_L_KG;
   };
@@ -104,6 +106,7 @@ export function MiniChillersField({ value, onChange, disabled, prevAppointment, 
 
     onChange({
       tanques,
+      ...marcasParaGravar(semProducao),
       totalAves: numAves,
       pesoCarcaca,
       avesIndisponivel,
@@ -112,13 +115,20 @@ export function MiniChillersField({ value, onChange, disabled, prevAppointment, 
       detalhesRNC: detalhes.length > 0 ? `Vazão Insuficiente (Mini-Chillers): ${detalhes.join("; ")}` : null,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tanques, numAves, pesoCarcaca, isConforme, avesIndisponivel, pesoMiudoIndisponivel]);
+  }, [tanques, semProducao, numAves, pesoCarcaca, isConforme, avesIndisponivel, pesoMiudoIndisponivel]);
 
   function alterarTanque(chave: ChaveMiudo, campo: keyof TanqueHidrometro, valor: string) {
     setTanques((atual) => ({ ...atual, [chave]: { ...atual[chave], [campo]: valor } }));
   }
 
+  function alterarSemProducao(chave: ChaveMiudo, marcado: boolean) {
+    const r = definirSemProducao(tanques, semProducao, chave, marcado, GELO_PADRAO_MIUDOS);
+    setTanques(r.tanques);
+    setSemProducao(r.marcas);
+  }
+
   function renderParte(chave: ChaveMiudo) {
+    const semProd = tanqueSemProducao(semProducao, chave);
     const { nome, cor } = CONFIG_PARTE[chave];
     const tanque = tanques[chave];
     const valorApurado = apurado[chave];
@@ -132,9 +142,14 @@ export function MiniChillersField({ value, onChange, disabled, prevAppointment, 
       <div key={chave} className="overflow-hidden rounded-lg border-2" style={{ borderColor: naoConforme ? "#dc2626" : `${cor}40` }}>
         <div className="flex flex-wrap gap-2 items-center justify-between px-3 py-2 text-sm font-black text-white" style={{ background: cor }}>
           {nome.toUpperCase()}
-          {numAves > 0 && <span className="text-xs opacity-90">Meta: {formatMaskedValue(META_L_KG.toFixed(3))} L/kg</span>}
+          <ChaveSemProducao marcado={semProd} onChange={(m) => alterarSemProducao(chave, m)} disabled={disabled} testId={`sem-producao-${chave}`} />
+          {!semProd && numAves > 0 && <span className="text-xs opacity-90">Meta: {formatMaskedValue(META_L_KG.toFixed(3))} L/kg</span>}
         </div>
         <div className="space-y-3 p-4">
+          {semProd ? (
+            <AvisoSemProducao />
+          ) : (
+            <>
           <div className="grid grid-cols-1 gap-3">
             {!isPrimeiroDoDia && (
               <div className="space-y-1">
@@ -201,6 +216,8 @@ export function MiniChillersField({ value, onChange, disabled, prevAppointment, 
           </div>
 
           {implausivel && <AvisoImplausivel apurado={valorApurado ?? 0} meta={META_L_KG} />}
+            </>
+          )}
         </div>
       </div>
     );

@@ -4,7 +4,8 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { formatHidrometro, formatMaskedValue, leituraHerdada, LIMIAR_IMPLAUSIVEL, parseHidrometro } from "./hidrometro";
 import { apurar, detalheDesvio, GELO_PADRAO_PARTES, massaPartes, META_L_KG } from "./calculosSpr";
-import { AvisoImplausivel, AvisoPrimeiroDoDia, CampoBloqueado, LogicaCalculo, TOOLTIP_HIDR_ANTERIOR } from "./componentesSpr";
+import { AvisoImplausivel, AvisoPrimeiroDoDia, AvisoSemProducao, CampoBloqueado, ChaveSemProducao, LogicaCalculo, TOOLTIP_HIDR_ANTERIOR } from "./componentesSpr";
+import { definirSemProducao, marcasParaGravar, tanqueSemProducao, type MarcasSemProducao } from "./tanqueSemProducao";
 import type { ChillerCarcacasValor, ChillerPartesValor, TanqueHidrometro } from "./tiposCompostos";
 
 type ChaveTanque = "chiller1" | "chiller2";
@@ -37,6 +38,7 @@ export function ChillerPartesField({ value, onChange, disabled, prevAppointment,
     chiller1: value?.tanques?.chiller1 ?? tanqueVazio(leituraHerdada(prevAppointment?.tanques?.chiller1)),
     chiller2: value?.tanques?.chiller2 ?? tanqueVazio(leituraHerdada(prevAppointment?.tanques?.chiller2)),
   });
+  const [semProducao, setSemProducao] = useState<MarcasSemProducao<ChaveTanque>>(value?.tanquesSemProducao ?? {});
   const [prevTravado, setPrevTravado] = useState({
     chiller1: !!(value?.tanques?.chiller1?.prev || leituraHerdada(prevAppointment?.tanques?.chiller1)),
     chiller2: !!(value?.tanques?.chiller2?.prev || leituraHerdada(prevAppointment?.tanques?.chiller2)),
@@ -67,7 +69,7 @@ export function ChillerPartesField({ value, onChange, disabled, prevAppointment,
   // Só bloqueia fora do 1º monitoramento do dia.
   const pesoCarcacaIndisponivel = !isPrimeiroDoDia && !pesoMedioCarcacaAtual;
   const conformeTanque = (chave: ChaveTanque) =>
-    !tanques[chave].cur ? true : totalPesoPartes === 0 ? true : (apurado[chave] ?? 0) >= META_L_KG;
+    tanqueSemProducao(semProducao, chave) || !tanques[chave].cur ? true : totalPesoPartes === 0 ? true : (apurado[chave] ?? 0) >= META_L_KG;
   const confChiller1 = conformeTanque("chiller1");
   const confChiller2 = conformeTanque("chiller2");
   const isConforme = !hasCurData || (confChiller1 && confChiller2);
@@ -79,6 +81,7 @@ export function ChillerPartesField({ value, onChange, disabled, prevAppointment,
 
     onChange({
       tanques,
+      ...marcasParaGravar(semProducao),
       totalCondenacoes,
       pesoMedioCarcaca: pesoMedioCarcacaAtual,
       pesoCarcacaIndisponivel,
@@ -86,13 +89,20 @@ export function ChillerPartesField({ value, onChange, disabled, prevAppointment,
       detalhesRNC: detalhes.length > 0 ? `Vazão Insuficiente (Partes): ${detalhes.join("; ")}` : null,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tanques, totalCondenacoes, pesoMedioCarcacaAtual, isConforme, pesoCarcacaIndisponivel]);
+  }, [tanques, semProducao, totalCondenacoes, pesoMedioCarcacaAtual, isConforme, pesoCarcacaIndisponivel]);
 
   function alterarTanque(chave: ChaveTanque, campo: keyof TanqueHidrometro, valor: string) {
     setTanques((atual) => ({ ...atual, [chave]: { ...atual[chave], [campo]: valor } }));
   }
 
+  function alterarSemProducao(chave: ChaveTanque, marcado: boolean) {
+    const r = definirSemProducao(tanques, semProducao, chave, marcado, GELO_PADRAO_PARTES);
+    setTanques(r.tanques);
+    setSemProducao(r.marcas);
+  }
+
   function renderTanque(chave: ChaveTanque) {
+    const semProd = tanqueSemProducao(semProducao, chave);
     const cor = CONFIG_TANQUE[chave].cor;
     const tanque = tanques[chave];
     const valorApurado = apurado[chave];
@@ -104,9 +114,14 @@ export function ChillerPartesField({ value, onChange, disabled, prevAppointment,
       <div key={chave} className="overflow-hidden rounded-lg border-2" style={{ borderColor: naoConforme ? "#dc2626" : `${cor}40` }}>
         <div className="flex flex-wrap gap-2 items-center justify-between px-3 py-2 text-sm font-black text-white" style={{ background: cor }}>
           {CONFIG_TANQUE[chave].nome.toUpperCase()}
+          <ChaveSemProducao marcado={semProd} onChange={(m) => alterarSemProducao(chave, m)} disabled={disabled} testId={`sem-producao-${chave}`} />
           <span className="text-xs opacity-90">Meta: {formatMaskedValue(META_L_KG.toFixed(3))} L/kg</span>
         </div>
         <div className="space-y-3 p-4">
+          {semProd ? (
+            <AvisoSemProducao />
+          ) : (
+            <>
           <div className="grid grid-cols-1 gap-3">
             {!isPrimeiroDoDia && (
               <div className="space-y-1">
@@ -166,6 +181,8 @@ export function ChillerPartesField({ value, onChange, disabled, prevAppointment,
           </div>
 
           {implausivel && <AvisoImplausivel apurado={valorApurado ?? 0} meta={META_L_KG} />}
+            </>
+          )}
         </div>
       </div>
     );
