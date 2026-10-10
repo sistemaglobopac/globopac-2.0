@@ -32,6 +32,8 @@ carimbo de tempo só existe depois da sincronização. A mesma confirmação val
 Isso depende de aceitação de Qualidade/Jurídico de que a confirmação offline basta como assinatura do inspetor enquanto não há rede.
 
 ## Decisão 3: prazo de 72 h estendido a 7 dias só com queda de rede PROVADA NO SERVIDOR
+> **Substituída em 2026-10-10 (migration `20261010063259`):** o prazo passou a ser de 7 dias para todos, sem exigir prova de queda de rede (um monitoramento do dia 06 ficou sem assinar). O gatilho voltou a ter só a janela de 7 dias (+1 h); `fora_do_prazo_offline` não é mais definida em registros novos. O texto abaixo fica como histórico.
+
 A regra anterior recusava o INSERT de uma ficha com mais de 72 h. Agora ela é aceita (e marcada `fora_do_prazo_offline`,
 visível ao verificador) se, no gatilho `definir_hora_monitoramento`:
 1. a ficha tem `confirmacao_offline` com a senha conferida (no aparelho ou no servidor);

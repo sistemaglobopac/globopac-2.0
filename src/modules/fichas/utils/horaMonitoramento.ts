@@ -7,7 +7,7 @@
 /** Chave reservada em dados_dinamicos. */
 export const CHAVE_HORA_MONITORAMENTO = "hora_monitoramento";
 /** Prazo máximo, a partir da hora do monitoramento, para assinar (a internet pode faltar). Espelha o banco. */
-export const PRAZO_ASSINATURA_HORAS = 72;
+export const PRAZO_ASSINATURA_HORAS = 168; // 7 dias
 /** Folga para relógio de aparelho adiantado. Espelha o banco. */
 export const TOLERANCIA_FUTURO_MIN = 5;
 
@@ -58,7 +58,7 @@ export function validarHoraMonitoramento({ hora, agora, anteriorEm, intervaloMin
   const t = new Date(hora).getTime();
   if (t > agora.getTime() + TOLERANCIA_FUTURO_MIN * 60_000) return "A hora do monitoramento não pode ser futura.";
   if (t < agora.getTime() - PRAZO_ASSINATURA_HORAS * 3_600_000) {
-    return `A hora do monitoramento passou de ${PRAZO_ASSINATURA_HORAS} horas: não é mais possível registrá-lo.`;
+    return `A hora do monitoramento passou de 7 dias: não é mais possível registrá-lo.`;
   }
   if (anteriorEm) {
     const ant = new Date(anteriorEm).getTime();

@@ -26,9 +26,7 @@ algumas horas").
    deveria ser necessário fazer nada manualmente na maioria dos casos; este runbook é para
    quando isso NÃO está acontecendo sozinho.
 
-3. **Status "falhou" com "passou do prazo de 72 horas"** (ADR 0016): a ficha tem mais de 72 h e o servidor
-   **não comprovou queda de rede** para aquele aparelho (houve contato dele com o servidor dentro do prazo, o
-   aparelho é desconhecido — dados do navegador apagados —, ou a ficha passou de 7 dias). Os dados continuam no
+3. **Status "falhou" com "passou do prazo de 7 dias"** (ADR 0016): a ficha tem mais de 7 dias da hora do monitoramento. Os dados continuam no
    aparelho (IndexedDB `globopac-fila-offline`). **Não apagar nem refazer a ficha**: levar o caso ao verificador/gestão, que
    decide o tratamento (por exemplo, registro como não conformidade de processo com a evidência da fila).
 4. **Inspetor não consegue entrar sem internet**: só entra quem já entrou naquele aparelho COM internet nos últimos 7 dias

@@ -9,7 +9,7 @@ export type ConfirmacaoSenha =
   /** Sem internet: a senha foi conferida contra o verificador guardado neste aparelho (ADR 0016). */
   | { ok: true; modo: "aparelho"; matricula: string }
   /** Sem internet e este aparelho ainda não tem o verificador da senha (a sessão é anterior ao acesso offline): a
-   * ficha entra na fila SEM a confirmação com senha — melhor que travar o inspetor. Vale só o prazo normal de 72 h. */
+   * ficha entra na fila SEM a confirmação com senha — melhor que travar o inspetor. Vale o prazo de 7 dias. */
   | { ok: true; modo: "sem_verificador" }
   | { ok: false; erro: string };
 

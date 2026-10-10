@@ -91,7 +91,7 @@ export function ModalAssinaturaSenha({
               {semSenha ? (
                 <p role="status" data-testid="aviso-sem-verificador" className="rounded-md border border-warning bg-warning/15 p-2 text-xs text-warning-foreground">
                   Sem conexão e este aparelho ainda não liberou o acesso offline com senha (isso acontece no primeiro login com internet). O registro será salvo na fila
-                  <strong> sem a confirmação com senha</strong> e enviado quando a internet voltar, dentro do prazo normal de 72 h.
+                  <strong> sem a confirmação com senha</strong> e enviado quando a internet voltar, dentro do prazo de 7 dias.
                 </p>
               ) : (
                 <>

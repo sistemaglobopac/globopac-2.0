@@ -16,12 +16,12 @@ describe("hora do monitoramento (informada manualmente)", () => {
     expect(isoDeManaus("", "08:30")).toBeNull();
   });
 
-  it("obrigatória, não futura e dentro de 72 h", () => {
+  it("obrigatória, não futura e dentro de 7 dias", () => {
     expect(validarHoraMonitoramento({ hora: null, agora: AGORA })).toMatch(/Informe/);
     expect(validarHoraMonitoramento({ hora: "2026-10-06T17:00:00Z", agora: AGORA })).toMatch(/futura/);
     expect(validarHoraMonitoramento({ hora: "2026-10-06T16:03:00Z", agora: AGORA })).toBeNull(); // folga de 5 min
-    expect(validarHoraMonitoramento({ hora: "2026-10-03T15:59:00Z", agora: AGORA })).toMatch(/72 horas/);
-    expect(validarHoraMonitoramento({ hora: "2026-10-03T16:30:00Z", agora: AGORA })).toBeNull();
+    expect(validarHoraMonitoramento({ hora: "2026-09-29T15:59:00Z", agora: AGORA })).toMatch(/7 dias/);
+    expect(validarHoraMonitoramento({ hora: "2026-09-29T16:30:00Z", agora: AGORA })).toBeNull();
   });
 
   it("posterior ao anterior e respeitando o intervalo mínimo, contado da hora do anterior", () => {
@@ -69,8 +69,8 @@ describe("rascunhos locais", () => {
     expect((await listarRascunhos("u2")).map((r) => r.id)).toEqual(["x"]);
   });
 
-  it("expira 72 h depois da hora do monitoramento", () => {
-    const r = { horaMonitoramento: "2026-10-03T12:00:00Z" };
+  it("expira 7 dias depois da hora do monitoramento", () => {
+    const r = { horaMonitoramento: "2026-09-29T12:00:00Z" };
     expect(rascunhoExpirado(r, new Date("2026-10-06T11:59:00Z"))).toBe(false);
     expect(rascunhoExpirado(r, new Date("2026-10-06T12:01:00Z"))).toBe(true);
   });
@@ -102,7 +102,7 @@ describe("rascunhos locais", () => {
     const h = (min: number) => new Date(agoraReal - min * 60_000).toISOString();
     await salvarRascunho(rascunho("ok", h(30)));
     await salvarRascunho(rascunho("falha", h(20)));
-    await salvarRascunho(rascunho("vencido", h(73 * 60)));
+    await salvarRascunho(rascunho("vencido", h(169 * 60)));
     sincronizarUmaFicha.mockImplementation(async (item: { id: string }) => {
       if (item.id === "falha") throw new Error("sem rede");
     });

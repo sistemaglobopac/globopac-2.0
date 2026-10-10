@@ -175,8 +175,8 @@ export function useUltimoRegistroFicha(codigo: string | undefined, setor: string
   });
 }
 
-/** Janela (horas) dos registros comparados pela trava de monitoramento repetido: cobre o prazo de 72 h de assinatura. */
-const JANELA_REPETIDOS_HORAS = 84;
+/** Janela (horas) dos registros comparados pela trava de monitoramento repetido: cobre o prazo de 7 dias de assinatura. */
+const JANELA_REPETIDOS_HORAS = 180;
 
 // "v2": passou a devolver também a hora de cada registro (a trava compara só com o monitoramento anterior).
 export const chaveRegistrosRecentes = (codigo: string, setor: string) => ["monitoramentos", "registros-recentes", "v2", codigo, setor] as const;

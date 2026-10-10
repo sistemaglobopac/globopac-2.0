@@ -85,7 +85,7 @@ export async function assinarRascunhosEmLote(
 
 /** Sem internet: o inspetor confirma os rascunhos com a senha (conferida no aparelho) e eles entram na FILA
  * offline, de onde são gravados e assinados pelo servidor quando a rede voltar (ADR 0016). Rascunho com o prazo
- * de 72 h vencido não entra: sem confirmação, a regra de prazo estendido não vale para ele. */
+ * de 7 dias vencido não entra. */
 export async function confirmarRascunhosOffline(
   rascunhos: Rascunho[],
   userId: string,

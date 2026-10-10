@@ -1,5 +1,5 @@
 // Rascunhos de monitoramento (IndexedDB, só neste aparelho): o inspetor preenche e salva NO LOCAL,
-// mesmo sem internet, e assina todos de uma vez depois (em até 72 h da hora do monitoramento: cobre fins de semana e feriados).
+// mesmo sem internet, e assina todos de uma vez depois (em até 7 dias da hora do monitoramento: cobre fins de semana e feriados).
 // Diferente da fila offline (offlineQueue.ts), que já está assinada/confirmada e só espera a rede:
 // o rascunho ainda NÃO foi assinado nem enviado — pode ser descartado e não vale como registro.
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";

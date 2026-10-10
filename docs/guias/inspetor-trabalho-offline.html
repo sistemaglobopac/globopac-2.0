@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guia do Inspetor — Trabalho sem internet</title>
+<style>
+  @page { size: A4; margin: 10mm; }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #1a1a1a; background: #fff; margin: 0; padding: 12px; font-size: 12.5px; line-height: 1.35; }
+  .pagina { max-width: 190mm; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 2px; color: #0b3d6b; }
+  .sub { margin: 0 0 8px; color: #444; }
+  h2 { font-size: 14px; margin: 0 0 4px; padding: 3px 8px; color: #fff; border-radius: 4px; }
+  .antes h2 { background: #0b3d6b; }
+  .campo h2 { background: #1f7a3d; }
+  .volta h2 { background: #b35900; }
+  section { border: 1px solid #ccc; border-radius: 6px; padding: 6px 8px 6px; margin-bottom: 7px; break-inside: avoid; }
+  ol, ul { margin: 2px 0 0; padding-left: 20px; }
+  li { margin-bottom: 2px; }
+  .duas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 3px; }
+  .caixa { border: 1px dashed #888; border-radius: 4px; padding: 4px 8px; }
+  .caixa b { display: block; margin-bottom: 1px; }
+  .alerta { border: 2px solid #b00020; background: #fdecee; border-radius: 6px; padding: 5px 8px; margin-bottom: 6px; }
+  .alerta h2 { background: #b00020; margin-bottom: 3px; }
+  .alerta ul { margin-top: 0; }
+  .rodape { font-size: 11px; color: #555; margin-top: 4px; }
+  @media (max-width: 560px) { .duas { grid-template-columns: 1fr; } }
+  @media print { body { padding: 0; } }
+</style>
+</head>
+<body>
+<div class="pagina">
+  <h1>Trabalhando sem internet — Guia do Inspetor</h1>
+  <p class="sub">Se o sinal cair, você continua preenchendo os monitoramentos. O sistema guarda tudo no seu aparelho e envia quando a internet voltar.</p>
+
+  <section class="antes">
+    <h2>1. ANTES de sair (com internet)</h2>
+    <ol>
+      <li><b>Faça login no aparelho com internet</b> (matrícula e senha). Só assim ele libera o acesso sem internet. Vale por <b>7 dias</b> desde a última vez que o app ficou conectado.</li>
+      <li><b>Abra a tela "Nova ficha"</b> e passe pelas fichas e setores que vai usar, para o aparelho guardar as listas.</li>
+      <li><b>Inicie o turno com internet.</b> Sem internet não é possível iniciar o turno.</li>
+      <li>Use o <b>mesmo aparelho</b> em que fez o login. Só inspetores entram sem internet.</li>
+    </ol>
+  </section>
+
+  <section class="campo">
+    <h2>2. SEM internet (no campo)</h2>
+    <ol>
+      <li>Abra o app e entre com matrícula e senha. Ele abre em <b>"modo offline"</b>.</li>
+      <li>Preencha a ficha normalmente, <b>com a hora real do monitoramento</b>.</li>
+      <li>Escolha como guardar:</li>
+    </ol>
+    <div class="duas">
+      <div class="caixa"><b>A) Assinar na hora</b>Digite sua senha para confirmar. A ficha vai para a fila <i>"fichas aguardando sincronização"</i>.</div>
+      <div class="caixa"><b>B) Salvar como rascunho</b>Preencha várias fichas e, no fim, use <i>"Confirmar todos sem internet"</i> com sua senha. <u>Rascunho sem confirmar ainda não vale como registro.</u></div>
+    </div>
+    <ul>
+      <li>A sua senha confirma a ficha, mas a <b>assinatura oficial só é gerada depois</b>, quando a internet voltar.</li>
+    </ul>
+  </section>
+
+  <section class="volta">
+    <h2>3. QUANDO a internet voltar</h2>
+    <ol>
+      <li>Mantenha o app aberto. Ele pede <b>sua senha de novo</b> para reconectar. Digite.</li>
+      <li>A fila é enviada <b>sozinha</b>. Confira no painel <i>"fichas aguardando sincronização"</i> até esvaziar.</li>
+      <li>O servidor gera a assinatura oficial e o <b>carimbo de tempo</b> (feito em seguida, de forma automática). Nada a fazer.</li>
+      <li>Se aparecer <b>"Sessão expirada"</b>: faça login de novo no mesmo aparelho. A fila retoma sozinha.</li>
+    </ol>
+  </section>
+
+  <div class="alerta">
+    <h2>NUNCA FAÇA</h2>
+    <ul>
+      <li><b>Não preencha a ficha de novo "por garantia"</b> se ela está na fila: vira ficha duplicada.</li>
+      <li><b>Não limpe os dados do navegador nem desinstale o app</b> enquanto houver fichas na fila ou rascunhos. Eles só existem neste aparelho e seriam perdidos.</li>
+      <li><b>Não deixe passar de 7 dias</b> da hora do monitoramento. Depois disso o sistema recusa a ficha (os dados continuam no aparelho: chame o verificador ou a gestão).</li>
+    </ul>
+  </div>
+
+  <p class="rodape"><b>O que ainda precisa de internet:</b> iniciar o turno, verificação, liberação, tratativa de RNC, corrigir ficha não conforme e as fichas de Partes, Miúdos e Chuveiro que dependem do SPR Carcaças (fora do 1º monitoramento do dia).<br>
+  <b>Ficha presa na fila ou dúvida?</b> Chame o verificador ou a gestão, sem apagar nem refazer a ficha.</p>
+</div>
+</body>
+</html>

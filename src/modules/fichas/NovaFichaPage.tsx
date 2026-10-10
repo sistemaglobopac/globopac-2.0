@@ -66,9 +66,9 @@ function FilaOfflinePainel() {
             <Badge variant={item.status === "falha_autenticacao" ? "destructive" : "outline"}>
               {ROTULO_STATUS_FILA[item.status] ?? item.status}
             </Badge>
-            {item.status === "falhou" && /72 horas/.test(item.ultimoErro ?? "") && (
+            {item.status === "falhou" && /7 dias/.test(item.ultimoErro ?? "") && (
               <p role="alert" className="basis-full text-xs text-destructive">
-                O prazo de 72 h passou e o servidor não confirmou queda de rede para este aparelho. Os dados continuam salvos aqui — procure o verificador/gestão antes de apagar ou refazer.
+                O prazo de 7 dias para assinar passou. Os dados continuam salvos aqui — procure o verificador/gestão antes de apagar ou refazer.
               </p>
             )}
           </div>
@@ -429,10 +429,10 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
    * sem rede, não há como validar a senha contra o servidor, então esse passo é pulado e o
    * registro vai direto para a fila offline (useCriarMonitoramento já assina automaticamente
    * ao sincronizar, seção 7.5/ADR 0002). */
-  /** Valida a hora informada (obrigatória, não futura, dentro de 72 h, posterior à anterior e respeitando o
+  /** Valida a hora informada (obrigatória, não futura, dentro de 7 dias, posterior à anterior e respeitando o
    * intervalo mínimo) e a devolve em ISO; null (com a mensagem na tela) se inválida. */
   /** Hora do monitoramento anterior desta ficha+setor: o mais recente entre o anterior herdado e os
-   * rascunhos locais (de qualquer dia, dentro da janela de 72 h). */
+   * rascunhos locais (de qualquer dia, dentro da janela de 7 dias). */
   function anteriorParaValidar(): string | null {
     const horas = [registroPrevio?.criado_em, ...(rascunhosLocais ?? []).filter((r) => r.codigo === codigo && r.setor === setor).map((r) => r.horaMonitoramento)].filter(
       (h): h is string => !!h
@@ -904,7 +904,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
               </div>
             )}
             {sucesso === "rascunho" && (
-              <p className="text-sm text-success">Rascunho salvo neste aparelho. Assine pela lista de rascunhos em até 72 h.</p>
+              <p className="text-sm text-success">Rascunho salvo neste aparelho. Assine pela lista de rascunhos em até 7 dias.</p>
             )}
             {sucesso === "rascunho_nc" && (
               <p role="alert" className="rounded border border-destructive bg-destructive/10 p-2 text-sm font-medium text-destructive">
@@ -1099,7 +1099,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
             {semSenha ? (
               <p role="status" data-testid="aviso-sem-verificador" className="rounded-md border border-warning bg-warning/15 p-2 text-xs text-warning-foreground">
                 Sem conexão e este aparelho ainda não liberou o acesso offline com senha (isso acontece no primeiro login com internet). A ficha será salva na fila{" "}
-                <strong>sem a confirmação com senha</strong> e enviada e assinada quando a internet voltar, dentro do prazo normal de 72 h.
+                <strong>sem a confirmação com senha</strong> e enviada e assinada quando a internet voltar, dentro do prazo de 7 dias.
               </p>
             ) : (
               <>

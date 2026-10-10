@@ -60,10 +60,10 @@ describe("rascunhos confirmados sem internet entram na fila", () => {
     };
   }
 
-  it("vai para a fila com a evidência e sai da lista de rascunhos; o vencido (72 h) fica de fora", async () => {
+  it("vai para a fila com a evidência e sai da lista de rascunhos; o vencido (7 dias) fica de fora", async () => {
     const agora = Date.now();
     await salvarRascunho(rascunho("r-novo", new Date(agora - 3_600_000)));
-    await salvarRascunho(rascunho("r-vencido", new Date(agora - 80 * 3_600_000)));
+    await salvarRascunho(rascunho("r-vencido", new Date(agora - 170 * 3_600_000)));
 
     const rascunhos = await listarRascunhos(USUARIO);
     const r = await confirmarRascunhosOffline(rascunhos, USUARIO, { modo: "aparelho", matricula: "1234" });

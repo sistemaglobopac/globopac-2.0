@@ -228,7 +228,7 @@ function MenuLateral({ itens, onNavegar }: { itens: ItemMenu[]; onNavegar?: () =
 }
 
 /** Envia a fila offline de qualquer tela (não só a de "Nova ficha"): ao voltar a rede, o que o inspetor confirmou
- * sem internet precisa chegar ao servidor o quanto antes — antes de o prazo de 72 h correr. */
+ * sem internet precisa chegar ao servidor o quanto antes — antes de o prazo de 7 dias correr. */
 function SincronizadorOffline() {
   useSincronizacaoOffline();
   return null;
