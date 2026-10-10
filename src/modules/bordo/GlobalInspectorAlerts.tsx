@@ -16,6 +16,8 @@ import {
   PAUSAS_CONFIG,
   calcularFichasAtrasadas,
   fichasAplicaveisAoInspetor,
+  numeroDoLembretePragas,
+  pragasPendentes,
   urlNovaFicha,
   useEncerrarFichaDia,
   useKpisTurno,
@@ -121,6 +123,20 @@ export function GlobalInspectorAlerts() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kpis, turnoAtivo, turnoHoje, agora, dismissed, rascunhos]);
 
+  // Monitoramento de pragas (obrigatório pelo menos 1x/dia): enquanto não for feito, lembra de 2 em 2 horas a partir do início
+  // do turno. Cada lembrete é novo (a chave leva o número dele): "Ciente" cala só até o próximo.
+  const pragasLembrete = useMemo(() => {
+    if (!kpis || !turnoAtivo || !turnoHoje) return [];
+    const inicio = new Date(turnoHoje.inicio);
+    const numero = numeroDoLembretePragas(inicio, agora);
+    if (numero < 1) return [];
+    const aplicaveis = fichasAplicaveisAoInspetor(kpis.fichasAtivas, userSetores);
+    return pragasPendentes(aplicaveis, kpis.pragasRealizadas, rascunhosComoMonitoramentos(rascunhos, userSetores), inicio, agora)
+      .map((ficha) => ({ ficha, chave: `pragas_${ficha.id}_${numero}` }))
+      .filter((p) => !dismissed.has(p.chave));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kpis, turnoAtivo, turnoHoje, agora, dismissed, rascunhos]);
+
   // Rascunho NÃO CONFORME aguardando assinatura: a RNC/ação corretiva imediata só existe depois de assinar.
   const rascunhosNc = useMemo(
     () => (rascunhos ?? []).filter((r) => r.naoConforme && !dismissed.has(`rascunho_nc_${r.id}`)),
@@ -183,7 +199,7 @@ export function GlobalInspectorAlerts() {
     [emAndamento, agora, dismissed, userId]
   );
 
-  const isVisible = Boolean(isInspetor && (pausaEstourada || chiller2Pendentes.length > 0 || ncSemRnc.length > 0 || rascunhosNc.length > 0 || pesosPendentes.length > 0 || fichasAtrasadas.length > 0 || rncsCriticas.length > 0));
+  const isVisible = Boolean(isInspetor && (pausaEstourada || pragasLembrete.length > 0 || chiller2Pendentes.length > 0 || ncSemRnc.length > 0 || rascunhosNc.length > 0 || pesosPendentes.length > 0 || fichasAtrasadas.length > 0 || rncsCriticas.length > 0));
   useAudioAlarm(isVisible && !minimizado);
 
   useEffect(() => {
@@ -354,6 +370,43 @@ export function GlobalInspectorAlerts() {
                         Informar chiller 02
                       </Button>
                       <Button type="button" variant="outline" onClick={() => dismiss(`chiller2_${m.id}`)}>
+                        Ciente
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {pragasLembrete.length > 0 && (
+            <div data-testid="alerta-pragas-pendente">
+              <h3 className="mb-2 flex items-center gap-1 text-[0.7rem] font-black uppercase tracking-wider text-muted-foreground">
+                <Clock className="h-3.5 w-3.5 text-primary" /> Monitoramento de pragas pendente
+              </h3>
+              <div className="flex flex-col gap-2">
+                {pragasLembrete.map(({ ficha, chave }) => (
+                  <div key={ficha.id} className="flex flex-col gap-3 rounded border-l-4 border-destructive bg-background p-4 shadow-sm">
+                    <div>
+                      <h4 className="text-sm font-bold text-foreground">{ficha.nome}</h4>
+                      <p className="mt-1 text-[0.7rem] text-muted-foreground">
+                        Este monitoramento é obrigatório pelo menos uma vez por dia e ainda não foi feito hoje. Sem ele não é possível finalizar o turno. O lembrete se repete de 2 em
+                        2 horas.
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        className="flex-1"
+                        onClick={() => {
+                          dismiss(chave);
+                          navigate(urlNovaFicha(ficha, userSetores));
+                        }}
+                      >
+                        Fazer agora
+                      </Button>
+                      <Button type="button" variant="outline" onClick={() => dismiss(chave)}>
                         Ciente
                       </Button>
                     </div>

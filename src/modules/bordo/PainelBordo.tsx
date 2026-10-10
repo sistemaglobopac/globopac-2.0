@@ -45,6 +45,7 @@ import {
   paradasVigentes,
   fichasAplicaveisAoInspetor,
   calcularFichasAtrasadas,
+  pragasPendentes,
   resumoFichasPorSetor,
   urlNovaFicha,
   inicioDoDiaManaus,
@@ -125,6 +126,7 @@ export function PainelBordo() {
   const [ferramentasAbertas, setFerramentasAbertas] = useState(false);
 
   const [showConfirmTurno, setShowConfirmTurno] = useState(false);
+  const [showPragasObrigatorio, setShowPragasObrigatorio] = useState(false);
   const [pausaParaConfirmar, setPausaParaConfirmar] = useState<TipoPausa | null>(null);
   const [showModalParada, setShowModalParada] = useState(false);
   const [processoParadoDe, setProcessoParadoDe] = useState<FichaAtrasada | null>(null);
@@ -251,6 +253,11 @@ export function PainelBordo() {
   const codigosEncerrados = new Set(kpis?.fichasEncerradasHoje ?? []);
   const fichasEncerradas = fichasAplicaveis.filter((f) => f.encerravel && codigosEncerrados.has(f.codigo));
   const fichasAtrasadas = turnoHoje ? calcularFichasAtrasadas(fichasAplicaveis, [...(kpis?.monitoramentosDoSetorHoje ?? []), ...rascunhosComoMonitoramentos(rascunhosLocais, userSetores)], agora, codigosEncerrados, kpis?.processosParadosHoje) : [];
+  // Monitoramento de pragas: obrigatório pelo menos uma vez por dia. Enquanto houver ficha de pragas do setor sem monitoramento
+  // hoje (feito por este inspetor, por quem cobriu o setor ou em rascunho), o turno não pode ser finalizado.
+  const pragasFaltando = turnoHoje
+    ? pragasPendentes(fichasAplicaveis, kpis?.pragasRealizadas ?? [], rascunhosComoMonitoramentos(rascunhosLocais, userSetores), new Date(turnoHoje.inicio), agora)
+    : [];
   const processosParados = paradasVigentes(fichasAplicaveis, kpis?.processosParadosHoje ?? [], agora);
   const desviosComRnc = (kpis?.desviosAtivos ?? []).filter((d) => d.rnc !== null);
   const bloqueadoPorPausa = pausaAtiva != null;
@@ -266,6 +273,11 @@ export function PainelBordo() {
 
   async function confirmarFinalizarTurno() {
     if (!turnoHoje) return;
+    if (pragasFaltando.length > 0) {
+      setShowConfirmTurno(false);
+      setShowPragasObrigatorio(true);
+      return;
+    }
     try {
       await finalizarTurno.mutateAsync(turnoHoje.id);
       setShowConfirmTurno(false);
@@ -383,6 +395,22 @@ export function PainelBordo() {
             <X className="h-4 w-4" />
           </button>
         </div>
+      )}
+
+      {!shiftEnded && pragasFaltando.length > 0 && (
+        <section className="space-y-2 rounded-xl border-2 border-destructive bg-destructive/5 p-4" data-testid="pragas-pendentes">
+          <h2 className="flex items-center gap-2 text-sm font-black uppercase tracking-wider text-destructive">
+            <AlertTriangle className="h-4 w-4" /> Monitoramento de pragas pendente hoje
+          </h2>
+          <p className="text-xs text-muted-foreground">Obrigatório pelo menos uma vez por dia. Sem ele não é possível finalizar o turno; o sistema lembra de 2 em 2 horas.</p>
+          <div className="flex flex-wrap gap-2">
+            {pragasFaltando.map((f) => (
+              <Button key={f.id} type="button" size="sm" variant="destructive" disabled={bloqueadoPorPausa} onClick={() => navigate(urlNovaFicha(f, userSetores))}>
+                Fazer agora: {f.nome}
+              </Button>
+            ))}
+          </div>
+        </section>
       )}
 
       {fichasAtrasadas.length > 0 && (
@@ -741,7 +769,7 @@ export function PainelBordo() {
           type="button"
           variant="destructive"
           className="w-full"
-          onClick={() => setShowConfirmTurno(true)}
+          onClick={() => (pragasFaltando.length > 0 ? setShowPragasObrigatorio(true) : setShowConfirmTurno(true))}
         >
           <LogOut className="h-4 w-4" />
           FINALIZAR TURNO
@@ -861,6 +889,32 @@ export function PainelBordo() {
               {registrarParada.isPending ? "Registrando…" : "Registrar Parada"}
             </Button>
           </form>
+        </ModalBase>
+      )}
+
+      {showPragasObrigatorio && pragasFaltando.length > 0 && (
+        <ModalBase titulo="Monitoramento de pragas obrigatório" icone={<AlertTriangle className="h-5 w-5" />} corHeaderClasse="bg-destructive" onFechar={() => setShowPragasObrigatorio(false)}>
+          <div className="space-y-3" data-testid="pragas-obrigatorio">
+            <p className="text-sm">
+              O monitoramento de pragas precisa ser feito pelo menos uma vez por dia e ainda não foi feito hoje. Faça-o antes de finalizar o turno.
+            </p>
+            <div className="flex flex-col gap-2">
+              {pragasFaltando.map((f) => (
+                <Button
+                  key={f.id}
+                  type="button"
+                  variant="destructive"
+                  data-testid={`fazer-pragas-${f.id}`}
+                  onClick={() => navigate(urlNovaFicha(f, userSetores))}
+                >
+                  Fazer agora: {f.nome}
+                </Button>
+              ))}
+              <Button type="button" variant="outline" onClick={() => setShowPragasObrigatorio(false)}>
+                Voltar
+              </Button>
+            </div>
+          </div>
         </ModalBase>
       )}
 

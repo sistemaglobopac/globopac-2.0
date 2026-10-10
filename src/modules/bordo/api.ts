@@ -183,6 +183,9 @@ export interface FichaAtivaResumo {
   encerravel?: boolean;
   /** Ficha marcada no Construtor como "só com o processo em andamento": em atraso, aceita a justificativa "processo parado". */
   exige_processo_em_andamento?: boolean;
+  /** Ficha de monitoramento de pragas (tem o campo de ocorrência de pragas): obrigatória pelo menos uma vez por dia — o turno
+   * não pode ser finalizado sem ela e o sistema lembra de 2 em 2 horas. Derivado de schema_campos ao carregar os KPIs. */
+  exigeDiaria?: boolean;
 }
 
 type MonitoramentoComHora = MonitoramentoHoje & { hora_monitoramento: string | null };
@@ -359,6 +362,50 @@ export function calcularFichasAtrasadas(
   return atrasadas;
 }
 
+/** O schema da ficha tem o campo de ocorrência de pragas? (= ficha de monitoramento de pragas.) */
+export function temCampoDePragas(schemaCampos: { tipo?: string }[] | null | undefined): boolean {
+  return Array.isArray(schemaCampos) && schemaCampos.some((c) => c?.tipo === "ocorrencia_pragas");
+}
+
+export interface PragaRealizada {
+  codigo: string;
+  /** Hora do monitoramento (ISO). */
+  instante: string;
+}
+
+/** Lembrete do monitoramento de pragas pendente: de 2 em 2 horas, contadas do início do turno. */
+export const INTERVALO_LEMBRETE_PRAGAS_MIN = 120;
+
+/** "Hoje" do monitoramento de pragas: o dia corrente ou, se o turno começou antes da meia-noite (2º turno, 17h às 04h), o turno todo. */
+export function inicioJanelaPragas(inicioTurno: Date | null, agora: Date): Date {
+  const inicioDia = inicioDoDiaManaus(agora);
+  return inicioTurno && inicioTurno < inicioDia ? inicioTurno : inicioDia;
+}
+
+/** Fichas de pragas aplicáveis ao inspetor que ainda NÃO foram monitoradas hoje (por ele, por quem cobriu o setor ou em
+ * rascunho). O turno só pode ser finalizado com esta lista vazia. */
+export function pragasPendentes(
+  fichasAplicaveis: FichaAtivaResumo[],
+  realizadas: readonly PragaRealizada[],
+  rascunhos: readonly { ficha_template_id: string; criado_em: string }[],
+  inicioTurno: Date | null,
+  agora: Date
+): FichaAtivaResumo[] {
+  const desdeMs = inicioJanelaPragas(inicioTurno, agora).getTime();
+  return fichasAplicaveis.filter(
+    (f) =>
+      f.exigeDiaria === true &&
+      !realizadas.some((r) => r.codigo === f.codigo && new Date(r.instante).getTime() >= desdeMs) &&
+      !rascunhos.some((r) => r.ficha_template_id === f.id && new Date(r.criado_em).getTime() >= desdeMs)
+  );
+}
+
+/** Nº do lembrete vigente (1 = 2 h após o início do turno, 2 = 4 h…); 0 = ainda não é hora do primeiro. Cada número é um
+ * lembrete novo: dispensar ("Ciente") vale só até o próximo. */
+export function numeroDoLembretePragas(inicioTurno: Date, agora: Date): number {
+  return Math.max(0, Math.floor((agora.getTime() - inicioTurno.getTime()) / (INTERVALO_LEMBRETE_PRAGAS_MIN * 60_000)));
+}
+
 export interface DesvioAtivo {
   monitoramentoId: string;
   fichaTemplateId: string;
@@ -418,6 +465,8 @@ export interface KpisTurno {
   fichasEncerradasHoje: string[];
   /** Justificativas de "processo parado" registradas hoje (de qualquer inspetor). */
   processosParadosHoje: ProcessoParado[];
+  /** Monitoramentos de pragas (qualquer versão da ficha, qualquer inspetor) feitos nos setores do inspetor nas últimas 36 h. */
+  pragasRealizadas: PragaRealizada[];
   desviosAtivos: DesvioAtivo[];
   adendosPendentes: AdendoPendente[];
   nomesFicha: Map<string, { codigo: string; nome: string }>;
@@ -498,7 +547,29 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
       const fichasAtivas: FichaAtivaResumo[] = (fichasAtivasBrutas ?? []).map(({ schema_campos, ...ficha }) => ({
         ...ficha,
         encerravel: Array.isArray(schema_campos) && schema_campos.some((c) => c?.tipo === "espera_aves"),
+        exigeDiaria: temCampoDePragas(schema_campos),
       }));
+
+      // Monitoramento de pragas (obrigatório 1x/dia): o turno pode atravessar a meia-noite, então busca as últimas 36 h e
+      // quem decide o que vale é pragasPendentes (janela do turno). Reeditar a ficha cria outro template com o mesmo código.
+      const pragasRealizadas: PragaRealizada[] = [];
+      const codigosPragas = fichasAtivas.filter((f) => f.exigeDiaria).map((f) => f.codigo);
+      if (codigosPragas.length > 0) {
+        const { data: versoes } = await supabase.from("fichas_templates").select("id, codigo").in("codigo", codigosPragas);
+        const codigoPorId = new Map((versoes ?? []).map((v) => [v.id as string, v.codigo as string]));
+        const desde = new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString();
+        const { data: feitos } = await supabase
+          .from("monitoramentos")
+          .select("ficha_template_id, criado_em, hora_monitoramento")
+          .in("ficha_template_id", [...codigoPorId.keys()])
+          .in("setor", userSetores)
+          .or(`hora_monitoramento.gte.${desde},and(hora_monitoramento.is.null,criado_em.gte.${desde})`)
+          .overrideTypes<{ ficha_template_id: string; criado_em: string; hora_monitoramento: string | null }[], { merge: false }>();
+        for (const m of feitos ?? []) {
+          const codigo = codigoPorId.get(m.ficha_template_id);
+          if (codigo) pragasRealizadas.push({ codigo, instante: m.hora_monitoramento ?? m.criado_em });
+        }
+      }
 
       if (erroHoje) throw erroHoje;
       if (erroSetor) throw erroSetor;
@@ -607,7 +678,7 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
           return versaoAtivaPorTemplate.has(m.ficha_template_id) ? { ...efetivo, ficha_template_id: versaoAtivaPorTemplate.get(m.ficha_template_id)! } : efetivo;
         });
 
-      return { monitoramentosHoje: normalizar(monitoramentosHoje), monitoramentosDoSetorHoje: normalizar(monitoramentosDoSetor), fichasAtivas, fichasEncerradasHoje: (encerradas ?? []).map((e) => e.codigo), processosParadosHoje: processosParados ?? [], desviosAtivos, adendosPendentes, nomesFicha };
+      return { monitoramentosHoje: normalizar(monitoramentosHoje), monitoramentosDoSetorHoje: normalizar(monitoramentosDoSetor), fichasAtivas, fichasEncerradasHoje: (encerradas ?? []).map((e) => e.codigo), processosParadosHoje: processosParados ?? [], pragasRealizadas, desviosAtivos, adendosPendentes, nomesFicha };
     },
   });
 }
