@@ -430,7 +430,7 @@ export function PainelBordo() {
                   data-testid={`encerrar-abate-${a.ficha.id}`}
                   onClick={() => encerrarFicha.mutate(a.ficha.codigo)}
                 >
-                  Encerrar abate (sem cargas nos boxes)
+                  Informar: sem veículos com cargas vivas nos boxes
                 </Button>
               )}
               </div>
@@ -455,14 +455,14 @@ export function PainelBordo() {
 
       {fichasEncerradas.length > 0 && (
         <section className="space-y-2 rounded-xl border bg-muted/40 p-4" data-testid="abate-encerrado">
-          <h2 className="text-sm font-black uppercase tracking-wider text-muted-foreground">Abate encerrado hoje</h2>
+          <h2 className="text-sm font-black uppercase tracking-wider text-muted-foreground">Sem veículos com cargas vivas nos boxes (informado hoje)</h2>
           {fichasEncerradas.map((f) => (
             <div key={f.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
               <span>
                 {f.codigo} · {f.nome} <span className="text-muted-foreground">(sem aviso de atraso)</span>
               </span>
               <Button type="button" size="sm" variant="outline" disabled={reabrirFicha.isPending} onClick={() => reabrirFicha.mutate(f.codigo)}>
-                Reabrir abate
+                Desfazer informe
               </Button>
             </div>
           ))}

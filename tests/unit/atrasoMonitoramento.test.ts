@@ -48,7 +48,7 @@ describe("atraso de monitoramento: alerta só 10 minutos depois da hora devida",
     expect(calcularFichasAtrasadas([ficha("a", "Recorrente", null)], ultimo, new Date("2026-09-30T23:59:00Z"))).toHaveLength(0);
   });
 
-  it("ficha encerrada no dia (Encerrar abate) não atrasa; as demais continuam", () => {
+  it("ficha encerrada no dia (sem veículos com cargas vivas nos boxes) não atrasa; as demais continuam", () => {
     const depois = new Date("2026-09-30T23:59:00Z");
     expect(calcularFichasAtrasadas([ficha("a")], ultimo, depois, new Set(["A"]))).toHaveLength(0);
     expect(calcularFichasAtrasadas([ficha("a")], ultimo, depois, new Set(["OUTRA"]))).toHaveLength(1);

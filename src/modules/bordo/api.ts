@@ -314,7 +314,7 @@ export function calcularFichasAtrasadas(
   fichasAplicaveis: FichaAtivaResumo[],
   monitoramentosHoje: { ficha_template_id: string; criado_em: string }[],
   agora: Date,
-  /** Códigos das fichas encerradas hoje ("Encerrar abate"): nunca geram aviso de atraso. */
+  /** Códigos das fichas encerradas hoje (informado "sem veículos com cargas vivas nos boxes"): nunca geram aviso de atraso. */
   codigosEncerrados: ReadonlySet<string> = new Set(),
   /** Processo parado justificado: o período dispensado conta como se tivesse sido feito, então a próxima
    * cobrança vem um intervalo depois dele. */
@@ -414,7 +414,7 @@ export interface KpisTurno {
    * sequência dele, então atraso e "fichas iniciadas" olham o setor, não só o que este inspetor fez. */
   monitoramentosDoSetorHoje: MonitoramentoHoje[];
   fichasAtivas: FichaAtivaResumo[];
-  /** Códigos das fichas encerradas hoje com "Encerrar abate". */
+  /** Códigos das fichas com o informe "sem veículos com cargas vivas nos boxes". */
   fichasEncerradasHoje: string[];
   /** Justificativas de "processo parado" registradas hoje (de qualquer inspetor). */
   processosParadosHoje: ProcessoParado[];
@@ -612,7 +612,7 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
   });
 }
 
-/** "Encerrar abate": silencia, até o fim do dia, o aviso de atraso de uma ficha que depende de
+/** "Sem veículos com cargas vivas nos boxes": silencia, até o fim do dia, o aviso de atraso de uma ficha que depende de
  * haver abate (ex.: bem-estar nos boxes de espera). Reabrir desfaz. Vale por código da ficha. */
 export function useEncerrarFichaDia() {
   const queryClient = useQueryClient();

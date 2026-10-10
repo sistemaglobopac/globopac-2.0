@@ -432,7 +432,7 @@ export function GlobalInspectorAlerts() {
                         data-testid={`encerrar-abate-${f.ficha.id}`}
                         onClick={() => encerrarFicha.mutate(f.ficha.codigo)}
                       >
-                        Encerrar abate (sem cargas nos boxes)
+                        Informar: sem veículos com cargas vivas nos boxes
                       </Button>
                     )}
                   </div>
