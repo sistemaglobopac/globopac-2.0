@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Lock } from "lucide-react";
 import { Input } from "@/shared/ui/input";
-import { amostrasAbsorcaoIniciais, calcularAbsorcaoAgua, formatarPercentual, LIMITE_ABSORCAO_AGUA } from "./calculosAbsorcao";
+import { amostrasAbsorcaoIniciais, calcularAbsorcaoAgua, formatarPercentual, LIMITE_ABSORCAO_AGUA, linhaAbsorcaoValida, percentualIndividualAbsorcao } from "./calculosAbsorcao";
 import type { AbsorcaoAguaValor, AmostraAbsorcaoAgua, FaseAbsorcao } from "./tiposCompostos";
 
 interface AbsorcaoAguaFieldProps {
@@ -54,6 +54,7 @@ export function AbsorcaoAguaField({ value, onChange, disabled, fase = "UMA_VEZ" 
         <span className="flex-1">Lacre</span>
         <span className="flex-[1.2]">Peso Inicial (kg)</span>
         {mostraFinal && <span className="flex-[1.2]">Peso Final (kg)</span>}
+        {mostraFinal && <span className="w-24 text-center">Absorção</span>}
         {travaInicial && <span className="w-24 text-center">Descartada</span>}
       </div>
 
@@ -91,6 +92,11 @@ export function AbsorcaoAguaField({ value, onChange, disabled, fase = "UMA_VEZ" 
                   disabled={disabled || linhaTravada || Boolean(item.descartada)}
                   placeholder="0.000"
                 />
+              )}
+              {mostraFinal && (
+                <span className="w-24 text-center font-mono text-sm font-bold" data-testid={`absorcao-individual-${i + 1}`}>
+                  {item.descartada ? "Descartada" : linhaAbsorcaoValida(item) ? formatarPercentual(percentualIndividualAbsorcao(item) ?? 0) : "—"}
+                </span>
               )}
               {travaInicial && (
                 <span className="flex w-24 justify-center">
@@ -130,7 +136,7 @@ export function AbsorcaoAguaField({ value, onChange, disabled, fase = "UMA_VEZ" 
             <p className="text-xs font-bold" style={{ color: value.status === "nao-conforme" ? "#dc2626" : "#059669" }}>
               MÉDIA DE ABSORÇÃO C/ {value.validCount} AMOS. VÁLIDAS
             </p>
-            <p className="text-2xl font-black" style={{ color: value.status === "nao-conforme" ? "#dc2626" : "#059669" }}>
+            <p className="text-2xl font-black" data-testid="media-absorcao" style={{ color: value.status === "nao-conforme" ? "#dc2626" : "#059669" }}>
               {formatarPercentual(value.averagePercentage)}
             </p>
           </div>

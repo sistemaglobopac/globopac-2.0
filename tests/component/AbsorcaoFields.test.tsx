@@ -65,7 +65,7 @@ describe("A) Teste de Absorção de Água — tela", () => {
     digitar(pesos[2]!, "4.000");
     digitar(pesos[3]!, "4.200");
     expect(screen.getByText("MÉDIA DE ABSORÇÃO C/ 2 AMOS. VÁLIDAS")).toBeInTheDocument();
-    expect(screen.getByText("7,00%")).toBeInTheDocument();
+    expect(screen.getByTestId("media-absorcao")).toHaveTextContent("7,00%");
     expect(screen.queryByText(/ACIMA DO LIMITE/)).toBeNull();
     expect(Object.keys(ultimoA!).sort()).toEqual(["averagePercentage", "items", "status", "sumFinal", "sumInitial", "validCount"]);
     expect(ultimoA!.items).toHaveLength(10);
@@ -73,12 +73,27 @@ describe("A) Teste de Absorção de Água — tela", () => {
     expect(ultimoA!.status).toBe("conforme");
   });
 
+  it("mostra o percentual de absorção de cada carcaça, além da média", () => {
+    ultimoA = undefined;
+    render(<HarnessA />);
+    // sem pesos, nenhuma carcaça tem percentual
+    expect(screen.getByTestId("absorcao-individual-1")).toHaveTextContent("—");
+    const pesos = screen.getAllByPlaceholderText("0.000");
+    digitar(pesos[0]!, "1.000");
+    digitar(pesos[1]!, "1.150");
+    digitar(pesos[2]!, "4.000");
+    digitar(pesos[3]!, "4.200");
+    expect(screen.getByTestId("absorcao-individual-1")).toHaveTextContent("15,00%");
+    expect(screen.getByTestId("absorcao-individual-2")).toHaveTextContent("5,00%");
+    expect(screen.getByTestId("absorcao-individual-3")).toHaveTextContent("—");
+  });
+
   it("acima de 8% mostra o selo em vermelho; 8,00% exato não", () => {
     render(<HarnessA />);
     const pesos = screen.getAllByPlaceholderText("0.000");
     digitar(pesos[0]!, "10");
     digitar(pesos[1]!, "10.8");
-    expect(screen.getByText("8,00%")).toBeInTheDocument();
+    expect(screen.getByTestId("media-absorcao")).toHaveTextContent("8,00%");
     expect(screen.queryByText(/ACIMA DO LIMITE/)).toBeNull();
     digitar(pesos[1]!, "10.9");
     expect(screen.getByText("⚠️ ACIMA DO LIMITE (8%)")).toBeInTheDocument();
@@ -89,7 +104,7 @@ describe("A) Teste de Absorção de Água — tela", () => {
     const inicial = { items: Array.from({ length: 10 }, (_, i) => ({ id: i, seal: "", initial: i === 0 ? "2.000" : "", final: i === 0 ? "2.100" : "" })), status: "conforme", averagePercentage: 5, validCount: 1, sumInitial: 2, sumFinal: 2.1 } as AbsorcaoAguaValor;
     render(<HarnessA inicial={inicial} />);
     expect((screen.getAllByPlaceholderText("0.000")[0] as HTMLInputElement).value).toBe("2.000");
-    expect(screen.getByText("5,00%")).toBeInTheDocument();
+    expect(screen.getByTestId("media-absorcao")).toHaveTextContent("5,00%");
   });
 });
 

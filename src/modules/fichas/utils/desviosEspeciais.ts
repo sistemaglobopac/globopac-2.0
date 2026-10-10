@@ -27,7 +27,7 @@ function limiteConfigurado(campo: CampoTemplate): number | undefined {
 }
 
 // Widgets que gravam `conformidade` + `detalhesRNC` no próprio valor (vazão de água e recepção de aves).
-const TIPOS_VAZAO = ["chiller_carcacas", "chiller_partes", "mini_chillers", "lavagem_final", "recepcao_aves", "espera_aves", "pendura_aves", "eletronarcose_aves", "caixas_vazias", "peso_caixa", "temperatura_resfriamento", "potabilidade_agua", "potabilidade_pontos", "qualidade_miudos", "controle_absorcao", "aguas_residuais", "ventilacao", "higiene_habitos", "pso", "higiene_operacional", "higiene_colaboradores"];
+export const TIPOS_VAZAO = ["chiller_carcacas", "chiller_partes", "mini_chillers", "lavagem_final", "recepcao_aves", "espera_aves", "pendura_aves", "eletronarcose_aves", "caixas_vazias", "peso_caixa", "temperatura_resfriamento", "potabilidade_agua", "potabilidade_pontos", "qualidade_miudos", "controle_absorcao", "aguas_residuais", "ventilacao", "higiene_habitos", "pso", "higiene_operacional", "higiene_colaboradores"];
 
 /** Desvios que tornam a ficha NÃO CONFORME já no preenchimento: absorção/dripping fora do limite,
  * vazão de água abaixo da meta (o widget grava `conformidade: false` + `detalhesRNC`). Ocorrência

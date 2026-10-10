@@ -9,6 +9,7 @@ import { instanteDoRegistro } from "./utils/horaMonitoramento";
 import { useTurnoDoRegistro } from "./useTurnoDoRegistro";
 import { ensureLocalTime } from "./utils/tempo";
 import { alvosDoCampo } from "./utils/adendoCampos";
+import { alvoDaNaoConformidade, observacaoInicialDoAdendo } from "./utils/alvoNaoConformidade";
 import { temNaoConformidade } from "./utils/desviosEspeciais";
 import { urlAbrirRnc, useRncsDosMonitoramentos } from "@/modules/rnc/api";
 import { useAutocorrigidos } from "@/modules/autocorrecao/api";
@@ -420,7 +421,11 @@ function PainelAdendo({ pendentes, dados, verificadorNome, registroInicial, camp
   const [campo, setCampo] = useState(campoInicial ?? "");
   const [alvoCaminho, setAlvoCaminho] = useState("");
   const [valorNovo, setValorNovo] = useState("");
-  const [nota, setNota] = useState("");
+  // Adendo pedido sobre um campo não conforme: a observação já traz o desvio detectado no preenchimento.
+  const [nota, setNota] = useState(() => {
+    const reg = pendentes.find((p) => p.id === registroInicial);
+    return reg && campoInicial ? observacaoInicialDoAdendo(reg.dados_dinamicos[campoInicial]) : "";
+  });
 
   const registro = pendentes.find((p) => p.id === registroId);
   const campos = useMemo(
@@ -432,7 +437,12 @@ function PainelAdendo({ pendentes, dados, verificadorNome, registroInicial, camp
     const def = campos.find((c) => c.chave === campo);
     return registro && def ? alvosDoCampo(def, registro.dados_dinamicos[def.chave]) : [];
   }, [campos, campo, registro]);
-  const alvo = alvos.find((a) => a.caminho === alvoCaminho) ?? (alvos.length === 1 ? alvos[0] : undefined);
+  // Sem escolha do verificador, vale o dado onde está a não conformidade (identificado pelo sistema) ou o único alvo do campo.
+  const alvoSugerido = useMemo(() => {
+    const def = campos.find((c) => c.chave === campo);
+    return registro && def ? alvoDaNaoConformidade(def, registro.dados_dinamicos[def.chave], alvos) : undefined;
+  }, [campos, campo, registro, alvos]);
+  const alvo = alvos.find((a) => a.caminho === alvoCaminho) ?? alvoSugerido;
 
   async function confirmar() {
     if (!registro || !alvo || !nota.trim()) return;
@@ -492,7 +502,7 @@ function PainelAdendo({ pendentes, dados, verificadorNome, registroInicial, camp
           </>
         )}
         <Label>Novo valor</Label>
-        <Input value={valorNovo} onChange={(e) => setValorNovo(e.target.value)} disabled={!registro} />
+        <Input value={valorNovo} onChange={(e) => setValorNovo(e.target.value)} disabled={!registro} autoFocus={!!campoInicial} data-testid="adendo-novo-valor" />
         <Label>Observação</Label>
         <Textarea value={nota} onChange={(e) => setNota(e.target.value)} disabled={!registro} />
       </div>
