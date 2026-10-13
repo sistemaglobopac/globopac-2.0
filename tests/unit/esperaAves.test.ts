@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { acaoCorretivaPendente, avaliarEspera, boxVazio, esperaVazia, lerTemperatura, montarValorEspera, motivosBloqueioEspera } from "@/modules/fichas/fields/esperaAves";
+import { acaoCorretivaPendente, avaliarEspera, boxVazio, BOXES_ESPERA, proximoBoxLivre, esperaVazia, lerTemperatura, montarValorEspera, motivosBloqueioEspera } from "@/modules/fichas/fields/esperaAves";
 import { desviosEspeciais } from "@/modules/fichas/utils/desviosEspeciais";
 import { motivosDeBloqueioSpr } from "@/modules/fichas/utils/bloqueiosSpr";
 import type { CampoTemplate } from "@/shared/schema-campos";
@@ -101,5 +101,22 @@ describe("espera de aves — bem-estar animal", () => {
 
   it("sem marcar 'sem veículos', continua exigindo o preenchimento completo", () => {
     expect(motivosBloqueioEspera(esperaVazia()).length).toBeGreaterThan(0);
+  });
+});
+
+describe("área de espera: só os boxes 1 a 4", () => {
+  it("recusa box fora de 1–4 e box repetido", () => {
+    const fora = motivosBloqueioEspera(completo({ boxes: [box({ box: "5" })] })).join("|");
+    expect(fora).toContain("só os boxes 1, 2, 3 e 4");
+    const repetido = motivosBloqueioEspera(completo({ boxes: [box({ box: "2", cargaId: "c1" }), box({ box: "2", cargaId: "c2" })] })).join("|");
+    expect(repetido).toContain("box 2 foi informado mais de uma vez");
+    expect(motivosBloqueioEspera(completo({ boxes: [box({ box: "1" }), box({ box: "4", cargaId: "c2" })] })).join("|")).not.toContain("boxes 1, 2, 3 e 4");
+  });
+
+  it("sugere o próximo box livre e para quando os 4 estão em uso", () => {
+    expect(BOXES_ESPERA).toEqual(["1", "2", "3", "4"]);
+    expect(proximoBoxLivre([])).toBe("1");
+    expect(proximoBoxLivre([{ box: "1" }, { box: "3" }])).toBe("2");
+    expect(proximoBoxLivre([{ box: "1" }, { box: "2" }, { box: "3" }, { box: "4" }])).toBe("");
   });
 });

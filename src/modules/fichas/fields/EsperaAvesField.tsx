@@ -6,7 +6,7 @@ import { Label } from "@/shared/ui/label";
 import { Select } from "@/shared/ui/select";
 import { useCargasDoDia, useCargasRastreabilidade, type CargaAves } from "@/modules/recepcao/api";
 import { ensureLocalTime } from "../utils/tempo";
-import { acaoCorretivaPendente, avaliarEspera, boxesOfegantes, boxVazio, COMPORTAMENTOS_AVES, esperaVazia, montarValorEspera, motivosBloqueioEspera } from "./esperaAves";
+import { acaoCorretivaPendente, avaliarEspera, boxesOfegantes, BOXES_ESPERA, boxVazio, COMPORTAMENTOS_AVES, esperaVazia, montarValorEspera, motivosBloqueioEspera, proximoBoxLivre } from "./esperaAves";
 import type { BoxEsperaAves, EsperaAvesValor } from "./tiposCompostos";
 
 interface EsperaAvesFieldProps {
@@ -109,7 +109,16 @@ export function EsperaAvesField({ value, onChange, disabled }: EsperaAvesFieldPr
                 <div className="grid gap-3 sm:grid-cols-[6rem_1fr]">
                   <div className="space-y-1">
                     <Label htmlFor={`espera-box-${i}`}>Box</Label>
-                    <Input id={`espera-box-${i}`} value={b.box} maxLength={6} placeholder="1" onChange={(e) => atualizarBox(i, { box: e.target.value })} />
+                    <Select id={`espera-box-${i}`} value={b.box} onChange={(e) => atualizarBox(i, { box: e.target.value })}>
+                      <option value="">Box…</option>
+                      {/* Registro antigo com box fora de 1–4: continua visível até o inspetor corrigir. */}
+                      {b.box && !(BOXES_ESPERA as readonly string[]).includes(b.box) && <option value={b.box}>{b.box}</option>}
+                      {BOXES_ESPERA.map((n) => (
+                        <option key={n} value={n} disabled={n !== b.box && v.boxes.some((o) => o.box === n)}>
+                          {n}
+                        </option>
+                      ))}
+                    </Select>
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor={`espera-gta-${i}`}>GTA da carga no box</Label>
@@ -158,9 +167,16 @@ export function EsperaAvesField({ value, onChange, disabled }: EsperaAvesFieldPr
             );
           })}
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={() => atualizar({ boxes: [...v.boxes, boxVazio()] })}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={proximoBoxLivre(v.boxes) === ""}
+          onClick={() => atualizar({ boxes: [...v.boxes, { ...boxVazio(), box: proximoBoxLivre(v.boxes) }] })}
+        >
           <Plus className="mr-1 h-3.5 w-3.5" /> Adicionar box
         </Button>
+        {proximoBoxLivre(v.boxes) === "" && <p className="text-xs text-muted-foreground">Os 4 boxes da área de espera já estão na lista.</p>}
       </fieldset>
 
       <fieldset className="space-y-3" disabled={disabled}>

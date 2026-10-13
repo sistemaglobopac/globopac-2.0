@@ -11,6 +11,15 @@ export const COMPORTAMENTOS_AVES: { chave: string; rotulo: string }[] = [
   { chave: "outras", rotulo: "Outras (citar)" },
 ];
 
+/** A área de espera tem só 4 boxes (1 a 4), cada um com um veículo. */
+export const BOXES_ESPERA = ["1", "2", "3", "4"] as const;
+
+/** Próximo box livre (o menor número que nenhuma linha usa ainda); "" se os 4 já estão em uso. */
+export function proximoBoxLivre(boxes: Pick<BoxEsperaAves, "box">[]): string {
+  const usados = new Set(boxes.map((b) => b.box.trim()));
+  return BOXES_ESPERA.find((n) => !usados.has(n)) ?? "";
+}
+
 export function boxVazio(): BoxEsperaAves {
   return { box: "", cargaId: "", gta: "", integrado: "", aviario: "", nucleo: "", qtdAves: 0, comportamento: "", outrasCondicoes: "" };
 }
@@ -98,6 +107,8 @@ export function motivosBloqueioEspera(v: EsperaAvesValor | undefined | null): st
   preenchidos.forEach((b, i) => {
     const nome = b.box.trim() ? `Box ${b.box.trim()}` : `Linha ${i + 1}`;
     if (!b.box.trim()) m.push(`${prefixo}: informe o número do box (${nome}).`);
+    else if (!(BOXES_ESPERA as readonly string[]).includes(b.box.trim())) m.push(`${prefixo}: a área de espera tem só os boxes 1, 2, 3 e 4 (${nome}).`);
+    else if (preenchidos.some((o, j) => j < i && o.box.trim() === b.box.trim())) m.push(`${prefixo}: o box ${b.box.trim()} foi informado mais de uma vez.`);
     if (!b.cargaId) m.push(`${prefixo}: selecione a GTA da carga (${nome}).`);
     if (!b.comportamento) m.push(`${prefixo}: informe o comportamento das aves (${nome}).`);
     if (b.comportamento === "outras" && !b.outrasCondicoes.trim()) m.push(`${prefixo}: descreva o comportamento "Outras" (${nome}).`);

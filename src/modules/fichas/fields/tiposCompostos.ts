@@ -205,7 +205,7 @@ export interface OcorrenciaPragasValor {
 }
 
 export interface BoxEsperaAves {
-  /** Identificação do box na área de espera (texto livre: "1", "A2"…). */
+  /** Identificação do box na área de espera: "1", "2", "3" ou "4" (são só 4 boxes; ver BOXES_ESPERA). */
   box: string;
   cargaId: string;
   gta: string;
