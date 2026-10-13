@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Edit, KeyRound, Plus, Trash2, UserX, Users } from "lucide-react";
+import { Edit, KeyRound, Plus, Trash2, Users } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { useSessionStore } from "@/store/session";
 import { useAppDialog } from "../dialogSystem";
-import { NIVEL_ACESSO_BADGE, NIVEL_ACESSO_ROTULO, type PerfilGestao, parseConfigExtras, usePerfisGestao, useDesligarUsuarioGestao, useExcluirColaboradorDefinitivo } from "../api";
+import { NIVEL_ACESSO_BADGE, NIVEL_ACESSO_ROTULO, type PerfilGestao, parseConfigExtras, usePerfisGestao, useExcluirColaborador } from "../api";
 import { FormUsuarioModal } from "./FormUsuarioModal";
 import { ModalRedefinirSenha } from "./ModalRedefinirSenha";
 import { ModalAssinaturaSenha } from "@/shared/ModalAssinaturaSenha";
@@ -45,27 +45,14 @@ function ChipsSetores({ perfil }: { perfil: PerfilGestao }) {
 export function UsuariosAdminPanel() {
   const perfilLogado = useSessionStore((s) => s.perfil);
   const dialog = useAppDialog();
-  const { data: perfis, isLoading } = usePerfisGestao();
-  const desligar = useDesligarUsuarioGestao();
-  const excluirDefinitivo = useExcluirColaboradorDefinitivo();
+  const { data: todosPerfis, isLoading } = usePerfisGestao();
+  // Desligados não aparecem aqui: o cadastro fica no banco só para manter o nome nos relatórios.
+  const perfis = (todosPerfis ?? []).filter((p) => p.ativo);
+  const excluir = useExcluirColaborador();
   const [excluindoDe, setExcluindoDe] = useState<PerfilGestao | null>(null);
 
   const [modalForm, setModalForm] = useState<"fechado" | "novo" | PerfilGestao>("fechado");
   const [modalSenhaDe, setModalSenhaDe] = useState<PerfilGestao | null>(null);
-
-  function confirmarDesligar(usuario: PerfilGestao) {
-    dialog.confirm({
-      titulo: "Desligar colaborador",
-      mensagem: `Tem certeza que deseja desligar "${usuario.nome_completo}"? O login deixa de funcionar imediatamente.`,
-      icone: "error",
-      aoConfirmar: () => {
-        desligar.mutate(usuario.id, {
-          onSuccess: () => dialog.sucesso("Colaborador desligado."),
-          onError: (erro) => dialog.erro(erro, "Falha ao desligar colaborador"),
-        });
-      },
-    });
-  }
 
   return (
     <div className="rounded-2xl border border-hairline bg-card p-5 shadow-sm">
@@ -96,12 +83,12 @@ export function UsuariosAdminPanel() {
             </tr>
           </thead>
           <tbody>
-            {(perfis ?? []).map((p) => {
+            {perfis.map((p) => {
               const badge = NIVEL_ACESSO_BADGE[p.nivel_acesso];
               const config = parseConfigExtras(p.configuracoes_extras);
               const ehVoceMesmo = perfilLogado?.id === p.id;
               return (
-                <tr key={p.id} className={`border-t border-hairline ${p.ativo ? "" : "opacity-50"}`}>
+                <tr key={p.id} className="border-t border-hairline">
                   <td className="px-4 py-2">
                     <p className="font-bold text-ink">{p.nome_completo}</p>
                     <p className="text-xs text-muted-foreground">@{p.nome_usuario}</p>
@@ -133,32 +120,20 @@ export function UsuariosAdminPanel() {
                         type="button"
                         variant="outline"
                         size="sm"
-                        disabled={ehVoceMesmo || !p.ativo}
-                        aria-label={`Excluir ${p.nome_completo}`}
-                        className="border-destructive/30 text-destructive hover:bg-destructive/10"
-                        title="Desligar (o cadastro e o histórico são mantidos)"
-                        onClick={() => confirmarDesligar(p)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
                         disabled={ehVoceMesmo}
-                        aria-label={`Excluir definitivamente ${p.nome_completo}`}
-                        title="Excluir definitivamente (só quem nunca deixou histórico)"
+                        aria-label={`Excluir ${p.nome_completo}`}
+                        title="Excluir (some do cadastro; o que ele fez continua com o nome dele)"
                         className="border-destructive/30 text-destructive hover:bg-destructive/10"
                         onClick={() => setExcluindoDe(p)}
                       >
-                        <UserX className="h-3.5 w-3.5" />
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </td>
                 </tr>
               );
             })}
-            {!isLoading && (perfis ?? []).length === 0 && (
+            {!isLoading && perfis.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
                   Nenhum colaborador cadastrado.
@@ -171,13 +146,13 @@ export function UsuariosAdminPanel() {
 
       {excluindoDe && (
         <ModalAssinaturaSenha
-          titulo="Excluir definitivamente"
-          descricao={`Apagar de vez o cadastro de "${excluindoDe.nome_completo}"? Só é possível se ele nunca registrou nem assinou nada. Se tiver histórico, a exclusão é recusada (o nome precisa continuar nos relatórios) e você deve usar "Desligar". Confirme sua senha para continuar.`}
-          textoConfirmar="Excluir definitivamente"
+          titulo="Excluir colaborador"
+          descricao={`Excluir "${excluindoDe.nome_completo}" do cadastro? O login deixa de funcionar e ele some desta lista. Tudo o que ele já registrou ou assinou continua nos relatórios com o nome dele. Confirme sua senha para continuar.`}
+          textoConfirmar="Excluir"
           onAssinar={async () => {
-            await excluirDefinitivo.mutateAsync(excluindoDe.id);
+            await excluir.mutateAsync(excluindoDe.id);
             setExcluindoDe(null);
-            dialog.sucesso("Cadastro excluído definitivamente.");
+            dialog.sucesso("Colaborador excluído.");
           }}
           onCancelar={() => setExcluindoDe(null)}
           testId="modal-excluir-colaborador"

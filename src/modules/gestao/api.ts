@@ -239,36 +239,35 @@ export function useRestaurarSetorInspetor() {
   });
 }
 
-/** Exclusão DEFINITIVA (Edge Function excluir-colaborador): só funciona para quem nunca deixou
- * histórico; a função devolve o motivo claro quando recusa. */
-export function useExcluirColaboradorDefinitivo() {
+async function desligarPerfil(id: string) {
+  const { error } = await supabase
+    .from("perfis_usuarios")
+    .update({ ativo: false, desligado_em: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+/** "Excluir" colaborador: sai do cadastro, mas o que ele fez continua com o nome dele.
+ * 1) Tenta apagar de vez (Edge Function excluir-colaborador): só passa para quem nunca deixou
+ *    histórico.
+ * 2) Se tiver histórico (409), o perfil é desligado (ativo=false + desligado_em): o login para de
+ *    funcionar, a tela de usuários deixa de listá-lo e o nome segue nos relatórios e assinaturas
+ *    (perfis_usuarios nunca é apagado fisicamente quando há registros — trg_bloqueia_delete_perfil).
+ * Devolve como terminou, para a tela avisar. */
+export function useExcluirColaborador() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async (id: string): Promise<"apagado" | "desligado"> => {
       let { error } = await supabase.functions.invoke("excluir-colaborador", { body: { id } });
       if (error && statusDeFuncao(error) === 401) {
         const renovada = await supabase.auth.refreshSession();
         if (!renovada.error) ({ error } = await supabase.functions.invoke("excluir-colaborador", { body: { id } }));
         if (error && statusDeFuncao(error) === 401) throw new Error(MENSAGEM_SESSAO_EXPIRADA);
       }
-      if (error) throw await erroDeFuncao(error);
-    },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["perfis_usuarios"] }),
-  });
-}
-
-/** perfis_usuarios nunca é fisicamente apagado (trigger trg_bloqueia_delete_perfil) — "excluir"
- * aqui é desligar: ativo=false + desligado_em. O botão continua desabilitado para o próprio
- * usuário logado (checado no componente). */
-export function useDesligarUsuarioGestao() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("perfis_usuarios")
-        .update({ ativo: false, desligado_em: new Date().toISOString() })
-        .eq("id", id);
-      if (error) throw error;
+      if (!error) return "apagado";
+      if (statusDeFuncao(error) !== 409) throw await erroDeFuncao(error);
+      await desligarPerfil(id);
+      return "desligado";
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["perfis_usuarios"] }),
   });
