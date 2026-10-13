@@ -51,6 +51,6 @@ test("painel de BI mostra KPIs e permite exportar CSV de monitoramentos (Fase 7)
   expect(caminho).toBeTruthy();
   const fs = await import("node:fs/promises");
   const conteudo = await fs.readFile(caminho!, "utf-8");
-  expect(conteudo).toContain("ID,Setor,Situação,Criado em,Verificado em,Liberado ao SIF,Liberado em");
+  expect(conteudo).toContain("Código,Setor,Situação,Criado em,Verificado em,Liberado ao SIF,Liberado em");
   expect(conteudo).toContain(registro!.id);
 });
