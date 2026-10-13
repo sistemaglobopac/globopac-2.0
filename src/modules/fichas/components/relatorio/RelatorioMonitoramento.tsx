@@ -603,7 +603,7 @@ export function RelatorioMonitoramento({ ids, dados, turnoDe = (r) => turnoDoDia
                 if (carimbo.tsa_emitido_em)
                   return (
                     <p className="mt-1">
-                      RFC 3161 — {carimbo.tsa_utilizada ?? "TSA"} em {new Date(carimbo.tsa_emitido_em).toLocaleString("pt-BR", { timeZone: "America/Manaus" })}
+                      RFC 3161 — {carimbo.tsa_utilizada ?? "autoridade de carimbo de tempo"} em {new Date(carimbo.tsa_emitido_em).toLocaleString("pt-BR", { timeZone: "America/Manaus" })}
                     </p>
                   );
                 return <p className="mt-1">Carimbo RFC 3161 em processamento.</p>;

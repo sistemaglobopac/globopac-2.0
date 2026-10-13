@@ -109,9 +109,9 @@ export function CartaoRnc({ rnc, podeTratar, podeRevisar, podeReabrir }: { rnc: 
           <Badge variant="outline">{rnc.setor}</Badge>
           <Badge variant={VARIANTE_SEVERIDADE[rnc.severidade]}>{rnc.severidade}</Badge>
           <Badge variant={rnc.status === "FECHADA" ? "secondary" : "default"}>{RENOME_STATUS[rnc.status]}</Badge>
-          {atrasada && <Badge variant="destructive">SLA VENCIDO</Badge>}
+          {atrasada && <Badge variant="destructive">PRAZO VENCIDO</Badge>}
         </CardTitle>
-        <p className="text-xs text-muted-foreground">Prazo SLA: {new Date(rnc.prazo_sla).toLocaleString("pt-BR")}</p>
+        <p className="text-xs text-muted-foreground">Prazo limite: {new Date(rnc.prazo_sla).toLocaleString("pt-BR")}</p>
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="whitespace-pre-line text-sm">{rnc.descricao}</p>

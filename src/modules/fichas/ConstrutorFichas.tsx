@@ -73,7 +73,7 @@ type TipoCampo =
   | "assinatura";
 
 const TIPOS_CAMPO: { value: TipoCampo; label: string }[] = [
-  { value: "simples", label: "Sim / Não (Conforme/NC)" },
+  { value: "simples", label: "Sim / Não (Conforme/Não conforme)" },
   { value: "inteiro", label: "Número Inteiro" },
   { value: "decimal", label: "Número Decimal" },
   { value: "unica_escolha", label: "Múltipla Escolha (1 Opção)" },

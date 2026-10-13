@@ -145,7 +145,7 @@ function ItemDaTrilha({ item, protocolo }: { item: ItemTrilha; protocolo: string
           {item.carimbo ? (
             <span className="inline-flex flex-wrap items-center gap-2 rounded-full border border-emerald-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
               <CheckCircle2 className="h-3 w-3" aria-hidden />
-              RFC 3161 · {item.carimbo.tsa ?? "TSA"}
+              RFC 3161 · {item.carimbo.tsa ?? "autoridade de carimbo de tempo"}
               {item.carimbo.emitido_em ? ` · ${dataHora(item.carimbo.emitido_em)}` : ""}
               <button
                 type="button"

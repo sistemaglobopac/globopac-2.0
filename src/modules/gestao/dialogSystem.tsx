@@ -93,7 +93,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                   fechar();
                 }}
               >
-                {estado.modo === "confirm" ? "Confirmar" : "OK"}
+                {estado.modo === "confirm" ? "Confirmar" : "Entendi"}
               </Button>
             </div>
           </div>

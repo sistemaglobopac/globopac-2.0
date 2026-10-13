@@ -68,7 +68,7 @@ function VisaoGeralTab() {
   function exportarMonitoramentos() {
     const csv = linhasParaCsv<MonitoramentoResumo & { situacao: string }>(
       [
-        { chave: "id", rotulo: "ID" },
+        { chave: "id", rotulo: "Código" },
         { chave: "setor", rotulo: "Setor" },
         { chave: "situacao", rotulo: "Situação" },
         { chave: "criado_em", rotulo: "Criado em" },
@@ -84,12 +84,12 @@ function VisaoGeralTab() {
   function exportarRnc() {
     const csv = linhasParaCsv<RncResumo>(
       [
-        { chave: "id", rotulo: "ID" },
+        { chave: "id", rotulo: "Código" },
         { chave: "setor", rotulo: "Setor" },
         { chave: "severidade", rotulo: "Severidade" },
         { chave: "status", rotulo: "Status" },
         { chave: "criado_em", rotulo: "Criado em" },
-        { chave: "prazo_sla", rotulo: "Prazo SLA" },
+        { chave: "prazo_sla", rotulo: "Prazo limite" },
         { chave: "fechado_em", rotulo: "Fechado em" },
       ],
       rncs ?? []
@@ -100,7 +100,7 @@ function VisaoGeralTab() {
   function exportarOs() {
     const csv = linhasParaCsv<OsResumo>(
       [
-        { chave: "id", rotulo: "ID" },
+        { chave: "id", rotulo: "Código" },
         { chave: "setor", rotulo: "Setor" },
         { chave: "descricao", rotulo: "Descrição" },
         { chave: "status", rotulo: "Status" },
@@ -150,7 +150,7 @@ function VisaoGeralTab() {
         </div>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <CartaoKpi titulo="Abertas" valor={rncsAbertas} />
-          <CartaoKpi titulo="SLA vencido" valor={rncsSlaVencido} />
+          <CartaoKpi titulo="Prazo vencido" valor={rncsSlaVencido} />
           <CartaoKpi titulo="Total" valor={rncs?.length ?? 0} />
           <CartaoKpi titulo="Fechadas" valor={(rncs ?? []).filter((r) => r.status === "FECHADA").length} />
         </div>
@@ -200,7 +200,7 @@ const ABAS: DefinicaoAba[] = [
   { id: "consumo-agua", rotulo: "Consumo de água", perfis: ["ADMIN_MASTER", "GESTOR_SETOR"] },
 ];
 
-/** Painel de BI (seção 7.7) — uma aba por assunto/métrica. Todas leem só o que a RLS já permite ao usuário ver
+/** Painel de Indicadores (seção 7.7) — uma aba por assunto/métrica. Todas leem só o que a RLS já permite ao usuário ver
  * nas telas correspondentes; nenhuma permissão nova. */
 export function DashboardPage() {
   const nivel = useSessionStore((s) => s.perfil?.nivelAcesso);
@@ -211,12 +211,12 @@ export function DashboardPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Painel de BI</h1>
+        <h1 className="text-2xl font-semibold">Painel de Indicadores</h1>
         <p className="text-sm text-muted-foreground">Indicadores gerenciais do GloboPac, uma aba por assunto.</p>
       </div>
 
       {abas.length > 1 && (
-        <div role="tablist" aria-label="Métricas do Painel de BI" className="flex flex-wrap gap-1 border-b">
+        <div role="tablist" aria-label="Métricas do Painel de Indicadores" className="flex flex-wrap gap-1 border-b">
           {abas.map((a) => (
             <button
               key={a.id}

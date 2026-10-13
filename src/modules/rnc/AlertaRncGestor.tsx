@@ -99,7 +99,7 @@ export function AlertaRncGestor() {
               )}
               <span className="mt-2 block text-xs">
                 Prazo: {new Date(rnc.prazo_sla).toLocaleString("pt-BR")}
-                {estaAtrasada(rnc) && <strong className="ml-1 text-destructive">SLA VENCIDO</strong>}
+                {estaAtrasada(rnc) && <strong className="ml-1 text-destructive">PRAZO VENCIDO</strong>}
               </span>
               <span className="mt-2 block text-xs font-semibold text-primary">Clique para responder →</span>
             </button>

@@ -90,7 +90,7 @@ export function NovaOsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="sla_esperado_horas">SLA esperado (horas, opcional)</Label>
+              <Label htmlFor="sla_esperado_horas">Prazo esperado (horas, opcional)</Label>
               <Input
                 id="sla_esperado_horas"
                 type="number"

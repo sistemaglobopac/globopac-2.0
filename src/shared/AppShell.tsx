@@ -68,12 +68,12 @@ const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
   INSPECAO_FEDERAL: [{ rota: "/auditoria", rotulo: "Painel de Auditoria" }],
   GESTOR_SETOR: [
     { rota: "/rnc", rotulo: "Tratativas RNC" },
-    { rota: "/dashboard", rotulo: "Painel de BI" },
+    { rota: "/dashboard", rotulo: "Painel de Indicadores" },
   ],
   INSPETOR_PCM: [
     { rota: "/pcm", rotulo: "Ordens de Serviço" },
     { rota: "/pcm/nova", rotulo: "Nova OS" },
-    { rota: "/dashboard", rotulo: "Painel de BI" },
+    { rota: "/dashboard", rotulo: "Painel de Indicadores" },
   ],
   ADMIN_MASTER: [
     { rota: "/gestao", rotulo: "Painel de Gestão" },
@@ -86,7 +86,7 @@ const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
     { rota: "/sif/liberar", rotulo: "Painel de Arquivo" },
     { rota: "/auditoria", rotulo: "Painel de Auditoria" },
     { rota: "/carimbos", rotulo: "Carimbos de tempo" },
-    { rota: "/dashboard", rotulo: "Painel de BI" },
+    { rota: "/dashboard", rotulo: "Painel de Indicadores" },
   ],
 };
 

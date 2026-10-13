@@ -88,7 +88,7 @@ export function EquipamentosAdminPanel() {
           <thead className="bg-surface-soft">
             <tr className="text-left text-xs font-bold uppercase tracking-wide text-muted-foreground">
               <th className="px-4 py-2">Código</th>
-              <th className="px-4 py-2">TAG</th>
+              <th className="px-4 py-2">Etiqueta</th>
               <th className="px-4 py-2">Nome</th>
               <th className="px-4 py-2">Setor</th>
               <th className="px-4 py-2 text-right">Ações</th>
@@ -153,7 +153,7 @@ export function EquipamentosAdminPanel() {
                 <Input id="codigo-equip" value={codigo} onChange={(e) => setCodigo(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="tag-equip">TAG</Label>
+                <Label htmlFor="tag-equip">Etiqueta</Label>
                 <Input id="tag-equip" value={tag} onChange={(e) => setTag(e.target.value)} />
               </div>
             </div>

@@ -35,7 +35,7 @@ export function RncTratativasPage() {
 
       {atrasadas.length > 0 && (
         <p className="rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
-          {atrasadas.length} RNC(s) com SLA vencido — priorize o tratamento.
+          {atrasadas.length} RNC(s) com prazo vencido — priorize o tratamento.
         </p>
       )}
 

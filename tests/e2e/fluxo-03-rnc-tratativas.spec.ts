@@ -7,7 +7,7 @@ import { login, logout, clienteAdminDeTeste, selecionarTemplate, assinarComSenha
 // revisa e fecha." Gestor de Setor não fecha mais a própria tratativa (segregação de funções
 // reforçada por trg_segregacao_funcoes_rnc).
 // DoD da Fase 4 também exige "SLA configurável funcional com alerta" — coberto pelo segundo
-// teste abaixo, que força um prazo_sla vencido e confirma o badge "SLA VENCIDO".
+// teste abaixo, que força um prazo_sla vencido e confirma o badge "PRAZO VENCIDO".
 
 test("verificador reprova, RNC é criada, gestor de setor trata e verificador revisa e fecha (fluxo 3)", async ({ page }) => {
   const marcador = `E2E-fluxo3-${Date.now()}`;
@@ -126,6 +126,6 @@ test("RNC com prazo_sla vencido exibe alerta de SLA (DoD: SLA configurável com 
   await page.goto("/rnc");
   const cartaoRnc = page.locator(".rounded-lg.border").filter({ hasText: marcador });
   await expect(cartaoRnc).toBeVisible({ timeout: 15_000 });
-  await expect(cartaoRnc.getByText("SLA VENCIDO", { exact: true })).toBeVisible();
-  await expect(page.getByText(/RNC\(s\) com SLA vencido/)).toBeVisible();
+  await expect(cartaoRnc.getByText("PRAZO VENCIDO", { exact: true })).toBeVisible();
+  await expect(page.getByText(/RNC\(s\) com prazo vencido/)).toBeVisible();
 });

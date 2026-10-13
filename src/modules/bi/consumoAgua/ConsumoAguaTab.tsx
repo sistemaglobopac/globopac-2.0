@@ -19,7 +19,7 @@ import {
   type SistemaAgua,
 } from "./calculo";
 
-/** Dias fora do BI (AAAA-MM-DD, Manaus). Padrão: 05/10/2026, dia com leituras fora da realidade que escondia os demais dias. */
+/** Dias fora do painel (AAAA-MM-DD, Manaus). Padrão: 05/10/2026, dia com leituras fora da realidade que escondia os demais dias. */
 const DIAS_OCULTOS_PADRAO = ["2026-10-05"];
 const CHAVE_DIAS_OCULTOS = "bi-consumo-agua-dias-ocultos";
 
@@ -226,7 +226,7 @@ export function ConsumoAguaTab() {
             />
           </div>
           <div className="space-y-1" data-testid="dias-ocultos">
-            <p className="text-xs font-medium text-muted-foreground">Dias fora do BI (não entram nos totais nem nos gráficos)</p>
+            <p className="text-xs font-medium text-muted-foreground">Dias fora do painel (não entram nos totais nem nos gráficos)</p>
             <div className="flex flex-wrap items-center gap-2">
               {diasOcultos.length === 0 && <span className="text-xs text-muted-foreground">Nenhum dia oculto.</span>}
               {diasOcultos.map((d) => (

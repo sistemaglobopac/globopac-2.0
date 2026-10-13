@@ -73,7 +73,7 @@ afterEach(() => {
 
 const user = () => userEvent.setup({ advanceTimers: () => undefined });
 
-describe("Painel de BI — aba Consumo de água", () => {
+describe("Painel de Indicadores — aba Consumo de água", () => {
   it("mostra o consumo só de água (sem gelo): chillers somados, chuveiro à parte e total geral", () => {
     render(<ConsumoAguaTab />);
     // 4,635 m³ aparece no KPI dos chillers e no cartão do SPR Carcaças; 2,000 m³ no KPI e no cartão do Chuveiro Final.
@@ -133,10 +133,10 @@ describe("Painel de BI — aba Consumo de água", () => {
   });
 });
 
-describe("Painel de BI — abas", () => {
+describe("Painel de Indicadores — abas", () => {
   it("Administrador vê a aba Consumo de água e abre o conteúdo dela", async () => {
     render(<DashboardPage />);
-    expect(screen.getByRole("heading", { name: "Painel de BI" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Painel de Indicadores" })).toBeTruthy();
     expect(screen.getByText("Monitoramentos (30 dias)")).toBeTruthy();
     await user().click(screen.getByRole("tab", { name: "Consumo de água" }));
     expect(screen.getByRole("tab", { name: "Consumo de água", selected: true })).toBeTruthy();

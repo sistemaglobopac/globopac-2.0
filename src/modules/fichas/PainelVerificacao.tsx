@@ -403,7 +403,7 @@ export function PainelVerificacao() {
             </div>
             <div>
               <h1 className="text-xl font-semibold">Painel de Verificação</h1>
-              <p className="text-sm text-muted-foreground">Fila de QA — revisão, assinatura e adendos</p>
+              <p className="text-sm text-muted-foreground">Fila da Qualidade — revisão, assinatura e adendos</p>
             </div>
           </div>
 
@@ -441,8 +441,8 @@ export function PainelVerificacao() {
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard tag="Fila QA" label="Fichas Por Verificar" value={kpiAguardando} tom="primary" />
-        <KpiCard tag="OK" label="Fichas Verificadas" value={kpiVerificadas} tom="lima" />
+        <KpiCard tag="Fila da Qualidade" label="Fichas Por Verificar" value={kpiAguardando} tom="primary" />
+        <KpiCard tag="Concluídas" label="Fichas Verificadas" value={kpiVerificadas} tom="lima" />
         <KpiCard tag="Pendente" label="Adendos Pendentes" value={kpiAdendos} tom="alerta" />
         <KpiCard tag="Revisor" label="RNCs Aguardando Revisão" value={kpiRncTratativa} tom="destrutivo" onClick={() => navigate("/rnc")} />
       </div>
