@@ -35,6 +35,9 @@ export function chavesDeConfirmacao(campos: { chave: string; tipo: string }[]): 
 
 const semConteudo = (v: unknown) => v === undefined || v === null || v === "";
 
+/** O campo da área de espera foi respondido com "não há veículos nos boxes". */
+const semVeiculosNosBoxes = (v: unknown) => !!v && typeof v === "object" && !Array.isArray(v) && (v as { semVeiculos?: unknown }).semVeiculos === true;
+
 function canonico(valor: unknown): unknown {
   if (Array.isArray(valor)) return valor.map(canonico);
   if (valor && typeof valor === "object") {
@@ -51,8 +54,12 @@ function canonico(valor: unknown): unknown {
 /** Texto comparável dos dados medidos: independe da ordem das chaves e ignora hora e marcas de controle. */
 export function assinaturaDosDados(dados: Record<string, unknown> | null | undefined, ignorar: ReadonlySet<string> = new Set()): string {
   const medidos: Record<string, unknown> = {};
-  // Campo em branco (ex.: observação vazia) também não é dado medido.
-  for (const [chave, valor] of Object.entries(dados ?? {})) if (!CHAVES_DE_CONTROLE.has(chave) && !ignorar.has(chave) && !semConteudo(valor)) medidos[chave] = valor;
+  // Campo em branco (ex.: observação vazia) também não é dado medido. "Sem veículos nos boxes" (área de espera) também não: nada foi
+  // medido e a mesma resposta se repete a cada monitoramento enquanto não há carga — não é registro duplicado.
+  for (const [chave, valor] of Object.entries(dados ?? {})) {
+    if (CHAVES_DE_CONTROLE.has(chave) || ignorar.has(chave) || semConteudo(valor) || semVeiculosNosBoxes(valor)) continue;
+    medidos[chave] = valor;
+  }
   return JSON.stringify(canonico(medidos));
 }
 
