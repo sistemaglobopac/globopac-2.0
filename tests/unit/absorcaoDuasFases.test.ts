@@ -3,6 +3,7 @@ import {
   calcularAbsorcaoAgua,
   linhaAbsorcaoValida,
   minutosAguardandoPesoFinal,
+  pesoFinalNaoMaiorQueInicial,
   validarFaseInicial,
   validarFinalizacao,
 } from "@/modules/fichas/fields/calculosAbsorcao";
@@ -71,5 +72,22 @@ describe("tempo aguardando peso final", () => {
     const inicio = "2026-09-30T10:00:00-04:00";
     expect(minutosAguardandoPesoFinal(inicio, new Date("2026-09-30T10:45:30-04:00"))).toBe(45);
     expect(minutosAguardandoPesoFinal(inicio, new Date("2026-09-30T09:00:00-04:00"))).toBe(0);
+  });
+});
+
+describe("peso final sempre maior que o inicial", () => {
+  it("recusa finalizar com peso final menor ou igual ao inicial, apontando o lacre", () => {
+    const menor = validarFinalizacao([linha(0, "A1", "2.5", "2.4"), linha(1, "B2", "2.4", "2.6"), ...vazias(2)]);
+    expect(menor).toHaveLength(1);
+    expect(menor[0]).toContain("A1");
+    expect(menor[0]).toContain("maior que o peso inicial");
+    expect(validarFinalizacao([linha(0, "A1", "2.5", "2.5"), ...vazias(1)]).join(" ")).toContain("maior que o peso inicial");
+  });
+
+  it("aceita peso final maior e não reclama de linha em branco ou descartada", () => {
+    expect(validarFinalizacao([linha(0, "A1", "2.5", "2.501"), ...vazias(1)])).toEqual([]);
+    expect(pesoFinalNaoMaiorQueInicial(linha(0, "A1", "2.5", ""))).toBe(false);
+    expect(pesoFinalNaoMaiorQueInicial(linha(0, "A1", "2.5", "2.0", { descartada: true }))).toBe(false);
+    expect(pesoFinalNaoMaiorQueInicial(linha(0, "", "", ""))).toBe(false);
   });
 });

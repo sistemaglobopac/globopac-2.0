@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Lock } from "lucide-react";
 import { Input } from "@/shared/ui/input";
-import { amostrasAbsorcaoIniciais, calcularAbsorcaoAgua, formatarPercentual, LIMITE_ABSORCAO_AGUA, linhaAbsorcaoValida, percentualIndividualAbsorcao } from "./calculosAbsorcao";
+import { amostrasAbsorcaoIniciais, calcularAbsorcaoAgua, formatarPercentual, LIMITE_ABSORCAO_AGUA, linhaAbsorcaoValida, mensagemPesoFinalInvalido, percentualIndividualAbsorcao, pesoFinalNaoMaiorQueInicial } from "./calculosAbsorcao";
 import type { AbsorcaoAguaValor, AmostraAbsorcaoAgua, FaseAbsorcao } from "./tiposCompostos";
 
 interface AbsorcaoAguaFieldProps {
@@ -60,6 +60,7 @@ export function AbsorcaoAguaField({ value, onChange, disabled, fase = "UMA_VEZ" 
 
       {items.map((item, i) => {
         const linhaTravada = travaInicial && item.seal.trim() === "" && item.initial.trim() === "";
+        const finalInvalido = mostraFinal && pesoFinalNaoMaiorQueInicial(item);
         return (
           <div key={item.id} className="space-y-1">
             <div className="flex items-center gap-2">
@@ -84,9 +85,10 @@ export function AbsorcaoAguaField({ value, onChange, disabled, fase = "UMA_VEZ" 
               />
               {mostraFinal && (
                 <Input
-                  className="flex-[1.2] font-mono"
+                  className={`flex-[1.2] font-mono ${finalInvalido ? "border-destructive focus-visible:ring-destructive" : ""}`}
                   type="number" inputMode="decimal"
                   step="0.001"
+                  aria-invalid={finalInvalido}
                   value={item.final}
                   onChange={(e) => alterarItem(i, "final", e.target.value)}
                   disabled={disabled || linhaTravada || Boolean(item.descartada)}
@@ -111,6 +113,11 @@ export function AbsorcaoAguaField({ value, onChange, disabled, fase = "UMA_VEZ" 
                 </span>
               )}
             </div>
+            {finalInvalido && (
+              <p role="alert" className="ml-10 text-xs font-bold text-destructive" data-testid={`peso-final-invalido-${i + 1}`}>
+                {mensagemPesoFinalInvalido(item)}
+              </p>
+            )}
             {travaInicial && item.descartada && (
               <Input
                 className="ml-10 w-[calc(100%-2.5rem)]"
