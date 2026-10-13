@@ -4,6 +4,8 @@ import { aplicarNoCaminho } from "@/modules/fichas/utils/adendoCampos";
 import { idsAdendosConcluidos } from "@/modules/fichas/utils/adendosPendentes";
 import { supabase } from "@/lib/supabase";
 import type { StatusRnc } from "@/modules/rnc/api";
+import type { RegistroVazao } from "./avesNaVazao";
+import type { CampoTemplate } from "@/shared/schema-campos";
 
 export type TipoPausa = "CURTA_20M" | "ALMOCO_72M" | "JANTAR_72M";
 
@@ -186,6 +188,8 @@ export interface FichaAtivaResumo {
   /** Ficha de monitoramento de pragas (tem o campo de ocorrência de pragas): obrigatória pelo menos uma vez por dia — o turno
    * não pode ser finalizado sem ela e o sistema lembra de 2 em 2 horas. Derivado de schema_campos ao carregar os KPIs. */
   exigeDiaria?: boolean;
+  /** Ficha de vazão do SPR Carcaças (tem o campo de renovação da água do chiller): é ela que conta as aves de cada carga. */
+  vazaoSpr?: boolean;
 }
 
 type MonitoramentoComHora = MonitoramentoHoje & { hora_monitoramento: string | null };
@@ -195,6 +199,8 @@ export interface MonitoramentoHoje {
   ficha_template_id: string;
   criado_em: string;
   setor?: string;
+  /** Quem fez (só na lista do setor, usada nas prévias do Painel de Bordo). */
+  user_id?: string;
 }
 
 export const PAUSAS_CONFIG: Record<TipoPausa, { label: string; desc: string; limiteMin: number }> = {
@@ -505,7 +511,7 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
           .overrideTypes<MonitoramentoComHora[], { merge: false }>(),
         supabase
           .from("monitoramentos")
-          .select("id, ficha_template_id, criado_em, hora_monitoramento, setor")
+          .select("id, ficha_template_id, criado_em, hora_monitoramento, setor, user_id")
           .in("setor", userSetores)
           .or(filtroHoje)
           .overrideTypes<MonitoramentoComHora[], { merge: false }>(),
@@ -548,6 +554,7 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
         ...ficha,
         encerravel: Array.isArray(schema_campos) && schema_campos.some((c) => c?.tipo === "espera_aves"),
         exigeDiaria: temCampoDePragas(schema_campos),
+        vazaoSpr: Array.isArray(schema_campos) && schema_campos.some((c) => c?.tipo === "chiller_carcacas"),
       }));
 
       // Monitoramento de pragas (obrigatório 1x/dia): o turno pode atravessar a meia-noite, então busca as últimas 36 h e
@@ -685,6 +692,92 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
 
 /** "Sem veículos com cargas vivas nos boxes": silencia, até o fim do dia, o aviso de atraso de uma ficha que depende de
  * haver abate (ex.: bem-estar nos boxes de espera). Reabrir desfaz. Vale por código da ficha. */
+/** Monitoramentos de vazão (SPR Carcaças) do dia de abate, de QUALQUER inspetor dos setores informados — a base da
+ * conferência "aves programadas × aves contadas" (ver avesNaVazao.ts). Vale o valor corrigido: o original que ganhou um
+ * aditivo (adendo do Verificador) sai da lista e entra o aditivo. `dia` = AAAA-MM-DD (America/Manaus). */
+export function useRegistrosVazaoDoDia(dia: string | undefined, userSetores: string[], habilitado: boolean) {
+  return useQuery({
+    queryKey: ["painel-bordo", "vazao-do-dia", dia, userSetores],
+    meta: { offline: true },
+    enabled: habilitado && !!dia && userSetores.length > 0,
+    refetchInterval: 30_000,
+    queryFn: async (): Promise<RegistroVazao[]> => {
+      // Reeditar a ficha cria outro template: vale qualquer versão que tenha o campo de vazão.
+      const { data: templates, error: erroTemplates } = await supabase
+        .from("fichas_templates")
+        .select("id, schema_campos")
+        .contains("schema_campos", JSON.stringify([{ tipo: "chiller_carcacas" }]))
+        .overrideTypes<{ id: string; schema_campos: { tipo?: string; chave?: string }[] }[], { merge: false }>();
+      if (erroTemplates) throw erroTemplates;
+      const chavePorTemplate = new Map(
+        (templates ?? []).map((t) => [t.id, t.schema_campos.find((c) => c?.tipo === "chiller_carcacas")?.chave] as const)
+      );
+      if (chavePorTemplate.size === 0) return [];
+
+      const desde = `${dia}T04:00:00.000Z`;
+      const { data, error } = await supabase
+        .from("monitoramentos")
+        .select("id, ficha_template_id, aditivo_de, dados_dinamicos")
+        .in("ficha_template_id", [...chavePorTemplate.keys()])
+        .in("setor", userSetores)
+        .or(`hora_monitoramento.gte.${desde},and(hora_monitoramento.is.null,criado_em.gte.${desde})`)
+        .overrideTypes<
+          { id: string; ficha_template_id: string; aditivo_de: string | null; dados_dinamicos: Record<string, unknown> | null }[],
+          { merge: false }
+        >();
+      if (error) throw error;
+      const comAditivo = new Set((data ?? []).map((m) => m.aditivo_de).filter((id): id is string => !!id));
+      return (data ?? [])
+        .filter((m) => !comAditivo.has(m.id))
+        .map((m) => {
+          const chave = chavePorTemplate.get(m.ficha_template_id);
+          return { carcacas: chave ? (m.dados_dinamicos?.[chave] as RegistroVazao["carcacas"]) : undefined };
+        });
+    },
+  });
+}
+
+export interface PreviaMonitoramento {
+  id: string;
+  user_id: string;
+  setor: string;
+  dados_dinamicos: Record<string, unknown>;
+  criado_em: string;
+  hora_monitoramento: string | null;
+  finalizado_em: string | null;
+  conformidade: boolean | null;
+  situacao_conformidade: "CONFORME" | "NAO_CONFORME" | "TRATADO" | null;
+  verificado_por: string | null;
+  ficha: { codigo: string; nome: string; schema_campos: CampoTemplate[] } | null;
+}
+
+/** Prévia SOMENTE LEITURA de um monitoramento do turno: os dados coletados, quem fez e a situação. O inspetor lê os
+ * monitoramentos de qualquer inspetor que divida o setor com ele (monitoramentos_select já permite; nada novo no banco). */
+export function usePreviaMonitoramento(monitoramentoId: string | null) {
+  return useQuery({
+    queryKey: ["painel-bordo", "previa", monitoramentoId],
+    enabled: !!monitoramentoId,
+    queryFn: async (): Promise<PreviaMonitoramento | null> => {
+      const { data, error } = await supabase
+        .from("monitoramentos")
+        .select("id, ficha_template_id, user_id, setor, dados_dinamicos, criado_em, hora_monitoramento, finalizado_em, conformidade, situacao_conformidade, verificado_por")
+        .eq("id", monitoramentoId as string)
+        .maybeSingle()
+        .overrideTypes<(Omit<PreviaMonitoramento, "ficha"> & { ficha_template_id: string }) | null, { merge: false }>();
+      if (error) throw error;
+      if (!data) return null;
+      const { ficha_template_id, ...resto } = data;
+      const { data: ficha } = await supabase
+        .from("fichas_templates")
+        .select("codigo, nome, schema_campos")
+        .eq("id", ficha_template_id)
+        .maybeSingle()
+        .overrideTypes<PreviaMonitoramento["ficha"], { merge: false }>();
+      return { ...resto, ficha: ficha ?? null };
+    },
+  });
+}
+
 export function useEncerrarFichaDia() {
   const queryClient = useQueryClient();
   return useMutation({

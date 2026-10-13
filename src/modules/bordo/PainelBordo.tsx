@@ -39,6 +39,7 @@ import {
   useEncerrarFichaDia,
   useReabrirFichaDia,
   useKpisTurno,
+  useRegistrosVazaoDoDia,
   useAssinarAdendo,
   PAUSAS_CONFIG,
   MOTIVOS_PARADA_FALLBACK,
@@ -49,6 +50,7 @@ import {
   resumoFichasPorSetor,
   urlNovaFicha,
   inicioDoDiaManaus,
+  diaManaus,
   type TipoPausa,
   type FichaAtivaResumo,
   type FichaAtrasada,
@@ -57,6 +59,11 @@ import {
   type AdendoPendente,
 } from "./api";
 import { ModalProcessoParado } from "./ModalProcessoParado";
+import { CartaoAvesVazao } from "./CartaoAvesVazao";
+import { PreviaMonitoramentoModal } from "./PreviaMonitoramentoModal";
+import { useUsuariosMap } from "@/modules/fichas/api";
+import { conferirAvesNaVazao, SETOR_AVES_NA_VAZAO } from "./avesNaVazao";
+import { useCargasRastreabilidade } from "@/modules/recepcao/api";
 import { Button } from "@/shared/ui/button";
 import { rascunhosComoMonitoramentos, useRascunhos } from "@/modules/fichas/useRascunhos";
 import { Input } from "@/shared/ui/input";
@@ -120,6 +127,15 @@ export function PainelBordo() {
   const kpisQuery = useKpisTurno(perfil?.id, userSetores);
   const kpis = kpisQuery.data;
 
+  // Aves programadas × aves contadas na vazão (só informa): vale o dia do turno e só para o inspetor do PRÉ-RESFRIAMENTO 02.
+  const temVazaoSpr =
+    userSetores.includes(SETOR_AVES_NA_VAZAO) &&
+    (kpis?.fichasAtivas ?? []).some((f) => f.vazaoSpr && f.locais_aplicacao?.includes(SETOR_AVES_NA_VAZAO));
+  const diaAbate = diaManaus(turnoHoje ? new Date(turnoHoje.inicio) : new Date());
+  const { data: cargasDoDia } = useCargasRastreabilidade(temVazaoSpr ? diaAbate : undefined);
+  const { data: registrosVazao } = useRegistrosVazaoDoDia(diaAbate, [SETOR_AVES_NA_VAZAO], temVazaoSpr);
+  const avesNaVazao = temVazaoSpr && cargasDoDia && registrosVazao ? conferirAvesNaVazao(cargasDoDia, registrosVazao) : null;
+
   const [agora, setAgora] = useState(() => new Date());
   const [mensagem, setMensagem] = useState<{ tipo: "success" | "error"; texto: string } | null>(null);
   const [activeBordoTab, setActiveBordoTab] = useState<"fichas" | "os">("fichas");
@@ -131,6 +147,8 @@ export function PainelBordo() {
   const [showModalParada, setShowModalParada] = useState(false);
   const [processoParadoDe, setProcessoParadoDe] = useState<FichaAtrasada | null>(null);
   const [categoriaKpiModal, setCategoriaKpiModal] = useState<CategoriaKpi | null>(null);
+  const [previaMonitoramentoId, setPreviaMonitoramentoId] = useState<string | null>(null);
+  const { data: nomesUsuarios } = useUsuariosMap();
   const [desvioDetalhe, setDesvioDetalhe] = useState<DesvioAtivo | null>(null);
   const [autocorrigindo, setAutocorrigindo] = useState<{ monitoramentoId: string; fichaNome: string } | null>(null);
   const [adendoSelecionado, setAdendoSelecionado] = useState<AdendoPendente | null>(null);
@@ -398,6 +416,8 @@ export function PainelBordo() {
           </button>
         </div>
       )}
+
+      {!shiftEnded && turnoHoje && avesNaVazao && avesNaVazao.linhas.length > 0 && <CartaoAvesVazao resumo={avesNaVazao} />}
 
       {!shiftEnded && pragasFaltando.length > 0 && (
         <section className="space-y-2 rounded-xl border-2 border-destructive bg-destructive/5 p-4" data-testid="pragas-pendentes">
@@ -958,9 +978,13 @@ export function PainelBordo() {
             setCategoriaKpiModal(null);
             navigate(urlNovaFicha(ficha, userSetores));
           }}
+          nomesUsuarios={nomesUsuarios}
+          onAbrirPrevia={(id) => setPreviaMonitoramentoId(id)}
           onFechar={() => setCategoriaKpiModal(null)}
         />
       )}
+
+      {previaMonitoramentoId && <PreviaMonitoramentoModal monitoramentoId={previaMonitoramentoId} onFechar={() => setPreviaMonitoramentoId(null)} />}
 
       {autocorrigindo && (
         <ModalAutocorrecao
@@ -1236,6 +1260,8 @@ function ModalListaKpi({
   fichasAtrasadas,
   desviosComRnc,
   onAbrirFicha,
+  nomesUsuarios,
+  onAbrirPrevia,
   onFechar,
 }: {
   categoria: CategoriaKpi;
@@ -1245,6 +1271,8 @@ function ModalListaKpi({
   fichasAtrasadas: FichaAtrasada[];
   desviosComRnc: DesvioAtivo[];
   onAbrirFicha: (ficha: FichaAtivaResumo) => void;
+  nomesUsuarios: Map<string, string> | undefined;
+  onAbrirPrevia: (monitoramentoId: string) => void;
   onFechar: () => void;
 }) {
   const TITULOS: Record<CategoriaKpi, string> = {
@@ -1291,6 +1319,33 @@ function ModalListaKpi({
                 </button>
               </li>
             ))}
+          </ul>
+        ) : categoria === "monitoramentos" ? (
+          <ul className="max-h-80 space-y-1 overflow-y-auto p-4 text-sm" data-testid="lista-monitoramentos-turno">
+            {monitoramentosTurno.map((m) => {
+              const quem = m.user_id ? nomesUsuarios?.get(m.user_id) : undefined;
+              return (
+                <li key={m.id} className="border-b last:border-b-0">
+                  <button
+                    type="button"
+                    onClick={() => onAbrirPrevia(m.id)}
+                    className="flex w-full items-center justify-between gap-3 rounded px-1 py-1.5 text-left transition-colors hover:bg-secondary"
+                    data-testid={`previa-${m.id}`}
+                    aria-label={`Ver prévia: ${kpis.nomesFicha.get(m.ficha_template_id)?.nome ?? "Ficha"} às ${formatarHoraManaus(m.criado_em)}`}
+                  >
+                    <span className="min-w-0">
+                      <span className="block">
+                        {formatarHoraManaus(m.criado_em)} - {kpis.nomesFicha.get(m.ficha_template_id)?.nome ?? "Ficha"}
+                      </span>
+                      {quem && <span className="block text-xs text-muted-foreground">{quem}</span>}
+                    </span>
+                    <span className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-primary">
+                      <Eye className="h-3.5 w-3.5" /> Prévia
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         ) : (
         <ul className="max-h-80 space-y-1 overflow-y-auto p-4 text-sm">
