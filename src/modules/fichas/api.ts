@@ -655,8 +655,9 @@ export function useFilaVerificacao(filtros: FiltrosVerificacao, templateIdsDoPac
   return useQuery({
     queryKey: ["monitoramentos", "fila-verificacao", filtros, templateIdsDoPac],
     queryFn: async () => {
+      // Só a versão VIGENTE: o original corrigido por adendo fica de fora (continua guardado, aberto pelo histórico do relatório).
       let pendentesQuery = supabase
-        .from("monitoramentos")
+        .from("monitoramentos_vigentes")
         .select(CAMPOS_MONITORAMENTO_VERIFICACAO)
         .is("verificado_por", null)
         .neq("status_ficha", "EM_ANDAMENTO") // absorção só com pesagem inicial: ainda não vai à verificação
@@ -666,7 +667,7 @@ export function useFilaVerificacao(filtros: FiltrosVerificacao, templateIdsDoPac
       if (templateIdsDoPac) pendentesQuery = pendentesQuery.in("ficha_template_id", templateIdsDoPac);
 
       let verificadosQuery = supabase
-        .from("monitoramentos")
+        .from("monitoramentos_vigentes")
         .select(CAMPOS_MONITORAMENTO_VERIFICACAO)
         .not("verificado_por", "is", null)
         .order("verificado_em", { ascending: false })

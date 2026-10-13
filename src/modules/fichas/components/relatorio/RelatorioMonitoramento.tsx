@@ -328,7 +328,7 @@ function RegistroUnico({ record, ordem, template, dados, hashesAoVivo, acoesNaoC
       {adendos.length > 0 && <BlocoAdendos adendos={adendos} />}
       {record.aditivo_de && (
         <p className="mt-2 text-[10px] italic text-muted-foreground print:text-[8px]">
-          Este registro é um aditivo (correção) do apontamento original — id {record.aditivo_de.slice(0, 8).toUpperCase()}.
+          Este registro é a versão corrigida por adendo do apontamento original (id {record.aditivo_de.slice(0, 8).toUpperCase()}), que fica guardado no histórico e não aparece nas listas.
         </p>
       )}
       {record.origem_versao === "v1_legado" && (

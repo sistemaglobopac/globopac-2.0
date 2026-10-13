@@ -505,6 +505,7 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
         supabase
           .from("monitoramentos")
           .select("id, ficha_template_id, criado_em, hora_monitoramento, setor")
+          .is("aditivo_de", null) // a correção por adendo não é um monitoramento novo: não conta nem zera o atraso
           .eq("user_id", userId as string)
           .in("setor", userSetores)
           .or(filtroHoje)
@@ -512,11 +513,12 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
         supabase
           .from("monitoramentos")
           .select("id, ficha_template_id, criado_em, hora_monitoramento, setor, user_id")
+          .is("aditivo_de", null)
           .in("setor", userSetores)
           .or(filtroHoje)
           .overrideTypes<MonitoramentoComHora[], { merge: false }>(),
         supabase
-          .from("monitoramentos")
+          .from("monitoramentos_vigentes")
           .select("id, ficha_template_id, criado_em, conformidade, dados_dinamicos, aditivo_de")
           .eq("user_id", userId as string)
           .order("criado_em", { ascending: false })
@@ -715,24 +717,19 @@ export function useRegistrosVazaoDoDia(dia: string | undefined, userSetores: str
       if (chavePorTemplate.size === 0) return [];
 
       const desde = `${dia}T04:00:00.000Z`;
+      // Visão de versões vigentes: o original corrigido por adendo sai e entra a correção (sem contar a mesma carga duas vezes).
       const { data, error } = await supabase
-        .from("monitoramentos")
-        .select("id, ficha_template_id, aditivo_de, dados_dinamicos")
+        .from("monitoramentos_vigentes")
+        .select("id, ficha_template_id, dados_dinamicos")
         .in("ficha_template_id", [...chavePorTemplate.keys()])
         .in("setor", userSetores)
         .or(`hora_monitoramento.gte.${desde},and(hora_monitoramento.is.null,criado_em.gte.${desde})`)
-        .overrideTypes<
-          { id: string; ficha_template_id: string; aditivo_de: string | null; dados_dinamicos: Record<string, unknown> | null }[],
-          { merge: false }
-        >();
+        .overrideTypes<{ id: string; ficha_template_id: string; dados_dinamicos: Record<string, unknown> | null }[], { merge: false }>();
       if (error) throw error;
-      const comAditivo = new Set((data ?? []).map((m) => m.aditivo_de).filter((id): id is string => !!id));
-      return (data ?? [])
-        .filter((m) => !comAditivo.has(m.id))
-        .map((m) => {
-          const chave = chavePorTemplate.get(m.ficha_template_id);
-          return { carcacas: chave ? (m.dados_dinamicos?.[chave] as RegistroVazao["carcacas"]) : undefined };
-        });
+      return (data ?? []).map((m) => {
+        const chave = chavePorTemplate.get(m.ficha_template_id);
+        return { carcacas: chave ? (m.dados_dinamicos?.[chave] as RegistroVazao["carcacas"]) : undefined };
+      });
     },
   });
 }
@@ -748,6 +745,8 @@ export interface PreviaMonitoramento {
   conformidade: boolean | null;
   situacao_conformidade: "CONFORME" | "NAO_CONFORME" | "TRATADO" | null;
   verificado_por: string | null;
+  /** Este é o registro corrigido por adendo (o original continua guardado, só não aparece). */
+  corrigidoPorAdendo: boolean;
   ficha: { codigo: string; nome: string; schema_campos: CampoTemplate[] } | null;
 }
 
@@ -758,14 +757,27 @@ export function usePreviaMonitoramento(monitoramentoId: string | null) {
     queryKey: ["painel-bordo", "previa", monitoramentoId],
     enabled: !!monitoramentoId,
     queryFn: async (): Promise<PreviaMonitoramento | null> => {
-      const { data, error } = await supabase
-        .from("monitoramentos")
-        .select("id, ficha_template_id, user_id, setor, dados_dinamicos, criado_em, hora_monitoramento, finalizado_em, conformidade, situacao_conformidade, verificado_por")
-        .eq("id", monitoramentoId as string)
-        .maybeSingle()
-        .overrideTypes<(Omit<PreviaMonitoramento, "ficha"> & { ficha_template_id: string }) | null, { merge: false }>();
+      const colunas = "id, ficha_template_id, user_id, setor, dados_dinamicos, criado_em, hora_monitoramento, finalizado_em, conformidade, situacao_conformidade, verificado_por";
+      type Linha = Omit<PreviaMonitoramento, "ficha" | "corrigidoPorAdendo"> & { ficha_template_id: string };
+      const { data: original, error } = await supabase.from("monitoramentos").select(colunas).eq("id", monitoramentoId as string).maybeSingle().overrideTypes<Linha | null, { merge: false }>();
       if (error) throw error;
-      if (!data) return null;
+      if (!original) return null;
+      // O monitoramento corrigido por adendo mostra a versão VIGENTE (a correção mais recente); o original fica no histórico.
+      let data: Linha = original;
+      let corrigidoPorAdendo = false;
+      for (let nivel = 0; nivel < 8; nivel++) {
+        const { data: corrigido } = await supabase
+          .from("monitoramentos")
+          .select(colunas)
+          .eq("aditivo_de", data.id)
+          .order("criado_em", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+          .overrideTypes<Linha | null, { merge: false }>();
+        if (!corrigido) break;
+        data = corrigido;
+        corrigidoPorAdendo = true;
+      }
       const { ficha_template_id, ...resto } = data;
       const { data: ficha } = await supabase
         .from("fichas_templates")
@@ -773,7 +785,7 @@ export function usePreviaMonitoramento(monitoramentoId: string | null) {
         .eq("id", ficha_template_id)
         .maybeSingle()
         .overrideTypes<PreviaMonitoramento["ficha"], { merge: false }>();
-      return { ...resto, ficha: ficha ?? null };
+      return { ...resto, corrigidoPorAdendo, ficha: ficha ?? null };
     },
   });
 }

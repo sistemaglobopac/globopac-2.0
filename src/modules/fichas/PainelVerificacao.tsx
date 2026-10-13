@@ -201,9 +201,21 @@ export function PainelVerificacao() {
   const kpiRncTratativa = rncsParaJulgar.length;
   // Status da RNC de cada monitoramento com desvio (inclui FECHADA): um monitoramento com RNC
   // procedente não fica "não conforme" — fica TRATADO.
-  const { data: rncPorMonitoramento } = useRncsDosMonitoramentos(
-    displayItems.filter((i) => i.appt.conformidade === false || temNaoConformidade(i.appt.dados_dinamicos)).map((i) => i.id)
-  );
+  // A versão corrigida por adendo herda a RNC do original escondido (a RNC pode ter sido aberta antes da correção).
+  const idsParaRnc = [
+    ...displayItems.filter((i) => i.appt.conformidade === false || temNaoConformidade(i.appt.dados_dinamicos)).map((i) => i.id),
+    ...displayItems.flatMap((i) => (i.appt.aditivo_de ? [i.appt.aditivo_de] : [])),
+  ];
+  const { data: rncBruto } = useRncsDosMonitoramentos([...new Set(idsParaRnc)]);
+  const rncPorMonitoramento = useMemo(() => {
+    if (!rncBruto) return rncBruto;
+    const mapa = new Map(rncBruto);
+    for (const i of displayItems) {
+      const status = mapa.get(i.id) ?? (i.appt.aditivo_de ? mapa.get(i.appt.aditivo_de) : undefined);
+      if (status) mapa.set(i.id, status);
+    }
+    return mapa;
+  }, [rncBruto, displayItems]);
 
   const filtrosAtivos = Boolean(filtroSetor || filtroPac || filtroStatus || filtroInspetor || filtroPeriodo !== "todos" || dateBase !== hojeManaus());
 

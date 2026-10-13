@@ -63,7 +63,7 @@ function useRegistrosPragasMes(
     enabled: templateIds.length > 0,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("monitoramentos")
+        .from("monitoramentos_vigentes")
         .select("id, setor, criado_em, dados_dinamicos")
         .in("ficha_template_id", templateIds)
         .gte("criado_em", inicio)

@@ -24,7 +24,7 @@ export function useMonitoramentosParaLiberar() {
     queryKey: ["monitoramentos", "para-liberar"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("monitoramentos")
+        .from("monitoramentos_vigentes")
         .select("id, setor, conformidade, situacao_conformidade, verificado_em, liberado_sif, criado_em, hora_monitoramento, ficha_template_id, user_id")
         .not("verificado_por", "is", null)
         .eq("liberado_sif", false)
@@ -44,7 +44,7 @@ export function useMonitoramentosArquivo() {
     queryKey: ["monitoramentos", "arquivo"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("monitoramentos")
+        .from("monitoramentos_vigentes")
         .select("id, setor, conformidade, situacao_conformidade, verificado_em, liberado_sif, criado_em, hora_monitoramento, ficha_template_id, user_id")
         .not("verificado_por", "is", null)
         .order("criado_em", { ascending: false })
@@ -81,7 +81,7 @@ export function useMonitoramentosLiberados() {
     queryKey: ["monitoramentos", "liberados"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("monitoramentos")
+        .from("monitoramentos_vigentes")
         .select("id, setor, conformidade, situacao_conformidade, verificado_em, liberado_sif, criado_em, hora_monitoramento, ficha_template_id, user_id")
         .eq("liberado_sif", true)
         .order("liberado_em", { ascending: false })

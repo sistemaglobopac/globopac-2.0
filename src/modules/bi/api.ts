@@ -23,7 +23,7 @@ export function useMonitoramentosResumo() {
     queryFn: async () => {
       const desde = new Date(Date.now() - TRINTA_DIAS_MS).toISOString();
       const { data, error } = await supabase
-        .from("monitoramentos")
+        .from("monitoramentos_vigentes")
         .select("id, setor, conformidade, situacao_conformidade, criado_em, verificado_em, liberado_sif, liberado_em")
         .gte("criado_em", desde)
         .neq("status_ficha", "EM_ANDAMENTO")

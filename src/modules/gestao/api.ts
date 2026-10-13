@@ -430,6 +430,7 @@ export function useMonitoramentosHoje() {
       const { data, error } = await supabase
         .from("monitoramentos")
         .select("id, setor, ficha_template_id, user_id, criado_em, conformidade")
+        .is("aditivo_de", null)
         .gte("criado_em", desde)
         .order("criado_em", { ascending: false })
         .overrideTypes<MonitoramentoHojeResumo[], { merge: false }>();
@@ -479,6 +480,7 @@ export function useMonitoramentosHojeDetalhado() {
         supabase
           .from("monitoramentos")
           .select("id, setor, ficha_template_id, user_id, criado_em, conformidade, situacao_conformidade")
+          .is("aditivo_de", null)
           .gte("criado_em", desde)
           .order("criado_em", { ascending: false })
           .overrideTypes<MonitoramentoHojeResumo[], { merge: false }>(),

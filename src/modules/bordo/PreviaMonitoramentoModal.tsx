@@ -54,6 +54,7 @@ export function PreviaMonitoramentoModal({ monitoramentoId, onFechar }: { monito
                   <strong>{dataHoraManaus(m.hora_monitoramento ?? m.criado_em)}</strong>
                 </span>
                 <Situacao m={m} />
+                {m.corrigidoPorAdendo && <Badge variant="outline">Corrigido por adendo</Badge>}
               </div>
               <DadosColetados
                 dadosDinamicos={m.dados_dinamicos}
