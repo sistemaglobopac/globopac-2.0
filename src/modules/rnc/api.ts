@@ -170,10 +170,18 @@ export function useRevisarRnc() {
         input.decisao === "aprovar"
           ? { status: "FECHADA" as const, revisado_por: input.userId, fechado_em: new Date().toISOString() }
           : { status: "DEVOLVIDA" as const, revisado_por: input.userId, motivo_devolucao: input.motivo };
-      const { error } = await supabase.from("rnc").update(payload).eq("id", input.id);
+      // O banco recusa uma revisão sem permissão devolvendo 0 linhas, sem erro: sem conferir, a tela fingiria que aprovou.
+      const { data, error } = await supabase.from("rnc").update(payload).eq("id", input.id).select("id");
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error("Não foi possível registrar a revisão: a RNC não está mais aguardando julgamento ou você não tem permissão para revisá-la.");
+      }
     },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["rnc"] }),
+    // Fechar a RNC passa o monitoramento vinculado para TRATADO (gatilho do banco): atualiza também as telas dele.
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["rnc"] });
+      void queryClient.invalidateQueries({ queryKey: ["monitoramentos"] });
+    },
   });
 }
 
