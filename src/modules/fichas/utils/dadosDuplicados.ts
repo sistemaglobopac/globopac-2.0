@@ -60,6 +60,8 @@ export function assinaturaDosDados(dados: Record<string, unknown> | null | undef
 export interface RegistroComHora {
   dados: Record<string, unknown> | null | undefined;
   hora: string | null | undefined;
+  /** Registro de correção por adendo (cópia do original): não é um monitoramento novo. */
+  aditivo?: boolean;
 }
 
 const instante = (hora: string | null | undefined) => {

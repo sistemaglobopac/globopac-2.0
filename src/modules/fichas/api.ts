@@ -184,7 +184,7 @@ export const chaveRegistrosRecentes = (codigo: string, setor: string) => ["monit
 
 /** Dados dos monitoramentos recentes desta ficha+setor (todas as versões da ficha), para a trava de monitoramento
  * repetido (ver utils/dadosDuplicados.ts). Inclui os aditivos: são dados já registrados também. */
-export async function buscarRegistrosRecentesFicha(codigo: string, setor: string): Promise<{ dados: Record<string, unknown>; hora: string }[]> {
+export async function buscarRegistrosRecentesFicha(codigo: string, setor: string): Promise<{ dados: Record<string, unknown>; hora: string; aditivo: boolean }[]> {
   const { data: versoes, error: erroVersoes } = await supabase.rpc("ids_versoes_ficha", { p_codigo: codigo });
   if (erroVersoes) throw erroVersoes;
   const ids = (versoes as unknown as string[] | null) ?? [];
@@ -192,15 +192,15 @@ export async function buscarRegistrosRecentesFicha(codigo: string, setor: string
   const desde = new Date(Date.now() - JANELA_REPETIDOS_HORAS * 3_600_000).toISOString();
   const { data, error } = await supabase
     .from("monitoramentos")
-    .select("dados_dinamicos, hora_monitoramento, criado_em")
+    .select("dados_dinamicos, hora_monitoramento, criado_em, aditivo_de")
     .in("ficha_template_id", ids)
     .eq("setor", setor)
     .or(`hora_monitoramento.gte.${desde},and(hora_monitoramento.is.null,criado_em.gte.${desde})`)
     .order("criado_em", { ascending: false })
     .limit(300)
-    .overrideTypes<{ dados_dinamicos: Record<string, unknown>; hora_monitoramento: string | null; criado_em: string }[], { merge: false }>();
+    .overrideTypes<{ dados_dinamicos: Record<string, unknown>; hora_monitoramento: string | null; criado_em: string; aditivo_de: string | null }[], { merge: false }>();
   if (error) throw error;
-  return (data ?? []).map((m) => ({ dados: m.dados_dinamicos, hora: m.hora_monitoramento ?? m.criado_em }));
+  return (data ?? []).map((m) => ({ dados: m.dados_dinamicos, hora: m.hora_monitoramento ?? m.criado_em, aditivo: m.aditivo_de !== null }));
 }
 
 /** Janela máxima (horas) para continuar um monitoramento anterior que ficou para trás. */

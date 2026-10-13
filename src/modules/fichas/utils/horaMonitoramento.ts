@@ -46,14 +46,16 @@ export interface EntradaValidacaoHora {
   /** ISO da hora informada. */
   hora: string | null;
   agora: Date;
-  /** Hora efetiva do monitoramento anterior desta ficha+setor (registro ou rascunho), se houver. */
+  /** Hora efetiva do monitoramento IMEDIATAMENTE ANTES da hora informada, nesta ficha+setor (registro ou rascunho), se houver. */
   anteriorEm?: string | null;
+  /** Hora efetiva do primeiro monitoramento DEPOIS da hora informada (lançamento retroativo no meio de uma sequência), se houver. */
+  posteriorEm?: string | null;
   /** tempo_entre_apontamentos_min da ficha. */
   intervaloMin?: number | null;
 }
 
 /** Mensagem de erro para a hora informada, ou null se válida. */
-export function validarHoraMonitoramento({ hora, agora, anteriorEm, intervaloMin }: EntradaValidacaoHora): string | null {
+export function validarHoraMonitoramento({ hora, agora, anteriorEm, posteriorEm, intervaloMin }: EntradaValidacaoHora): string | null {
   if (!hora) return "Informe a data e a hora em que o monitoramento foi realizado.";
   const t = new Date(hora).getTime();
   if (t > agora.getTime() + TOLERANCIA_FUTURO_MIN * 60_000) return "A hora do monitoramento não pode ser futura.";
@@ -67,5 +69,31 @@ export function validarHoraMonitoramento({ hora, agora, anteriorEm, intervaloMin
       return `O intervalo mínimo entre monitoramentos desta ficha é de ${intervaloMin} min (anterior às ${horaManaus(new Date(anteriorEm))}).`;
     }
   }
+  if (posteriorEm && intervaloMin && intervaloMin > 0) {
+    const dep = new Date(posteriorEm).getTime();
+    if (dep < t + intervaloMin * 60_000) {
+      return `O intervalo mínimo entre monitoramentos desta ficha é de ${intervaloMin} min: já existe um monitoramento às ${horaManaus(new Date(posteriorEm))} do dia ${dataManaus(new Date(posteriorEm)).split("-").reverse().join("/")}.`;
+    }
+  }
   return null;
+}
+
+/** Os monitoramentos vizinhos da hora informada: o mais próximo ANTES dela (inclusive no mesmo minuto, que também é
+ * recusado) e o mais próximo DEPOIS. Assim um lançamento retroativo (ex.: o dia 10, lançado dia 13) é comparado com o que
+ * veio logo antes dele naquele dia, e não com o último monitoramento gravado de todos. Horas inválidas são ignoradas. */
+export function vizinhosDaHora(hora: string | null, horas: (string | null | undefined)[]): { anteriorEm: string | null; posteriorEm: string | null } {
+  const t = hora ? new Date(hora).getTime() : NaN;
+  if (!Number.isFinite(t)) return { anteriorEm: null, posteriorEm: null };
+  let anterior: number | null = null;
+  let posterior: number | null = null;
+  for (const h of horas) {
+    const x = h ? new Date(h).getTime() : NaN;
+    if (!Number.isFinite(x)) continue;
+    if (x <= t) {
+      if (anterior === null || x > anterior) anterior = x;
+    } else if (posterior === null || x < posterior) {
+      posterior = x;
+    }
+  }
+  return { anteriorEm: anterior === null ? null : new Date(anterior).toISOString(), posteriorEm: posterior === null ? null : new Date(posterior).toISOString() };
 }

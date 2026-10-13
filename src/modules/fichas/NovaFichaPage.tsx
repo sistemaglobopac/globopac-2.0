@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm, useWatch, type FieldValues } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertTriangle, ArrowLeft, BellRing, CheckCircle2, Clock, Lock, ShieldCheck, X } from "lucide-react";
@@ -14,7 +14,7 @@ import { ContinuacaoMonitoramento, MOTIVO_CONTINUACAO_MIN_CARACTERES } from "./c
 import { RascunhosPainel } from "./components/RascunhosPainel";
 import { useAtualizarRascunhos, useRascunhos } from "./useRascunhos";
 import { cargasEmRascunhoPorTipo, cargasEmRascunhos, combinarAnterior } from "./utils/rascunhosAnterior";
-import { CHAVE_HORA_MONITORAMENTO, dataManaus, horaManaus, isoDeManaus, validarHoraMonitoramento } from "./utils/horaMonitoramento";
+import { CHAVE_HORA_MONITORAMENTO, dataManaus, horaManaus, isoDeManaus, validarHoraMonitoramento, vizinhosDaHora } from "./utils/horaMonitoramento";
 import { salvarRascunho } from "@/lib/rascunhos";
 import { listarFichasEnfileiradas } from "@/lib/offlineQueue";
 import { chavesDeConfirmacao, repeteOAnterior, type RegistroComHora } from "./utils/dadosDuplicados";
@@ -358,6 +358,15 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
     [continuando, registroContinuavel, rascunhosLocais, codigo, setor]
   );
   const registroPrevio = ultimoRegistro ?? anteriorContinuacao;
+  // Monitoramentos recentes desta ficha+setor (qualquer dia da janela de 7 dias): a hora digitada é validada contra os VIZINHOS
+  // dela, para o lançamento retroativo (dia 10, lançado dia 13) ser comparado com o que veio logo antes naquele dia.
+  const { data: registrosRecentesHora } = useQuery({
+    queryKey: chaveRegistrosRecentes(codigo, setor),
+    queryFn: () => buscarRegistrosRecentesFicha(codigo, setor),
+    enabled: !!codigo && !!setor,
+    meta: { offline: true },
+    staleTime: 30_000,
+  });
   const cargasEmRascunho = useMemo(() => cargasEmRascunhos(rascunhosLocais, codigo, setor), [rascunhosLocais, codigo, setor]);
   // Carga já monitorada em rascunho (ainda não assinado) não volta à lista no monitoramento seguinte.
   const cargasUsadasEmRascunho = useMemo(() => cargasEmRascunhoPorTipo(rascunhosLocais), [rascunhosLocais]);
@@ -433,11 +442,11 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
    * intervalo mínimo) e a devolve em ISO; null (com a mensagem na tela) se inválida. */
   /** Hora do monitoramento anterior desta ficha+setor: o mais recente entre o anterior herdado e os
    * rascunhos locais (de qualquer dia, dentro da janela de 7 dias). */
-  function anteriorParaValidar(): string | null {
-    const horas = [registroPrevio?.criado_em, ...(rascunhosLocais ?? []).filter((r) => r.codigo === codigo && r.setor === setor).map((r) => r.horaMonitoramento)].filter(
-      (h): h is string => !!h
-    );
-    return horas.length > 0 ? horas.sort().at(-1)! : null;
+  function vizinhosParaValidar(hora: string | null): { anteriorEm: string | null; posteriorEm: string | null } {
+    const rascunhos = (rascunhosLocais ?? []).filter((r) => r.codigo === codigo && r.setor === setor).map((r) => r.horaMonitoramento);
+    // Correção por adendo não é um monitoramento novo: não entra na sequência.
+    const doServidor = registrosRecentesHora ? registrosRecentesHora.filter((r) => !r.aditivo).map((r) => r.hora) : [registroPrevio?.criado_em];
+    return vizinhosDaHora(hora, [...doServidor, ...rascunhos]);
   }
 
   function horaValidada(): string | null {
@@ -445,7 +454,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
     const erro = validarHoraMonitoramento({
       hora: iso,
       agora: new Date(),
-      anteriorEm: anteriorParaValidar(),
+      ...vizinhosParaValidar(iso),
       intervaloMin,
     });
     setErroHora(erro);
