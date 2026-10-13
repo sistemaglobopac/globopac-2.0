@@ -30,6 +30,19 @@ export interface Rascunho {
   ultimoErro?: string;
 }
 
+/** Como o rascunho deixou de existir neste aparelho: virou monitoramento assinado ou o inspetor o descartou. */
+export type MotivoRemocaoRascunho = "assinado" | "descartado";
+
+/** Avisos para a cópia na nuvem (rascunhosNuvem.ts se registra aqui): este módulo continua só local, sem depender da rede. */
+interface OuvintesRascunho {
+  aoSalvar?: (r: Rascunho) => void;
+  aoRemover?: (id: string, motivo: MotivoRemocaoRascunho) => void;
+}
+let ouvintes: OuvintesRascunho = {};
+export function registrarOuvintesRascunho(o: OuvintesRascunho): void {
+  ouvintes = o;
+}
+
 interface RascunhosDB extends DBSchema {
   rascunhos: { key: string; value: Rascunho };
 }
@@ -49,7 +62,20 @@ export async function salvarRascunho(r: Omit<Rascunho, "salvoEm" | "status">): P
   const db = await abrirDb();
   const item: Rascunho = { ...r, salvoEm: new Date().toISOString(), status: "rascunho" };
   await db.put("rascunhos", item);
+  ouvintes.aoSalvar?.(item);
   return item;
+}
+
+/** Grava o rascunho exatamente como veio (cópia trazida da nuvem, com a hora de salvamento original): não avisa a nuvem. */
+export async function colocarRascunhoLocal(r: Rascunho): Promise<void> {
+  const db = await abrirDb();
+  await db.put("rascunhos", r);
+}
+
+/** Apaga só do aparelho, sem avisar a nuvem (a nuvem é quem mandou apagar). */
+export async function apagarRascunhoLocal(id: string): Promise<void> {
+  const db = await abrirDb();
+  await db.delete("rascunhos", id);
 }
 
 /** Rascunhos do usuário, mais antigos (pela hora do monitoramento) primeiro. */
@@ -59,9 +85,11 @@ export async function listarRascunhos(userId: string): Promise<Rascunho[]> {
   return todos.filter((r) => r.userId === userId).sort((a, b) => (a.horaMonitoramento < b.horaMonitoramento ? -1 : 1));
 }
 
-export async function removerRascunho(id: string): Promise<void> {
+/** Remove o rascunho do aparelho e avisa a nuvem (assinado ou descartado), para outro aparelho não o trazer de volta. */
+export async function removerRascunho(id: string, motivo: MotivoRemocaoRascunho = "descartado"): Promise<void> {
   const db = await abrirDb();
   await db.delete("rascunhos", id);
+  ouvintes.aoRemover?.(id, motivo);
 }
 
 export async function atualizarStatusRascunho(id: string, status: StatusRascunho, ultimoErro?: string): Promise<void> {

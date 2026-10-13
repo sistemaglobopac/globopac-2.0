@@ -8,6 +8,7 @@ import {
   ClipboardPlus,
   Clock,
   Cog,
+  FileSignature,
   FileText,
   Landmark,
   MapPin,
@@ -46,6 +47,7 @@ import { DesviosAdminPanel } from "./admin/DesviosAdminPanel";
 import { ComunicadosPanel } from "./admin/ComunicadosPanel";
 import { ControlePragasPanel } from "./admin/ControlePragasPanel";
 import { SegurancaLoginPanel } from "./admin/SegurancaLoginPanel";
+import { PendenciasAssinaturaPanel } from "./admin/PendenciasAssinaturaPanel";
 
 const ABAS_VALIDAS = [
   "bi",
@@ -63,6 +65,7 @@ const ABAS_VALIDAS = [
   "comunicados",
   "controle_pragas",
   "seguranca_login",
+  "pendencias_assinatura",
 ] as const;
 type AbaGestao = (typeof ABAS_VALIDAS)[number];
 
@@ -302,6 +305,7 @@ function AbaHome({ irPara }: { irPara: (aba: AbaGestao) => void }) {
           <BotaoFerramenta icon={TrendingUp} categoria="Gestão" titulo="Melhoria Contínua" indice={6} onClick={() => navigate("/melhoria-continua")} />
           <BotaoFerramenta icon={Truck} categoria="Bem-Estar Animal" titulo="Cargas e Veículos" indice={7} onClick={() => navigate("/gestao/cargas-aves")} />
           <BotaoFerramenta icon={ArrowRightLeft} categoria="Inspetores" titulo="Trocar Setor / Cobertura" indice={8} onClick={() => setModalAberto("troca_setor")} />
+          <BotaoFerramenta icon={FileSignature} categoria="Inspetores" titulo="Pendências de Assinatura" indice={9} onClick={() => irPara("pendencias_assinatura")} />
         </div>
       </section>
 
@@ -345,6 +349,7 @@ const PAINEL_POR_ABA: Partial<Record<AbaGestao, ComponentType>> = {
   comunicados: ComunicadosPanel,
   controle_pragas: ControlePragasPanel,
   seguranca_login: SegurancaLoginPanel,
+  pendencias_assinatura: PendenciasAssinaturaPanel,
 };
 
 /** Painel de Gestão — console administrativo master do ADMIN_MASTER. Componente único e

@@ -7,6 +7,7 @@ import { ReconectarModal } from "@/modules/auth/ReconectarModal";
 import { useContatoServidor } from "@/modules/auth/useContatoServidor";
 import { useSincronizacaoOffline } from "@/modules/fichas/useSincronizacaoOffline";
 import { useSessionStore, type PerfilSessao } from "@/store/session";
+import { useSincronizarRascunhosNuvem } from "@/modules/fichas/useRascunhos";
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/lib/utils";
 import { usePresenceTracking } from "@/modules/gestao/usePresenceTracking";
@@ -236,6 +237,8 @@ function SincronizadorOffline() {
 
 export function AppShell() {
   const perfil = useSessionStore((s) => s.perfil);
+  // Cópia dos rascunhos na nuvem: permite assinar de qualquer aparelho (ver lib/rascunhosNuvem.ts).
+  useSincronizarRascunhosNuvem(perfil?.id);
   const itens = perfil ? (MENU_POR_PERFIL[perfil.nivelAcesso] ?? []) : [];
   const [menuAberto, setMenuAberto] = useState(false);
   const location = useLocation();

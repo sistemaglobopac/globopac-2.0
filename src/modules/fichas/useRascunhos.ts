@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { atualizarStatusRascunho, listarRascunhos, rascunhoExpirado, removerRascunho, type Rascunho } from "@/lib/rascunhos";
+import { sincronizarRascunhosNuvem } from "@/lib/rascunhosNuvem";
 import { enfileirarFicha } from "@/lib/offlineQueue";
 import { montarConfirmacaoOffline } from "@/lib/confirmacaoOffline";
 import { sincronizarUmaFicha } from "./sincronizacaoOffline";
@@ -16,6 +18,43 @@ export function useRascunhos(userId: string | undefined) {
     refetchInterval: 10_000,
     queryFn: () => listarRascunhos(userId as string),
   });
+}
+
+/** Mantém a cópia dos rascunhos na nuvem em dia: ao entrar, a cada minuto, quando a internet volta e quando a aba reaparece.
+ * É o que permite assinar um rascunho de QUALQUER aparelho. Fica montado no layout do app (AppShell). */
+export function useSincronizarRascunhosNuvem(userId: string | undefined) {
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (!userId) return;
+    let ativo = true;
+    let rodando = false;
+    async function sincronizar() {
+      if (rodando) return;
+      rodando = true;
+      try {
+        const mudou = await sincronizarRascunhosNuvem(userId as string);
+        if (mudou && ativo) await queryClient.invalidateQueries({ queryKey: CHAVE_RASCUNHOS });
+      } catch {
+        /* sem rede ou erro passageiro: tenta de novo na próxima */
+      } finally {
+        rodando = false;
+      }
+    }
+    void sincronizar();
+    const intervalo = window.setInterval(() => void sincronizar(), 60_000);
+    const aoVoltar = () => void sincronizar();
+    const aoReaparecer = () => {
+      if (document.visibilityState === "visible") void sincronizar();
+    };
+    window.addEventListener("online", aoVoltar);
+    document.addEventListener("visibilitychange", aoReaparecer);
+    return () => {
+      ativo = false;
+      window.clearInterval(intervalo);
+      window.removeEventListener("online", aoVoltar);
+      document.removeEventListener("visibilitychange", aoReaparecer);
+    };
+  }, [userId, queryClient]);
 }
 
 export function useAtualizarRascunhos() {
@@ -70,7 +109,7 @@ export async function assinarRascunhosEmLote(
         enfileiradoEm: r.salvoEm,
         status: "sincronizando",
       });
-      await removerRascunho(r.id);
+      await removerRascunho(r.id, "assinado");
       resultado.assinados.push(r.id);
     } catch (erro) {
       const mensagem = erro instanceof Error ? erro.message : (erro as { message?: string } | null)?.message ?? String(erro);
@@ -113,7 +152,7 @@ export async function confirmarRascunhosOffline(
         matricula: confirmacao.matricula ?? null,
       }),
     });
-    await removerRascunho(r.id);
+    await removerRascunho(r.id, "assinado");
     resultado.enfileirados.push(r.id);
   }
   return resultado;
