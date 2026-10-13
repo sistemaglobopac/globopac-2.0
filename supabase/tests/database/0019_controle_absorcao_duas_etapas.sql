@@ -5,7 +5,7 @@
 create extension if not exists pgtap with schema extensions;
 
 begin;
-select plan(8);
+select plan(9);
 
 insert into auth.users (id, aud, role, email, instance_id, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 values
@@ -25,10 +25,14 @@ insert into monitoramentos (id, ficha_template_id, versao_template, user_id, set
    '{"campo":{"tempoPermanenciaMin":"15","temperaturas":{"preChiller":"12","chiller1":"3","chiller2":""},"borbulhamento":{"preChiller":"moderado","chiller1":"intenso","chiller2":""},"observacao":"","conformidade":true,"detalhesRNC":null},"aguardando_chiller2":true}'::jsonb,
    'EM_ANDAMENTO');
 
--- ---- inspetor B (mesmo setor, mas não é quem abriu): a RLS não deixa completar (0 linhas, sem erro)
+-- ---- inspetor B (mesmo setor, mas não é quem abriu): não completa o chiller 02. Desde 20261013115654 a RLS deixa o colega do
+-- setor chegar até a linha (para a absorção de água), então quem barra o chiller 02 é o gatilho guard_fase_absorcao (erro).
 select set_config('request.jwt.claims', json_build_object('sub', 'e9000000-0000-0000-0000-000000000002', 'role', 'authenticated', 'perfil', 'INSPETOR_QUALIDADE', 'setores_permitidos', array['PRE_RESFRIAMENTO'])::text, true);
 set local role authenticated;
-update monitoramentos set dados_dinamicos = jsonb_set(dados_dinamicos, '{campo,temperaturas,chiller2}', '"3"') where id = '19000000-0000-0000-0000-000000000001';
+select throws_ok(
+  $$update monitoramentos set dados_dinamicos = jsonb_set(dados_dinamicos, '{campo,temperaturas,chiller2}', '"3"') where id = '19000000-0000-0000-0000-000000000001'$$,
+  'P0001', null, 'o gatilho recusa o colega do setor completando o chiller 02 de outro inspetor'
+);
 reset role;
 select is(
   (select dados_dinamicos #>> '{campo,temperaturas,chiller2}' from monitoramentos where id = '19000000-0000-0000-0000-000000000001'),
