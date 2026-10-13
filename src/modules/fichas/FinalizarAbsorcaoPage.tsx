@@ -9,7 +9,7 @@ import { Label } from "@/shared/ui/label";
 import { Card, CardContent } from "@/shared/ui/card";
 import { useFichasTemplatesTodas, useFinalizarAbsorcao, useMonitoramentoEmAndamento, useTemplatesPorIds, type MonitoramentoEmAndamento } from "./api";
 import { AbsorcaoAguaField } from "./fields/AbsorcaoAguaField";
-import { calcularAbsorcaoAgua, minutosAguardandoPesoFinal, validarFinalizacao, LIMITE_ABSORCAO_AGUA } from "./fields/calculosAbsorcao";
+import { calcularAbsorcaoAgua, CHAVE_ABSORCAO_FINALIZADA, minutosAguardandoPesoFinal, validarFinalizacao, LIMITE_ABSORCAO_AGUA } from "./fields/calculosAbsorcao";
 import type { AbsorcaoAguaValor } from "./fields/tiposCompostos";
 import { DadosColetados } from "./components/DadosColetadosFicha";
 import { ensureLocalTime } from "./utils/tempo";
@@ -96,7 +96,7 @@ export function FinalizarAbsorcaoPage() {
   }
 
   async function confirmarComSenha() {
-    if (!registro || !campoAbsorcao || !valor) return;
+    if (!registro || !campoAbsorcao || !valor || !perfil) return;
     setErroSenha(null);
     setAutenticando(true);
     try {
@@ -108,7 +108,11 @@ export function FinalizarAbsorcaoPage() {
       await finalizar.mutateAsync({
         id: registro.id,
         jaFinalizado: gravado,
-        dadosDinamicos: { ...registro.dados_dinamicos, [campoAbsorcao.chave]: { ...valor, fase: "FINAL", ...calcularAbsorcaoAgua(valor.items) } },
+        dadosDinamicos: {
+          ...registro.dados_dinamicos,
+          [campoAbsorcao.chave]: { ...valor, fase: "FINAL", ...calcularAbsorcaoAgua(valor.items) },
+          [CHAVE_ABSORCAO_FINALIZADA]: { por: perfil.id, nome: perfil.nomeCompleto, em: new Date().toISOString() },
+        },
         aoGravar: () => setGravado(true),
       });
       setPedirSenha(false);

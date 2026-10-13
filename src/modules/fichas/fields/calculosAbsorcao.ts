@@ -6,6 +6,10 @@
 // Não os unifique.
 import type { AmostraAbsorcaoAgua, AmostraDrippingTest } from "./tiposCompostos";
 
+/** Marca em dados_dinamicos de quem finalizou o teste (pesagem final): `{ por, nome, em }`. Pode ser um colega do setor, não
+ * só quem abriu o registro — a função de assinatura só aceita o colega que tem a própria marca aqui. */
+export const CHAVE_ABSORCAO_FINALIZADA = "absorcao_finalizada";
+
 export const LIMITE_ABSORCAO_AGUA = 8.0;
 export const LIMITE_DRIPPING = 6.0;
 export const LINHAS_ABSORCAO_AGUA = 10;

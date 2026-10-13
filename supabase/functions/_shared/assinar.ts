@@ -18,6 +18,25 @@ export type ResultadoAssinatura =
   | { ok: true; id: string; hash_documento: string; criado_em: string }
   | { ok: false; status: number; mensagem: string };
 
+/** Marcas gravadas em dados_dinamicos por quem completa o registro de outro inspetor: `{ por, nome, em }`. */
+const MARCAS_DE_CONCLUSAO = ["absorcao_finalizada", "peso_completado"] as const;
+
+/** O registro FINALIZADO foi concluído por `userId`, e ele é do mesmo setor do registro (ou tem acesso a todos)? A marca só
+ * é aceita porque o banco só deixa alguém do setor (ou o criador/ADMIN_MASTER) finalizar um registro em andamento. */
+async function finalizadoPorColegaDoSetor(
+  adminClient: SupabaseClient,
+  monitoramento: { setor: string; status_ficha: string; dados_dinamicos: unknown },
+  userId: string
+): Promise<boolean> {
+  if (monitoramento.status_ficha !== "FINALIZADO") return false;
+  const dados = (monitoramento.dados_dinamicos ?? {}) as Record<string, { por?: string } | undefined>;
+  if (!MARCAS_DE_CONCLUSAO.some((chave) => dados[chave]?.por === userId)) return false;
+  const { data: perfil } = await adminClient.from("perfis_usuarios").select("setores_permitidos, ativo").eq("id", userId).maybeSingle();
+  if (!perfil || perfil.ativo === false) return false;
+  const setores = (perfil.setores_permitidos ?? []) as string[];
+  return setores.includes("Todos") || setores.includes(monitoramento.setor);
+}
+
 /**
  * Busca o monitoramento via o cliente do CHAMADOR (RLS decide o que ele pode ver), recalcula
  * o hash no servidor e grava a assinatura + o item de fila de carimbo via o cliente admin
@@ -52,7 +71,12 @@ export async function assinarMonitoramento(
   }
 
   if ((params.tipo === "INSPETOR" || params.tipo === "INSPETOR_PARCIAL") && monitoramento.user_id !== params.userId) {
-    return { ok: false, status: 403, mensagem: "só o criador do registro pode assiná-lo como INSPETOR" };
+    // Exceção: o colega do MESMO setor que finalizou o registro de outro inspetor (absorção de água ou peso por caixa
+    // completados por quem assumiu o turno) assina a finalização. A pesagem/etapa 1 continua assinada pelo criador.
+    const colegaFinalizou = params.tipo === "INSPETOR" && (await finalizadoPorColegaDoSetor(adminClient, monitoramento, params.userId));
+    if (!colegaFinalizou) {
+      return { ok: false, status: 403, mensagem: "só o criador do registro (ou o colega do setor que o finalizou) pode assiná-lo como INSPETOR" };
+    }
   }
   if (params.tipo === "VERIFICADOR" && monitoramento.verificado_por !== params.userId) {
     return {

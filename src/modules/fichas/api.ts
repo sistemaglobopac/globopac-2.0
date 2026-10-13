@@ -1,3 +1,4 @@
+import type { CandidatoSubstituicao } from "./fields/substituicaoAbsorcao";
 import { erroDeFuncao } from "@/lib/erroFuncao";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CAMPOS_AUTOCORRECAO, type AutocorrecaoImediata } from "@/modules/autocorrecao/api";
@@ -929,9 +930,9 @@ export interface MonitoramentoEmAndamento {
 
 const CAMPOS_EM_ANDAMENTO = "id, ficha_template_id, setor, user_id, dados_dinamicos, criado_em, hora_monitoramento, status_ficha";
 
-/** Monitoramentos em andamento: as absorções abertas (só pesagem inicial) do PRÓPRIO inspetor e os
- * monitoramentos que aguardam o peso da balança (peso por caixa) de QUALQUER inspetor dos setores dele
- * — o turno pode ter mudado enquanto o peso não chegava. */
+/** Monitoramentos em andamento: as absorções abertas (só pesagem inicial) e os monitoramentos que aguardam o peso da
+ * balança (peso por caixa) de QUALQUER inspetor dos setores dele — o turno pode ter mudado e quem assumiu continua o trabalho
+ * do colega. Ficam de fora os que aguardam o chiller 02 (só o criador completa) e os marcados como SUBSTITUÍDOS. */
 export function useMonitoramentosEmAndamento(userId: string | undefined, setores: string[] = []) {
   return useQuery({
     queryKey: ["monitoramentos", "em-andamento", userId, setores],
@@ -954,7 +955,7 @@ export function useMonitoramentosEmAndamento(userId: string | undefined, setores
               .select(CAMPOS_EM_ANDAMENTO)
               .eq("status_ficha", "EM_ANDAMENTO")
               .in("setor", setores)
-              .filter("dados_dinamicos->>aguardando_peso", "eq", "true")
+              .or("dados_dinamicos->>aguardando_chiller2.is.null,dados_dinamicos->>aguardando_chiller2.neq.true")
               .order("criado_em", { ascending: true })
               .overrideTypes<MonitoramentoEmAndamento[], { merge: false }>(),
       ]);
@@ -962,8 +963,52 @@ export function useMonitoramentosEmAndamento(userId: string | undefined, setores
       if (doSetor.error) throw doSetor.error;
       const porId = new Map<string, MonitoramentoEmAndamento>();
       for (const m of [...(proprios.data ?? []), ...(doSetor.data ?? [])]) porId.set(m.id, m);
+      // Substituídos por outro registro saem da lista (erro aqui só significa "nenhum substituído").
+      const { data: substituidos } = porId.size
+        ? await supabase.from("monitoramentos_substituidos").select("monitoramento_id").in("monitoramento_id", [...porId.keys()]).overrideTypes<{ monitoramento_id: string }[], { merge: false }>()
+        : { data: [] as { monitoramento_id: string }[] };
+      for (const { monitoramento_id } of substituidos ?? []) porId.delete(monitoramento_id);
       return Array.from(porId.values()).sort((a, b) => (a.criado_em < b.criado_em ? -1 : 1));
     },
+  });
+}
+
+/** Registros finalizados do mesmo setor, posteriores ao pendente: candidatos a tê-lo substituído (a ordenação e o filtro de
+ * "é absorção de água" ficam em ordenarCandidatos). */
+export function useCandidatosSubstituicao(pendente: Pick<MonitoramentoEmAndamento, "id" | "setor" | "criado_em"> | null) {
+  return useQuery({
+    queryKey: ["monitoramentos", "candidatos-substituicao", pendente?.id],
+    enabled: !!pendente,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("monitoramentos")
+        .select("id, user_id, criado_em, hora_monitoramento, dados_dinamicos")
+        .eq("status_ficha", "FINALIZADO")
+        .eq("setor", pendente!.setor)
+        .gte("criado_em", pendente!.criado_em)
+        .order("criado_em", { ascending: true })
+        .limit(40)
+        .overrideTypes<CandidatoSubstituicao[], { merge: false }>();
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+/** Marca o registro em andamento como substituído por outro já finalizado (função do banco: valida setor, ficha, ordem e
+ * permissão; grava quem marcou, quando e o motivo). O registro original não é alterado. */
+export function useMarcarSubstituido() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; substitutoId: string; motivo: string }) => {
+      const { error } = await supabase.rpc("marcar_monitoramento_substituido", {
+        p_id: input.id,
+        p_substituto: input.substitutoId,
+        p_motivo: input.motivo,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["monitoramentos"] }),
   });
 }
 
@@ -1036,7 +1081,7 @@ export function useFinalizarAbsorcao() {
           .select("id");
         if (error) throw error;
         // A RLS filtra sem erro: 0 linhas = já finalizado, ou não é o inspetor que abriu.
-        if (!data || data.length === 0) throw new Error("Não foi possível finalizar: o registro já foi finalizado ou você não é quem o abriu.");
+        if (!data || data.length === 0) throw new Error("Não foi possível finalizar: o registro já foi finalizado ou não é do seu setor.");
         input.aoGravar?.(); // pesagem final gravada; se a assinatura falhar, dá para só re-assinar
       }
       const { error: erroAssinar } = await supabase.functions.invoke("assinar-documento", {

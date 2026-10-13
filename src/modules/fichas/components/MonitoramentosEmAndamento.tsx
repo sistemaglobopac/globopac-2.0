@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { AlertTriangle, Hourglass, Scale, Waves } from "lucide-react";
 import { useSessionStore } from "@/store/session";
 import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/api";
-import { aguardaChiller2, aguardaPesoDaBalanca, useFichasTemplatesTodas, useMonitoramentosEmAndamento, useTemplatesPorIds } from "../api";
+import { aguardaChiller2, aguardaPesoDaBalanca, useFichasTemplatesTodas, useMonitoramentosEmAndamento, useTemplatesPorIds, useUsuariosMap, type MonitoramentoEmAndamento } from "../api";
+import { SubstituirAbsorcaoModal } from "./SubstituirAbsorcaoModal";
 import { ALERTA_PESAGEM_FINAL_MIN, minutosAguardandoPesoFinal } from "../fields/calculosAbsorcao";
 import { ALERTA_PESO_PENDENTE_MIN } from "../fields/pesoCaixa";
 import { ALERTA_CHILLER2_MIN } from "../fields/controleAbsorcao";
@@ -15,8 +16,8 @@ function duracao(minutos: number): string {
   return `${Math.floor(minutos / 60)} h ${minutos % 60} min`;
 }
 
-/** "Monitoramentos em andamento": (1) absorções abertas (só pesagem inicial) do inspetor, destacadas após
- * ALERTA_PESAGEM_FINAL_MIN; (2) monitoramentos de peso por caixa AGUARDANDO O PESO DA BALANÇA, de qualquer
+/** "Monitoramentos em andamento": (1) absorções abertas (só pesagem inicial) de qualquer inspetor do setor — quem assume o
+ * turno finaliza a do colega —, destacadas após ALERTA_PESAGEM_FINAL_MIN; (2) monitoramentos de peso por caixa AGUARDANDO O PESO DA BALANÇA, de qualquer
  * inspetor do setor, destacados após ALERTA_PESO_PENDENTE_MIN. Tocar abre o registro para completar. */
 export function MonitoramentosEmAndamento() {
   const perfil = useSessionStore((s) => s.perfil);
@@ -24,6 +25,8 @@ export function MonitoramentosEmAndamento() {
   const { data: masterSetores } = useSetoresCadastrados();
   const setores = resolverSetoresEfetivos(perfil?.setoresPermitidos ?? [], masterSetores);
   const { data: emAndamento } = useMonitoramentosEmAndamento(perfil?.id, setores);
+  const { data: nomes } = useUsuariosMap();
+  const [substituindo, setSubstituindo] = useState<MonitoramentoEmAndamento | null>(null);
   const { data: templates } = useFichasTemplatesTodas();
   const { data: templatesDosRegistros } = useTemplatesPorIds((emAndamento ?? []).map((m) => m.ficha_template_id));
   const [agora, setAgora] = useState(() => new Date());
@@ -47,9 +50,11 @@ export function MonitoramentosEmAndamento() {
           const inicio = horaEfetiva(m);
           const minutos = minutosAguardandoPesoFinal(inicio, agora);
           const atrasado = minutos >= (chiller2 ? ALERTA_CHILLER2_MIN : peso ? ALERTA_PESO_PENDENTE_MIN : ALERTA_PESAGEM_FINAL_MIN);
+          const doColega = !!perfil && m.user_id !== perfil.id;
+          const absorcao = !chiller2 && !peso;
           return (
+            <div key={m.id} className="flex flex-col gap-1">
             <button
-              key={m.id}
               type="button"
               data-testid={chiller2 ? "aguardando-chiller2" : peso ? "aguardando-peso" : "aguardando-pesagem-final"}
               onClick={() => navigate(chiller2 ? `/fichas/chiller2/${m.id}` : peso ? `/fichas/peso/${m.id}` : `/fichas/continuar/${m.id}`)}
@@ -71,10 +76,23 @@ export function MonitoramentosEmAndamento() {
                     ? `Aguardando o peso da balança há ${duracao(minutos)} — toque para completar`
                     : `Aguardando peso final há ${duracao(minutos)} — toque para pesar`}
               </span>
+              {doColega && <span className="mt-1 block text-xs text-muted-foreground">Iniciado por {nomes?.get(m.user_id) ?? "outro inspetor"} (do seu setor)</span>}
             </button>
+            {absorcao && (
+              <button
+                type="button"
+                className="self-start rounded px-1 text-xs font-semibold text-muted-foreground underline hover:text-primary"
+                data-testid={`substituido-${m.id}`}
+                onClick={() => setSubstituindo(m)}
+              >
+                Já foi refeito em outro registro? Marcar como substituído
+              </button>
+            )}
+            </div>
           );
         })}
       </div>
+      {substituindo && <SubstituirAbsorcaoModal pendente={substituindo} onFechar={() => setSubstituindo(null)} />}
     </section>
   );
 }
