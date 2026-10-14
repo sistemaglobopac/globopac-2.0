@@ -27,12 +27,12 @@ select lives_ok(
   'registro de 160 h atrás é aceito'
 );
 
--- Passou de 7 dias: recusado.
-select throws_ok(
+-- Passou de 7 dias: aceito (20261014083632 tirou o limite do passado — retroativo de qualquer data).
+select lives_ok(
   $$insert into monitoramentos (id, ficha_template_id, versao_template, user_id, setor, dados_dinamicos)
     values ('19200003-0000-0000-0000-000000000001', 'f9200000-0000-0000-0000-000000000001', 1, 'e9200000-0000-0000-0000-000000000001', 'S1',
             jsonb_build_object('campo', 3, 'hora_monitoramento', to_char((now() - interval '8 days') at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')))$$,
-  'P0001', null, 'passou de 7 dias: recusado'
+  'passou de 7 dias: aceito (retroativo sem limite de dias)'
 );
 
 -- A marca nunca vem do cliente e não é mais definida pelo servidor.

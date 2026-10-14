@@ -20,17 +20,17 @@ values ('f9200000-0000-0000-0000-000000000001', 'TEMP-PROP', 1, 'Template Propag
 
 -- A (inspetor das 8h) corrigiu por adendo a leitura atual do chiller 1 de 100 para 104. B fez o monitoramento seguinte (12h, mesmo turno)
 -- herdando 100 como leitura anterior; há também um monitoramento de outro dia, que não pode ser tocado.
-insert into monitoramentos (id, ficha_template_id, versao_template, user_id, setor, dados_dinamicos, hora_monitoramento) values
+insert into monitoramentos (id, ficha_template_id, versao_template, user_id, setor, dados_dinamicos, hora_monitoramento, criado_em) values
   ('29200000-0000-0000-0000-0000000000a0', 'f9200000-0000-0000-0000-000000000001', 1, 'e9200000-0000-0000-0000-000000000001', 'SETOR_PROP',
     '{"hora_monitoramento":"2026-10-10T12:00:00Z","campo_1":{"tanques":{"chiller1":{"prev":"90","cur":"104"}}},
       "adendos":[{"id":"a9200000-0000-0000-0000-000000000001","status":"completed","corrections":{"campo_1.tanques.chiller1.cur":{"old":"100","new":"104"}}}]}',
-    '2026-10-10T12:00:00Z'),
+    '2026-10-10T12:00:00Z', '2026-10-10T12:05:00Z'),
   ('29200000-0000-0000-0000-0000000000b0', 'f9200000-0000-0000-0000-000000000001', 1, 'e9200000-0000-0000-0000-000000000002', 'SETOR_PROP',
     '{"hora_monitoramento":"2026-10-10T16:00:00Z","campo_1":{"tanques":{"chiller1":{"prev":"100","cur":"110"}}}}',
-    '2026-10-10T16:00:00Z'),
+    '2026-10-10T16:00:00Z', '2026-10-10T16:05:00Z'),
   ('29200000-0000-0000-0000-0000000000c0', 'f9200000-0000-0000-0000-000000000001', 1, 'e9200000-0000-0000-0000-000000000002', 'SETOR_PROP',
     '{"hora_monitoramento":"2026-10-11T16:00:00Z","campo_1":{"tanques":{"chiller1":{"prev":"100","cur":"120"}}}}',
-    '2026-10-11T16:00:00Z');
+    '2026-10-11T16:00:00Z', '2026-10-11T16:05:00Z');
 
 -- Como o dono do monitoramento corrigido (A): propaga para o seguinte de B.
 select set_config('request.jwt.claims', json_build_object('sub', 'e9200000-0000-0000-0000-000000000001', 'role', 'authenticated', 'perfil', 'INSPETOR_QUALIDADE', 'setores_permitidos', array['SETOR_PROP'])::text, true);

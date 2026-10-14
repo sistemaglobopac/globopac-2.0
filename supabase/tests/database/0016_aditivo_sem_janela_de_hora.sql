@@ -1,5 +1,6 @@
 -- Testes pgTAP — o aditivo (adendo assinado) herda a hora do original sem a janela de assinatura (7 dias)
--- (20261006180000_aditivo_sem_janela_de_hora.sql); um monitoramento NOVO com hora antiga continua recusado.
+-- (20261006180000_aditivo_sem_janela_de_hora.sql). Desde 20261014083632 um monitoramento NOVO com hora antiga também é aceito
+-- (retroativo de qualquer data); só a hora futura continua recusada.
 
 create extension if not exists pgtap with schema extensions;
 
@@ -20,9 +21,9 @@ update monitoramentos
 set dados_dinamicos = jsonb_build_object('campo', 1, 'hora_monitoramento', to_char((now() - interval '8 days') at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'))
 where id = '19100000-0000-0000-0000-000000000001';
 
-select throws_ok(
+select lives_ok(
   $$insert into monitoramentos (ficha_template_id, versao_template, user_id, setor, dados_dinamicos) values ('f9100000-0000-0000-0000-000000000001', 1, 'e9100000-0000-0000-0000-000000000001', 'S1', jsonb_build_object('campo', 2, 'hora_monitoramento', to_char((now() - interval '8 days') at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')))$$,
-  'P0001', null, 'monitoramento NOVO com hora de 8 dias atras continua recusado'
+  'monitoramento NOVO com hora de 8 dias atras e aceito (retroativo sem limite de dias)'
 );
 select lives_ok(
   $$insert into monitoramentos (ficha_template_id, versao_template, user_id, setor, dados_dinamicos, aditivo_de)
