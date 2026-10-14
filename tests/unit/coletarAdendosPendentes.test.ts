@@ -35,6 +35,17 @@ describe("adendos que chegam ao inspetor", () => {
     expect(coletarAdendosPendentes([original], concluidos, "leidiane")).toEqual([]);
   });
 
+  it("dois adendos assinados em aditivos irmãos: o que o aditivo vigente não concluiu volta ao inspetor (caso Leidiane/Kauan)", () => {
+    const original = { id: "orig", dados_dinamicos: { adendos: [adendo("a1", "leidiane"), adendo("a2", "leidiane")] } as Record<string, unknown> };
+    const aditivo1 = { id: "ad1", aditivo_de: "orig", criado_em: "2026-10-13T10:29:53Z", dados_dinamicos: { adendos: [adendo("a1", "leidiane", "completed"), adendo("a2", "leidiane")] } as Record<string, unknown> };
+    const aditivo2 = { id: "ad2", aditivo_de: "orig", criado_em: "2026-10-13T10:30:01Z", dados_dinamicos: { adendos: [adendo("a1", "leidiane"), adendo("a2", "leidiane", "completed")] } as Record<string, unknown> };
+    const concluidos = idsAdendosConcluidos([aditivo1, aditivo2]);
+    expect([...concluidos]).toEqual(["a2"]);
+    // o aditivo antigo (ad1) já foi descartado da lista; original e vigente pedem o mesmo adendo → aparece uma vez só
+    const r = coletarAdendosPendentes([original, aditivo2], concluidos, "leidiane");
+    expect(r.map((a) => a.id)).toEqual(["a1"]);
+  });
+
   it("registro sem adendos ou com dado inesperado é ignorado", () => {
     const registros = [{ id: "x", dados_dinamicos: null }, { id: "y", dados_dinamicos: { adendos: "texto" } as Record<string, unknown> }, registro("z", [])];
     expect(coletarAdendosPendentes(registros, new Set(), "leidiane")).toEqual([]);

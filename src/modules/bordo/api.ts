@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { temNaoConformidade } from "@/modules/fichas/utils/desviosEspeciais";
 import { aplicarNoCaminho } from "@/modules/fichas/utils/adendoCampos";
-import { idsAdendosConcluidos } from "@/modules/fichas/utils/adendosPendentes";
+import { aditivosVigentes, idsAdendosConcluidos } from "@/modules/fichas/utils/adendosPendentes";
 import { supabase } from "@/lib/supabase";
 import type { StatusRnc } from "@/modules/rnc/api";
 import type { RegistroVazao } from "./avesNaVazao";
@@ -428,18 +428,21 @@ interface AdendoBruto {
   corrections?: Record<string, { old: unknown; new: unknown; rotulo?: string }>;
 }
 
-/** Adendos que aguardam a assinatura do inspetor `userId` nos registros dados (e que nenhum aditivo concluiu). */
+/** Adendos que aguardam a assinatura do inspetor `userId` nos registros dados (e que o aditivo vigente não concluiu).
+ * O mesmo adendo pode estar no original e no aditivo: aparece uma vez só. */
 export function coletarAdendosPendentes(
   registros: { id: string; dados_dinamicos: Record<string, unknown> | null }[],
   concluidos: Set<string>,
   userId: string
 ): AdendoPendente[] {
   const pendentes: AdendoPendente[] = [];
+  const vistos = new Set<string>();
   for (const m of registros) {
     const adendos = (m.dados_dinamicos as { adendos?: AdendoBruto[] } | null)?.adendos;
     if (!Array.isArray(adendos)) continue;
     for (const adendo of adendos) {
-      if (adendo.status === "pending_monitor" && adendo.monitorId === userId && !concluidos.has(adendo.id)) {
+      if (adendo.status === "pending_monitor" && adendo.monitorId === userId && !concluidos.has(adendo.id) && !vistos.has(adendo.id)) {
+        vistos.add(adendo.id);
         pendentes.push({
           id: adendo.id,
           monitoramentoId: m.id,
@@ -631,25 +634,28 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
       // Adendos pedidos pelo Verificador: o registro pedido pode ser de QUALQUER dia (inspetores com dezenas de monitoramentos por
       // dia têm o registro bem além dos 50 mais recentes). Por isso buscam-se, no servidor, os registros do inspetor com adendo
       // pendente e os aditivos que os concluem — não só a janela dos 50 mais recentes. Falha nesta busca cai só na janela.
+      type RegistroAdendo = { id: string; dados_dinamicos: Record<string, unknown>; aditivo_de: string | null; criado_em: string };
       const { data: comAdendo } = await supabase
         .from("monitoramentos")
-        .select("id, dados_dinamicos, aditivo_de")
+        .select("id, dados_dinamicos, aditivo_de, criado_em")
         .eq("user_id", userId as string)
         .contains("dados_dinamicos", { adendos: [{ status: "pending_monitor", monitorId: userId }] })
         .order("criado_em", { ascending: false })
         .limit(500)
-        .overrideTypes<{ id: string; dados_dinamicos: Record<string, unknown>; aditivo_de: string | null }[], { merge: false }>();
-      const idsComAdendo = (comAdendo ?? []).map((m) => m.id);
+        .overrideTypes<RegistroAdendo[], { merge: false }>();
+      // Cadeias com pendência: o original e TODOS os aditivos dele — o pedido pode estar no original ou num aditivo (adendo aberto
+      // depois), e só o aditivo vigente (o mais recente) diz o que já foi assinado.
+      const raizes = [...new Set((comAdendo ?? []).map((m) => m.aditivo_de ?? m.id))];
       const { data: aditivos } =
-        idsComAdendo.length > 0
-          ? await supabase
-              .from("monitoramentos")
-              .select("id, dados_dinamicos, aditivo_de")
-              .in("aditivo_de", idsComAdendo)
-              .overrideTypes<{ id: string; dados_dinamicos: Record<string, unknown>; aditivo_de: string | null }[], { merge: false }>()
-          : { data: [] as { id: string; dados_dinamicos: Record<string, unknown>; aditivo_de: string | null }[] };
-      const registrosComAdendo = [...new Map([...(recentes ?? []), ...(comAdendo ?? [])].map((m) => [m.id, m])).values()];
-      const adendosConcluidos = idsAdendosConcluidos([...registrosComAdendo, ...(aditivos ?? [])]);
+        raizes.length > 0
+          ? await supabase.from("monitoramentos").select("id, dados_dinamicos, aditivo_de, criado_em").in("aditivo_de", raizes).overrideTypes<RegistroAdendo[], { merge: false }>()
+          : { data: [] as RegistroAdendo[] };
+      const vigentesDasCadeias = new Set(aditivosVigentes(aditivos ?? []).map((a) => a.id));
+      const antigos = new Set((aditivos ?? []).filter((a) => !vigentesDasCadeias.has(a.id)).map((a) => a.id));
+      const registrosComAdendo = [...new Map([...(recentes ?? []), ...(comAdendo ?? []), ...(aditivos ?? [])].map((m) => [m.id, m])).values()].filter(
+        (m) => !antigos.has(m.id) // aditivo antigo: o vigente já traz tudo o que ele tinha, com o que foi assinado depois
+      );
+      const adendosConcluidos = idsAdendosConcluidos(aditivos ?? []);
       const adendosPendentes = coletarAdendosPendentes(registrosComAdendo, adendosConcluidos, userId as string);
 
       const nomesFicha = new Map<string, { codigo: string; nome: string }>();
@@ -841,18 +847,33 @@ export function useAssinarAdendo() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: { monitoramentoId: string; adendoId: string; corrections: Record<string, { old: unknown; new: unknown; rotulo?: string }> }) => {
-      const { data: original, error: erroOriginal } = await supabase
+      type Versao = { id: string; ficha_template_id: string; versao_template: number; user_id: string; setor: string; dados_dinamicos: Record<string, unknown>; aditivo_de: string | null };
+      const colunas = "id, ficha_template_id, versao_template, user_id, setor, dados_dinamicos, aditivo_de";
+      const { data: alvo, error: erroAlvo } = await supabase.from("monitoramentos").select(colunas).eq("id", input.monitoramentoId).single().overrideTypes<Versao, { merge: false }>();
+      if (erroAlvo) throw erroAlvo;
+
+      // O aditivo parte da versão MAIS RECENTE da cadeia (e aponta para o original), não do original: com 2 adendos no mesmo
+      // registro, partir do original gerava dois aditivos irmãos, cada um com só um adendo assinado e só uma correção aplicada.
+      const raizId = alvo.aditivo_de ?? alvo.id;
+      const { data: ultimos, error: erroUltimo } = await supabase
         .from("monitoramentos")
-        .select("ficha_template_id, versao_template, user_id, setor, dados_dinamicos")
-        .eq("id", input.monitoramentoId)
-        .single()
-        .overrideTypes<
-          { ficha_template_id: string; versao_template: number; user_id: string; setor: string; dados_dinamicos: Record<string, unknown> },
-          { merge: false }
-        >();
-      if (erroOriginal) throw erroOriginal;
+        .select(colunas)
+        .eq("aditivo_de", raizId)
+        .order("criado_em", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(1)
+        .overrideTypes<Versao[], { merge: false }>();
+      if (erroUltimo) throw erroUltimo;
+      let original = ultimos?.[0] ?? alvo;
+      if (!ultimos?.[0] && alvo.aditivo_de) {
+        const { data: raiz, error: erroRaiz } = await supabase.from("monitoramentos").select(colunas).eq("id", raizId).single().overrideTypes<Versao, { merge: false }>();
+        if (erroRaiz) throw erroRaiz;
+        original = raiz;
+      }
 
       const dadosOriginais = original.dados_dinamicos as { adendos?: AdendoBruto[] } & Record<string, unknown>;
+      // Já assinado na versão vigente (toque repetido, outro aparelho): não gera outro aditivo.
+      if ((dadosOriginais.adendos ?? []).some((a) => a.id === input.adendoId && a.status === "completed")) return;
       const agora = new Date().toISOString();
       const novosAdendos = (dadosOriginais.adendos ?? []).map((a) =>
         a.id === input.adendoId ? { ...a, status: "completed", monitorSignature: "signed_by_session", monitorSignedAt: agora } : a
@@ -870,7 +891,7 @@ export function useAssinarAdendo() {
         user_id: original.user_id,
         setor: original.setor,
         dados_dinamicos: dadosCorrigidos,
-        aditivo_de: input.monitoramentoId,
+        aditivo_de: raizId,
       });
       if (erroInsert) throw erroInsert;
     },
