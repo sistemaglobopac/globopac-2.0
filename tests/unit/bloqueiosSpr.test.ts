@@ -69,3 +69,29 @@ describe("turno para herdar a leitura anterior", () => {
     expect(turnoAlvoHeranca(undefined, manaus(20))).toBe("2º Turno");
   });
 });
+
+describe("assinar exige 100% dos campos simples preenchidos", () => {
+  const simples = [
+    { chave: "n", tipo: "numero", obrigatorio: false, label: "Temperatura" },
+    { chave: "i", tipo: "inteiro", obrigatorio: false },
+    { chave: "d", tipo: "decimal", obrigatorio: true },
+    { chave: "t", tipo: "texto", obrigatorio: false },
+    { chave: "tl", tipo: "texto_longo", obrigatorio: false },
+    { chave: "h", tipo: "hora", obrigatorio: false },
+    { chave: "s", tipo: "selecao", obrigatorio: false, opcoes: ["A", "B"] },
+    { chave: "u", tipo: "unica_escolha", obrigatorio: false, opcoes: ["A", "B"] },
+    { chave: "b", tipo: "booleano", obrigatorio: false },
+  ] as unknown as CampoTemplate[];
+  const cheios = { n: 0, i: 3, d: 1.5, t: "x", tl: "y", h: "10:00", s: "A", u: "B", b: false };
+
+  it("libera quando tudo está preenchido (zero e caixa desmarcada contam como preenchidos)", () => {
+    expect(motivosDeBloqueioSpr(simples, cheios)).toEqual([]);
+  });
+
+  it("bloqueia cada campo vazio, mesmo sem `obrigatorio`", () => {
+    const vazios = { n: Number.NaN, i: undefined, d: "", t: "  ", tl: "", h: "", s: "", u: undefined, b: false };
+    const motivos = motivosDeBloqueioSpr(simples, vazios);
+    expect(motivos).toHaveLength(8);
+    expect(motivos[0]).toContain("Temperatura");
+  });
+});

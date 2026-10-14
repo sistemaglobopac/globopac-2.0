@@ -366,13 +366,18 @@ export function PainelBordo() {
   async function handleAssinarAdendo() {
     if (!adendoSelecionado) return;
     try {
-      await assinarAdendo.mutateAsync({
+      const r = await assinarAdendo.mutateAsync({
         monitoramentoId: adendoSelecionado.monitoramentoId,
         adendoId: adendoSelecionado.id,
         corrections: adendoSelecionado.corrections,
       });
       setAdendoSelecionado(null);
-      setMensagem({ tipo: "success", texto: "Adendo assinado com sucesso." });
+      const extras = [
+        r?.propagados ? `A leitura corrigida foi acertada em ${r.propagados} monitoramento(s) seguinte(s), que voltam para a verificação.` : "",
+        r?.naoPropagados ? `${r.naoPropagados} monitoramento(s) seguinte(s) são de outro inspetor: peça a ele para ajustar a leitura anterior por adendo.` : "",
+        r?.erro ? `Não foi possível acertar os monitoramentos seguintes (${r.erro}). Avise o verificador.` : "",
+      ].filter(Boolean);
+      setMensagem({ tipo: r?.erro || r?.naoPropagados ? "error" : "success", texto: ["Adendo assinado com sucesso.", ...extras].join(" ") });
     } catch (erro) {
       setMensagem({ tipo: "error", texto: erro instanceof Error ? erro.message : "Falha ao assinar o adendo." });
     }

@@ -41,8 +41,9 @@ describe("lançamento retroativo: a hora vale contra os vizinhos dela, não cont
     expect(vizinhosDaHora(null, registros)).toEqual({ anteriorEm: null, posteriorEm: null });
   });
 
-  it("continua recusando hora futura e hora com mais de 7 dias", () => {
+  it("recusa hora futura e aceita retroativo de qualquer data", () => {
     expect(validarHoraMonitoramento({ hora: h("2026-10-14", "10:00"), agora: AGORA })).toMatch(/futura/);
-    expect(validarHoraMonitoramento({ hora: h("2026-10-05", "10:00"), agora: AGORA })).toMatch(/7 dias/);
+    expect(validarHoraMonitoramento({ hora: h("2026-10-05", "10:00"), agora: AGORA })).toBeNull();
+    expect(validarHoraMonitoramento({ hora: h("2026-06-01", "10:00"), agora: AGORA })).toBeNull();
   });
 });

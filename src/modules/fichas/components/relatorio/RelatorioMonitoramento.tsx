@@ -331,6 +331,16 @@ function RegistroUnico({ record, ordem, template, dados, hashesAoVivo, acoesNaoC
           Este registro é a versão corrigida por adendo do apontamento original (id {record.aditivo_de.slice(0, 8).toUpperCase()}), que fica guardado no histórico e não aparece nas listas.
         </p>
       )}
+      {(() => {
+        const propagadas = (record.dados_dinamicos as { correcoes_propagadas?: { caminho: string; de: string; para: string; origemId: string }[] } | null)?.correcoes_propagadas;
+        if (!Array.isArray(propagadas) || propagadas.length === 0) return null;
+        return (
+          <p className="mt-2 text-[10px] italic text-muted-foreground print:text-[8px]">
+            Leitura anterior acertada automaticamente por adendo no monitoramento anterior (id {propagadas[0]!.origemId.slice(0, 8).toUpperCase()}):{" "}
+            {propagadas.map((p) => `${p.caminho.replace(/^[^.]+\./, "")}: ${p.de} → ${p.para}`).join("; ")}.
+          </p>
+        );
+      })()}
       {record.origem_versao === "v1_legado" && (
         <p className="mt-2 text-[10px] italic text-muted-foreground print:text-[8px]">
           Registro migrado do sistema anterior — hash/carimbo de tempo originais preservados, não recomputados sob as regras deste sistema.
@@ -400,14 +410,18 @@ export function RelatorioMonitoramento({ ids, dados, turnoDe = (r) => turnoDoDia
 
   const template = dados.templatesPorId.get(primary.ficha_template_id);
   const diaDocumento = ensureLocalTime(instanteDoRegistro(primary)).datePt;
-  const hashId = primary.id.split("-")[0]!.toUpperCase();
+  // Identidade do documento (protocolo, selo, ID de auditoria): o registro VERIFICADO mais antigo do consolidado, não o mais
+  // antigo de todos. Um monitoramento retroativo lançado depois da verificação entra antes dos demais e não pode trocar o
+  // protocolo de um relatório que já foi emitido/verificado. Sem nenhum verificado, vale o primeiro.
+  const ancora = records.find((r) => r.verificado_por) ?? primary;
+  const hashId = ancora.id.split("-")[0]!.toUpperCase();
   const protocolo = `GS-${diaDocumento.split("/").reverse().join("")}-${hashId}${isGrouped ? "-CONSOLIDADO" : ""}`;
   const emitidoEm = new Date().toLocaleString("pt-BR", { timeZone: "America/Manaus" });
 
   const assinaturaPrimario =
-    assinaturaDe(dados.assinaturas, primary.id, "VERIFICADOR") ?? assinaturaDe(dados.assinaturas, primary.id, "INSPETOR");
-  const hashPrimario = assinaturaPrimario?.hash_documento ?? hashesAoVivo.get(primary.id);
-  const hashAoVivoPrimario = hashesAoVivo.get(primary.id);
+    assinaturaDe(dados.assinaturas, ancora.id, "VERIFICADOR") ?? assinaturaDe(dados.assinaturas, ancora.id, "INSPETOR");
+  const hashPrimario = assinaturaPrimario?.hash_documento ?? hashesAoVivo.get(ancora.id);
+  const hashAoVivoPrimario = hashesAoVivo.get(ancora.id);
   const integroPrimario = assinaturaPrimario?.hash_documento && hashAoVivoPrimario ? assinaturaPrimario.hash_documento === hashAoVivoPrimario : null;
 
   const rncDe = (r: MonitoramentoRelatorio) => dados.rncs.find((rnc) => rnc.monitoramento_id === r.id);
@@ -531,7 +545,7 @@ export function RelatorioMonitoramento({ ids, dados, turnoDe = (r) => turnoDoDia
           {isGrouped ? (
             <>{records.length} REGISTROS · <span className="font-mono">{hashId}</span></>
           ) : (
-            <>SHA-256: <span className="font-mono">{resumoHash(assinaturaDe(dados.assinaturas, primary.id, "VERIFICADOR")?.hash_documento ?? assinaturaDe(dados.assinaturas, primary.id, "INSPETOR")?.hash_documento ?? hashesAoVivo.get(primary.id), 12) ?? hashId}</span></>
+            <>SHA-256: <span className="font-mono">{resumoHash(assinaturaDe(dados.assinaturas, ancora.id, "VERIFICADOR")?.hash_documento ?? assinaturaDe(dados.assinaturas, ancora.id, "INSPETOR")?.hash_documento ?? hashesAoVivo.get(ancora.id), 12) ?? hashId}</span></>
           )}
         </div>
       </div>
@@ -598,7 +612,7 @@ export function RelatorioMonitoramento({ ids, dados, turnoDe = (r) => turnoDoDia
                 retroativas. Protocolo Oficial: <strong className="text-primary">{protocolo}</strong>
               </p>
               {(() => {
-                const carimbo = assinaturaDe(dados.assinaturas, primary.id, "VERIFICADOR") ?? assinaturaDe(dados.assinaturas, primary.id, "INSPETOR");
+                const carimbo = assinaturaDe(dados.assinaturas, ancora.id, "VERIFICADOR") ?? assinaturaDe(dados.assinaturas, ancora.id, "INSPETOR");
                 if (!carimbo) return <p className="mt-1">Aguardando assinatura.</p>;
                 if (carimbo.tsa_emitido_em)
                   return (
@@ -617,7 +631,7 @@ export function RelatorioMonitoramento({ ids, dados, turnoDe = (r) => turnoDoDia
                 Acesse <strong className="text-primary">{typeof window !== "undefined" ? window.location.host : ""}/verificar</strong> e informe o identificador único do
                 documento:
               </p>
-              <p className="mt-1 break-all rounded border border-hairline bg-gray-50 px-2 py-1 font-mono text-[10px] font-bold text-ink print:text-[8px]">{primary.id}</p>
+              <p className="mt-1 break-all rounded border border-hairline bg-gray-50 px-2 py-1 font-mono text-[10px] font-bold text-ink print:text-[8px]">{ancora.id}</p>
             </div>
           </div>
           <p className="border-t border-hairline bg-gray-50 px-4 py-1 text-[9px] text-muted-foreground print:px-3 print:text-[7px]">

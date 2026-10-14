@@ -13,7 +13,7 @@ import { pacsDoTemplate, useFichasTemplatesTodas, useFilaVerificacao, useUsuario
 import { useTurnoDoRegistro } from "./useTurnoDoRegistro";
 import { diaTurno,turnosBloqueadosMap, turnosPendentes, encerrarTurnoAdmin } from "./utils/turnoUtils";
 import { instanteDoRegistro } from "./utils/horaMonitoramento";
-import { agruparPorSetor, groupFichaCards, calcularOrdemDia, type AppointmentDisplay, type MonitoramentoVerificacao, type StatusVerificacao } from "./utils/recordGrouping";
+import { agruparPorSetor, chaveDossie, groupFichaCards, calcularOrdemDia, tipoPorTemplate, type AppointmentDisplay, type MonitoramentoVerificacao, type StatusVerificacao } from "./utils/recordGrouping";
 import { ensureLocalTime } from "./utils/tempo";
 import { KpiCard } from "./components/KpiCard";
 import { AuditRecordCard } from "./components/AuditRecordCard";
@@ -154,13 +154,40 @@ export function PainelVerificacao() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [pendentesOrdenados, filtroPeriodo, dateBase]
   );
+  // Monitoramento solto entra no consolidado dele: o dossiê (dia + turno + tipo de ficha + setor, de qualquer dia) é sempre
+  // mostrado inteiro. Um consolidado já verificado que ganhou um pendente (ex.: retroativo) volta à fila com todos os irmãos e
+  // só o pendente é reassinado; os filtros de inspetor/status não separam um dossiê.
+  const chaveDoGrupo = useMemo(() => {
+    const tipoDaFicha = tipoPorTemplate(codigoPorTemplateId);
+    return (m: MonitoramentoVerificacao) => `${chaveDossie(m, tipoDaFicha, turnoDe)}|${m.setor}`;
+  }, [codigoPorTemplateId, turnoDe]);
+  const irmaosDe = (itens: AppointmentDisplay[]) => {
+    const ids = new Set(itens.map((i) => i.id));
+    const chaves = new Set(itens.map((i) => chaveDoGrupo(i.appt)));
+    return displayItems.filter((i) => !ids.has(i.id) && chaves.has(chaveDoGrupo(i.appt)));
+  };
+  const chavesReabertas = useMemo(() => new Set(pendingAppointments.map((i) => chaveDoGrupo(i.appt))), [pendingAppointments, chaveDoGrupo]);
+  const pendentesComIrmaos = useMemo(
+    () => [...pendingAppointments, ...irmaosDe(pendingAppointments)],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pendingAppointments, displayItems, chaveDoGrupo]
+  );
   const verifiedToday = useMemo(
-    () => filtrados.filter((i) => i.status === "verificado" && ensureLocalTime(i.appt.verificado_em ?? i.appt.criado_em).isoLocal === dateBase),
-    [filtrados, dateBase]
+    () =>
+      filtrados.filter(
+        (i) => i.status === "verificado" && ensureLocalTime(i.appt.verificado_em ?? i.appt.criado_em).isoLocal === dateBase && !chavesReabertas.has(chaveDoGrupo(i.appt))
+      ),
+    [filtrados, dateBase, chavesReabertas, chaveDoGrupo]
+  );
+  // O verificado do dia traz os irmãos verificados em outros dias (ex.: o retroativo verificado hoje, o resto ontem).
+  const verificadosComIrmaos = useMemo(
+    () => [...verifiedToday, ...irmaosDe(verifiedToday).filter((i) => i.status === "verificado" && !chavesReabertas.has(chaveDoGrupo(i.appt)))],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [verifiedToday, displayItems, chavesReabertas, chaveDoGrupo]
   );
 
   const pendingKey = pendingAppointments.map((i) => i.id).join(",");
-  const { data: autocorrigidoIds } = useAutocorrigidos([...pendingAppointments, ...verifiedToday].map((i) => i.id));
+  const { data: autocorrigidoIds } = useAutocorrigidos([...pendentesComIrmaos, ...verificadosComIrmaos].map((i) => i.id));
   // Encerrar o turno não muda a lista de pendentes, só o estado dos turnos — sem este contador
   // o efeito abaixo não reexecutava e o botão "Verificar" ficava travado com o bloqueio antigo.
   const [turnosVersao, setTurnosVersao] = useState(0);
@@ -176,13 +203,13 @@ export function PainelVerificacao() {
   }, [pendingKey, turnosVersao]);
 
   const { dossies, avulsos } = useMemo(
-    () => groupFichaCards(pendingAppointments, blockedIds, usuarios, pacPorTemplateId, codigoPorTemplateId, turnoDe, { porSetor: true }),
-    [pendingAppointments, blockedIds, usuarios, pacPorTemplateId, codigoPorTemplateId, turnoDe]
+    () => groupFichaCards(pendentesComIrmaos, blockedIds, usuarios, pacPorTemplateId, codigoPorTemplateId, turnoDe, { porSetor: true }),
+    [pendentesComIrmaos, blockedIds, usuarios, pacPorTemplateId, codigoPorTemplateId, turnoDe]
   );
   // Verificados também consolidam: um card VERIFICADO por dossiê (tipo de ficha + turno).
   const { dossies: dossiesVerificados, avulsos: avulsosVerificados } = useMemo(
-    () => groupFichaCards(verifiedToday, new Set(), usuarios, pacPorTemplateId, codigoPorTemplateId, turnoDe, { porSetor: true }),
-    [verifiedToday, usuarios, pacPorTemplateId, codigoPorTemplateId, turnoDe]
+    () => groupFichaCards(verificadosComIrmaos, new Set(), usuarios, pacPorTemplateId, codigoPorTemplateId, turnoDe, { porSetor: true }),
+    [verificadosComIrmaos, usuarios, pacPorTemplateId, codigoPorTemplateId, turnoDe]
   );
 
   // Os cards ficam separados por setor: uma seção por setor, com os dossiês e depois os avulsos daquele setor.

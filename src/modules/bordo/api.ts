@@ -2,6 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { temNaoConformidade } from "@/modules/fichas/utils/desviosEspeciais";
 import { aplicarNoCaminho } from "@/modules/fichas/utils/adendoCampos";
 import { aditivosVigentes, idsAdendosConcluidos } from "@/modules/fichas/utils/adendosPendentes";
+import { propagarLeituraNosSeguintes } from "@/modules/fichas/utils/propagacaoCorrecao";
+import { horaEfetiva } from "@/modules/fichas/utils/horaMonitoramento";
+import { turnoParaHeranca } from "@/modules/fichas/utils/turnoUtils";
 import { supabase } from "@/lib/supabase";
 import type { StatusRnc } from "@/modules/rnc/api";
 import type { RegistroVazao } from "./avesNaVazao";
@@ -847,8 +850,8 @@ export function useAssinarAdendo() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: { monitoramentoId: string; adendoId: string; corrections: Record<string, { old: unknown; new: unknown; rotulo?: string }> }) => {
-      type Versao = { id: string; ficha_template_id: string; versao_template: number; user_id: string; setor: string; dados_dinamicos: Record<string, unknown>; aditivo_de: string | null };
-      const colunas = "id, ficha_template_id, versao_template, user_id, setor, dados_dinamicos, aditivo_de";
+      type Versao = { id: string; ficha_template_id: string; versao_template: number; user_id: string; setor: string; dados_dinamicos: Record<string, unknown>; aditivo_de: string | null; hora_monitoramento: string | null; criado_em: string };
+      const colunas = "id, ficha_template_id, versao_template, user_id, setor, dados_dinamicos, aditivo_de, hora_monitoramento, criado_em";
       const { data: alvo, error: erroAlvo } = await supabase.from("monitoramentos").select(colunas).eq("id", input.monitoramentoId).single().overrideTypes<Versao, { merge: false }>();
       if (erroAlvo) throw erroAlvo;
 
@@ -873,7 +876,7 @@ export function useAssinarAdendo() {
 
       const dadosOriginais = original.dados_dinamicos as { adendos?: AdendoBruto[] } & Record<string, unknown>;
       // Já assinado na versão vigente (toque repetido, outro aparelho): não gera outro aditivo.
-      if ((dadosOriginais.adendos ?? []).some((a) => a.id === input.adendoId && a.status === "completed")) return;
+      if ((dadosOriginais.adendos ?? []).some((a) => a.id === input.adendoId && a.status === "completed")) return { propagados: 0, naoPropagados: 0 };
       const agora = new Date().toISOString();
       const novosAdendos = (dadosOriginais.adendos ?? []).map((a) =>
         a.id === input.adendoId ? { ...a, status: "completed", monitorSignature: "signed_by_session", monitorSignedAt: agora } : a
@@ -894,7 +897,96 @@ export function useAssinarAdendo() {
         aditivo_de: raizId,
       });
       if (erroInsert) throw erroInsert;
+
+      // A correção segue para os monitoramentos seguintes que já foram feitos com a leitura antiga. Falha aqui não desfaz a
+      // assinatura do adendo (já gravada): vira aviso para o inspetor.
+      try {
+        return await propagarCorrecaoNosSeguintes({ origem: original, adendoId: input.adendoId, dadosCorrigidos, corrections: input.corrections, agora });
+      } catch (erro) {
+        return { propagados: 0, naoPropagados: 0, erro: erro instanceof Error ? erro.message : "Falha ao propagar a correção." };
+      }
     },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["painel-bordo", "kpis"] }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["painel-bordo", "kpis"] });
+      void queryClient.invalidateQueries({ queryKey: ["monitoramentos"] });
+    },
   });
+}
+
+/** Leituras de hidrômetro corrigidas por adendo seguem para os monitoramentos seguintes (mesma ficha, setor, dia e turno) que
+ * herdaram a leitura antiga: cada um ganha um aditivo com a leitura anterior acertada e volta para a verificação. Vale também
+ * para os de outros inspetores (função do banco propagar_leitura_adendo). */
+async function propagarCorrecaoNosSeguintes(args: {
+  origem: { id: string; aditivo_de: string | null; ficha_template_id: string; setor: string; user_id: string; hora_monitoramento: string | null; criado_em: string };
+  adendoId: string;
+  dadosCorrigidos: Record<string, unknown>;
+  corrections: Record<string, { old: unknown; new: unknown }>;
+  agora: string;
+}): Promise<{ propagados: number; naoPropagados: number }> {
+  const { origem, adendoId, dadosCorrigidos, corrections, agora } = args;
+  if (!Object.keys(corrections).some((c) => c.endsWith(".cur"))) return { propagados: 0, naoPropagados: 0 };
+
+  const raizOrigem = origem.aditivo_de ?? origem.id;
+  const horaOrigem = horaEfetiva(origem);
+  const turnoOrigem = turnoParaHeranca(new Date(horaOrigem));
+  const dia = diaManaus(new Date(horaOrigem));
+  const iniDia = new Date(`${dia}T00:00:00-04:00`);
+  const fimDia = new Date(iniDia.getTime() + 24 * 3_600_000);
+
+  const { data: cods, error: erroCod } = await supabase.rpc("codigos_de_templates", { p_ids: [origem.ficha_template_id] });
+  if (erroCod) throw erroCod;
+  const codigo = (cods as unknown as { id: string; codigo: string }[] | null)?.[0]?.codigo;
+  if (!codigo) return { propagados: 0, naoPropagados: 0 };
+  const { data: versoes, error: erroVersoes } = await supabase.rpc("ids_versoes_ficha", { p_codigo: codigo });
+  if (erroVersoes) throw erroVersoes;
+
+  type Linha = { id: string; ficha_template_id: string; versao_template: number; user_id: string; setor: string; dados_dinamicos: Record<string, unknown>; aditivo_de: string | null; hora_monitoramento: string | null; criado_em: string };
+  const { data: linhas, error } = await supabase
+    .from("monitoramentos_vigentes")
+    .select("id, ficha_template_id, versao_template, user_id, setor, dados_dinamicos, aditivo_de, hora_monitoramento, criado_em")
+    .in("ficha_template_id", (versoes as unknown as string[] | null) ?? [])
+    .eq("setor", origem.setor)
+    .or(
+      `and(hora_monitoramento.gt.${new Date(horaOrigem).toISOString()},hora_monitoramento.lt.${fimDia.toISOString()}),` +
+        `and(hora_monitoramento.is.null,criado_em.gt.${new Date(horaOrigem).toISOString()},criado_em.lt.${fimDia.toISOString()})`
+    )
+    .limit(500)
+    .overrideTypes<Linha[], { merge: false }>();
+  if (error) throw error;
+
+  // Uma versão por monitoramento (liberado ao SIF aparece o original e a correção): vale a gravada por último.
+  const porRaiz = new Map<string, Linha>();
+  for (const l of linhas ?? []) {
+    const raiz = l.aditivo_de ?? l.id;
+    if (raiz === raizOrigem) continue;
+    const atual = porRaiz.get(raiz);
+    if (!atual || l.criado_em > atual.criado_em) porRaiz.set(raiz, l);
+  }
+  const seguintes = [...porRaiz.values()]
+    .filter((l) => turnoParaHeranca(new Date(horaEfetiva(l))) === turnoOrigem)
+    .sort((a, b) => (horaEfetiva(a) < horaEfetiva(b) ? -1 : 1));
+
+  const atualizados = propagarLeituraNosSeguintes({
+    origemId: raizOrigem,
+    adendoId,
+    dadosCorrigidos,
+    correcoes: corrections,
+    seguintes: seguintes.map((l) => ({ id: l.id, dados: l.dados_dinamicos })),
+    agora,
+  });
+
+  let propagados = 0;
+  for (const a of atualizados) {
+    // Função do banco: grava o aditivo no nome do dono do seguinte (a RLS não deixa o inspetor gravar o de outro) e revalida tudo
+    // no servidor — só a leitura anterior herdada é alterada.
+    const { error: erroRpc } = await supabase.rpc("propagar_leitura_adendo", {
+      p_origem: raizOrigem,
+      p_adendo: adendoId,
+      p_alvo: a.id,
+      p_ajustes: a.correcoes.map((c) => ({ caminho: c.caminho })),
+    });
+    if (erroRpc) throw erroRpc;
+    propagados += 1;
+  }
+  return { propagados, naoPropagados: 0 };
 }

@@ -20,7 +20,7 @@ describe("hora do monitoramento (informada manualmente)", () => {
     expect(validarHoraMonitoramento({ hora: null, agora: AGORA })).toMatch(/Informe/);
     expect(validarHoraMonitoramento({ hora: "2026-10-06T17:00:00Z", agora: AGORA })).toMatch(/futura/);
     expect(validarHoraMonitoramento({ hora: "2026-10-06T16:03:00Z", agora: AGORA })).toBeNull(); // folga de 5 min
-    expect(validarHoraMonitoramento({ hora: "2026-09-29T15:59:00Z", agora: AGORA })).toMatch(/7 dias/);
+    expect(validarHoraMonitoramento({ hora: "2026-09-29T15:59:00Z", agora: AGORA })).toBeNull(); // sem limite para o passado
     expect(validarHoraMonitoramento({ hora: "2026-09-29T16:30:00Z", agora: AGORA })).toBeNull();
   });
 

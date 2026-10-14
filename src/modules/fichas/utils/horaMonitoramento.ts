@@ -59,9 +59,7 @@ export function validarHoraMonitoramento({ hora, agora, anteriorEm, posteriorEm,
   if (!hora) return "Informe a data e a hora em que o monitoramento foi realizado.";
   const t = new Date(hora).getTime();
   if (t > agora.getTime() + TOLERANCIA_FUTURO_MIN * 60_000) return "A hora do monitoramento não pode ser futura.";
-  if (t < agora.getTime() - PRAZO_ASSINATURA_HORAS * 3_600_000) {
-    return `A hora do monitoramento passou de 7 dias: não é mais possível registrá-lo.`;
-  }
+  // Sem limite para o passado: o lançamento retroativo (qualquer data) entra no consolidado do dia dele.
   if (anteriorEm) {
     const ant = new Date(anteriorEm).getTime();
     if (t <= ant) return "A hora do monitoramento deve ser posterior à do monitoramento anterior desta ficha.";

@@ -249,6 +249,10 @@ export interface Database {
         Args: { p_ids: string[] };
         Returns: { id: string; codigo: string }[];
       };
+      propagar_leitura_adendo: {
+        Args: { p_origem: string; p_adendo: string; p_alvo: string; p_ajustes: { caminho: string }[] };
+        Returns: string;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

@@ -20,6 +20,29 @@ import { motivosBloqueioChecklist } from "../fields/checklistConformidade";
 import { motivosPreenchimentoCarcacas, motivosPreenchimentoChuveiro, motivosPreenchimentoMiudos, motivosPreenchimentoPartes } from "../fields/preenchimentoSpr";
 import type { CaixasVaziasValor, ChillerCarcacasValor, ChillerPartesValor, EletronarcoseAvesValor, LavagemFinalValor, MiniChillersValor, EsperaAvesValor, OcorrenciaPragasValor, PenduraAvesValor, PesoCaixaValor, RastreabilidadeDoaValor, RecepcaoAvesValor, TemperaturaResfriamentoValor, PotabilidadeAguaValor, PotabilidadePontosValor, QualidadeMiudosValor, ControleAbsorcaoValor, ChecklistConformidadeValor } from "../fields/tiposCompostos";
 
+/** Campos simples: ASSINAR EXIGE 100% PREENCHIDO, tenham ou não `obrigatorio`. Número vazio/NaN, texto em branco e seleção sem
+ * escolha bloqueiam. Caixa de marcar (booleano/simples) não entra: desmarcada é uma resposta ("não"), não um vazio. Foto e
+ * assinatura também ficam de fora (só valem quando marcadas obrigatórias no construtor). */
+export function motivoCampoSimplesVazio(campo: CampoTemplate, valor: unknown): string | null {
+  const nome = campo.label ?? campo.chave;
+  switch (campo.tipo) {
+    case "numero":
+    case "inteiro":
+    case "decimal": {
+      const preenchido = typeof valor === "number" ? Number.isFinite(valor) : typeof valor === "string" && valor.trim() !== "" && Number.isFinite(Number(valor.replace(",", ".")));
+      return preenchido ? null : `${nome}: preencha o campo (assinatura exige 100% dos campos preenchidos).`;
+    }
+    case "texto":
+    case "texto_longo":
+    case "hora":
+    case "selecao":
+    case "unica_escolha":
+      return typeof valor === "string" && valor.trim() !== "" ? null : `${nome}: preencha o campo (assinatura exige 100% dos campos preenchidos).`;
+    default:
+      return null;
+  }
+}
+
 export function motivosDeBloqueioSpr(
   campos: CampoTemplate[],
   dados: Record<string, unknown>,
@@ -94,12 +117,10 @@ export function motivosDeBloqueioSpr(
     if (campo.tipo === "lavagem_final") {
       motivos.push(...motivosPreenchimentoChuveiro(dados[campo.chave] as LavagemFinalValor | undefined));
     }
-    // Campos simples obrigatórios: o schema Zod aceita texto vazio, então a conferência é feita aqui.
-    if ((campo.tipo === "texto" || campo.tipo === "texto_longo" || campo.tipo === "hora") && campo.obrigatorio) {
-      const texto = dados[campo.chave];
-      if (typeof texto !== "string" || texto.trim() === "") motivos.push(`${campo.label ?? campo.chave}: campo obrigatório sem preencher.`);
-      continue;
-    }
+    // Campos simples: todos os visíveis precisam estar preenchidos (o schema Zod aceita texto vazio e só exige o `obrigatorio`).
+    const vazio = motivoCampoSimplesVazio(campo, dados[campo.chave]);
+    if (vazio) motivos.push(vazio);
+    if (campo.tipo === "texto" || campo.tipo === "texto_longo" || campo.tipo === "hora" || campo.tipo === "numero" || campo.tipo === "inteiro" || campo.tipo === "decimal" || campo.tipo === "selecao" || campo.tipo === "unica_escolha") continue;
 
     const valor = dados[campo.chave] as Record<string, unknown> | undefined;
     if (!valor || typeof valor !== "object") continue;

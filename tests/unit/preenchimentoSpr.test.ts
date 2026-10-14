@@ -123,13 +123,17 @@ describe("SPR Miúdos e Chuveiro Final", () => {
 });
 
 describe("motivosDeBloqueioSpr", () => {
-  it("campo de texto obrigatório em branco bloqueia; opcional não", () => {
+  it("campo de texto em branco bloqueia, obrigatório ou não (assinar exige 100% preenchido)", () => {
     const campos: CampoTemplate[] = [
       { chave: "a", tipo: "texto", obrigatorio: true, label: "Observação" },
-      { chave: "b", tipo: "texto_longo", obrigatorio: false },
+      { chave: "b", tipo: "texto_longo", obrigatorio: false, label: "Detalhe" },
     ];
-    expect(motivosDeBloqueioSpr(campos, { a: "  ", b: "" })).toEqual(["Observação: campo obrigatório sem preencher."]);
-    expect(motivosDeBloqueioSpr(campos, { a: "ok", b: "" })).toEqual([]);
+    const motivos = motivosDeBloqueioSpr(campos, { a: "  ", b: "" });
+    expect(motivos).toHaveLength(2);
+    expect(motivos[0]).toContain("Observação");
+    expect(motivos[1]).toContain("Detalhe");
+    expect(motivosDeBloqueioSpr(campos, { a: "ok", b: "" })).toHaveLength(1);
+    expect(motivosDeBloqueioSpr(campos, { a: "ok", b: "ok" })).toEqual([]);
   });
 
   it("widget SPR nulo (nunca tocado) bloqueia", () => {

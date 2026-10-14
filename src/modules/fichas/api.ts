@@ -11,7 +11,8 @@ import type { Rnc, StatusRnc } from "@/modules/rnc/api";
 import type { MonitoramentoVerificacao } from "./utils/recordGrouping";
 import { parseConfigExtras } from "@/modules/gestao/api";
 import { turnoParaHeranca, type TurnoHeranca } from "./utils/turnoUtils";
-import { horaEfetiva } from "./utils/horaMonitoramento";
+import { horaEfetiva, instanteDoRegistro } from "./utils/horaMonitoramento";
+import { ensureLocalTime } from "./utils/tempo";
 
 export interface TemplateAtivo {
   id: string;
@@ -682,7 +683,34 @@ export function useFilaVerificacao(filtros: FiltrosVerificacao, templateIdsDoPac
       if (erroPendentes) throw erroPendentes;
       if (erroVerificados) throw erroVerificados;
 
-      return { pendentes: pendentes ?? [], verificados: verificados ?? [] };
+      // Monitoramento solto precisa achar o consolidado dele: um pendente (ex.: retroativo lançado depois da verificação) e um
+      // verificado recente reencontram os irmãos do mesmo dia, por mais antigo que seja (os 500 recentes acima não alcançam).
+      // Em blocos de dias, para a consulta não ficar grande demais.
+      const idsJaTrazidos = new Set((verificados ?? []).map((m) => m.id));
+      const dias = [...new Set([...(pendentes ?? []), ...(verificados ?? [])].map((m) => ensureLocalTime(instanteDoRegistro(m)).isoLocal))];
+      const blocos: string[][] = [];
+      for (let i = 0; i < dias.length; i += 8) blocos.push(dias.slice(i, i + 8));
+      const irmaos = await Promise.all(
+        blocos.map(async (bloco) => {
+          const faixas = bloco.map((dia) => {
+            const ini = new Date(`${dia}T00:00:00-04:00`);
+            const fim = new Date(ini.getTime() + 24 * 3600 * 1000);
+            return (
+              `and(hora_monitoramento.gte.${ini.toISOString()},hora_monitoramento.lt.${fim.toISOString()}),` +
+              `and(hora_monitoramento.is.null,criado_em.gte.${ini.toISOString()},criado_em.lt.${fim.toISOString()})`
+            );
+          });
+          let q = supabase.from("monitoramentos_vigentes").select(CAMPOS_MONITORAMENTO_VERIFICACAO).not("verificado_por", "is", null).or(faixas.join(",")).limit(2000);
+          if (filtros.setor) q = q.eq("setor", filtros.setor);
+          if (templateIdsDoPac) q = q.in("ficha_template_id", templateIdsDoPac);
+          const { data, error } = await q.overrideTypes<MonitoramentoVerificacao[], { merge: false }>();
+          if (error) throw error;
+          return data ?? [];
+        })
+      );
+      const extras = [...new Map(irmaos.flat().filter((m) => !idsJaTrazidos.has(m.id)).map((m) => [m.id, m])).values()];
+
+      return { pendentes: pendentes ?? [], verificados: [...(verificados ?? []), ...extras] };
     },
   });
 }
