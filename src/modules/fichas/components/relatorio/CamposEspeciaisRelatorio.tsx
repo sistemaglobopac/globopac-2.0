@@ -36,7 +36,7 @@ import { pesoVivoMedioDaCarcaca, RENDIMENTO_CARCACA_PERCENTUAL } from "@/modules
 import { tanqueSemProducao } from "@/modules/fichas/fields/tanqueSemProducao";
 import { pragasPresentes, rotuloDaPraga } from "@/modules/fichas/fields/pragas";
 import { COMPORTAMENTOS_AVES } from "@/modules/fichas/fields/esperaAves";
-import { formatarPctDoa } from "@/modules/fichas/fields/rastreabilidadeDoa";
+import { formatarPctDoa, ordenarPorInicioAbate } from "@/modules/fichas/fields/rastreabilidadeDoa";
 import { CHECKLISTS, respostaNaoConforme, rotuloResposta, salasDoChecklist, type TipoChecklist } from "@/modules/fichas/fields/checklistConformidade";
 import { cloroForaDoLimite, lerMedida, phForaDoLimite, rotuloTanque, SISTEMAS_POTABILIDADE } from "@/modules/fichas/fields/potabilidadeAgua";
 import { cloroPontoForaDoLimite, phPontoForaDoLimite, rotuloPonto } from "@/modules/fichas/fields/potabilidadePontos";
@@ -671,15 +671,19 @@ export function RastreabilidadeDoaRelatorio({ valor, titulo = "Rastreabilidade e
   // O mesmo vale para o início da pendura e o veículo (Recepção de Aves): o relatório sai com todos os pesos e
   // horários já conhecidos, mesmo os registrados depois desta apuração.
   const herdadaPorId = new Map((herdadas ?? []).map((h) => [h.carga_id, h]));
-  const cargas = (valor.cargas ?? []).map((c) => {
-    const h = herdadaPorId.get(c.cargaId);
-    return {
-      ...c,
-      pesoMedioKg: c.pesoMedioKg || h?.peso_medio_kg || "",
-      penduraInicioEm: c.penduraInicioEm || h?.pendura_inicio_em || "",
-      placa: c.placa || h?.placa || "",
-    };
-  });
+  // A ordem é sempre a do início do abate, com os horários já completados: a carga informada por último, mas cujo abate
+  // começou no meio, se encaixa na posição certa (e a numeração acompanha), mesmo em registros gravados em outra ordem.
+  const cargas = ordenarPorInicioAbate(
+    (valor.cargas ?? []).map((c) => {
+      const h = herdadaPorId.get(c.cargaId);
+      return {
+        ...c,
+        pesoMedioKg: c.pesoMedioKg || h?.peso_medio_kg || "",
+        penduraInicioEm: c.penduraInicioEm || h?.pendura_inicio_em || "",
+        placa: c.placa || h?.placa || "",
+      };
+    })
+  );
   const comNota = cargas.filter((c) => c.notaSaldo);
   return (
     <div className="col-span-full space-y-2 rounded-lg border border-hairline bg-gray-50 p-3 print:p-2" data-testid="relatorio-rastreabilidade-doa">

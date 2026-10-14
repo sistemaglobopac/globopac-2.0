@@ -100,19 +100,38 @@ export function cargaAguardando(c: Pick<CargaDoa, "penduraInicioEm" | "avesReceb
   return !c.penduraInicioEm && !c.avesRecebidas.trim() && !c.avesMortas.trim();
 }
 
+/** Instante (ms) do início do abate/pendura. Aceita `YYYY-MM-DDTHH:mm[:ss]` (hora de Manaus, UTC-4) ou ISO com fuso;
+ * null se vazio ou inválido. Compara-se o INSTANTE, não o texto: horários gravados em formatos diferentes ordenam certo. */
+export function instanteInicioAbate(texto: string | undefined): number | null {
+  const t = (texto ?? "").trim();
+  if (!t) return null;
+  const iso = /[zZ]|[+-]\d{2}:?\d{2}$/.test(t) ? t : `${t.length === 16 ? `${t}:00` : t}-04:00`;
+  const ms = new Date(iso).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/** Reordena as cargas pelo horário de início do abate (pendura) e renumera a ordem: a carga informada por último, mas
+ * cujo abate começou no meio, se encaixa na posição certa. As sem horário vão para o fim, na ordem em que vieram (a
+ * ordenação é estável); empate de horário mantém a ordem de chegada. */
+export function ordenarPorInicioAbate<T extends { penduraInicioEm: string; ordemPendura: number | null }>(cargas: T[]): T[] {
+  const chave = (c: T) => instanteInicioAbate(c.penduraInicioEm);
+  const ordenadas = [...cargas].sort((a, b) => (chave(a) ?? Infinity) - (chave(b) ?? Infinity) || 0);
+  let n = 0;
+  return ordenadas.map((c) => ({ ...c, ordemPendura: chave(c) === null ? null : ++n }));
+}
+
 /** Monta as linhas do monitoramento: dados herdados (frescos, da recepção) + o que o inspetor já
  * digitou. TODAS as cargas programadas do dia entram, para o DOA refletir a programação inteira: as que
  * já começaram a ser penduradas vêm primeiro, em ordem crescente de início da pendura; as que ainda
  * não chegaram ficam depois, "aguardando chegada". Linhas salvas antes que não voltaram da consulta
  * (carga removida da programação) são mantidas. */
 export function montarCargas(herdadas: CargaHerdadaDoa[], entradas: Record<string, EntradaDoa>, salvas: CargaDoa[] = []): CargaDoa[] {
-  const comPendura = herdadas.filter((h) => h.penduraInicioEm).sort((a, b) => a.penduraInicioEm.localeCompare(b.penduraInicioEm));
-  const ordem = new Map(comPendura.map((h, i) => [h.cargaId, i + 1]));
   const linhas: CargaDoa[] = herdadas
     .map((h) =>
       calcularCarga({
         cargaId: h.cargaId,
-        ordemPendura: ordem.get(h.cargaId) ?? null,
+        ordemPendura: null, // definida abaixo, pela ordenação por início do abate
+
         penduraInicioEm: h.penduraInicioEm,
         placa: h.placa,
         pesoMedioKg: h.pesoMedioKg ?? "",
@@ -129,10 +148,8 @@ export function montarCargas(herdadas: CargaHerdadaDoa[], entradas: Record<strin
   const idsAtuais = new Set(herdadas.map((h) => h.cargaId));
   const orfas = salvas.filter((s) => !idsAtuais.has(s.cargaId)).map((s) => calcularCarga({ ...s, ...(entradas[s.cargaId] ?? {}) }));
 
-  const ordenadas = [...linhas, ...orfas];
-  // Estável: as sem pendura (ordem nula) ficam no fim, na ordem em que a programação as devolveu.
-  ordenadas.sort((a, b) => (a.ordemPendura ?? Infinity) - (b.ordemPendura ?? Infinity));
-  return ordenadas;
+  // Pelo horário de início do abate; as sem horário ficam no fim, na ordem em que a programação as devolveu.
+  return ordenarPorInicioAbate([...linhas, ...orfas]);
 }
 
 export function montarValorDoa(dataAbate: string, cargas: CargaDoa[]): RastreabilidadeDoaValor {

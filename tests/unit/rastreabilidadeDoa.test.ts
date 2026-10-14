@@ -8,6 +8,7 @@ import {
   montarValorDoa,
   motivosBloqueioDoa,
   notaCorrecaoSaldo,
+  ordenarPorInicioAbate,
   type CargaHerdadaDoa,
 } from "@/modules/fichas/fields/rastreabilidadeDoa";
 import type { CargaDoa } from "@/modules/fichas/fields/tiposCompostos";
@@ -165,5 +166,33 @@ describe("herdarComRegistradas", () => {
   it("carga editável usa o herdado fresco e cai no gravado da própria ficha se faltar", () => {
     expect(herdarComRegistradas({ ...fresca, pesoMedioKg: "2,5" }, undefined, { pesoMedioKg: "2,9" } as CargaDoa).pesoMedioKg).toBe("2,5");
     expect(herdarComRegistradas(fresca, undefined, { pesoMedioKg: "2,9" } as CargaDoa).pesoMedioKg).toBe("2,9");
+  });
+});
+
+describe("DOA — ordem pelo início do abate", () => {
+  const linha = (cargaId: string, penduraInicioEm: string, ordemPendura: number | null) => ({ cargaId, penduraInicioEm, ordemPendura });
+
+  it("a carga informada por último, com abate no meio, se encaixa e a numeração é refeita", () => {
+    const gravadas = [linha("A", "2026-10-08T05:10", 1), linha("B", "2026-10-08T07:30", 2), linha("C", "2026-10-08T06:20", 3)];
+    expect(ordenarPorInicioAbate(gravadas).map((c) => [c.cargaId, c.ordemPendura])).toEqual([["A", 1], ["C", 2], ["B", 3]]);
+  });
+
+  it("sem horário vai para o fim, sem número, na ordem em que veio", () => {
+    const r = ordenarPorInicioAbate([linha("X", "", null), linha("B", "2026-10-08T07:30", 1), linha("Y", "", null), linha("A", "2026-10-08T05:10", 2)]);
+    expect(r.map((c) => [c.cargaId, c.ordemPendura])).toEqual([["A", 1], ["B", 2], ["X", null], ["Y", null]]);
+  });
+
+  it("compara o instante, não o texto: formatos diferentes e virada de dia ordenam certo", () => {
+    const r = ordenarPorInicioAbate([
+      linha("T", "2026-10-09T01:00", 1), // madrugada do dia seguinte
+      linha("U", "2026-10-08T23:30:00-04:00", 2),
+      linha("V", "2026-10-09T03:15:00.000Z", 3), // 23:15 em Manaus
+    ]);
+    expect(r.map((c) => c.cargaId)).toEqual(["V", "U", "T"]);
+  });
+
+  it("montarCargas aplica a mesma regra (carga com pendura registrada depois entra na posição do horário)", () => {
+    const l = montarCargas([carga("A", "2026-10-08T05:10"), carga("B", "2026-10-08T07:30"), carga("C", "2026-10-08T06:20")], {});
+    expect(l.map((c) => [c.cargaId, c.ordemPendura])).toEqual([["A", 1], ["C", 2], ["B", 3]]);
   });
 });
