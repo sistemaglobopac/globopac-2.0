@@ -800,6 +800,27 @@ export function usePreviaMonitoramento(monitoramentoId: string | null) {
   });
 }
 
+/** O monitoramento corrigido por adendo tem uma versão mais recente (aditivo): o relatório mostra a VIGENTE, não o original. Devolve o
+ * id da correção mais recente, ou o próprio id se não houve correção. */
+export function useIdVigenteDoMonitoramento(monitoramentoId: string | null) {
+  return useQuery({
+    queryKey: ["painel-bordo", "id-vigente", monitoramentoId],
+    enabled: !!monitoramentoId,
+    queryFn: async (): Promise<string> => {
+      const { data, error } = await supabase
+        .from("monitoramentos")
+        .select("id")
+        .eq("aditivo_de", monitoramentoId as string)
+        .order("criado_em", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(1)
+        .overrideTypes<{ id: string }[], { merge: false }>();
+      if (error) throw error;
+      return data?.[0]?.id ?? (monitoramentoId as string);
+    },
+  });
+}
+
 export function useEncerrarFichaDia() {
   const queryClient = useQueryClient();
   return useMutation({

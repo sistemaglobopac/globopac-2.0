@@ -21,6 +21,7 @@ import {
   CheckCircle2,
   PauseCircle,
   X,
+  FileText,
 } from "lucide-react";
 import { useSessionStore } from "@/store/session";
 import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/api";
@@ -61,6 +62,9 @@ import {
 import { ModalProcessoParado } from "./ModalProcessoParado";
 import { CartaoAvesVazao } from "./CartaoAvesVazao";
 import { PreviaMonitoramentoModal } from "./PreviaMonitoramentoModal";
+import { RelatorioDoMonitoramentoModal } from "./RelatorioDoMonitoramentoModal";
+import { PreviaRascunhoModal } from "@/modules/fichas/components/PreviaRascunhoModal";
+import type { Rascunho } from "@/lib/rascunhos";
 import { useUsuariosMap } from "@/modules/fichas/api";
 import { conferirAvesNaVazao, SETOR_AVES_NA_VAZAO } from "./avesNaVazao";
 import { useCargasRastreabilidade } from "@/modules/recepcao/api";
@@ -148,6 +152,8 @@ export function PainelBordo() {
   const [processoParadoDe, setProcessoParadoDe] = useState<FichaAtrasada | null>(null);
   const [categoriaKpiModal, setCategoriaKpiModal] = useState<CategoriaKpi | null>(null);
   const [previaMonitoramentoId, setPreviaMonitoramentoId] = useState<string | null>(null);
+  const [previaRascunho, setPreviaRascunho] = useState<Rascunho | null>(null);
+  const [relatorioMonitoramentoId, setRelatorioMonitoramentoId] = useState<string | null>(null);
   const { data: nomesUsuarios } = useUsuariosMap();
   const [desvioDetalhe, setDesvioDetalhe] = useState<DesvioAtivo | null>(null);
   const [autocorrigindo, setAutocorrigindo] = useState<{ monitoramentoId: string; fichaNome: string } | null>(null);
@@ -268,6 +274,10 @@ export function PainelBordo() {
     .filter((m) => new Date(m.criado_em).getTime() >= inicioTurno.getTime())
     .sort((a, b) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime());
   const fichasIniciadas = fichasAplicaveis.filter((f) => fichasIniciadasNoTurno.has(f.id));
+  // Rascunhos (preenchidos e ainda não assinados) deste turno, para a mesma prévia dos já assinados.
+  const rascunhosDoTurno = (rascunhosLocais ?? [])
+    .filter((r) => new Date(r.horaMonitoramento).getTime() >= inicioTurno.getTime())
+    .sort((a, b) => new Date(b.horaMonitoramento).getTime() - new Date(a.horaMonitoramento).getTime());
   const codigosEncerrados = new Set(kpis?.fichasEncerradasHoje ?? []);
   const fichasEncerradas = fichasAplicaveis.filter((f) => f.encerravel && codigosEncerrados.has(f.codigo));
   const fichasAtrasadas = turnoHoje ? calcularFichasAtrasadas(fichasAplicaveis, [...(kpis?.monitoramentosDoSetorHoje ?? []), ...rascunhosComoMonitoramentos(rascunhosLocais, userSetores)], agora, codigosEncerrados, kpis?.processosParadosHoje) : [];
@@ -630,7 +640,7 @@ export function PainelBordo() {
               tag="Turno"
               valor={monitoramentosTurno.length}
               tom="primary"
-              onClick={() => abrirTileKpi("monitoramentos", monitoramentosTurno.length)}
+              onClick={() => abrirTileKpi("monitoramentos", monitoramentosTurno.length + rascunhosDoTurno.length)}
             />
             <KpiTile
               titulo="Fichas Ativas"
@@ -976,6 +986,8 @@ export function PainelBordo() {
           categoria={categoriaKpiModal}
           kpis={kpis}
           monitoramentosTurno={monitoramentosTurno}
+          rascunhosDoTurno={rascunhosDoTurno}
+          onAbrirPreviaRascunho={(r) => setPreviaRascunho(r)}
           fichasAplicaveis={fichasIniciadas}
           fichasAtrasadas={fichasAtrasadas}
           desviosComRnc={desviosComRnc}
@@ -985,11 +997,14 @@ export function PainelBordo() {
           }}
           nomesUsuarios={nomesUsuarios}
           onAbrirPrevia={(id) => setPreviaMonitoramentoId(id)}
+          onAbrirRelatorio={(id) => setRelatorioMonitoramentoId(id)}
           onFechar={() => setCategoriaKpiModal(null)}
         />
       )}
 
       {previaMonitoramentoId && <PreviaMonitoramentoModal monitoramentoId={previaMonitoramentoId} onFechar={() => setPreviaMonitoramentoId(null)} />}
+      {relatorioMonitoramentoId && <RelatorioDoMonitoramentoModal monitoramentoId={relatorioMonitoramentoId} onFechar={() => setRelatorioMonitoramentoId(null)} />}
+      {previaRascunho && <PreviaRascunhoModal rascunho={previaRascunho} onFechar={() => setPreviaRascunho(null)} />}
 
       {autocorrigindo && (
         <ModalAutocorrecao
@@ -1261,23 +1276,29 @@ function ModalListaKpi({
   categoria,
   kpis,
   monitoramentosTurno,
+  rascunhosDoTurno,
+  onAbrirPreviaRascunho,
   fichasAplicaveis,
   fichasAtrasadas,
   desviosComRnc,
   onAbrirFicha,
   nomesUsuarios,
   onAbrirPrevia,
+  onAbrirRelatorio,
   onFechar,
 }: {
   categoria: CategoriaKpi;
   kpis: NonNullable<ReturnType<typeof useKpisTurno>["data"]>;
   monitoramentosTurno: MonitoramentoHoje[];
+  rascunhosDoTurno: Rascunho[];
+  onAbrirPreviaRascunho: (r: Rascunho) => void;
   fichasAplicaveis: FichaAtivaResumo[];
   fichasAtrasadas: FichaAtrasada[];
   desviosComRnc: DesvioAtivo[];
   onAbrirFicha: (ficha: FichaAtivaResumo) => void;
   nomesUsuarios: Map<string, string> | undefined;
   onAbrirPrevia: (monitoramentoId: string) => void;
+  onAbrirRelatorio: (monitoramentoId: string) => void;
   onFechar: () => void;
 }) {
   const TITULOS: Record<CategoriaKpi, string> = {
@@ -1329,28 +1350,59 @@ function ModalListaKpi({
           <ul className="max-h-80 space-y-1 overflow-y-auto p-4 text-sm" data-testid="lista-monitoramentos-turno">
             {monitoramentosTurno.map((m) => {
               const quem = m.user_id ? nomesUsuarios?.get(m.user_id) : undefined;
+              const nomeFicha = kpis.nomesFicha.get(m.ficha_template_id)?.nome ?? "Ficha";
               return (
-                <li key={m.id} className="border-b last:border-b-0">
-                  <button
-                    type="button"
-                    onClick={() => onAbrirPrevia(m.id)}
-                    className="flex w-full items-center justify-between gap-3 rounded px-1 py-1.5 text-left transition-colors hover:bg-secondary"
-                    data-testid={`previa-${m.id}`}
-                    aria-label={`Ver prévia: ${kpis.nomesFicha.get(m.ficha_template_id)?.nome ?? "Ficha"} às ${formatarHoraManaus(m.criado_em)}`}
-                  >
-                    <span className="min-w-0">
-                      <span className="block">
-                        {formatarHoraManaus(m.criado_em)} - {kpis.nomesFicha.get(m.ficha_template_id)?.nome ?? "Ficha"}
-                      </span>
-                      {quem && <span className="block text-xs text-muted-foreground">{quem}</span>}
+                <li key={m.id} className="flex items-center justify-between gap-2 border-b last:border-b-0">
+                  <span className="min-w-0 flex-1 py-1.5 pl-1">
+                    <span className="block">
+                      {formatarHoraManaus(m.criado_em)} - {nomeFicha}
                     </span>
-                    <span className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-primary">
+                    {quem && <span className="block text-xs text-muted-foreground">{quem}</span>}
+                  </span>
+                  <span className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => onAbrirPrevia(m.id)}
+                      className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-bold text-primary hover:bg-secondary"
+                      data-testid={`previa-${m.id}`}
+                      aria-label={`Ver prévia: ${nomeFicha} às ${formatarHoraManaus(m.criado_em)}`}
+                    >
                       <Eye className="h-3.5 w-3.5" /> Prévia
-                    </span>
-                  </button>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onAbrirRelatorio(m.id)}
+                      className="inline-flex items-center gap-1 rounded border border-primary/40 px-2 py-1 text-xs font-bold text-primary hover:bg-secondary"
+                      data-testid={`relatorio-${m.id}`}
+                      aria-label={`Ver relatório: ${nomeFicha} às ${formatarHoraManaus(m.criado_em)}`}
+                    >
+                      <FileText className="h-3.5 w-3.5" /> Relatório
+                    </button>
+                  </span>
                 </li>
               );
             })}
+            {rascunhosDoTurno.map((r) => (
+              <li key={r.id} className="border-b last:border-b-0">
+                <button
+                  type="button"
+                  onClick={() => onAbrirPreviaRascunho(r)}
+                  className="flex w-full items-center justify-between gap-3 rounded px-1 py-1.5 text-left transition-colors hover:bg-secondary"
+                  data-testid={`previa-rascunho-${r.id}`}
+                  aria-label={`Ver prévia do rascunho: ${r.nomeFicha} às ${formatarHoraManaus(r.horaMonitoramento)}`}
+                >
+                  <span className="min-w-0">
+                    <span className="block">
+                      {formatarHoraManaus(r.horaMonitoramento)} - {r.nomeFicha}
+                    </span>
+                    <span className="block text-xs text-warning-foreground">Rascunho — ainda não assinado</span>
+                  </span>
+                  <span className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-primary">
+                    <Eye className="h-3.5 w-3.5" /> Prévia
+                  </span>
+                </button>
+              </li>
+            ))}
           </ul>
         ) : (
         <ul className="max-h-80 space-y-1 overflow-y-auto p-4 text-sm">

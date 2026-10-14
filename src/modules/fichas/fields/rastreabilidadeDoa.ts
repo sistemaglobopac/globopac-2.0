@@ -180,20 +180,25 @@ export function montarValorDoa(dataAbate: string, cargas: CargaDoa[]): Rastreabi
   };
 }
 
-/** Motivos que impedem assinar: toda carga que já chegou (pendura iniciada ou algo digitado) precisa de aves
- * recebidas e mortas coerentes. Carga "aguardando chegada" não trava, mas ao menos uma carga precisa ter
- * chegado para haver o que apurar. */
+/** Carga com ao menos uma das contagens digitadas (recebidas ou mortas): a que o inspetor já começou a informar. */
+export function cargaInformada(c: Pick<CargaDoa, "avesRecebidas" | "avesMortas">): boolean {
+  return Boolean(c.avesRecebidas.trim() || c.avesMortas.trim());
+}
+
+/** Motivos que impedem assinar. O DOA se informa PARCIALMENTE: só as cargas em que o inspetor já digitou algo precisam estar
+ * completas e coerentes (aves recebidas e mortas); as que ainda não foram contadas — pendurada ou aguardando chegada — ficam para
+ * uma apuração seguinte e não travam a assinatura. Ao menos uma carga precisa ser informada, para haver o que apurar. */
 export function motivosBloqueioDoa(v: RastreabilidadeDoaValor | undefined | null): string[] {
   const p = "DOA";
   if (!v || !v.cargas || v.cargas.length === 0) {
     return [`${p}: nenhuma carga programada para esta data — cadastre a programação ou escolha outra data.`];
   }
-  const chegadas = v.cargas.filter((c) => !cargaAguardando(c));
-  if (chegadas.length === 0) {
-    return [`${p}: nenhuma carga chegou ainda (sem pendura iniciada) — registre a recepção de aves ou aguarde a chegada.`];
+  const informadas = v.cargas.filter(cargaInformada);
+  if (informadas.length === 0) {
+    return [`${p}: informe as aves que vieram e as mortas de ao menos uma carga — as demais podem ficar para a próxima apuração.`];
   }
   const m: string[] = [];
-  for (const c of chegadas) {
+  for (const c of informadas) {
     const nome = `GTA ${c.gta || "?"}`;
     const recebidas = lerContagem(c.avesRecebidas);
     const mortas = lerContagem(c.avesMortas);

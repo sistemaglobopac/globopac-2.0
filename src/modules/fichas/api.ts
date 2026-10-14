@@ -929,12 +929,21 @@ export function useDadosRelatorio(ids: string[]) {
       if (erroTemplates) throw erroTemplates;
       if (erroPerfis) throw erroPerfis;
 
+      // O inspetor só lê os modelos ATIVOS (RLS): o de uma ficha reeditada no meio do dia vem pela função templates_por_ids.
+      const achados = new Set((templates ?? []).map((t) => t.id));
+      const faltantes = templateIds.filter((id) => !achados.has(id));
+      let templatesExtras: TemplateRelatorio[] = [];
+      if (faltantes.length > 0) {
+        const { data: porIds } = await supabase.rpc("templates_por_ids", { p_ids: faltantes });
+        templatesExtras = (porIds ?? []) as unknown as TemplateRelatorio[];
+      }
+
       return {
         monitoramentos: monitoramentos ?? [],
         assinaturas: assinaturas ?? [],
         rncs: rncs ?? [],
         autocorrecoes: autocorrecoes ?? [],
-        templatesPorId: new Map((templates ?? []).map((t) => [t.id, t])),
+        templatesPorId: new Map([...(templates ?? []), ...templatesExtras].map((t) => [t.id, t])),
         nomesPorId: new Map(((perfis ?? []) as { id: string; nome_completo: string }[]).map((p) => [p.id, p.nome_completo])),
       };
     },

@@ -104,25 +104,31 @@ describe("DOA — bloqueio de assinatura", () => {
     expect(motivosDeBloqueioSpr(campos, { doa: null })).toHaveLength(1);
   });
 
-  it("carga aguardando chegada não trava o que já foi apurado, mas sem nenhuma chegada não há o que assinar", () => {
-    const programadas = [carga("A", "2026-10-02T05:10"), carga("C", "")];
+  it("informa parcialmente: carga sem nada digitado (aguardando ou já pendurada) não trava o que já foi apurado", () => {
+    const programadas = [carga("A", "2026-10-02T05:10"), carga("B", "2026-10-02T06:10"), carga("C", "")];
     const parcial = montarValorDoa("2026-10-02", montarCargas(programadas, { A: { avesRecebidas: "1000", avesMortas: "2" } }));
-    expect(parcial.cargas).toHaveLength(2);
+    expect(parcial.cargas).toHaveLength(3);
     expect(motivosBloqueioDoa(parcial)).toEqual([]);
-    const nenhuma = montarValorDoa("2026-10-02", montarCargas([carga("C", "")], {}));
+    expect(motivosDeBloqueioSpr(campos, { doa: parcial })).toEqual([]);
+    // a soma do dia conta só a carga informada
+    expect(parcial).toMatchObject({ totalRecebidas: 1000, totalMortas: 2 });
+  });
+
+  it("sem nenhuma carga informada não há o que assinar", () => {
+    const nenhuma = montarValorDoa("2026-10-02", montarCargas([carga("A", "2026-10-02T05:10"), carga("C", "")], {}));
     expect(motivosBloqueioDoa(nenhuma)).toHaveLength(1);
-    expect(motivosBloqueioDoa(nenhuma)[0]).toMatch(/nenhuma carga chegou/);
+    expect(motivosBloqueioDoa(nenhuma)[0]).toMatch(/ao menos uma carga/);
   });
 
-  it("carga que chegou mas ficou pela metade continua travando", () => {
-    const v = montarValorDoa("2026-10-02", montarCargas([carga("A", "2026-10-02T05:10"), carga("C", "")], { C: { avesRecebidas: "10", avesMortas: "" } }));
-    // A (pendurada, sem nada digitado): 2 faltas; C (recebidas sem mortas): 1 falta.
-    expect(motivosBloqueioDoa(v)).toHaveLength(3);
+  it("carga começada pela metade (só recebidas ou só mortas) continua travando", () => {
+    const v = montarValorDoa("2026-10-02", montarCargas([carga("A", "2026-10-02T05:10"), carga("B", "2026-10-02T06:10"), carga("C", "")], { A: { avesRecebidas: "1000", avesMortas: "1" }, C: { avesRecebidas: "10", avesMortas: "" } }));
+    // B (nada digitado) não trava; C (recebidas sem mortas): 1 falta.
+    expect(motivosBloqueioDoa(v)).toHaveLength(1);
+    const soMortas = montarValorDoa("2026-10-02", montarCargas([carga("A", "2026-10-02T05:10")], { A: { avesRecebidas: "", avesMortas: "3" } }));
+    expect(motivosBloqueioDoa(soMortas)).toHaveLength(1);
   });
 
-  it("exige recebidas e mortas (zero vale) em cada carga listada", () => {
-    const incompleto = montarValorDoa("2026-10-02", montarCargas([carga("A", "2026-10-02T05:10")], {}));
-    expect(motivosBloqueioDoa(incompleto).length).toBe(2);
+  it("carga informada exige recebidas e mortas (zero vale)", () => {
     const completo = montarValorDoa("2026-10-02", montarCargas([carga("A", "2026-10-02T05:10")], { A: { avesRecebidas: "1000", avesMortas: "0" } }));
     expect(motivosBloqueioDoa(completo)).toEqual([]);
     expect(motivosDeBloqueioSpr(campos, { doa: completo })).toEqual([]);

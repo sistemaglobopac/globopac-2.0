@@ -5,7 +5,7 @@ import { Label } from "@/shared/ui/label";
 import { useCargasRastreabilidade, useDoaCargasRegistradas } from "@/modules/recepcao/api";
 import { ensureLocalTime } from "../utils/tempo";
 import { formatarDataHora } from "./recepcaoAves";
-import { cargaAguardando, doaVazio, formatarPctDoa, herdarComRegistradas, lerContagem, montarCargas, montarValorDoa, motivosBloqueioDoa, type CargaHerdadaDoa, type EntradaDoa } from "./rastreabilidadeDoa";
+import { cargaAguardando, cargaInformada, doaVazio, formatarPctDoa, herdarComRegistradas, lerContagem, montarCargas, montarValorDoa, motivosBloqueioDoa, type CargaHerdadaDoa, type EntradaDoa } from "./rastreabilidadeDoa";
 import type { RastreabilidadeDoaValor } from "./tiposCompostos";
 
 import type { CargasEmRascunhoPorTipo } from "../utils/rascunhosAnterior";
@@ -81,6 +81,8 @@ export function RastreabilidadeDoaField({ value, onChange, disabled, cargasUsada
   const notas = valor.cargas.filter((c) => c.notaSaldo);
   const aguardando = valor.cargas.filter(cargaAguardando).length;
   const apuradas = valor.cargas.filter((c) => lerContagem(c.avesRecebidas) !== null && lerContagem(c.avesMortas) !== null).length;
+  // Pendurada (ou já chegou) mas ainda sem contagem: pode ficar para a próxima apuração, não trava a assinatura.
+  const semContagem = valor.cargas.filter((c) => !cargaAguardando(c) && !cargaInformada(c)).length;
 
   useEffect(() => {
     onChange(valor);
@@ -105,6 +107,7 @@ export function RastreabilidadeDoaField({ value, onChange, disabled, cargasUsada
           <span>
             <strong>{apuradas}</strong> de <strong>{valor.cargas.length}</strong> cargas programadas apuradas
             {aguardando > 0 ? ` · ${aguardando} aguardando chegada` : ""}
+            {semContagem > 0 ? ` · ${semContagem} sem contagem (ficam para a próxima apuração)` : ""}
           </span>
           <a className="flex items-center gap-1 font-semibold text-primary underline" href={`/conferencia-cargas?data=${dataAbate}`} target="_blank" rel="noreferrer">
             <ClipboardList className="h-3.5 w-3.5" /> Conferência das cargas do dia
@@ -114,6 +117,7 @@ export function RastreabilidadeDoaField({ value, onChange, disabled, cargasUsada
 
       <fieldset className="space-y-3" disabled={disabled}>
         <legend className="text-xs font-black uppercase tracking-wider text-muted-foreground">Rastreabilidade e controle de DOA por carga</legend>
+        <p className="text-xs text-muted-foreground">Informe só as cargas que já foram contadas: as demais ficam para a próxima apuração.</p>
         <div className="space-y-1 sm:w-48">
           <Label htmlFor="doa-data">Data do abate</Label>
           <Input id="doa-data" type="date" value={dataAbate} onChange={(e) => e.target.value && setDataAbate(e.target.value)} />

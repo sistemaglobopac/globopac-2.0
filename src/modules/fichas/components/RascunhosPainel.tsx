@@ -1,13 +1,14 @@
 import { useState } from "react";
-import { AlertTriangle, ClipboardList, Trash2, WifiOff } from "lucide-react";
+import { AlertTriangle, ClipboardList, Eye, Trash2, WifiOff } from "lucide-react";
 import { useSessionStore } from "@/store/session";
-import { prazoDoRascunho, rascunhoExpirado, removerRascunho } from "@/lib/rascunhos";
+import { prazoDoRascunho, rascunhoExpirado, removerRascunho, type Rascunho } from "@/lib/rascunhos";
 import { ModalAssinaturaSenha } from "@/shared/ModalAssinaturaSenha";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { assinarRascunhosEmLote, confirmarRascunhosOffline, useAtualizarRascunhos, useRascunhos } from "../useRascunhos";
 import { useQueryClient } from "@tanstack/react-query";
+import { PreviaRascunhoModal } from "./PreviaRascunhoModal";
 
 const formatar = (iso: string | Date) =>
   new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Manaus", dateStyle: "short", timeStyle: "short" });
@@ -23,6 +24,7 @@ export function RascunhosPainel() {
   const [assinando, setAssinando] = useState(false);
   const [progresso, setProgresso] = useState<{ atual: number; total: number } | null>(null);
   const [resumo, setResumo] = useState<string | null>(null);
+  const [previa, setPrevia] = useState<Rascunho | null>(null);
 
   if (!perfil || !rascunhos || rascunhos.length === 0) return null;
 
@@ -83,6 +85,9 @@ export function RascunhosPainel() {
                   </Badge>
                 )}
                 {expirado && <Badge variant="secondary">Prazo vencido</Badge>}
+                <Button type="button" size="sm" variant="outline" onClick={() => setPrevia(r)} data-testid={`previa-rascunho-${r.id}`}>
+                  <Eye className="h-3.5 w-3.5" /> Prévia
+                </Button>
                 <Button
                   type="button"
                   size="sm"
@@ -118,6 +123,8 @@ export function RascunhosPainel() {
           {online ? `Assinar todos (${assinaveis.length})` : `Confirmar todos sem internet (${assinaveis.length})`}
         </Button>
       </CardContent>
+
+      {previa && <PreviaRascunhoModal rascunho={previa} onFechar={() => setPrevia(null)} />}
 
       {assinando && (
         <ModalAssinaturaSenha
