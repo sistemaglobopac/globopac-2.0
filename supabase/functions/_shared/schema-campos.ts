@@ -449,17 +449,19 @@ export function zodFromSchemaCampos(campos: CampoTemplate[]): z.ZodEffects<z.Zod
                 .passthrough()
             : z.unknown();
         break;
-      // Área de espera: obrigatória, ao menos um box com carga; o restante (comportamento,
-      // temperatura, equipamentos) é conferido na tela antes de assinar.
+      // Área de espera: obrigatória, ao menos um box com carga — exceto com "não há veículos nos
+      // boxes" (semVeiculos), que emite boxes vazio; o restante (comportamento, temperatura,
+      // equipamentos) é conferido na tela antes de assinar.
       case "espera_aves":
         fieldSchema =
           campo.obrigatorio && !campo.dependeDe
             ? z
                 .object(
-                  { boxes: z.array(z.unknown()).min(1, "Informe ao menos um box") },
+                  { boxes: z.array(z.unknown()), semVeiculos: z.boolean().optional() },
                   { required_error: "Campo obrigatório", invalid_type_error: "Campo obrigatório" }
                 )
                 .passthrough()
+                .refine((v) => v.semVeiculos === true || v.boxes.length > 0, { message: "Informe ao menos um box", path: ["boxes"] })
             : z.unknown();
         break;
       // Rastreabilidade de DOA: obrigatória, ao menos uma carga listada; aves recebidas/mortas são

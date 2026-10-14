@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { acaoCorretivaPendente, avaliarEspera, boxVazio, BOXES_ESPERA, proximoBoxLivre, esperaVazia, lerTemperatura, montarValorEspera, motivosBloqueioEspera } from "@/modules/fichas/fields/esperaAves";
 import { desviosEspeciais } from "@/modules/fichas/utils/desviosEspeciais";
 import { motivosDeBloqueioSpr } from "@/modules/fichas/utils/bloqueiosSpr";
-import type { CampoTemplate } from "@/shared/schema-campos";
+import { zodFromSchemaCampos, type CampoTemplate } from "@/shared/schema-campos";
 import type { BoxEsperaAves, EsperaAvesValor } from "@/modules/fichas/fields/tiposCompostos";
 
 function box(parcial: Partial<BoxEsperaAves> = {}): BoxEsperaAves {
@@ -101,6 +101,14 @@ describe("espera de aves — bem-estar animal", () => {
 
   it("sem marcar 'sem veículos', continua exigindo o preenchimento completo", () => {
     expect(motivosBloqueioEspera(esperaVazia()).length).toBeGreaterThan(0);
+  });
+
+  it("o Zod do campo obrigatório aceita 'sem veículos' (boxes vazio) e segue exigindo box sem a marcação", () => {
+    const campos = [{ chave: "esp", tipo: "espera_aves", obrigatorio: true, label: "Área de espera" }] as CampoTemplate[];
+    const schema = zodFromSchemaCampos(campos);
+    expect(schema.safeParse({ esp: montarValorEspera({ ...esperaVazia(), semVeiculos: true }) }).success).toBe(true);
+    expect(schema.safeParse({ esp: { ...esperaVazia(), boxes: [] } }).success).toBe(false);
+    expect(schema.safeParse({ esp: montarValorEspera(completo()) }).success).toBe(true);
   });
 });
 
