@@ -195,4 +195,4 @@ grant execute on function public.propagar_leitura_adendo(uuid, uuid, uuid, jsonb
 
 comment on function public.propagar_leitura_adendo(uuid, uuid, uuid, jsonb) is
   'Grava o aditivo do monitoramento SEGUINTE (de qualquer inspetor) com a leitura anterior acertada pela correção de um adendo assinado. '
-  'Valida tudo no servidor; só altera `...prev` para a leitura herdada nova. Ver 20261014100000.';
+  'Valida tudo no servidor; só altera `...prev` para a leitura herdada nova. Ver 20261014083708.';

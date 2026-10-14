@@ -1,4 +1,4 @@
--- Testes pgTAP — propagar_leitura_adendo (20261014100000_propagar_leitura_adendo.sql): a correção de leitura de um adendo assinado
+-- Testes pgTAP — propagar_leitura_adendo (20261014083708_propagar_leitura_adendo.sql): a correção de leitura de um adendo assinado
 -- acerta a leitura anterior do monitoramento SEGUINTE, mesmo sendo de outro inspetor, e só nisso.
 
 create extension if not exists pgtap with schema extensions;
