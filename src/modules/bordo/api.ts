@@ -3,6 +3,7 @@ import { temNaoConformidade } from "@/modules/fichas/utils/desviosEspeciais";
 import { aplicarNoCaminho } from "@/modules/fichas/utils/adendoCampos";
 import { aditivosVigentes, idsAdendosConcluidos } from "@/modules/fichas/utils/adendosPendentes";
 import { propagarLeituraNosSeguintes } from "@/modules/fichas/utils/propagacaoCorrecao";
+import { ajustesDeCargaDoa, ajustesQueSeAplicam, recalcularDoaNoRegistro } from "@/modules/fichas/utils/doaCorrecao";
 import { horaEfetiva } from "@/modules/fichas/utils/horaMonitoramento";
 import { turnoParaHeranca } from "@/modules/fichas/utils/turnoUtils";
 import { supabase } from "@/lib/supabase";
@@ -887,6 +888,8 @@ export function useAssinarAdendo() {
       for (const [caminho, correcao] of Object.entries(input.corrections)) {
         dadosCorrigidos = aplicarNoCaminho(dadosCorrigidos, caminho, correcao.new);
       }
+      // DOA: o adendo troca o valor digitado; a % de DOA, o saldo e a SOMA do dia são refeitos a partir dele.
+      dadosCorrigidos = recalcularDoaNoRegistro(dadosCorrigidos);
 
       const { error: erroInsert } = await supabase.from("monitoramentos").insert({
         ficha_template_id: original.ficha_template_id,
@@ -901,7 +904,9 @@ export function useAssinarAdendo() {
       // A correção segue para os monitoramentos seguintes que já foram feitos com a leitura antiga. Falha aqui não desfaz a
       // assinatura do adendo (já gravada): vira aviso para o inspetor.
       try {
-        return await propagarCorrecaoNosSeguintes({ origem: original, adendoId: input.adendoId, dadosCorrigidos, corrections: input.corrections, agora });
+        const leituras = await propagarCorrecaoNosSeguintes({ origem: original, adendoId: input.adendoId, dadosCorrigidos, corrections: input.corrections, agora });
+        const cargas = await propagarCorrecaoDoaNosSeguintes({ origem: original, adendoId: input.adendoId, dadosCorrigidos, corrections: input.corrections });
+        return { propagados: leituras.propagados + cargas.propagados, naoPropagados: 0 };
       } catch (erro) {
         return { propagados: 0, naoPropagados: 0, erro: erro instanceof Error ? erro.message : "Falha ao propagar a correção." };
       }
@@ -911,6 +916,67 @@ export function useAssinarAdendo() {
       void queryClient.invalidateQueries({ queryKey: ["monitoramentos"] });
     },
   });
+}
+
+/** Correção de dado de CARGA no DOA segue para as apurações seguintes do mesmo dia de abate (cada apuração guarda a própria cópia da
+ * carga e a soma do dia): cada uma ganha um aditivo com a carga corrigida e a soma refeita (função do banco
+ * propagar_correcao_carga_doa, que revalida tudo) e volta para a verificação. */
+async function propagarCorrecaoDoaNosSeguintes(args: {
+  origem: { id: string; aditivo_de: string | null; ficha_template_id: string; setor: string; hora_monitoramento: string | null; criado_em: string };
+  adendoId: string;
+  dadosCorrigidos: Record<string, unknown>;
+  corrections: Record<string, { old: unknown; new: unknown }>;
+}): Promise<{ propagados: number }> {
+  const { origem, adendoId, dadosCorrigidos, corrections } = args;
+  const ajustes = ajustesDeCargaDoa(dadosCorrigidos, corrections);
+  if (ajustes.length === 0) return { propagados: 0 };
+
+  const raizOrigem = origem.aditivo_de ?? origem.id;
+  const horaOrigem = new Date(horaEfetiva(origem)).toISOString();
+  // Um dia de abate pode atravessar a meia-noite: olha as 48 h seguintes e confere o dia de abate dentro do registro.
+  const limite = new Date(new Date(horaOrigem).getTime() + 48 * 3_600_000).toISOString();
+
+  const { data: cods, error: erroCod } = await supabase.rpc("codigos_de_templates", { p_ids: [origem.ficha_template_id] });
+  if (erroCod) throw erroCod;
+  const codigo = (cods as unknown as { id: string; codigo: string }[] | null)?.[0]?.codigo;
+  if (!codigo) return { propagados: 0 };
+  const { data: versoes, error: erroVersoes } = await supabase.rpc("ids_versoes_ficha", { p_codigo: codigo });
+  if (erroVersoes) throw erroVersoes;
+
+  type Linha = { id: string; aditivo_de: string | null; dados_dinamicos: Record<string, unknown>; hora_monitoramento: string | null; criado_em: string };
+  const { data: linhas, error } = await supabase
+    .from("monitoramentos_vigentes")
+    .select("id, aditivo_de, dados_dinamicos, hora_monitoramento, criado_em")
+    .in("ficha_template_id", (versoes as unknown as string[] | null) ?? [])
+    .eq("setor", origem.setor)
+    .or(`and(hora_monitoramento.gt.${horaOrigem},hora_monitoramento.lt.${limite}),and(hora_monitoramento.is.null,criado_em.gt.${horaOrigem},criado_em.lt.${limite})`)
+    .limit(500)
+    .overrideTypes<Linha[], { merge: false }>();
+  if (error) throw error;
+
+  // Uma versão por monitoramento (liberado ao SIF aparece o original e a correção): vale a gravada por último.
+  const porRaiz = new Map<string, Linha>();
+  for (const l of linhas ?? []) {
+    const raiz = l.aditivo_de ?? l.id;
+    if (raiz === raizOrigem) continue;
+    const atual = porRaiz.get(raiz);
+    if (!atual || l.criado_em > atual.criado_em) porRaiz.set(raiz, l);
+  }
+
+  let propagados = 0;
+  for (const alvo of [...porRaiz.values()].sort((a, b) => (horaEfetiva(a) < horaEfetiva(b) ? -1 : 1))) {
+    const aplicaveis = ajustesQueSeAplicam(ajustes, alvo.dados_dinamicos);
+    if (aplicaveis.length === 0) continue;
+    const { error: erroRpc } = await supabase.rpc("propagar_correcao_carga_doa", {
+      p_origem: raizOrigem,
+      p_adendo: adendoId,
+      p_alvo: alvo.id,
+      p_ajustes: aplicaveis.map((a) => ({ campo: a.campo, cargaId: a.cargaId, prop: a.prop })),
+    });
+    if (erroRpc) throw erroRpc;
+    propagados += 1;
+  }
+  return { propagados };
 }
 
 /** Leituras de hidrômetro corrigidas por adendo seguem para os monitoramentos seguintes (mesma ficha, setor, dia e turno) que

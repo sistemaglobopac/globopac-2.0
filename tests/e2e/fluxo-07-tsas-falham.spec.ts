@@ -31,6 +31,8 @@ test("falha simultânea de todas as TSAs marca o carimbo como pendente sem trava
     await page.goto("/fichas/nova");
     await selecionarTemplate(page, "Monitoramento de Temperatura — Linha DIF (v1)");
     await page.locator("#temperatura_celsius").fill("25");
+    // Assinar exige 100% dos campos preenchidos (inclusive os não obrigatórios).
+    await page.locator("#observacoes").fill(`E2E-fluxo7-${Date.now()}`);
 
     const antesDaCriacao = new Date().toISOString();
     // Hora do monitoramento agora é obrigatória e informada pelo inspetor.

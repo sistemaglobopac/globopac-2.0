@@ -249,6 +249,10 @@ export interface Database {
         Args: { p_ids: string[] };
         Returns: { id: string; codigo: string }[];
       };
+      propagar_correcao_carga_doa: {
+        Args: { p_origem: string; p_adendo: string; p_alvo: string; p_ajustes: { campo: string; cargaId: string; prop: string }[] };
+        Returns: string;
+      };
       propagar_leitura_adendo: {
         Args: { p_origem: string; p_adendo: string; p_alvo: string; p_ajustes: { caminho: string }[] };
         Returns: string;

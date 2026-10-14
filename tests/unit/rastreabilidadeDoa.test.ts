@@ -9,6 +9,7 @@ import {
   motivosBloqueioDoa,
   notaCorrecaoSaldo,
   ordenarPorInicioAbate,
+  semCargasApagadas,
   type CargaHerdadaDoa,
 } from "@/modules/fichas/fields/rastreabilidadeDoa";
 import type { CargaDoa } from "@/modules/fichas/fields/tiposCompostos";
@@ -194,5 +195,14 @@ describe("DOA — ordem pelo início do abate", () => {
   it("montarCargas aplica a mesma regra (carga com pendura registrada depois entra na posição do horário)", () => {
     const l = montarCargas([carga("A", "2026-10-08T05:10"), carga("B", "2026-10-08T07:30"), carga("C", "2026-10-08T06:20")], {});
     expect(l.map((c) => [c.cargaId, c.ordemPendura])).toEqual([["A", 1], ["C", 2], ["B", 3]]);
+  });
+});
+
+describe("carga apagada da programação sai do DOA", () => {
+  const cargas = [{ cargaId: "a" }, { cargaId: "b" }, { cargaId: "c" }];
+  it("mantém só as cargas que ainda existem; sem resposta da consulta não esconde nada", () => {
+    expect(semCargasApagadas(cargas, new Set(["a", "c"]))).toEqual([{ cargaId: "a" }, { cargaId: "c" }]);
+    expect(semCargasApagadas(cargas, new Set())).toEqual([]);
+    expect(semCargasApagadas(cargas, undefined)).toEqual(cargas);
   });
 });

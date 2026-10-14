@@ -120,6 +120,12 @@ export function ordenarPorInicioAbate<T extends { penduraInicioEm: string; ordem
   return ordenadas.map((c) => ({ ...c, ordemPendura: chave(c) === null ? null : ++n }));
 }
 
+/** Carga APAGADA da programação sai do DOA: fica só o que ainda existe. `idsExistentes` indefinido (consulta ainda não voltou ou
+ * sem conexão) não filtra nada — não se esconde carga por falta de resposta. */
+export function semCargasApagadas<T extends { cargaId: string }>(cargas: T[], idsExistentes: ReadonlySet<string> | undefined): T[] {
+  return idsExistentes ? cargas.filter((c) => idsExistentes.has(c.cargaId)) : cargas;
+}
+
 /** Monta as linhas do monitoramento: dados herdados (frescos, da recepção) + o que o inspetor já
  * digitou. TODAS as cargas programadas do dia entram, para o DOA refletir a programação inteira: as que
  * já começaram a ser penduradas vêm primeiro, em ordem crescente de início da pendura; as que ainda

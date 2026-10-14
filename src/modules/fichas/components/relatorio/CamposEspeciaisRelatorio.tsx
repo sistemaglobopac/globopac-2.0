@@ -36,7 +36,7 @@ import { pesoVivoMedioDaCarcaca, RENDIMENTO_CARCACA_PERCENTUAL } from "@/modules
 import { tanqueSemProducao } from "@/modules/fichas/fields/tanqueSemProducao";
 import { pragasPresentes, rotuloDaPraga } from "@/modules/fichas/fields/pragas";
 import { COMPORTAMENTOS_AVES } from "@/modules/fichas/fields/esperaAves";
-import { formatarPctDoa, ordenarPorInicioAbate } from "@/modules/fichas/fields/rastreabilidadeDoa";
+import { calcularCarga, formatarPctDoa, montarValorDoa, ordenarPorInicioAbate, semCargasApagadas } from "@/modules/fichas/fields/rastreabilidadeDoa";
 import { CHECKLISTS, respostaNaoConforme, rotuloResposta, salasDoChecklist, type TipoChecklist } from "@/modules/fichas/fields/checklistConformidade";
 import { cloroForaDoLimite, lerMedida, phForaDoLimite, rotuloTanque, SISTEMAS_POTABILIDADE } from "@/modules/fichas/fields/potabilidadeAgua";
 import { cloroPontoForaDoLimite, phPontoForaDoLimite, rotuloPonto } from "@/modules/fichas/fields/potabilidadePontos";
@@ -673,23 +673,29 @@ export function RastreabilidadeDoaRelatorio({ valor, titulo = "Rastreabilidade e
   const herdadaPorId = new Map((herdadas ?? []).map((h) => [h.carga_id, h]));
   // A ordem é sempre a do início do abate, com os horários já completados: a carga informada por último, mas cujo abate
   // começou no meio, se encaixa na posição certa (e a numeração acompanha), mesmo em registros gravados em outra ordem.
+  // Carga APAGADA da programação não aparece (só se filtra depois que a consulta das cargas do dia voltou).
+  const existentes = herdadas ? new Set(herdadas.map((h) => h.carga_id)) : undefined;
   const cargas = ordenarPorInicioAbate(
-    (valor.cargas ?? []).map((c) => {
+    semCargasApagadas(valor.cargas ?? [], existentes).map((c) => {
       const h = herdadaPorId.get(c.cargaId);
-      return {
+      const completa = {
         ...c,
         pesoMedioKg: c.pesoMedioKg || h?.peso_medio_kg || "",
         penduraInicioEm: c.penduraInicioEm || h?.pendura_inicio_em || "",
         placa: c.placa || h?.placa || "",
       };
+      // % de DOA, saldo e nota sempre conferem com as aves exibidas (um adendo troca o valor digitado, não o derivado gravado).
+      return typeof c.qtdPrevista === "number" && typeof c.avesRecebidas === "string" && typeof c.avesMortas === "string" ? calcularCarga(completa) : completa;
     })
   );
+  // A soma do dia acompanha as cargas exibidas (sem as apagadas e com os valores corrigidos).
+  const totais = montarValorDoa(valor.dataAbate, cargas);
   const comNota = cargas.filter((c) => c.notaSaldo);
   return (
     <div className="col-span-full space-y-2 rounded-lg border border-hairline bg-gray-50 p-3 print:p-2" data-testid="relatorio-rastreabilidade-doa">
       <div className="flex items-center justify-between gap-2">
         <span className="text-[10px] font-black uppercase tracking-wider text-primary print:text-[9px]">{titulo}</span>
-        <span className="text-[10px] font-black print:text-[8px]">DOA do dia: {formatarPctDoa(valor.doaTotalPct)}</span>
+        <span className="text-[10px] font-black print:text-[8px]">DOA do dia: {formatarPctDoa(totais.doaTotalPct)}</span>
       </div>
       <table className="max-sm:block max-sm:overflow-x-auto w-full text-[10px] print:text-[8px]">
         <thead>
@@ -731,9 +737,9 @@ export function RastreabilidadeDoaRelatorio({ valor, titulo = "Rastreabilidade e
         <tfoot>
           <tr className="border-t font-black">
             <td colSpan={7} className="pr-2 pt-1 text-right">Total</td>
-            <td className="pr-2 pt-1">{valor.totalRecebidas.toLocaleString("pt-BR")}</td>
-            <td className="pr-2 pt-1">{valor.totalMortas.toLocaleString("pt-BR")}</td>
-            <td className="pt-1">{formatarPctDoa(valor.doaTotalPct)}</td>
+            <td className="pr-2 pt-1">{totais.totalRecebidas.toLocaleString("pt-BR")}</td>
+            <td className="pr-2 pt-1">{totais.totalMortas.toLocaleString("pt-BR")}</td>
+            <td className="pt-1">{formatarPctDoa(totais.doaTotalPct)}</td>
           </tr>
         </tfoot>
       </table>

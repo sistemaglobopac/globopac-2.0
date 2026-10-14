@@ -72,7 +72,8 @@ export function RastreabilidadeDoaField({ value, onChange, disabled, cargasUsada
     const salvas = [...(dataAbate === inicial.current.dataAbate ? inicial.current.cargas : []), ...anteriores.values()];
     const efetivas: Record<string, EntradaDoa> = { ...entradas };
     for (const c of anteriores.values()) efetivas[c.cargaId] = { avesRecebidas: c.avesRecebidas, avesMortas: c.avesMortas };
-    return montarValorDoa(dataAbate, montarCargas(rpc ? herdadas : [], efetivas, salvas));
+    // Com a consulta respondida, carga apagada da programação não volta pelas linhas salvas; sem resposta (offline) elas ficam.
+    return montarValorDoa(dataAbate, montarCargas(rpc ? herdadas : [], efetivas, rpc ? [] : salvas));
   }, [rpc, herdadas, entradas, dataAbate, anteriores]);
 
   const faltas = motivosBloqueioDoa(valor);
