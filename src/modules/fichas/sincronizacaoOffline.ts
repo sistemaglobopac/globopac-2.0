@@ -9,8 +9,13 @@ import {
   atualizarStatusFicha,
   listarFichasEnfileiradas,
   removerFichaEnfileirada,
+  tentativaAbandonada,
   type FichaEnfileirada,
 } from "@/lib/offlineQueue";
+
+/** Prazo de cada chamada ao servidor na sincronização. Sem isto, uma conexão que "pendura" deixava a tentativa para sempre
+ * em andamento e bloqueava a fila inteira; estourado o prazo, o item volta a "falhou" e é tentado de novo em 10 s. */
+const PRAZO_CHAMADA_MS = 30_000;
 
 export interface ResultadoSincronizacao {
   sincronizadas: string[];
@@ -30,7 +35,8 @@ async function jaAssinadaComoInspetor(monitoramentoId: string, userId: string, t
     .eq("monitoramento_id", monitoramentoId)
     .eq("tipo", tipo)
     .eq("user_id", userId)
-    .limit(1);
+    .limit(1)
+    .abortSignal(AbortSignal.timeout(PRAZO_CHAMADA_MS));
   if (error) throw error;
   return (data?.length ?? 0) > 0;
 }
@@ -51,7 +57,7 @@ export async function sincronizarUmaFicha(item: FichaEnfileirada): Promise<void>
       ...(item.confirmacaoOffline ? { confirmacao_offline: item.confirmacaoOffline } : {}),
     },
     { onConflict: "id", ignoreDuplicates: true }
-  );
+  ).abortSignal(AbortSignal.timeout(PRAZO_CHAMADA_MS));
   if (erroUpsert) throw erroUpsert;
 
   // 2) Assina como INSPETOR só se ainda não assinou (idempotência do passo 2, independente
@@ -61,6 +67,7 @@ export async function sincronizarUmaFicha(item: FichaEnfileirada): Promise<void>
 
   const { error: erroAssinar } = await supabase.functions.invoke("assinar-documento", {
     body: { monitoramento_id: item.id, tipo: tipoAssinatura },
+    timeout: PRAZO_CHAMADA_MS,
   });
   if (erroAssinar) throw erroAssinar;
 }
@@ -68,7 +75,9 @@ export async function sincronizarUmaFicha(item: FichaEnfileirada): Promise<void>
 export async function sincronizarFilaOffline(): Promise<ResultadoSincronizacao> {
   const resultado: ResultadoSincronizacao = { sincronizadas: [], falharam: [], precisaReautenticar: false };
   const fila = await listarFichasEnfileiradas();
-  const pendentes = fila.filter((item) => item.status !== "sincronizando");
+  // "sincronizando" recente é uma tentativa em curso (outra aba); a abandonada (app fechado/sem sinal no meio) é retomada —
+  // antes ficava presa para sempre, sem nunca ser tentada de novo.
+  const pendentes = fila.filter((item) => item.status !== "sincronizando" || tentativaAbandonada(item));
 
   for (const item of pendentes) {
     await atualizarStatusFicha(item.id, "sincronizando");

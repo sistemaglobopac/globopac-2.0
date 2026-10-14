@@ -23,6 +23,8 @@ export interface FichaEnfileirada {
   enfileiradoEm: string;
   status: StatusFilaOffline;
   ultimoErro?: string;
+  /** Quando a tentativa em curso começou (status "sincronizando"): permite retomar a que o aparelho abandonou no meio. */
+  sincronizandoDesde?: string;
 }
 
 interface FilaOfflineDB extends DBSchema {
@@ -72,7 +74,17 @@ export async function atualizarStatusFicha(id: string, status: StatusFilaOffline
   const db = await abrirDb();
   const item = await db.get("fichas_pendentes", id);
   if (!item) return;
-  await db.put("fichas_pendentes", { ...item, status, ultimoErro });
+  await db.put("fichas_pendentes", { ...item, status, ultimoErro, sincronizandoDesde: status === "sincronizando" ? new Date().toISOString() : undefined });
+}
+
+/** Uma tentativa "sincronizando" há mais que isto foi abandonada (app fechado, aparelho sem sinal, aba morta) e pode ser retomada.
+ * A sincronização é idempotente (upsert + só assina se ainda não assinou), então retomar nunca duplica. */
+export const PRAZO_TENTATIVA_ABANDONADA_MS = 60_000;
+
+export function tentativaAbandonada(item: Pick<FichaEnfileirada, "status" | "sincronizandoDesde">, agora = Date.now()): boolean {
+  if (item.status !== "sincronizando") return false;
+  const desde = item.sincronizandoDesde ? new Date(item.sincronizandoDesde).getTime() : NaN;
+  return !Number.isFinite(desde) || agora - desde > PRAZO_TENTATIVA_ABANDONADA_MS;
 }
 
 export async function removerFichaEnfileirada(id: string) {

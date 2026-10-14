@@ -5,6 +5,7 @@ import {
   estaOffline,
   listarFichasEnfileiradas,
   removerFichaEnfileirada,
+  tentativaAbandonada,
 } from "@/lib/offlineQueue";
 
 const RASCUNHO_BASE = {
@@ -105,5 +106,30 @@ describe("estaOffline", () => {
 
   it("não trata um erro estruturado comum (sem hint/name de abort) como offline", () => {
     expect(estaOffline({ message: "duplicate key value violates unique constraint" })).toBe(false);
+  });
+});
+
+describe("offlineQueue — tentativa abandonada", () => {
+  const agora = Date.parse("2026-10-14T12:00:00Z");
+
+  it("só 'sincronizando' pode estar abandonada; a recente é uma tentativa em curso", () => {
+    expect(tentativaAbandonada({ status: "pendente" }, agora)).toBe(false);
+    expect(tentativaAbandonada({ status: "falhou" }, agora)).toBe(false);
+    expect(tentativaAbandonada({ status: "sincronizando", sincronizandoDesde: "2026-10-14T11:59:30Z" }, agora)).toBe(false);
+  });
+
+  it("'sincronizando' há mais de 1 minuto, ou sem marca de início (item antigo preso), é retomada", () => {
+    expect(tentativaAbandonada({ status: "sincronizando", sincronizandoDesde: "2026-10-14T11:58:00Z" }, agora)).toBe(true);
+    expect(tentativaAbandonada({ status: "sincronizando" }, agora)).toBe(true);
+  });
+
+  it("marcar 'sincronizando' grava o início; sair desse status o apaga", async () => {
+    await limparFila();
+    await enfileirarFicha(RASCUNHO_BASE);
+    await atualizarStatusFicha(RASCUNHO_BASE.id, "sincronizando");
+    expect((await listarFichasEnfileiradas())[0]!.sincronizandoDesde).toBeTruthy();
+    await atualizarStatusFicha(RASCUNHO_BASE.id, "falhou", "x");
+    expect((await listarFichasEnfileiradas())[0]!.sincronizandoDesde).toBeUndefined();
+    await limparFila();
   });
 });
