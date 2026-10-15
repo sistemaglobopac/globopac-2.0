@@ -12,6 +12,7 @@ import type { MonitoramentoVerificacao } from "./utils/recordGrouping";
 import { parseConfigExtras } from "@/modules/gestao/api";
 import { turnoParaHeranca, type TurnoHeranca } from "./utils/turnoUtils";
 import { horaEfetiva, instanteDoRegistro } from "./utils/horaMonitoramento";
+import { herdarInstanteDoOriginal } from "./utils/instanteDoAdendo";
 import { ensureLocalTime } from "./utils/tempo";
 
 export interface TemplateAtivo {
@@ -676,18 +677,20 @@ export function useFilaVerificacao(filtros: FiltrosVerificacao, templateIdsDoPac
       if (filtros.setor) verificadosQuery = verificadosQuery.eq("setor", filtros.setor);
       if (templateIdsDoPac) verificadosQuery = verificadosQuery.in("ficha_template_id", templateIdsDoPac);
 
-      const [{ data: pendentes, error: erroPendentes }, { data: verificados, error: erroVerificados }] = await Promise.all([
+      const [{ data: pendentesBrutos, error: erroPendentes }, { data: verificadosBrutos, error: erroVerificados }] = await Promise.all([
         pendentesQuery.overrideTypes<MonitoramentoVerificacao[], { merge: false }>(),
         verificadosQuery.overrideTypes<MonitoramentoVerificacao[], { merge: false }>(),
       ]);
       if (erroPendentes) throw erroPendentes;
       if (erroVerificados) throw erroVerificados;
+      // O adendo fica no dia do original (não no dia em que foi assinado): ver herdarInstanteDoOriginal.
+      const [pendentes, verificados] = await Promise.all([herdarInstanteDoOriginal(pendentesBrutos ?? []), herdarInstanteDoOriginal(verificadosBrutos ?? [])]);
 
       // Monitoramento solto precisa achar o consolidado dele: um pendente (ex.: retroativo lançado depois da verificação) e um
       // verificado recente reencontram os irmãos do mesmo dia, por mais antigo que seja (os 500 recentes acima não alcançam).
       // Em blocos de dias, para a consulta não ficar grande demais.
-      const idsJaTrazidos = new Set((verificados ?? []).map((m) => m.id));
-      const dias = [...new Set([...(pendentes ?? []), ...(verificados ?? [])].map((m) => ensureLocalTime(instanteDoRegistro(m)).isoLocal))];
+      const idsJaTrazidos = new Set(verificados.map((m) => m.id));
+      const dias = [...new Set([...pendentes, ...verificados].map((m) => ensureLocalTime(instanteDoRegistro(m)).isoLocal))];
       const blocos: string[][] = [];
       for (let i = 0; i < dias.length; i += 8) blocos.push(dias.slice(i, i + 8));
       const irmaos = await Promise.all(
@@ -705,12 +708,12 @@ export function useFilaVerificacao(filtros: FiltrosVerificacao, templateIdsDoPac
           if (templateIdsDoPac) q = q.in("ficha_template_id", templateIdsDoPac);
           const { data, error } = await q.overrideTypes<MonitoramentoVerificacao[], { merge: false }>();
           if (error) throw error;
-          return data ?? [];
+          return herdarInstanteDoOriginal(data ?? []);
         })
       );
       const extras = [...new Map(irmaos.flat().filter((m) => !idsJaTrazidos.has(m.id)).map((m) => [m.id, m])).values()];
 
-      return { pendentes: pendentes ?? [], verificados: [...(verificados ?? []), ...extras] };
+      return { pendentes, verificados: [...verificados, ...extras] };
     },
   });
 }
@@ -939,7 +942,7 @@ export function useDadosRelatorio(ids: string[]) {
       }
 
       return {
-        monitoramentos: monitoramentos ?? [],
+        monitoramentos: await herdarInstanteDoOriginal(monitoramentos ?? []),
         assinaturas: assinaturas ?? [],
         rncs: rncs ?? [],
         autocorrecoes: autocorrecoes ?? [],

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { herdarInstanteDoOriginal } from "@/modules/fichas/utils/instanteDoAdendo";
 import type { SituacaoConformidade } from "@/shared/situacaoConformidade";
 
 export interface MonitoramentoVerificado {
@@ -12,6 +13,8 @@ export interface MonitoramentoVerificado {
   criado_em: string;
   /** Hora em que o monitoramento foi realizado (informada pelo inspetor); nula em registros antigos. */
   hora_monitoramento?: string | null;
+  /** Registro original que este adendo corrige; o adendo fica no dia/turno do original. */
+  aditivo_de?: string | null;
   ficha_template_id: string;
   user_id: string;
 }
@@ -25,13 +28,13 @@ export function useMonitoramentosParaLiberar() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("monitoramentos_vigentes")
-        .select("id, setor, conformidade, situacao_conformidade, verificado_em, liberado_sif, criado_em, hora_monitoramento, ficha_template_id, user_id")
+        .select("id, setor, conformidade, situacao_conformidade, verificado_em, liberado_sif, criado_em, hora_monitoramento, aditivo_de, ficha_template_id, user_id")
         .not("verificado_por", "is", null)
         .eq("liberado_sif", false)
         .order("verificado_em", { ascending: true })
         .overrideTypes<MonitoramentoVerificado[], { merge: false }>();
       if (error) throw error;
-      return data;
+      return herdarInstanteDoOriginal(data);
     },
   });
 }
@@ -45,13 +48,13 @@ export function useMonitoramentosArquivo() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("monitoramentos_vigentes")
-        .select("id, setor, conformidade, situacao_conformidade, verificado_em, liberado_sif, criado_em, hora_monitoramento, ficha_template_id, user_id")
+        .select("id, setor, conformidade, situacao_conformidade, verificado_em, liberado_sif, criado_em, hora_monitoramento, aditivo_de, ficha_template_id, user_id")
         .not("verificado_por", "is", null)
         .order("criado_em", { ascending: false })
         .limit(3000)
         .overrideTypes<MonitoramentoVerificado[], { merge: false }>();
       if (error) throw error;
-      return data;
+      return herdarInstanteDoOriginal(data);
     },
   });
 }
@@ -82,12 +85,12 @@ export function useMonitoramentosLiberados() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("monitoramentos_vigentes")
-        .select("id, setor, conformidade, situacao_conformidade, verificado_em, liberado_sif, criado_em, hora_monitoramento, ficha_template_id, user_id")
+        .select("id, setor, conformidade, situacao_conformidade, verificado_em, liberado_sif, criado_em, hora_monitoramento, aditivo_de, ficha_template_id, user_id")
         .eq("liberado_sif", true)
         .order("liberado_em", { ascending: false })
         .overrideTypes<MonitoramentoVerificado[], { merge: false }>();
       if (error) throw error;
-      return data;
+      return herdarInstanteDoOriginal(data);
     },
   });
 }
