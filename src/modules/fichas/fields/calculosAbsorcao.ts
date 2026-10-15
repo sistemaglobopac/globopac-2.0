@@ -49,20 +49,20 @@ export function linhaAbsorcaoValida(item: Pick<AmostraAbsorcaoAgua, "initial" | 
   return !isNaN(inicial) && !isNaN(final) && inicial > 0;
 }
 
-/** Peso final informado que NÃO é maior que o inicial: a carcaça absorve água no pré-resfriamento, então o peso final tem
- * de ser sempre maior. Só vale para linha com os dois pesos preenchidos e não descartada (linha em branco ou descartada
- * não é erro). */
-export function pesoFinalNaoMaiorQueInicial(item: Pick<AmostraAbsorcaoAgua, "initial" | "final"> & { descartada?: boolean }): boolean {
+/** Peso final informado MENOR que o inicial: a carcaça não perde peso no pré-resfriamento, então é erro de digitação ou de
+ * pesagem. Peso final IGUAL ao inicial é aceito (absorção de 0%). Só vale para linha com os dois pesos preenchidos e não
+ * descartada (linha em branco ou descartada não é erro). */
+export function pesoFinalMenorQueInicial(item: Pick<AmostraAbsorcaoAgua, "initial" | "final"> & { descartada?: boolean }): boolean {
   if (item.descartada) return false;
   const inicial = parseFloat(item.initial);
   const final = parseFloat(item.final);
   if (isNaN(inicial) || inicial <= 0 || isNaN(final)) return false;
-  return final <= inicial;
+  return final < inicial;
 }
 
 /** Mensagem do peso final inválido (a mesma na linha da tela e no bloqueio de finalizar). */
 export function mensagemPesoFinalInvalido(item: Pick<AmostraAbsorcaoAgua, "initial">): string {
-  return `O peso final deve ser maior que o peso inicial (${item.initial} kg).`;
+  return `O peso final não pode ser menor que o peso inicial (${item.initial} kg). Confira a pesagem.`;
 }
 
 /** % individual de UMA carcaça — só informativo (relatório impresso). A média oficial NÃO é a
@@ -128,7 +128,7 @@ export function validarFinalizacao(items: AmostraAbsorcaoAgua[]): string[] {
       if (!item.motivoDescarte?.trim()) motivos.push(`Informe o motivo do descarte da carcaça ${rotulo}.`);
     } else if (isNaN(parseFloat(item.final))) {
       motivos.push(`Informe o peso final da carcaça ${rotulo} (ou marque como descartada).`);
-    } else if (pesoFinalNaoMaiorQueInicial(item)) {
+    } else if (pesoFinalMenorQueInicial(item)) {
       motivos.push(`Carcaça ${rotulo}: ${mensagemPesoFinalInvalido(item)}`);
     }
   }

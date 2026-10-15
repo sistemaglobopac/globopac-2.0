@@ -3,7 +3,7 @@ import {
   calcularAbsorcaoAgua,
   linhaAbsorcaoValida,
   minutosAguardandoPesoFinal,
-  pesoFinalNaoMaiorQueInicial,
+  pesoFinalMenorQueInicial,
   validarFaseInicial,
   validarFinalizacao,
 } from "@/modules/fichas/fields/calculosAbsorcao";
@@ -75,19 +75,21 @@ describe("tempo aguardando peso final", () => {
   });
 });
 
-describe("peso final sempre maior que o inicial", () => {
-  it("recusa finalizar com peso final menor ou igual ao inicial, apontando o lacre", () => {
+describe("peso final não pode ser menor que o inicial", () => {
+  it("recusa finalizar com peso final MENOR que o inicial, apontando o lacre; igual é aceito", () => {
     const menor = validarFinalizacao([linha(0, "A1", "2.5", "2.4"), linha(1, "B2", "2.4", "2.6"), ...vazias(2)]);
     expect(menor).toHaveLength(1);
     expect(menor[0]).toContain("A1");
-    expect(menor[0]).toContain("maior que o peso inicial");
-    expect(validarFinalizacao([linha(0, "A1", "2.5", "2.5"), ...vazias(1)]).join(" ")).toContain("maior que o peso inicial");
+    expect(menor[0]).toContain("não pode ser menor que o peso inicial");
+    expect(validarFinalizacao([linha(0, "A1", "2.5", "2.5"), ...vazias(1)])).toEqual([]);
   });
 
-  it("aceita peso final maior e não reclama de linha em branco ou descartada", () => {
+  it("aceita peso final maior ou igual e não reclama de linha em branco ou descartada", () => {
     expect(validarFinalizacao([linha(0, "A1", "2.5", "2.501"), ...vazias(1)])).toEqual([]);
-    expect(pesoFinalNaoMaiorQueInicial(linha(0, "A1", "2.5", ""))).toBe(false);
-    expect(pesoFinalNaoMaiorQueInicial(linha(0, "A1", "2.5", "2.0", { descartada: true }))).toBe(false);
-    expect(pesoFinalNaoMaiorQueInicial(linha(0, "", "", ""))).toBe(false);
+    expect(pesoFinalMenorQueInicial(linha(0, "A1", "2.5", "2.5"))).toBe(false);
+    expect(pesoFinalMenorQueInicial(linha(0, "A1", "2.5", "2.4"))).toBe(true);
+    expect(pesoFinalMenorQueInicial(linha(0, "A1", "2.5", ""))).toBe(false);
+    expect(pesoFinalMenorQueInicial(linha(0, "A1", "2.5", "2.0", { descartada: true }))).toBe(false);
+    expect(pesoFinalMenorQueInicial(linha(0, "", "", ""))).toBe(false);
   });
 });

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Lock } from "lucide-react";
 import { Input } from "@/shared/ui/input";
-import { amostrasAbsorcaoIniciais, calcularAbsorcaoAgua, formatarPercentual, LIMITE_ABSORCAO_AGUA, linhaAbsorcaoValida, mensagemPesoFinalInvalido, percentualIndividualAbsorcao, pesoFinalNaoMaiorQueInicial } from "./calculosAbsorcao";
+import { amostrasAbsorcaoIniciais, calcularAbsorcaoAgua, formatarPercentual, LIMITE_ABSORCAO_AGUA, linhaAbsorcaoValida, mensagemPesoFinalInvalido, percentualIndividualAbsorcao, pesoFinalMenorQueInicial } from "./calculosAbsorcao";
 import type { AbsorcaoAguaValor, AmostraAbsorcaoAgua, FaseAbsorcao } from "./tiposCompostos";
 
 interface AbsorcaoAguaFieldProps {
@@ -60,7 +60,7 @@ export function AbsorcaoAguaField({ value, onChange, disabled, fase = "UMA_VEZ" 
 
       {items.map((item, i) => {
         const linhaTravada = travaInicial && item.seal.trim() === "" && item.initial.trim() === "";
-        const finalInvalido = mostraFinal && pesoFinalNaoMaiorQueInicial(item);
+        const finalInvalido = mostraFinal && pesoFinalMenorQueInicial(item);
         return (
           <div key={item.id} className="space-y-1">
             <div className="flex items-center gap-2">
