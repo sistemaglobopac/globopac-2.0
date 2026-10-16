@@ -15,7 +15,7 @@ const ELEMENTO_IMPRESSAO_ID = "relatorio-impressao";
  * `relatorio-modal-*` existem só para o @media print neutralizar overflow/position dos
  * wrappers do modal (ver index.css) — sem isso, o overflow-hidden/max-h-full do diálogo corta
  * o relatório na impressão mesmo com #relatorio-impressao marcado como visível. */
-export function RelatorioModal({ ids, grupos, onFechar }: { ids: string[]; grupos?: string[][]; onFechar: () => void }) {
+export function RelatorioModal({ ids, grupos, onFechar, onCorrigirCampo }: { ids: string[]; grupos?: string[][]; onFechar: () => void; onCorrigirCampo?: (monitoramentoId: string, chaveCampo: string) => void }) {
   // `grupos`: vários relatórios consolidados (um por ficha/turno) impressos juntos, cada um numa nova folha.
   const todosIds = grupos ? [...new Set(grupos.flat())] : ids;
   const { data: dados, isLoading, isError } = useDadosRelatorio(todosIds);
@@ -59,7 +59,7 @@ export function RelatorioModal({ ids, grupos, onFechar }: { ids: string[]; grupo
                   </div>
                 ))
               ) : (
-                <RelatorioMonitoramento ids={ids} dados={dados} turnoDe={turnoDe} />
+                <RelatorioMonitoramento ids={ids} dados={dados} turnoDe={turnoDe} onCorrigirCampo={onCorrigirCampo ? (registro, chave) => onCorrigirCampo(registro.id, chave) : undefined} />
               )}
             </div>
           )}

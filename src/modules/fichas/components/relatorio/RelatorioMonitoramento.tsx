@@ -247,6 +247,7 @@ interface RegistroUnicoProps {
   dados: DadosRelatorio;
   hashesAoVivo: Map<string, string>;
   acoesNaoConformidade?: (record: MonitoramentoRelatorio, jaTemRncOuAutocorrecao: boolean) => AcoesNaoConformidade | undefined;
+  onCorrigirCampo?: (record: MonitoramentoRelatorio, chaveCampo: string) => void;
 }
 
 export type SituacaoRegistro = "conforme" | "tratado" | "autocorrigido" | "nao-conforme" | "desvio-pendente" | "aguardando";
@@ -284,7 +285,7 @@ const CLASSE_SELO: Record<SituacaoRegistro, string> = {
   aguardando: "text-muted-foreground",
 };
 
-function RegistroUnico({ record, ordem, template, dados, hashesAoVivo, acoesNaoConformidade }: RegistroUnicoProps) {
+function RegistroUnico({ record, ordem, template, dados, hashesAoVivo, acoesNaoConformidade, onCorrigirCampo }: RegistroUnicoProps) {
   const inspetorAssinatura = assinaturaDe(dados.assinaturas, record.id, "INSPETOR");
   const verificadorAssinatura = assinaturaDe(dados.assinaturas, record.id, "VERIFICADOR");
   const hashReferencia = verificadorAssinatura?.hash_documento ?? inspetorAssinatura?.hash_documento;
@@ -315,7 +316,7 @@ function RegistroUnico({ record, ordem, template, dados, hashesAoVivo, acoesNaoC
         </span>
       </div>
 
-      <DadosColetados dadosDinamicos={record.dados_dinamicos} campos={camposSemHora} acoesNaoConformidade={acoesNaoConformidade?.(record, Boolean(rnc || autocorrecao))} registro={{ criado_em: record.criado_em, finalizado_em: record.finalizado_em, assinado_em: inspetorAssinatura?.criado_em }} />
+      <DadosColetados dadosDinamicos={record.dados_dinamicos} campos={camposSemHora} acoesNaoConformidade={acoesNaoConformidade?.(record, Boolean(rnc || autocorrecao))} onCorrigirCampo={onCorrigirCampo ? (chave) => onCorrigirCampo(record, chave) : undefined} registro={{ criado_em: record.criado_em, finalizado_em: record.finalizado_em, assinado_em: inspetorAssinatura?.criado_em }} />
 
       {rnc && (
         <BlocoRnc
@@ -378,12 +379,14 @@ export interface RelatorioMonitoramentoProps {
   turnoDe?: (m: MonitoramentoRelatorio) => string;
   /** Só na tela de verificação: ações do Verificador/Administrador sobre cada campo não conforme. */
   acoesNaoConformidade?: (record: MonitoramentoRelatorio, jaTemRncOuAutocorrecao: boolean) => AcoesNaoConformidade | undefined;
+  /** Só para o inspetor que pode corrigir o monitoramento (antes da verificação): botão "Corrigir" sobre cada valor. */
+  onCorrigirCampo?: (record: MonitoramentoRelatorio, chaveCampo: string) => void;
 }
 
 /** Relatório oficial — um único registro OU um dossiê consolidado (vários `ids` do mesmo
  * grupo: mesmo inspetor/dia/turno/PAC/setor, ver DossieVerificacaoCard). Renderizado dentro de
  * #relatorio-impressao pelo RelatorioModal, que é o que de fato vira a página impressa. */
-export function RelatorioMonitoramento({ ids, dados, turnoDe = (r) => turnoDoDia(new Date(instanteDoRegistro(r))), acoesNaoConformidade }: RelatorioMonitoramentoProps) {
+export function RelatorioMonitoramento({ ids, dados, turnoDe = (r) => turnoDoDia(new Date(instanteDoRegistro(r))), acoesNaoConformidade, onCorrigirCampo }: RelatorioMonitoramentoProps) {
   // Sempre em ordem cronológica: "Apuração 1" é o 1º monitoramento do dia, independentemente da
   // ordem em que os ids chegaram na URL.
   const records = ids
@@ -583,6 +586,7 @@ export function RelatorioMonitoramento({ ids, dados, turnoDe = (r) => turnoDoDia
                 dados={dados}
                 hashesAoVivo={hashesAoVivo}
                 acoesNaoConformidade={acoesNaoConformidade}
+                onCorrigirCampo={onCorrigirCampo}
               />
             ))}
           </div>

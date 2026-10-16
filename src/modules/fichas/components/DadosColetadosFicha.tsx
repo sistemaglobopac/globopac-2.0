@@ -145,11 +145,14 @@ export function DadosColetados({
   campos,
   registro,
   acoesNaoConformidade,
+  onCorrigirCampo,
 }: {
   dadosDinamicos: Record<string, unknown>;
   campos: CampoTemplate[];
   /** Só na tela de verificação: barra com "Incluir adendo"/"Abrir RNC" sobre cada campo não conforme. */
   acoesNaoConformidade?: AcoesNaoConformidade;
+  /** Só para o inspetor que pode corrigir o monitoramento: um botão "Corrigir" sobre cada valor do relatório (nunca na impressão). */
+  onCorrigirCampo?: (chaveCampo: string) => void;
   /** Horas do servidor do registro (início = criado_em, fim = finalizado_em) — mostradas na absorção de água. */
   registro?: { criado_em: string; finalizado_em: string | null; assinado_em?: string | null };
 }) {
@@ -242,8 +245,23 @@ export function DadosColetados({
           }
         }
         })();
-        return barraNc ? (
+        const barraCorrigir =
+          onCorrigirCampo && elemento && campo.tipo !== "foto" && campo.tipo !== "assinatura" ? (
+            <div key={`corrigir-${campo.chave}`} className="col-span-full -mb-2 flex justify-end print:hidden">
+              <button
+                type="button"
+                onClick={() => onCorrigirCampo(campo.chave)}
+                data-testid={`corrigir-campo-${campo.chave}`}
+                title="Corrigir este valor"
+                className="flex items-center gap-1 rounded-full border border-warning/60 bg-warning/10 px-2.5 py-0.5 text-[11px] font-bold text-warning-foreground hover:bg-warning/20"
+              >
+                <PenLine className="h-3 w-3" /> Corrigir {rotulo}
+              </button>
+            </div>
+          ) : null;
+        return barraNc || barraCorrigir ? (
           <Fragment key={campo.chave}>
+            {barraCorrigir}
             {barraNc}
             {elemento}
           </Fragment>

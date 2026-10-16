@@ -5,6 +5,7 @@ import { aditivosVigentes, idsAdendosConcluidos } from "@/modules/fichas/utils/a
 import { propagarLeituraNosSeguintes } from "@/modules/fichas/utils/propagacaoCorrecao";
 import { ajustesDeCargaDoa, ajustesQueSeAplicam, recalcularDoaNoRegistro } from "@/modules/fichas/utils/doaCorrecao";
 import { horaEfetiva } from "@/modules/fichas/utils/horaMonitoramento";
+import { diffCorrecoes, MOTIVO_CORRECAO_MIN_CARACTERES, podeCorrigirMonitoramento, type ResultadoPodeCorrigir } from "@/modules/fichas/utils/correcaoInspetor";
 import { turnoParaHeranca } from "@/modules/fichas/utils/turnoUtils";
 import { supabase } from "@/lib/supabase";
 import type { StatusRnc } from "@/modules/rnc/api";
@@ -934,6 +935,126 @@ export function useAssinarAdendo() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["painel-bordo", "kpis"] });
+      void queryClient.invalidateQueries({ queryKey: ["monitoramentos"] });
+    },
+  });
+}
+
+type VersaoCadeia = {
+  id: string;
+  ficha_template_id: string;
+  versao_template: number;
+  user_id: string;
+  setor: string;
+  dados_dinamicos: Record<string, unknown>;
+  aditivo_de: string | null;
+  hora_monitoramento: string | null;
+  criado_em: string;
+  verificado_por: string | null;
+  status_ficha: string | null;
+};
+
+const COLUNAS_CADEIA = "id, ficha_template_id, versao_template, user_id, setor, dados_dinamicos, aditivo_de, hora_monitoramento, criado_em, verificado_por, status_ficha";
+
+/** Todas as versões de um monitoramento (o original e seus aditivos), da mais antiga para a mais recente. */
+async function buscarCadeiaDoMonitoramento(monitoramentoId: string): Promise<VersaoCadeia[]> {
+  const { data: alvo, error: erroAlvo } = await supabase.from("monitoramentos").select("id, aditivo_de").eq("id", monitoramentoId).maybeSingle().overrideTypes<{ id: string; aditivo_de: string | null } | null, { merge: false }>();
+  if (erroAlvo) throw erroAlvo;
+  if (!alvo) return [];
+  const raizId = alvo.aditivo_de ?? alvo.id;
+  const { data, error } = await supabase
+    .from("monitoramentos")
+    .select(COLUNAS_CADEIA)
+    .or(`id.eq.${raizId},aditivo_de.eq.${raizId}`)
+    .order("criado_em", { ascending: true })
+    .order("id", { ascending: true })
+    .overrideTypes<VersaoCadeia[], { merge: false }>();
+  if (error) throw error;
+  return data ?? [];
+}
+
+/** O monitoramento pode ser corrigido por quem está logado? (dono, nada verificado, finalizado — ver podeCorrigirMonitoramento.) */
+export function usePodeCorrigirMonitoramento(monitoramentoId: string | null, quem: { id: string; nivelAcesso: string } | null) {
+  return useQuery({
+    queryKey: ["painel-bordo", "pode-corrigir", monitoramentoId, quem?.id],
+    enabled: !!monitoramentoId && !!quem,
+    queryFn: async (): Promise<ResultadoPodeCorrigir> => podeCorrigirMonitoramento(await buscarCadeiaDoMonitoramento(monitoramentoId as string), quem as { id: string; nivelAcesso: string }),
+  });
+}
+
+/** Correção feita pelo PRÓPRIO inspetor, antes de o Verificador verificar: ele refaz os valores errados na ficha (os cálculos são
+ * refeitos pelos mesmos campos do preenchimento) e o sistema grava uma nova versão — aditivo, igual ao adendo assinado — com a
+ * justificativa e o que mudou (antigo → novo). O original fica guardado no histórico e a versão corrigida volta para a verificação. */
+export function useCorrigirMonitoramento() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      monitoramentoId: string;
+      campos: CampoTemplate[];
+      /** Valores dos campos da ficha depois da correção (já recalculados pelos campos). */
+      dadosNovos: Record<string, unknown>;
+      /** Valores logo antes de o inspetor mexer: o que difere do gravado é preenchimento automático dos campos (dado herdado), não correção dele. */
+      dadosAntesDaEdicao: Record<string, unknown>;
+      justificativa: string;
+      quem: { id: string; nivelAcesso: string; nome: string };
+    }) => {
+      const cadeia = await buscarCadeiaDoMonitoramento(input.monitoramentoId);
+      const permissao = podeCorrigirMonitoramento(cadeia, input.quem);
+      if (!permissao.pode) throw new Error(permissao.motivo);
+      const justificativa = input.justificativa.trim();
+      if (justificativa.length < MOTIVO_CORRECAO_MIN_CARACTERES) throw new Error(`Informe o motivo da correção (mínimo ${MOTIVO_CORRECAO_MIN_CARACTERES} caracteres).`);
+
+      const raiz = cadeia[0]!;
+      const vigente = cadeia[cadeia.length - 1]!;
+      // `correcoes` = tudo o que mudou em relação ao gravado (trilha completa no adendo); `correcoesDoInspetor` = só o que ele mexeu —
+      // é isso que segue para os monitoramentos seguintes.
+      const correcoes = diffCorrecoes(input.campos, vigente.dados_dinamicos, input.dadosNovos);
+      const correcoesDoInspetor = diffCorrecoes(input.campos, input.dadosAntesDaEdicao, input.dadosNovos);
+      if (Object.keys(correcoesDoInspetor).length === 0) throw new Error("Nenhum valor foi alterado.");
+
+      const agora = new Date().toISOString();
+      const dadosOriginais = vigente.dados_dinamicos as { adendos?: AdendoBruto[] } & Record<string, unknown>;
+      const adendo = {
+        id: crypto.randomUUID(),
+        status: "completed",
+        origem: "inspetor",
+        monitorId: input.quem.id,
+        verificadorName: `${input.quem.nome} (correção do próprio inspetor)`,
+        notes: justificativa,
+        corrections: correcoes,
+        criadoEm: agora,
+        monitorSignature: "signed_by_password",
+        monitorSignedAt: agora,
+      };
+      // Só os campos da ficha vêm do formulário; hora, continuação e demais marcas do registro ficam como estavam.
+      const mesclado: Record<string, unknown> = { ...dadosOriginais };
+      for (const campo of input.campos) if (campo.chave in input.dadosNovos) mesclado[campo.chave] = input.dadosNovos[campo.chave];
+      mesclado.adendos = [...(dadosOriginais.adendos ?? []), adendo];
+      // DOA: a % por carga, o saldo e a SOMA do dia são refeitos a partir do valor corrigido (rede de segurança sobre o campo).
+      const dadosCorrigidos = recalcularDoaNoRegistro(mesclado);
+
+      const { error: erroInsert } = await supabase.from("monitoramentos").insert({
+        ficha_template_id: vigente.ficha_template_id,
+        versao_template: vigente.versao_template,
+        user_id: vigente.user_id,
+        setor: vigente.setor,
+        dados_dinamicos: dadosCorrigidos,
+        aditivo_de: raiz.id,
+      });
+      if (erroInsert) throw erroInsert;
+
+      // A correção segue para os monitoramentos seguintes que herdaram a leitura antiga (hidrômetro) ou a carga (DOA); falha aqui
+      // não desfaz a correção já gravada: vira aviso.
+      try {
+        const leituras = await propagarCorrecaoNosSeguintes({ origem: vigente, adendoId: adendo.id, dadosCorrigidos, corrections: correcoesDoInspetor, agora });
+        const cargas = await propagarCorrecaoDoaNosSeguintes({ origem: vigente, adendoId: adendo.id, dadosCorrigidos, corrections: correcoesDoInspetor });
+        return { propagados: leituras.propagados + cargas.propagados, erro: undefined as string | undefined, alteradas: Object.keys(correcoes).length };
+      } catch (erro) {
+        return { propagados: 0, erro: erro instanceof Error ? erro.message : "Falha ao propagar a correção.", alteradas: Object.keys(correcoes).length };
+      }
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["painel-bordo"] });
       void queryClient.invalidateQueries({ queryKey: ["monitoramentos"] });
     },
   });

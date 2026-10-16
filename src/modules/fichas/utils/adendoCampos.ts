@@ -88,7 +88,7 @@ function coletarAninhados(campo: { chave: string; tipo?: string }, nome: string,
 }
 
 /** Dados calculados ou de conformidade: corrigi-los à mão deixaria o registro incoerente. */
-const DERIVADOS = /^(conformidade|detalhesRNC|status|houveOfegantes|acaoCorretiva|acaoCorretivaEm|doaPct|saldoDiferenca|notaSaldo|ordemPendura|dataAbate|cargaId|veiculoId|adendos|total.*|.*Pct)$/;
+export const DERIVADOS = /^(conformidade|detalhesRNC|status|houveOfegantes|acaoCorretiva|acaoCorretivaEm|doaPct|saldoDiferenca|notaSaldo|ordemPendura|dataAbate|cargaId|veiculoId|adendos|total.*|.*Pct)$/;
 
 /** Dados que o adendo pode acrescentar mesmo ainda ausentes no item (herdados depois do registro). */
 const EXTRAS_POR_ITEM: Record<string, string[]> = {
