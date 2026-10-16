@@ -11,10 +11,13 @@ export function situacaoDe(m: { situacao_conformidade?: SituacaoConformidade | n
   return null;
 }
 
+/** Não conformidade que já recebeu RNC ou adendo: não é mais "não conforme" (vermelho), é tratada (âmbar). */
+export const ROTULO_NC_TRATADA = "NÃO CONFORMIDADE TRATADA";
+
 export const ROTULO_SITUACAO: Record<SituacaoConformidade, string> = {
   CONFORME: "Conforme",
   NAO_CONFORME: "Não conforme",
-  TRATADO: "Tratado",
+  TRATADO: "Não conformidade tratada",
 };
 
 /** Texto para telas e CSV; sem decisão ainda = "Aguardando verificação". */

@@ -53,6 +53,11 @@ export function idsAdendosConcluidos(registros: RegistroComAdendos[]): Set<strin
   return ids;
 }
 
+/** O registro recebeu adendo (ele mesmo traz adendos, ou é o aditivo/versão corrigida de outro)? Usado para tratar a não conformidade. */
+export function temAdendoRegistrado(registro: RegistroComAdendos): boolean {
+  return Boolean(registro.aditivo_de) || adendosDe(registro).length > 0;
+}
+
 /** O registro tem ao menos um adendo aguardando a assinatura do inspetor (e nenhum aditivo o concluiu)? */
 export function temAdendoPendente(registro: RegistroComAdendos, concluidos: Set<string>): boolean {
   return adendosDe(registro).some((a) => a.status === "pending_monitor" && !(a.id && concluidos.has(a.id)));

@@ -8,6 +8,7 @@ import { ensureLocalTime } from "../utils/tempo";
 import type { StatusRnc } from "@/modules/rnc/api";
 import { AuditRecordCard } from "./AuditRecordCard";
 import { temNaoConformidade } from "../utils/desviosEspeciais";
+import { temAdendoRegistrado } from "../utils/adendosPendentes";
 
 interface DossieVerificacaoCardProps {
   dossie: DossieVerificacao;
@@ -67,7 +68,10 @@ export function DossieVerificacaoCard({
   const primeiraHora = primeiroItem ? ensureLocalTime(instanteDoRegistro(primeiroItem.appt)).time : "—";
   const ultimaHora = ultimoItem ? ensureLocalTime(instanteDoRegistro(ultimoItem.appt)).time : "—";
   const semRnc = dossie.items.filter(
-    (i) => (i.appt.conformidade === false || temNaoConformidade(i.appt.dados_dinamicos)) && !rncPorMonitoramento?.has(i.id) && !autocorrigidoIds?.has(i.id)
+    (i) => (i.appt.conformidade === false || temNaoConformidade(i.appt.dados_dinamicos)) &&
+      !rncPorMonitoramento?.has(i.id) &&
+      !autocorrigidoIds?.has(i.id) &&
+      !temAdendoRegistrado(i.appt)
   ).length;
   const nomeFicha = primeiroItem ? nomePorTemplateId.get(primeiroItem.appt.ficha_template_id) ?? dossie.codigo : dossie.codigo;
 
@@ -98,7 +102,7 @@ export function DossieVerificacaoCard({
               <Badge variant="secondary">{dossie.items.length} Monitoramentos</Badge>
               {semRnc > 0 && (
                 <Badge variant="destructive" data-testid="dossie-nc-sem-rnc">
-                  {semRnc} não conforme{semRnc > 1 ? "s" : ""} sem RNC — veja em "Apurações"
+                  {semRnc} não conforme{semRnc > 1 ? "s" : ""} sem RNC nem adendo — veja em "Apurações"
                 </Badge>
               )}
               {!dossie.verificado && (

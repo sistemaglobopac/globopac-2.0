@@ -6,6 +6,8 @@ import { ensureLocalTime } from "../utils/tempo";
 import type { AppointmentDisplay } from "../utils/recordGrouping";
 import type { StatusRnc } from "@/modules/rnc/api";
 import { temNaoConformidade } from "../utils/desviosEspeciais";
+import { temAdendoRegistrado } from "../utils/adendosPendentes";
+import { ROTULO_NC_TRATADA } from "@/shared/situacaoConformidade";
 
 const STATUS_ROTULO: Record<AppointmentDisplay["status"], string> = {
   aguardando: "Aguardando verificação",
@@ -80,6 +82,8 @@ export function AuditRecordCard({
   // Não conforme no preenchimento (ou já reprovado) e ainda sem RNC nem autocorreção: dá para abrir a RNC daqui.
   const naoConforme = appt.conformidade === false || temNaoConformidade(appt.dados_dinamicos);
   const podeAbrirRnc = Boolean(onAbrirRnc) && naoConforme && !rncStatus && !autocorrigido;
+  // RNC (em qualquer andamento) ou adendo: a não conformidade passa a TRATADA (âmbar); vermelho só para a ainda não tratada.
+  const ncTratada = Boolean(rncStatus) || (naoConforme && temAdendoRegistrado(appt));
 
   return (
     <div
@@ -110,10 +114,9 @@ export function AuditRecordCard({
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-1.5">
-          {naoConforme && !rncStatus && !autocorrigido && <Badge variant="destructive">NÃO CONFORME</Badge>}
+          {naoConforme && !ncTratada && !autocorrigido && <Badge variant="destructive">NÃO CONFORME</Badge>}
           {autocorrigido && <Badge className="border-transparent bg-lime text-primary">AUTOCORRIGIDO</Badge>}
-          {rncStatus === "FECHADA" && <Badge className="border-transparent bg-lime text-primary">TRATADO</Badge>}
-          {rncStatus && rncStatus !== "FECHADA" && <Badge variant="warning">RNC em andamento</Badge>}
+          {ncTratada && <Badge variant="warning">{ROTULO_NC_TRATADA}</Badge>}
           {item.status !== "verificado" && <Badge variant={STATUS_VARIANT[item.status]}>{STATUS_ROTULO[item.status]}</Badge>}
         </div>
       </div>

@@ -11,6 +11,7 @@ import { ensureLocalTime } from "./utils/tempo";
 import { alvosDoCampo } from "./utils/adendoCampos";
 import { alvoDaNaoConformidade, observacaoInicialDoAdendo } from "./utils/alvoNaoConformidade";
 import { temNaoConformidade } from "./utils/desviosEspeciais";
+import { temAdendoRegistrado } from "./utils/adendosPendentes";
 import { urlAbrirRnc, useRncsDosMonitoramentos } from "@/modules/rnc/api";
 import { useAutocorrigidos } from "@/modules/autocorrecao/api";
 import { Button } from "@/shared/ui/button";
@@ -109,6 +110,7 @@ export function VerificarFichaPage() {
               setTimeout(() => painelAcaoRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
             },
         onAbrirRnc: jaTemRncOuAutocorrecao ? undefined : () => navigate(urlAbrirRnc(registro.id)),
+        tratada: jaTemRncOuAutocorrecao || temAdendoRegistrado(registro),
       })
     : undefined;
 

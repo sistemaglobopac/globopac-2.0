@@ -6,6 +6,7 @@
 // conteudoAssinavelMonitoramento (v2), não o de v1.
 import { useEffect, useState } from "react";
 import { camposNaoConformes, type CampoNaoConforme } from "../../utils/desviosEspeciais";
+import { temAdendoRegistrado } from "../../utils/adendosPendentes";
 import { CheckCircle2, AlertTriangle, Clock, Scale, Search, Shield } from "lucide-react";
 import { turnoDoDia } from "@/modules/bordo/api";
 import type { AssinaturaRelatorio, DadosRelatorio, MonitoramentoRelatorio, TemplateRelatorio } from "../../api";
@@ -254,10 +255,10 @@ export type SituacaoRegistro = "conforme" | "tratado" | "autocorrigido" | "nao-c
  * antes disso é `null` — NÃO é "não conforme". Enquanto pendente, mostra "Aguardando verificação"
  * (ou "Desvio detectado" se algum widget do próprio registro apontou desvio). */
 export function situacaoDoRegistro(record: MonitoramentoRelatorio, rnc?: Rnc, autocorrecao?: AutocorrecaoImediata): SituacaoRegistro {
-  // RNC procedente (fechada pelo Verificador): o monitoramento não fica "não conforme", fica TRATADO.
-  if (rnc?.status === "FECHADA" && record.conformidade !== true) return "tratado";
+  // Não conformidade que recebeu RNC (em qualquer andamento) ou adendo não fica "não conforme" (vermelho): fica TRATADA (âmbar).
+  if (rnc && record.conformidade !== true) return "tratado";
   if (record.conformidade === true) return "conforme";
-  if (record.conformidade === false) return "nao-conforme";
+  if (record.conformidade === false) return temAdendoRegistrado(record) ? "tratado" : "nao-conforme";
   const temDesvio = Object.values(record.dados_dinamicos).some(
     (v) => v && typeof v === "object" && ((v as { conformidade?: unknown }).conformidade === false || (v as { status?: unknown }).status === "nao-conforme")
   );
@@ -268,7 +269,7 @@ export function situacaoDoRegistro(record: MonitoramentoRelatorio, rnc?: Rnc, au
 
 const ROTULO_SELO: Record<SituacaoRegistro, string> = {
   conforme: "Conforme",
-  tratado: "Tratado — RNC procedente e fechada",
+  tratado: "Não conformidade tratada",
   autocorrigido: "Conforme — autocorreção imediata",
   "nao-conforme": "Não Conforme",
   "desvio-pendente": "Desvio detectado — aguardando verificação",
@@ -276,7 +277,7 @@ const ROTULO_SELO: Record<SituacaoRegistro, string> = {
 };
 const CLASSE_SELO: Record<SituacaoRegistro, string> = {
   conforme: "text-success",
-  tratado: "text-success",
+  tratado: "text-warning-foreground",
   autocorrigido: "text-success",
   "nao-conforme": "text-down",
   "desvio-pendente": "text-warning-foreground",
@@ -427,9 +428,11 @@ export function RelatorioMonitoramento({ ids, dados, turnoDe = (r) => turnoDoDia
   const rncDe = (r: MonitoramentoRelatorio) => dados.rncs.find((rnc) => rnc.monitoramento_id === r.id);
   const autocorrecaoDe = (r: MonitoramentoRelatorio) => dados.autocorrecoes.find((a) => a.monitoramento_id === r.id);
   const situacoes = records.map((r) => situacaoDoRegistro(r, rncDe(r), autocorrecaoDe(r)));
-  // "Tratado" (RNC procedente fechada) conta como resolvido: o documento não fica não conforme.
+  // "Tratado" (RNC ou adendo sobre a não conformidade) conta como resolvido: o documento não fica não conforme (vermelho).
   const todasConformes = situacoes.every((s) => s === "conforme" || s === "tratado" || s === "autocorrigido");
   const houveTratado = situacoes.includes("tratado");
+  // Banner âmbar: tudo resolvido, mas houve não conformidade tratada (não é "conforme" limpo).
+  const bannerTratado = todasConformes && houveTratado;
   const houveAutocorrecao = situacoes.includes("autocorrigido");
   // Nenhum registro reprovado, mas ainda há decisão do Verificador pendente (conformidade null).
   const aguardando = !todasConformes && records.every((r) => r.conformidade !== false);
@@ -503,7 +506,9 @@ export function RelatorioMonitoramento({ ids, dados, turnoDe = (r) => turnoDoDia
       {/* Banner de conformidade */}
       <div
         className={`flex w-full flex-col items-start justify-between gap-2 border-b-[3px] px-6 py-3 sm:flex-row sm:items-center print:flex-row print:px-4 print:py-2 ${
-          todasConformes
+          bannerTratado
+            ? "border-warning bg-warning/5"
+            : todasConformes
             ? "border-success bg-success/5"
             : aguardando
               ? desvioPendente
@@ -515,19 +520,31 @@ export function RelatorioMonitoramento({ ids, dados, turnoDe = (r) => turnoDoDia
         }`}
       >
         <div className="flex items-center gap-3">
-          {todasConformes ? (
+          {bannerTratado ? (
+            <AlertTriangle className="h-4 w-4 text-warning-foreground" />
+          ) : todasConformes ? (
             <CheckCircle2 className="h-4 w-4 text-success" />
           ) : (
             <AlertTriangle className={`h-4 w-4 ${aguardando ? (desvioPendente ? "text-warning-foreground" : "text-muted-foreground") : todasTratadas ? "text-warning-foreground" : "text-down"}`} />
           )}
           <span
             className={`text-sm font-extrabold print:text-xs ${
-              todasConformes ? "text-success" : aguardando ? (desvioPendente ? "text-warning-foreground" : "text-muted-foreground") : todasTratadas ? "text-warning-foreground" : "text-down"
+              bannerTratado
+                ? "text-warning-foreground"
+                : todasConformes
+                  ? "text-success"
+                  : aguardando
+                    ? desvioPendente
+                      ? "text-warning-foreground"
+                      : "text-muted-foreground"
+                    : todasTratadas
+                      ? "text-warning-foreground"
+                      : "text-down"
             }`}
           >
             {todasConformes
               ? houveTratado
-                ? "TRATADO — Desvio identificado, RNC procedente e fechada"
+                ? "NÃO CONFORMIDADE TRATADA — Desvio identificado e tratado (RNC ou adendo)"
                 : houveAutocorrecao
                   ? "CONFORME — Desvio corrigido por autocorreção imediata do inspetor"
                   : "CONFORME — Todos os Pontos dentro dos Padrões"
@@ -540,7 +557,7 @@ export function RelatorioMonitoramento({ ids, dados, turnoDe = (r) => turnoDoDia
                   : "NÃO CONFORME — Contém Desvios Identificados"}
           </span>
         </div>
-        <div className={`flex items-center gap-2 text-sm font-bold print:text-[10px] ${todasConformes ? "text-success" : aguardando ? "text-muted-foreground" : "text-down"}`}>
+        <div className={`flex items-center gap-2 text-sm font-bold print:text-[10px] ${bannerTratado ? "text-warning-foreground" : todasConformes ? "text-success" : aguardando ? "text-muted-foreground" : "text-down"}`}>
           <Shield className="h-3.5 w-3.5" />
           {isGrouped ? (
             <>{records.length} REGISTROS · <span className="font-mono">{hashId}</span></>

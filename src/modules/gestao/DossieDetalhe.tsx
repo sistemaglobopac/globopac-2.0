@@ -34,7 +34,11 @@ export function DossieDetalhe({ monitoramentoId, onVoltar }: { monitoramentoId: 
             <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold">
               <span
                 className={`rounded-full px-2.5 py-1 ${
-                  situacaoDe(dossie) === "NAO_CONFORME" ? "bg-destructive/10 text-destructive" : "bg-lime text-primary"
+                  situacaoDe(dossie) === "NAO_CONFORME"
+                    ? "bg-destructive/10 text-destructive"
+                    : situacaoDe(dossie) === "TRATADO"
+                      ? "bg-warning/15 text-warning-foreground"
+                      : "bg-lime text-primary"
                 }`}
               >
                 {rotuloSituacao(dossie)}

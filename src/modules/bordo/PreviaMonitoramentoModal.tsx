@@ -2,6 +2,7 @@ import { X } from "lucide-react";
 import { DadosColetados } from "@/modules/fichas/components/DadosColetadosFicha";
 import { useUsuariosMap } from "@/modules/fichas/api";
 import { Badge } from "@/shared/ui/badge";
+import { ROTULO_NC_TRATADA } from "@/shared/situacaoConformidade";
 import { Button } from "@/shared/ui/button";
 import { usePreviaMonitoramento, type PreviaMonitoramento } from "./api";
 
@@ -10,7 +11,7 @@ function dataHoraManaus(iso: string): string {
 }
 
 function Situacao({ m }: { m: PreviaMonitoramento }) {
-  if (m.situacao_conformidade === "TRATADO") return <Badge className="border-transparent bg-lime text-primary">TRATADO</Badge>;
+  if (m.situacao_conformidade === "TRATADO") return <Badge variant="warning">{ROTULO_NC_TRATADA}</Badge>;
   if (m.situacao_conformidade === "NAO_CONFORME") return <Badge variant="destructive">NÃO CONFORME</Badge>;
   if (m.situacao_conformidade === "CONFORME") return <Badge className="border-transparent bg-success/15 text-success">CONFORME</Badge>;
   return <Badge variant="warning">Aguardando verificação</Badge>;

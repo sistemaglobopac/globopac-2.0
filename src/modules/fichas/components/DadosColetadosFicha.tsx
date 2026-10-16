@@ -106,17 +106,21 @@ export interface AcoesNaoConformidade {
   onAdendo?: (chaveCampo: string) => void;
   /** Abrir a RNC do monitoramento; ausente quando já existe RNC ou autocorreção. */
   onAbrirRnc?: (chaveCampo: string) => void;
+  /** Já tem RNC, autocorreção ou adendo: a não conformidade está tratada (âmbar, não vermelho). */
+  tratada?: boolean;
 }
 
 function BarraNaoConformidade({ chave, rotulo, acoes }: { chave: string; rotulo: string; acoes: AcoesNaoConformidade }) {
   if (!acoes.onAdendo && !acoes.onAbrirRnc) return null;
   return (
     <div
-      className="col-span-full flex flex-wrap items-center justify-between gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 print:hidden"
+      className={`col-span-full flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 print:hidden ${
+        acoes.tratada ? "border-warning/60 bg-warning/10" : "border-destructive/50 bg-destructive/10"
+      }`}
       data-testid={`nc-acoes-${chave}`}
     >
-      <span className="flex items-center gap-1.5 text-xs font-black uppercase text-destructive">
-        <ShieldAlert className="h-4 w-4" /> {rotulo} — não conforme
+      <span className={`flex items-center gap-1.5 text-xs font-black uppercase ${acoes.tratada ? "text-warning-foreground" : "text-destructive"}`}>
+        <ShieldAlert className="h-4 w-4" /> {rotulo} — {acoes.tratada ? "não conformidade tratada" : "não conforme"}
       </span>
       <div className="flex flex-wrap gap-2">
         {acoes.onAdendo && (
