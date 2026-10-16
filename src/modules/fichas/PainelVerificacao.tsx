@@ -34,7 +34,7 @@ function statusDoItem(m: MonitoramentoVerificacao, adendosConcluidos: Set<string
   return "aguardando";
 }
 
-/** Abas do painel: o dia/turno em curso (pendentes e verificadas do dia), toda a fila por verificar e as já verificadas do dia. */
+/** Abas do painel: fichas do turno ainda aberto (não dá para assinar), fichas de turnos já fechados por verificar e as já verificadas do dia. */
 type AbaVerificacao = "dia" | "por_verificar" | "verificadas";
 
 function hojeManaus(): string {
@@ -145,15 +145,10 @@ export function PainelVerificacao() {
         .sort((a, b) => PESO_STATUS[a.status] - PESO_STATUS[b.status] || new Date(instanteDoRegistro(b.appt)).getTime() - new Date(instanteDoRegistro(a.appt)).getTime()),
     [filtrados]
   );
-  // O dia do monitoramento é o da hora em que foi realizado (a mesma regra dos verificados abaixo).
-  const ehDoDia = (i: AppointmentDisplay) => ensureLocalTime(instanteDoRegistro(i.appt)).isoLocal === dateBase;
-  const qtdPendentesDoDia = pendentesOrdenados.filter(ehDoDia).length;
-  // Aba do dia: só os pendentes do dia selecionado; "Por verificar" traz a fila inteira (inclusive de outros dias / turnos fechados).
-  const pendingAppointments = useMemo(
-    () => (aba === "dia" ? pendentesOrdenados.filter(ehDoDia) : pendentesOrdenados),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [pendentesOrdenados, aba, dateBase]
-  );
+  // Turno ainda aberto = ficha do turno atual: aparece só na aba do dia/turno; "Por verificar" é o que já está liberado (turno fechado).
+  const pendentesDoTurnoAtual = useMemo(() => pendentesOrdenados.filter((i) => blockedIds.has(i.id)), [pendentesOrdenados, blockedIds]);
+  const pendentesLiberados = useMemo(() => pendentesOrdenados.filter((i) => !blockedIds.has(i.id)), [pendentesOrdenados, blockedIds]);
+  const pendingAppointments = useMemo(() => (aba === "dia" ? pendentesDoTurnoAtual : pendentesLiberados), [aba, pendentesDoTurnoAtual, pendentesLiberados]);
   // Monitoramento solto entra no consolidado dele: o dossiê (dia + turno + tipo de ficha + setor, de qualquer dia) é sempre
   // mostrado inteiro. Um consolidado já verificado que ganhou um pendente (ex.: retroativo) volta à fila com todos os irmãos e
   // só o pendente é reassinado; os filtros de inspetor/status não separam um dossiê.
@@ -186,15 +181,19 @@ export function PainelVerificacao() {
     [verifiedToday, displayItems, chavesReabertas, chaveDoGrupo]
   );
 
-  const pendingKey = pendingAppointments.map((i) => i.id).join(",");
+  const pendingKey = pendentesOrdenados.map((i) => i.id).join(",");
   const { data: autocorrigidoIds } = useAutocorrigidos([...pendentesComIrmaos, ...verificadosComIrmaos].map((i) => i.id));
   // Encerrar o turno não muda a lista de pendentes, só o estado dos turnos — sem este contador
   // o efeito abaixo não reexecutava e o botão "Verificar" ficava travado com o bloqueio antigo.
   const [turnosVersao, setTurnosVersao] = useState(0);
+  // Até saber quais turnos estão abertos não dá para separar as abas: evita a ficha do turno atual piscar em "Por verificar".
+  const [bloqueiosProntos, setBloqueiosProntos] = useState(false);
   useEffect(() => {
     let cancelado = false;
-    turnosBloqueadosMap(pendingAppointments.map((i) => ({ id: i.id, user_id: i.appt.user_id, criado_em: instanteDoRegistro(i.appt) }))).then((set) => {
-      if (!cancelado) setBlockedIds(set);
+    turnosBloqueadosMap(pendentesOrdenados.map((i) => ({ id: i.id, user_id: i.appt.user_id, criado_em: instanteDoRegistro(i.appt) }))).then((set) => {
+      if (cancelado) return;
+      setBlockedIds(set);
+      setBloqueiosProntos(true);
     });
     return () => {
       cancelado = true;
@@ -503,8 +502,8 @@ export function PainelVerificacao() {
         <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Seções do painel" data-testid="abas-verificacao">
           {(
             [
-              ["dia", "Dia / turno atual", qtdPendentesDoDia + verifiedToday.length],
-              ["por_verificar", "Fichas por verificar", pendentesOrdenados.length],
+              ["dia", "Dia / turno atual", pendentesDoTurnoAtual.length],
+              ["por_verificar", "Fichas por verificar", pendentesLiberados.length],
               ["verificadas", "Fichas verificadas", verifiedToday.length],
             ] as const
           ).map(([valor, rotulo, qtd]) => (
@@ -513,7 +512,7 @@ export function PainelVerificacao() {
             </Button>
           ))}
         </div>
-        {aba !== "verificadas" && (
+        {aba === "por_verificar" && (
           <Button type="button" variant="outline" size="sm" onClick={selecionarPendentes}>
             Selecionar Pendentes
           </Button>
@@ -522,10 +521,10 @@ export function PainelVerificacao() {
 
       {aba !== "verificadas" && (
         <div className="space-y-3" data-testid="fila-pendente">
-          {fila.isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
-          {!fila.isLoading && dossies.length === 0 && avulsos.length === 0 && (
+          {(fila.isLoading || !bloqueiosProntos) && <p className="text-sm text-muted-foreground">Carregando…</p>}
+          {!fila.isLoading && bloqueiosProntos && dossies.length === 0 && avulsos.length === 0 && (
             <div className="rounded-lg border bg-muted/40 p-8 text-center text-sm text-muted-foreground">
-              {aba === "dia" ? "Nenhuma ficha aguardando verificação neste dia." : "Nenhuma ficha aguardando verificação."}
+              {aba === "dia" ? "Nenhuma ficha de turno em andamento." : "Nenhuma ficha aguardando verificação."}
             </div>
           )}
           {secoesPendentes.map((secao) => (
@@ -541,7 +540,7 @@ export function PainelVerificacao() {
         </div>
       )}
 
-      {aba !== "por_verificar" && (verifiedToday.length > 0 || aba === "verificadas") && (
+      {aba === "verificadas" && (
         <div className="space-y-3">
           <h2 className="text-lg font-medium">Verificadas em {ensureLocalTime(`${dateBase}T12:00:00`).datePt}</h2>
           {verifiedToday.length === 0 && (
