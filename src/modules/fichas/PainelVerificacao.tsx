@@ -34,7 +34,8 @@ function statusDoItem(m: MonitoramentoVerificacao, adendosConcluidos: Set<string
   return "aguardando";
 }
 
-type PeriodoPendentes = "todos" | "dia" | "outros";
+/** Abas do painel: o dia/turno em curso (pendentes e verificadas do dia), toda a fila por verificar e as já verificadas do dia. */
+type AbaVerificacao = "dia" | "por_verificar" | "verificadas";
 
 function hojeManaus(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "America/Manaus" });
@@ -57,8 +58,7 @@ export function PainelVerificacao() {
   const [filtroPac, setFiltroPac] = useState<string | null>(null);
   const [filtroStatus, setFiltroStatus] = useState<StatusVerificacao | null>(null);
   const [filtroInspetor, setFiltroInspetor] = useState<string | null>(null);
-  // Pendentes do dia selecionado x pendentes que sobraram de outros dias (turnos já fechados).
-  const [filtroPeriodo, setFiltroPeriodo] = useState<PeriodoPendentes>("todos");
+  const [aba, setAba] = useState<AbaVerificacao>("dia");
   const [showFilters, setShowFilters] = useState(false);
   const [showTrocaSetor, setShowTrocaSetor] = useState(false);
 
@@ -148,11 +148,11 @@ export function PainelVerificacao() {
   // O dia do monitoramento é o da hora em que foi realizado (a mesma regra dos verificados abaixo).
   const ehDoDia = (i: AppointmentDisplay) => ensureLocalTime(instanteDoRegistro(i.appt)).isoLocal === dateBase;
   const qtdPendentesDoDia = pendentesOrdenados.filter(ehDoDia).length;
-  const qtdPendentesOutrosDias = pendentesOrdenados.length - qtdPendentesDoDia;
+  // Aba do dia: só os pendentes do dia selecionado; "Por verificar" traz a fila inteira (inclusive de outros dias / turnos fechados).
   const pendingAppointments = useMemo(
-    () => (filtroPeriodo === "todos" ? pendentesOrdenados : pendentesOrdenados.filter((i) => ehDoDia(i) === (filtroPeriodo === "dia"))),
+    () => (aba === "dia" ? pendentesOrdenados.filter(ehDoDia) : pendentesOrdenados),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [pendentesOrdenados, filtroPeriodo, dateBase]
+    [pendentesOrdenados, aba, dateBase]
   );
   // Monitoramento solto entra no consolidado dele: o dossiê (dia + turno + tipo de ficha + setor, de qualquer dia) é sempre
   // mostrado inteiro. Um consolidado já verificado que ganhou um pendente (ex.: retroativo) volta à fila com todos os irmãos e
@@ -166,7 +166,7 @@ export function PainelVerificacao() {
     const chaves = new Set(itens.map((i) => chaveDoGrupo(i.appt)));
     return displayItems.filter((i) => !ids.has(i.id) && chaves.has(chaveDoGrupo(i.appt)));
   };
-  const chavesReabertas = useMemo(() => new Set(pendingAppointments.map((i) => chaveDoGrupo(i.appt))), [pendingAppointments, chaveDoGrupo]);
+  const chavesReabertas = useMemo(() => new Set(pendentesOrdenados.map((i) => chaveDoGrupo(i.appt))), [pendentesOrdenados, chaveDoGrupo]);
   const pendentesComIrmaos = useMemo(
     () => [...pendingAppointments, ...irmaosDe(pendingAppointments)],
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -244,7 +244,7 @@ export function PainelVerificacao() {
     return mapa;
   }, [rncBruto, displayItems]);
 
-  const filtrosAtivos = Boolean(filtroSetor || filtroPac || filtroStatus || filtroInspetor || filtroPeriodo !== "todos" || dateBase !== hojeManaus());
+  const filtrosAtivos = Boolean(filtroSetor || filtroPac || filtroStatus || filtroInspetor || dateBase !== hojeManaus());
 
   const verificarLote = useVerificarLote();
 
@@ -253,13 +253,12 @@ export function PainelVerificacao() {
     setFiltroPac(null);
     setFiltroStatus(null);
     setFiltroInspetor(null);
-    setFiltroPeriodo("todos");
     setDateBase(hojeManaus());
   }
 
-  function escolherPeriodo(periodo: PeriodoPendentes) {
-    setFiltroPeriodo(periodo);
-    // A seleção para o lote só vale para o que está na tela: trocar o período não deixa fichas ocultas selecionadas.
+  function escolherAba(proxima: AbaVerificacao) {
+    setAba(proxima);
+    // A seleção para o lote só vale para o que está na tela: trocar de aba não deixa fichas ocultas selecionadas.
     setSelectedIds(new Set());
   }
 
@@ -500,47 +499,54 @@ export function PainelVerificacao() {
         </section>
       )}
 
-      <div className="flex flex-wrap gap-2 items-center justify-between">
-        <h2 className="text-lg font-medium">Fila de Verificação</h2>
-        <Button type="button" variant="outline" size="sm" onClick={selecionarPendentes}>
-          Selecionar Pendentes
-        </Button>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Período dos pendentes" data-testid="filtro-periodo">
-        {(
-          [
-            ["todos", "Todos", pendentesOrdenados.length],
-            ["dia", `Do dia ${ensureLocalTime(`${dateBase}T12:00:00`).datePt}`, qtdPendentesDoDia],
-            ["outros", "De outros dias / turnos fechados", qtdPendentesOutrosDias],
-          ] as const
-        ).map(([valor, rotulo, qtd]) => (
-          <Button key={valor} type="button" size="sm" variant={filtroPeriodo === valor ? "default" : "outline"} aria-pressed={filtroPeriodo === valor} onClick={() => escolherPeriodo(valor)}>
-            {rotulo} <span className="ml-1 rounded-full bg-white/20 px-1.5 text-[10px]">{qtd}</span>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Seções do painel" data-testid="abas-verificacao">
+          {(
+            [
+              ["dia", "Dia / turno atual", qtdPendentesDoDia + verifiedToday.length],
+              ["por_verificar", "Fichas por verificar", pendentesOrdenados.length],
+              ["verificadas", "Fichas verificadas", verifiedToday.length],
+            ] as const
+          ).map(([valor, rotulo, qtd]) => (
+            <Button key={valor} type="button" role="tab" size="sm" variant={aba === valor ? "default" : "outline"} aria-selected={aba === valor} onClick={() => escolherAba(valor)}>
+              {rotulo} <span className="ml-1 rounded-full bg-white/20 px-1.5 text-[10px]">{qtd}</span>
+            </Button>
+          ))}
+        </div>
+        {aba !== "verificadas" && (
+          <Button type="button" variant="outline" size="sm" onClick={selecionarPendentes}>
+            Selecionar Pendentes
           </Button>
-        ))}
-      </div>
-
-      <div className="space-y-3" data-testid="fila-pendente">
-        {fila.isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
-        {!fila.isLoading && dossies.length === 0 && avulsos.length === 0 && (
-          <div className="rounded-lg border bg-muted/40 p-8 text-center text-sm text-muted-foreground">Nenhuma ficha aguardando verificação.</div>
         )}
-        {secoesPendentes.map((secao) => (
-          <section key={secao.setor} className="space-y-3" data-testid={`setor-pendente-${secao.setor}`} aria-label={`Setor ${secao.setor}`}>
-            <h3 className="flex items-center justify-between border-b pb-1 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              <span>{secao.setor}</span>
-              <span className="text-xs font-normal normal-case">{secao.dossies.length + secao.avulsos.length} card(s)</span>
-            </h3>
-            {secao.dossies.map((dossie) => cartaoDossie(dossie, false))}
-            {secao.avulsos.map((item) => cartaoAvulso(item, false))}
-          </section>
-        ))}
       </div>
 
-      {verifiedToday.length > 0 && (
+      {aba !== "verificadas" && (
+        <div className="space-y-3" data-testid="fila-pendente">
+          {fila.isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
+          {!fila.isLoading && dossies.length === 0 && avulsos.length === 0 && (
+            <div className="rounded-lg border bg-muted/40 p-8 text-center text-sm text-muted-foreground">
+              {aba === "dia" ? "Nenhuma ficha aguardando verificação neste dia." : "Nenhuma ficha aguardando verificação."}
+            </div>
+          )}
+          {secoesPendentes.map((secao) => (
+            <section key={secao.setor} className="space-y-3" data-testid={`setor-pendente-${secao.setor}`} aria-label={`Setor ${secao.setor}`}>
+              <h3 className="flex items-center justify-between border-b pb-1 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                <span>{secao.setor}</span>
+                <span className="text-xs font-normal normal-case">{secao.dossies.length + secao.avulsos.length} card(s)</span>
+              </h3>
+              {secao.dossies.map((dossie) => cartaoDossie(dossie, false))}
+              {secao.avulsos.map((item) => cartaoAvulso(item, false))}
+            </section>
+          ))}
+        </div>
+      )}
+
+      {aba !== "por_verificar" && (verifiedToday.length > 0 || aba === "verificadas") && (
         <div className="space-y-3">
           <h2 className="text-lg font-medium">Verificadas em {ensureLocalTime(`${dateBase}T12:00:00`).datePt}</h2>
+          {verifiedToday.length === 0 && (
+            <div className="rounded-lg border bg-muted/40 p-8 text-center text-sm text-muted-foreground">Nenhuma ficha verificada neste dia.</div>
+          )}
           <div className="space-y-3">
             {secoesVerificadas.map((secao) => (
               <section key={secao.setor} className="space-y-3" data-testid={`setor-verificado-${secao.setor}`} aria-label={`Setor ${secao.setor}`}>
