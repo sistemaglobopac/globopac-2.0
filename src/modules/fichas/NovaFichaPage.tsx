@@ -5,6 +5,7 @@ import { useForm, useWatch, type FieldValues } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertTriangle, ArrowLeft, BellRing, CheckCircle2, Clock, Lock, ShieldCheck, X } from "lucide-react";
 import { useSessionStore, type PerfilSessao } from "@/store/session";
+import { useOnline } from "@/lib/useOnline";
 import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/api";
 import { zodFromSchemaCampos, valoresIniciaisDe, type CampoTemplate } from "@/shared/schema-campos";
 import { conferirSenha } from "@/modules/auth/reautenticar";
@@ -332,7 +333,8 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
     perfil.id,
   );
   const turnoAlvo = turnoAlvoHeranca(turnoFixo, new Date());
-  const { data: ultimoServidor } = useUltimoRegistroFicha(
+  const online = useOnline();
+  const { data: ultimoServidor, isFetchedAfterMount: anteriorAtualizado, isError: erroAnterior } = useUltimoRegistroFicha(
     codigo,
     setor,
     turnoAlvo,
@@ -348,6 +350,10 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
   // Continuação de um monitoramento de antes de hoje (turno encerrado antes do lançamento): só é
   // oferecida quando hoje ainda não há registro desta ficha para herdar.
   const camposComHeranca = campos.some((c) => ["chiller_carcacas", "chiller_partes", "mini_chillers", "lavagem_final", "potabilidade_agua", "potabilidade_pontos"].includes(c.tipo));
+  // Os campos que herdam a leitura anterior nascem com ela e a travam (hidrômetro "anterior" é somente leitura): se abrissem com
+  // o que veio do cache do aparelho, repetiriam a leitura de um monitoramento antigo. Com rede, esperam a consulta de verdade;
+  // sem rede (ou se ela falhar) vale o cache, como sempre.
+  const aguardandoAnterior = camposComHeranca && online && !erroAnterior && (!turnoConhecido || !anteriorAtualizado);
   const { data: registroContinuavel } = useRegistroContinuavel(codigo, setor, turnoConhecido && camposComHeranca && ultimoRegistro === null);
   const [continuando, setContinuando] = useState(false);
   const [motivoContinuacao, setMotivoContinuacao] = useState("");
@@ -839,7 +845,12 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
                 }}
               />
             )}
-            {camposVisiveis.map((campo) => (
+            {aguardandoAnterior && (
+              <p role="status" className="rounded-md border border-primary/30 bg-primary/5 p-3 text-sm text-muted-foreground" data-testid="aguardando-leitura-anterior">
+                Buscando a leitura anterior do hidrômetro…
+              </p>
+            )}
+            {!aguardandoAnterior && camposVisiveis.map((campo) => (
               <DynamicField
                 key={`${campo.chave}-${continuando ? "continuacao" : "novo"}`}
                 campo={campo}
@@ -927,7 +938,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
             )}
 
             {campoAbsorcao ? (
-              <Button type="submit" disabled={isSubmitting || criarMonitoramento.isPending}>
+              <Button type="submit" disabled={isSubmitting || criarMonitoramento.isPending || aguardandoAnterior}>
                 {isSubmitting || criarMonitoramento.isPending ? "Salvando…" : "Salvar primeira etapa"}
               </Button>
             ) : drippingFase1 ? (
@@ -936,13 +947,13 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
               </p>
             ) : (
               <div className="flex flex-wrap gap-2">
-                <Button type="submit" disabled={isSubmitting || criarMonitoramento.isPending}>
+                <Button type="submit" disabled={isSubmitting || criarMonitoramento.isPending || aguardandoAnterior}>
                   {isSubmitting || criarMonitoramento.isPending ? "Salvando…" : etapa1Chiller2 ? "Salvar etapa 1 (chiller 02 depois)" : pesoPendente ? "Salvar e aguardar o peso" : "Criar e assinar"}
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={isSubmitting || criarMonitoramento.isPending}
+                  disabled={isSubmitting || criarMonitoramento.isPending || aguardandoAnterior}
                   onClick={() => void handleSubmit(aoSalvarRascunho)()}
                 >
                   Salvar rascunho (assinar depois)

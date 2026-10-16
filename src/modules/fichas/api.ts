@@ -144,6 +144,11 @@ export function useUltimoRegistroFicha(codigo: string | undefined, setor: string
     queryKey: ["monitoramentos", "ultimo-registro-ficha", codigo, setor, turno],
     meta: { offline: true },
     enabled: !!codigo && !!setor && habilitado,
+    // A leitura anterior do hidrômetro vem daqui: nunca pode ser a de uma consulta antiga (cache de 30 s, ou o cache
+    // do aparelho de outro dia/turno). Colega do setor pode ter assinado um monitoramento depois da última busca.
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: "always",
     queryFn: async () => {
       // Função do banco: o inspetor só lê templates ativos, e os registros do dia podem apontar
       // para versões já inativas (ficha reeditada no meio do dia).
