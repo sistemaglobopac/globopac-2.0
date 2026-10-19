@@ -40,7 +40,6 @@ import {
   useEncerrarFichaDia,
   useReabrirFichaDia,
   useKpisTurno,
-  useRegistrosVazaoDoDia,
   useAssinarAdendo,
   PAUSAS_CONFIG,
   MOTIVOS_PARADA_FALLBACK,
@@ -51,7 +50,6 @@ import {
   resumoFichasPorSetor,
   urlNovaFicha,
   inicioDoDiaManaus,
-  diaManaus,
   type TipoPausa,
   type FichaAtivaResumo,
   type FichaAtrasada,
@@ -60,14 +58,11 @@ import {
   type AdendoPendente,
 } from "./api";
 import { ModalProcessoParado } from "./ModalProcessoParado";
-import { CartaoAvesVazao } from "./CartaoAvesVazao";
 import { PreviaMonitoramentoModal } from "./PreviaMonitoramentoModal";
 import { RelatorioDoMonitoramentoModal } from "./RelatorioDoMonitoramentoModal";
 import { PreviaRascunhoModal } from "@/modules/fichas/components/PreviaRascunhoModal";
 import type { Rascunho } from "@/lib/rascunhos";
 import { useUsuariosMap } from "@/modules/fichas/api";
-import { conferirAvesNaVazao, SETOR_AVES_NA_VAZAO } from "./avesNaVazao";
-import { useCargasRastreabilidade } from "@/modules/recepcao/api";
 import { Button } from "@/shared/ui/button";
 import { rascunhosComoMonitoramentos, useRascunhos } from "@/modules/fichas/useRascunhos";
 import { Input } from "@/shared/ui/input";
@@ -130,15 +125,6 @@ export function PainelBordo() {
 
   const kpisQuery = useKpisTurno(perfil?.id, userSetores);
   const kpis = kpisQuery.data;
-
-  // Aves programadas × aves contadas na vazão (só informa): vale o dia do turno e só para o inspetor do PRÉ-RESFRIAMENTO 02.
-  const temVazaoSpr =
-    userSetores.includes(SETOR_AVES_NA_VAZAO) &&
-    (kpis?.fichasAtivas ?? []).some((f) => f.vazaoSpr && f.locais_aplicacao?.includes(SETOR_AVES_NA_VAZAO));
-  const diaAbate = diaManaus(turnoHoje ? new Date(turnoHoje.inicio) : new Date());
-  const { data: cargasDoDia } = useCargasRastreabilidade(temVazaoSpr ? diaAbate : undefined);
-  const { data: registrosVazao } = useRegistrosVazaoDoDia(diaAbate, [SETOR_AVES_NA_VAZAO], temVazaoSpr);
-  const avesNaVazao = temVazaoSpr && cargasDoDia && registrosVazao ? conferirAvesNaVazao(cargasDoDia, registrosVazao) : null;
 
   const [agora, setAgora] = useState(() => new Date());
   const [mensagem, setMensagem] = useState<{ tipo: "success" | "error"; texto: string } | null>(null);
@@ -431,8 +417,6 @@ export function PainelBordo() {
           </button>
         </div>
       )}
-
-      {!shiftEnded && turnoHoje && avesNaVazao && avesNaVazao.linhas.length > 0 && <CartaoAvesVazao resumo={avesNaVazao} />}
 
       {!shiftEnded && pragasFaltando.length > 0 && (
         <section className="space-y-2 rounded-xl border-2 border-destructive bg-destructive/5 p-4" data-testid="pragas-pendentes">
