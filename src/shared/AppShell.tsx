@@ -18,6 +18,7 @@ import { NIVEL_ACESSO_BADGE } from "@/modules/gestao/api";
 import { useRncsAbertas } from "@/modules/rnc/api";
 import { useSolicitacoes } from "@/modules/bpf/api";
 import { SETOR_BPF } from "@/modules/bpf/tipos";
+import { casaSomenteRotaExata } from "./menuRotas";
 import { AlertaRncGestor } from "@/modules/rnc/AlertaRncGestor";
 import { SemConexaoBanner } from "@/shared/SemConexaoBanner";
 
@@ -223,6 +224,7 @@ function MenuLateral({ itens, onNavegar }: { itens: ItemMenu[]; onNavegar?: () =
           <NavLink
             key={item.rota}
             to={item.rota}
+            end={casaSomenteRotaExata(item.rota, itens.map((i) => i.rota))}
             onClick={onNavegar}
             className={({ isActive }) =>
               cn(
