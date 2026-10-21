@@ -34,7 +34,7 @@ que sincronizado entre policies de RLS, esta tabela e a migration de seed):
 | `GESTOR_SETOR` | `monitoramentos`: ler · `rnc`: ler, criar, tratar |
 | `ADMIN_MASTER` | Acesso total a todos os recursos listados (ver migration de seed para a lista completa) · `bloqueios_login_ip`: ler (Segurança de Login — ver ADR 0015; o desbloqueio em si é feito pela Edge Function `desbloquear-ip-login`, não por RLS de UPDATE) |
 | `INSPECAO_FEDERAL` | `monitoramentos`: ler (apenas `liberado_sif=true`, reforçado na policy) · `assinaturas_eletronicas`/`assinaturas_os_eletronicas`: ler · `lote_liberacao_sif`: ler · `manutencao_os`/`manutencao_relatorios_sif`: ler (mesma restrição `liberado_sif=true`, corrigida na Fase 5 — ver ASSUMPTIONS.md) |
-| `INSPETOR_QUALIDADE` (BPF) | `bpf_solicitacoes`: ler, criar · `bpf_ordens`: ler, verificar · `bpf_relatorios`: ler, emitir — restrito ao setor `MANUTENCOES_DIVERSAS` (ver ADR 0017) |
+| `INSPETOR_QUALIDADE` (BPF) | `bpf_solicitacoes`: ler, criar · `bpf_ordens`: ler, verificar · `bpf_relatorios`: ler, emitir — restrito ao setor `MANUTENÇÕES DIVERSAS` (ver ADR 0017) |
 | `VERIFICADOR` (BPF) | `bpf_solicitacoes`/`bpf_ordens`: ler · `bpf_relatorios`: ler, liberar |
 | `ADMIN_MASTER` (BPF) | `bpf_solicitacoes`: ler, criar, aprovar · `bpf_ordens`: ler, verificar, importar · `bpf_relatorios`: ler, emitir, liberar |
 | `INSPETOR_PCM` (BPF) | `bpf_solicitacoes`: ler (só após a aprovação) · `bpf_ordens`: ler, programar |

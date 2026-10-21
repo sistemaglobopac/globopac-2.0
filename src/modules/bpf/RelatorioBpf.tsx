@@ -9,6 +9,11 @@ import {
 } from "./regras";
 import type { ItemRelatorio, Relatorio } from "./tipos";
 
+/** "Escaldagem/Depenagem" não tem espaço onde quebrar e estoura a coluna: permite a quebra depois da barra. */
+function permitirQuebra(texto: string): string {
+  return texto.replace(/\//g, "/​");
+}
+
 const COR_RESULTADO = {
   NC: "text-red-700",
   NP: "text-blue-800",
@@ -20,18 +25,21 @@ function LinhaItem({ item }: { item: ItemRelatorio }) {
     <tr className="align-top">
       <td className="border border-slate-400 p-1.5">
         <p className="font-semibold">{item.anomalia}</p>
-        <p className="text-[10px] text-slate-600">
-          {item.categoria}
-          {item.solicitacao_numero ? ` · SS ${String(item.solicitacao_numero).padStart(4, "0")}` : ""}
-          {item.origem === "v2" ? ` · constatada em ${formatarDataHora(item.constatado_em)}` : ""}
-          {item.constatado_por ? ` por ${item.constatado_por}` : ""}
-        </p>
+        {/* OS importadas não têm categoria/SS/constatação detalhada: só o que veio do relatório manual. */}
+        {item.origem === "v2" && (
+          <p className="text-[10px] text-slate-600">
+            {item.categoria}
+            {item.solicitacao_numero ? ` · SS ${String(item.solicitacao_numero).padStart(4, "0")}` : ""}
+            {` · constatada em ${formatarDataHora(item.constatado_em)}`}
+            {item.constatado_por ? ` por ${item.constatado_por}` : ""}
+          </p>
+        )}
         {item.local_detalhe && <p className="text-[10px] text-slate-600">Local: {item.local_detalhe}</p>}
         {item.observacao && <p className="text-[10px] italic text-slate-700">Obs. do inspetor: {item.observacao}</p>}
       </td>
       <td className="border border-slate-400 p-1.5">
-        <p className="font-medium">{item.setor_area}</p>
-        <p className="text-[10px] text-slate-600">CC {item.centro_custo_codigo}</p>
+        <p className="font-medium">{permitirQuebra(item.setor_area)}</p>
+        <p className="text-[10px] text-slate-600 [overflow-wrap:anywhere]">CC {item.centro_custo_codigo}</p>
       </td>
       <td className="border border-slate-400 p-1.5">{item.acao_corretiva ?? "—"}</td>
       <td className="border border-slate-400 p-1.5">
@@ -100,9 +108,9 @@ export function RelatorioBpf({ relatorio }: { relatorio: Relatorio }) {
 
       <table className="w-full table-fixed border-collapse text-[11px]">
         <colgroup>
-          <col style={{ width: "28%" }} />
-          <col style={{ width: "12%" }} />
-          <col style={{ width: "16%" }} />
+          <col style={{ width: "26%" }} />
+          <col style={{ width: "15%" }} />
+          <col style={{ width: "15%" }} />
           <col style={{ width: "22%" }} />
           <col style={{ width: "8%" }} />
           <col style={{ width: "14%" }} />

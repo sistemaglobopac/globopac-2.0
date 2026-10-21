@@ -33,7 +33,7 @@ values
   ('f1000000-0000-0000-0000-000000000006', 'authenticated', 'authenticated', 'bpf.sif@test.local', '00000000-0000-0000-0000-000000000000', '{}', '{}', now(), now());
 
 insert into perfis_usuarios (id, nome_completo, nome_usuario, matricula, nivel_acesso, setores_permitidos) values
-  ('f1000000-0000-0000-0000-000000000001', 'Inspetor BPF', 'bpf.insp.teste', 'T0100', 'INSPETOR_QUALIDADE', array['MANUTENCOES_DIVERSAS']),
+  ('f1000000-0000-0000-0000-000000000001', 'Inspetor BPF', 'bpf.insp.teste', 'T0100', 'INSPETOR_QUALIDADE', array['MANUTENÇÕES DIVERSAS']),
   ('f1000000-0000-0000-0000-000000000002', 'Inspetor Recepção', 'bpf.insp2.teste', 'T0101', 'INSPETOR_QUALIDADE', array['RECEPCAO']),
   ('f1000000-0000-0000-0000-000000000003', 'Administrador BPF', 'bpf.admin.teste', 'T0102', 'ADMIN_MASTER', array[]::text[]),
   ('f1000000-0000-0000-0000-000000000004', 'PCM BPF', 'bpf.pcm.teste', 'T0103', 'INSPETOR_PCM', array['MANUTENCAO']),
@@ -45,13 +45,13 @@ insert into centros_custo (id, codigo, nome) values ('f2000000-0000-0000-0000-00
 -- OS que já existia antes de hoje e está com prazo vencido (cenário NC) e outra dentro do prazo.
 insert into bpf_ordens (id, numero_os, setor, centro_custo_id, descricao, constatado_em, prazo_atual, criado_em)
 values
-  ('f3000000-0000-0000-0000-000000000001', 'T-VENCIDA', 'MANUTENCOES_DIVERSAS', 'f2000000-0000-0000-0000-000000000001', 'Porta com prazo vencido', now() - interval '30 days', public.bpf_hoje() - 3, now() - interval '30 days'),
-  ('f3000000-0000-0000-0000-000000000002', 'T-NOPRAZO', 'MANUTENCOES_DIVERSAS', 'f2000000-0000-0000-0000-000000000001', 'Luminária dentro do prazo', now() - interval '5 days', public.bpf_hoje() + 10, now() - interval '5 days');
+  ('f3000000-0000-0000-0000-000000000001', 'T-VENCIDA', 'MANUTENÇÕES DIVERSAS', 'f2000000-0000-0000-0000-000000000001', 'Porta com prazo vencido', now() - interval '30 days', public.bpf_hoje() - 3, now() - interval '30 days'),
+  ('f3000000-0000-0000-0000-000000000002', 'T-NOPRAZO', 'MANUTENÇÕES DIVERSAS', 'f2000000-0000-0000-0000-000000000001', 'Luminária dentro do prazo', now() - interval '5 days', public.bpf_hoje() + 10, now() - interval '5 days');
 
 -- ------------------------------------------------------------------------------------------
 -- 1) Solicitação: inspetor do setor abre; outro setor e escrita direta são negados
 -- ------------------------------------------------------------------------------------------
-select pg_temp.como('f1000000-0000-0000-0000-000000000001', 'INSPETOR_QUALIDADE', array['MANUTENCOES_DIVERSAS']);
+select pg_temp.como('f1000000-0000-0000-0000-000000000001', 'INSPETOR_QUALIDADE', array['MANUTENÇÕES DIVERSAS']);
 set local role authenticated;
 
 select lives_ok(
@@ -61,7 +61,7 @@ select lives_ok(
 
 select throws_matching(
   $$ insert into bpf_solicitacoes (setor, centro_custo_id, categoria, descricao, aberta_por, aberta_por_nome)
-     values ('MANUTENCOES_DIVERSAS', 'f2000000-0000-0000-0000-000000000001', 'x', 'descricao longa o bastante', 'f1000000-0000-0000-0000-000000000001', 'x') $$,
+     values ('MANUTENÇÕES DIVERSAS', 'f2000000-0000-0000-0000-000000000001', 'x', 'descricao longa o bastante', 'f1000000-0000-0000-0000-000000000001', 'x') $$,
   'permission denied',
   'INSERT direto em bpf_solicitacoes é negado (só pela função do fluxo)'
 );
@@ -87,7 +87,7 @@ set local role authenticated;
 select is((select count(*)::int from bpf_solicitacoes), 0, 'PCM não vê a solicitação antes da aprovação do administrador');
 
 reset role;
-select pg_temp.como('f1000000-0000-0000-0000-000000000001', 'INSPETOR_QUALIDADE', array['MANUTENCOES_DIVERSAS']);
+select pg_temp.como('f1000000-0000-0000-0000-000000000001', 'INSPETOR_QUALIDADE', array['MANUTENÇÕES DIVERSAS']);
 set local role authenticated;
 select throws_matching(
   $$ select public.bpf_aprovar_solicitacao((select id from bpf_solicitacoes limit 1)) $$,
@@ -142,8 +142,8 @@ select is((select reprogramacoes from bpf_ordens where id = 'f3000000-0000-0000-
 -- (a OS T-VENCIDA foi reprogramada acima; usa uma terceira, ainda vencida, para o cenário NC)
 reset role;
 insert into bpf_ordens (id, numero_os, setor, centro_custo_id, descricao, constatado_em, prazo_atual, criado_em)
-values ('f3000000-0000-0000-0000-000000000003', 'T-VENCIDA2', 'MANUTENCOES_DIVERSAS', 'f2000000-0000-0000-0000-000000000001', 'Outra porta vencida', now() - interval '40 days', public.bpf_hoje() - 5, now() - interval '40 days');
-select pg_temp.como('f1000000-0000-0000-0000-000000000001', 'INSPETOR_QUALIDADE', array['MANUTENCOES_DIVERSAS']);
+values ('f3000000-0000-0000-0000-000000000003', 'T-VENCIDA2', 'MANUTENÇÕES DIVERSAS', 'f2000000-0000-0000-0000-000000000001', 'Outra porta vencida', now() - interval '40 days', public.bpf_hoje() - 5, now() - interval '40 days');
+select pg_temp.como('f1000000-0000-0000-0000-000000000001', 'INSPETOR_QUALIDADE', array['MANUTENÇÕES DIVERSAS']);
 set local role authenticated;
 
 select throws_matching(

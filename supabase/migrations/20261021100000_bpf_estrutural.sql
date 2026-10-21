@@ -16,10 +16,10 @@
 -- Setor de inspeção deste monitoramento (fonte de verdade: app_config.setores_cadastrados).
 -- ------------------------------------------------------------------------------------------
 update app_config
-   set valor = valor || '["MANUTENCOES_DIVERSAS"]'::jsonb,
+   set valor = valor || '["MANUTENÇÕES DIVERSAS"]'::jsonb,
        atualizado_em = now()
  where chave = 'setores_cadastrados'
-   and not (valor @> '["MANUTENCOES_DIVERSAS"]'::jsonb);
+   and not (valor @> '["MANUTENÇÕES DIVERSAS"]'::jsonb);
 
 create or replace function public.bpf_hoje()
 returns date
@@ -391,7 +391,7 @@ create or replace function public.bpf_abrir_solicitacao(
   p_descricao text,
   p_local_detalhe text default null,
   p_constatado_em timestamptz default null,
-  p_setor text default 'MANUTENCOES_DIVERSAS'
+  p_setor text default 'MANUTENÇÕES DIVERSAS'
 )
 returns bpf_solicitacoes
 language plpgsql
@@ -694,7 +694,7 @@ $$;
 -- Inspetor encerra o dia: gera a fotografia do relatório. Exige o veredito de todas as OS que
 -- já existiam antes do início do dia.
 create or replace function public.bpf_emitir_relatorio(
-  p_setor text default 'MANUTENCOES_DIVERSAS'
+  p_setor text default 'MANUTENÇÕES DIVERSAS'
 )
 returns bpf_relatorios
 language plpgsql
@@ -837,7 +837,7 @@ $$;
 --            prazos: [date, date, ...]}]  (prazos[0] = programação original; demais = Rep. I, II...)
 create or replace function public.bpf_importar_ordens(
   p_itens jsonb,
-  p_setor text default 'MANUTENCOES_DIVERSAS'
+  p_setor text default 'MANUTENÇÕES DIVERSAS'
 )
 returns jsonb
 language plpgsql
@@ -850,6 +850,9 @@ declare
   v_numero text;
   v_area text;
   v_centro_id uuid;
+  v_codigo_base text;
+  v_codigo text;
+  v_n integer;
   v_prazos date[];
   v_aberta date;
   v_os_id uuid;
@@ -887,9 +890,20 @@ begin
 
     select id into v_centro_id from centros_custo where lower(btrim(nome)) = lower(v_area) limit 1;
     if v_centro_id is null then
-      insert into centros_custo (codigo, nome)
-      values (left(upper(regexp_replace(v_area, '[^A-Za-z0-9]+', '_', 'g')), 40), v_area)
-      on conflict (codigo) do update set codigo = centros_custo.codigo
+      -- Código gerado sem acentos; se já existir um código igual (nome diferente), numera.
+      v_codigo_base := regexp_replace(
+        translate(v_area,
+          'ÁÀÂÃÄáàâãäÉÈÊËéèêëÍÌÎÏíìîïÓÒÔÕÖóòôõöÚÙÛÜúùûüÇçÑñ',
+          'AAAAAaaaaaEEEEeeeeIIIIiiiiOOOOOoooooUUUUuuuuCcNn'),
+        '[^A-Za-z0-9]+', '_', 'g');
+      v_codigo_base := trim(both '_' from upper(v_codigo_base));
+      v_codigo := left(v_codigo_base, 40);
+      v_n := 1;
+      while exists (select 1 from centros_custo where codigo = v_codigo) loop
+        v_n := v_n + 1;
+        v_codigo := left(v_codigo_base, 36) || '_' || v_n;
+      end loop;
+      insert into centros_custo (codigo, nome) values (v_codigo, v_area)
       returning id into v_centro_id;
       v_centros_criados := v_centros_criados || to_jsonb(v_area);
     end if;

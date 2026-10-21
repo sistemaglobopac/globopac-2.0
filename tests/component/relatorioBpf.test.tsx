@@ -49,7 +49,7 @@ const itemImportado: ItemRelatorio = {
 
 const base: Relatorio = {
   id: "r1",
-  setor: "MANUTENCOES_DIVERSAS",
+  setor: "MANUTENÇÕES DIVERSAS",
   data_referencia: "2026-10-21",
   status: "emitido",
   itens: [itemV2, itemImportado],

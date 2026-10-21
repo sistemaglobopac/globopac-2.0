@@ -4,7 +4,7 @@ export type StatusOrdem = "PROGRAMADA" | "CONCLUIDA";
 export type StatusRelatorio = "emitido" | "liberado";
 
 /** Setor de inspeção do monitoramento de manutenções diversas (app_config.setores_cadastrados). */
-export const SETOR_BPF = "MANUTENCOES_DIVERSAS";
+export const SETOR_BPF = "MANUTENÇÕES DIVERSAS";
 
 export const CATEGORIAS_BPF = [
   "Prédio / estrutura",
