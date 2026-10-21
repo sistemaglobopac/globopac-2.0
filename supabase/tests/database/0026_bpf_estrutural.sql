@@ -1,4 +1,4 @@
--- Testes pgTAP — BPF Estrutural (migration 20261021100000_bpf_estrutural.sql): fluxo
+-- Testes pgTAP — BPF Estrutural (migration 20261021085824_bpf_estrutural.sql): fluxo
 -- SS -> aprovação -> programação do PCM -> verificação diária (C/NP/NC) -> relatório -> SIF.
 --
 -- Técnica idêntica a 0004_rls_manutencao_os.sql: simula o JWT de cada perfil com
