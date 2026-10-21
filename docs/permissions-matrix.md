@@ -17,6 +17,10 @@ que sincronizado entre policies de RLS, esta tabela e a migration de seed):
 | `tratar` | Conduzir a tratativa de uma RNC (ABERTA/REABERTA/DEVOLVIDA → TRATADA) |
 | `revisar` | Revisar a tratativa de uma RNC: aprovar o fechamento ou devolver ao gestor (TRATADA → FECHADA/DEVOLVIDA) |
 | `abrir` | Abrir uma nova Ordem de Serviço |
+| `aprovar` | Assinar (aprovar) ou reprovar uma solicitação de serviço do BPF Estrutural |
+| `programar` | Programar e reprogramar o prazo de uma OS do BPF Estrutural (PCM) |
+| `emitir` | Encerrar o dia e emitir o relatório diário do BPF Estrutural |
+| `importar` | Importar OS já programadas (carga do relatório manual anterior) |
 | `avancar_etapa` | Avançar a OS para a próxima etapa da máquina de estados |
 | `atualizar` | Atualizar campos administrativos (ex.: `perfis_usuarios.ativo`) |
 | `gerenciar` | Controle administrativo total sobre um recurso de configuração |
@@ -30,6 +34,11 @@ que sincronizado entre policies de RLS, esta tabela e a migration de seed):
 | `GESTOR_SETOR` | `monitoramentos`: ler · `rnc`: ler, criar, tratar |
 | `ADMIN_MASTER` | Acesso total a todos os recursos listados (ver migration de seed para a lista completa) · `bloqueios_login_ip`: ler (Segurança de Login — ver ADR 0015; o desbloqueio em si é feito pela Edge Function `desbloquear-ip-login`, não por RLS de UPDATE) |
 | `INSPECAO_FEDERAL` | `monitoramentos`: ler (apenas `liberado_sif=true`, reforçado na policy) · `assinaturas_eletronicas`/`assinaturas_os_eletronicas`: ler · `lote_liberacao_sif`: ler · `manutencao_os`/`manutencao_relatorios_sif`: ler (mesma restrição `liberado_sif=true`, corrigida na Fase 5 — ver ASSUMPTIONS.md) |
+| `INSPETOR_QUALIDADE` (BPF) | `bpf_solicitacoes`: ler, criar · `bpf_ordens`: ler, verificar · `bpf_relatorios`: ler, emitir — restrito ao setor `MANUTENCOES_DIVERSAS` (ver ADR 0017) |
+| `VERIFICADOR` (BPF) | `bpf_solicitacoes`/`bpf_ordens`: ler · `bpf_relatorios`: ler, liberar |
+| `ADMIN_MASTER` (BPF) | `bpf_solicitacoes`: ler, criar, aprovar · `bpf_ordens`: ler, verificar, importar · `bpf_relatorios`: ler, emitir, liberar |
+| `INSPETOR_PCM` (BPF) | `bpf_solicitacoes`: ler (só após a aprovação) · `bpf_ordens`: ler, programar |
+| `INSPECAO_FEDERAL` (BPF) | `bpf_relatorios`: ler (só `status = 'liberado'`) |
 | `INSPETOR_PCM` | `manutencao_os`: ler, abrir, avancar_etapa · `manutencao_os_historico`: ler · `manutencao_relatorios_sif`: ler, criar, liberar · `assinaturas_os_eletronicas`: ler |
 
 `rnc_update` (ação `tratar`) proíbe explicitamente gravar `status` em `FECHADA`/`DEVOLVIDA` ou
@@ -65,6 +74,7 @@ segregação `tratado_por <> revisado_por` é reforçada por trigger de banco
 | Segregação de funções (criador ≠ verificador) | `0001_segregacao_e_append_only.sql` |
 | Segregação de funções em RNC (tratou ≠ revisou) | `0001_segregacao_e_append_only.sql` |
 | Imutabilidade pós-liberação | `0001_segregacao_e_append_only.sql` |
+| BPF Estrutural: fluxo SS → OS → verificação C/NP/NC → relatório → SIF, regra do prazo, segregação e RLS | `0026_bpf_estrutural.sql` |
 | Append-only de assinaturas | `0001_segregacao_e_append_only.sql` |
 | perfis_usuarios: self-read sempre, cross-read nunca sem permissão | `0003_rls_perfis_e_permissoes.sql` |
 | View pública não vaza campos sensíveis | `0003_rls_perfis_e_permissoes.sql` |

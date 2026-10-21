@@ -1,0 +1,55 @@
+numero_os;anomalia;setor;acao_corretiva;responsavel;data_abertura;prazo_programado;reprogramacoes
+463597;Porta da sangria não está fechando corretamente;Sangria;Regular porta;Katiuscia;02/09/2026;22/09/2026;20/10/2026
+469023;Luminária sem emitir luz em um dos lados, na sala de controle da sangria.;Sangria;Trocar luminária;Cláudia;15/10/2026;04/11/2026;
+463842;Abertura no forro acima do escaldador de cabeça;Escaldagem/Depenagem;;Edineia;20/10/2026;19/11/2026;
+463843;Abertura entre o forro e o cano de tubulação de água acima do escaldador de cabeça;Escaldagem/Depenagem;;Edineia;20/10/2026;19/11/2026;
+463844;Abertura entre o forro e o cano de tubulação de água das depenadeiras próximo ao escaldador de cabeça;Escaldagem/Depenagem;;Edineia;20/10/2026;19/11/2026;
+463841;As portas de proteção dos motores da 3ª depenadeira estão soltas (lado da parede);Escaldagem/Depenagem;;Edineia;20/10/2026;14/11/2026;
+463840;Consta escoamento de sujidades nas laterais da 3ª depenadeira;Escaldagem/Depenagem;;Edineia;20/10/2026;14/11/2026;
+467032;Ventilador oxidado ao lado da mesa de pé;Escaldagem/Depenagem;Lixar e realizar pintura;Cláudia;10/09/2026;10/10/2026;15/11/2026
+467367;Solda não sanitária na calha elevada próximo ao registro de auto higienização.;Escaldagem/Depenagem;Corrigir a solda;Leidiane;25/08/2026;19/09/2026;10/10/2026|15/11/2026
+467368;Ventilador acima do bebedouro na Escaldagem está oxidado.;Escaldagem/Depenagem;Fazer pintura;Leidiane;26/08/2026;20/09/2026;25/10/2026
+463839;Registro da tubulação do escaldador de patas está com vazamento de água, acima do suporte de aventais.;Escaldagem/Depenagem;Corrigir vazamento;Leidiane;19/10/2026;08/11/2026;
+469013;Acionador da pia de higienizar mãos ao lado do esterilizador de facas está quebrado;Evisceração;Trocar acionador;Claudia;13/10/2026;07/11/2026;
+466934;Necessita-se de uma janela/proteção no óculo na sala de higienizar caixas;Evisceração;Instalar uma janela;Katiuscia;22/09/2026;22/10/2026;
+467098;Ventilador ao lado do chute de coração encostando na parede causando zinabre e oxidação sobre a mesma.;Evisceração;Corrigir lixar e pintar;Caroline;21/09/2026;20/10/2026;
+467076;Ventilador acima da pia de higienizar mãos está oxidado próximo a rependura.;Evisceração;Lixar e pintar;Leidiane;15/09/2026;15/10/2026;30/11/2026
+463306;Maçaneta da porta da sala de higienizar caixas está travando.;Evisceração;Trocar maçaneta;Katiuscia;03/09/2026;23/09/2026;20/10/2026
+466846;Falta uma torneira frente a mesa de fígado.;Evisceração;Colocar torneira;Cláudia;05/10/2026;20/10/2026;
+469003;Acrílico da luminária no final da linha de separação de miúdos próximo ao chute de fígado está danificada.;Evisceração;Trocar acrílico;Cláudia;08/10/2026;02/11/2026;
+469022;Vazamento na tubulação de saída de água na pia de higienização de mãos, ao lado do esterilizador de facas do sif.;Evisceração;Corrigir vazamento;Cláudia;15/10/2026;14/11/2026;
+463828;Painel de controle da evisceração está danificado.;Evisceração;Trocar painel;Cláudia;16/10/2026;05/11/2026;
+463830;Luminária acima da primeira tesoura da linha do SIF, enferrujada descascando.;Evisceração;Trocar luminária;Cláudia;19/10/2026;08/11/2026;
+463831;Luminária com mal contato na entrada da extratora de papo.;Evisceração;Realizar manutenção;Leidiane;19/10/2026;08/11/2026;
+463836;Acionador da torneira na retirada de coração na linha do SIF está danificado.;Evisceração;Trocar acionador;Leidiane;19/10/2026;08/11/2026;
+463850;O perfil acima do 1º lavador e botas de acesso a sala de cortes está solto;Corredor de acesso aos setores;;Edineia;20/10/2026;14/11/2026;
+463591;O acionador da pia de higienizar mãos está travando;Esterilização e armazenamento de utensílios limpos;Trocar o acionador;Katiuscia;11/08/2026;21/09/2026;20/10/2026
+463832;Maçaneta da porta da sala de esterilização de utensílios está danificado.;Esterilização e armazenamento de utensílios limpos;Trocar maçaneta;Leidiane;19/10/2026;03/11/2026;
+467047;Sala de higienizar caixas na área suja está com painel danificado (caixa quebrada).;Sala de higienização de caixas área suja;Realizar troca de caixa;Leidiane;14/09/2026;10/10/2026;16/11/2026
+463833;Tubulação do mini chiller de coração está com vazamento de água no registro.;Pré-Resfriamento de Miúdos;Corrigir vazamento;Leidiane;19/10/2026;08/11/2026;
+463845;A luminária próximo ao chiller de pés está solta;Pré-Resfriamento de Miúdos;;Edineia;20/10/2026;30/10/2026;
+463846;A luminária próximo ao chiller de partes 01 na está solta;Pré-Resfriamento de carcaças;;Edineia;20/10/2026;14/11/2026;
+463835;Pia de higienizar mãos não está funcionando.;Pré-Resfriamento de carcaças;Realizar manutenção;Leidiane;19/10/2026;03/11/2026;
+467422;Aumentar a boca do funil de descarte de CMS para não cair resíduos no piso.;Sala de CMS;Realizar aumento;Carla;15/07/2026;09/08/2026;15/09/2026|20/10/2026
+466850;Ausência de luminária acima da esteira de refile de filé;Sala de Cortes;Colocar luminária;Vanderlei;06/10/2026;21/10/2026;
+469008;Ausência de luminária na linha de cone entre linha B e C.;Sala de Cortes;Colocar luminária;Cláudia;09/10/2026;24/10/2026;
+469025;Calha da máquina separadora de asa está mal posicionada causando vazamento de água residual no piso.;Sala de Cortes;Redirecionar calha;Cláudia;15/10/2026;04/11/2026;
+463847;Falta uma luminária entre as duas embaladoras de peito e filé;Sala de Cortes;;Edineia;20/10/2026;14/11/2026;
+466939;O painel de controle está sem travas.;Sala de inteiros;Colocar travas;Ana Paula;25/09/2026;20/10/2026;
+463826;Porta de entrada para sala de caixas limpas do IQF, está danificada.;Sala de higienização e deposito de caixas IQF;Realizar manutenção;Cláudia;16/10/2026;15/11/2026;
+463829;Registro de tubulação de água quente de lavar caixas do IQF, está com vazamento.;Sala de higienização e deposito de caixas IQF;Corrigir vazamento;Cláudia;16/10/2026;10/11/2026;
+469019;Abertura na tubulação de vapor da máquina de higienização de caixas no IQF.;Sala de higienização e deposito de caixas IQF;Corrigir abertura;Claudia;14/10/2026;03/11/2026;
+467086;Ventilador próximo a calha na sala de caixas limpas no IQF está oxidado.;Sala de higienização e deposito de caixas IQF;Lixar e pintar;Leidiane;16/09/2026;16/10/2026;15/11/2026
+463848;falta um luminária acima das balanças de pesagem de peito/filé na sala de Embalagem Secundária;Embalagem Secundária;;Edineia;20/10/2026;14/11/2026;
+463249;Há pequenos furos no forro do corredor da paletização/expedição.;Expedição;Vedar furos;Leidiane;24/08/2026;18/09/2026;20/10/2026
+466947;Porta de entrada da sala de paleteira está danificada.;Expedição;Fazer manutenção na porta;Cláudia;28/09/2026;23/10/2026;
+466948;Estrutura da parede próximo a máquina seladora do IQF está danificada.;Paletização;Realizar manutenção na estrutura;Cláudia;28/09/2026;28/10/2026;
+467416;Abertura no teto da sala de pop-up (paletização).;Paletização;Corrigir abertura;Josiane;15/07/2026;09/08/2026;10/09/2026|10/10/2026|18/11/2026
+469007;Ausência de luminária na entrada da sala de carimbo.;Sala de carimbo;Colocar luminária;Cláudia;08/10/2026;23/10/2026;
+469011;Prateleira de guardar embalagens, na sala de carimbo, não está fixada na parede.;Sala de carimbo;Fixar prateleira;Cláudia;09/10/2026;08/11/2026;
+469014;Ausência de luminária no sanitário branco masculino da expedição;Sanitário branco masculino;Colocar luminária;Cláudia;13/10/2026;28/10/2026;
+463849;Ausência da tampa no vaso sanitário do box 04;Sanitário branco masculino;;Edineia;20/10/2026;14/11/2026;
+462350;Ausência do trinco na porta do box 6 no sanitário feminino branco.;Sanitário branco feminino;Trocar o trinco;Leidiane;24/08/2026;13/09/2026;30/10/2026
+463837;Maçaneta da porta de entrada da área civil (área de entrada de roupas civil) está danificado.;Vestiário branco masculino;Consertar maçaneta;Leidiane;19/10/2026;03/11/2026;
+463838;Chuveiro do box 10 está com vazamento de água.;Vestiário branco masculino;consertar vazamento;Leidiane;19/10/2026;08/11/2026;
+467030;Vazamento de água no forro acima do box 05 do vestiário branco feminino;Vestiário branco feminino;Vedar vazamento;Josiane;09/09/2026;04/10/2026;10/11/2026

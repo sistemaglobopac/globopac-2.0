@@ -28,6 +28,12 @@ import { RncTratativasPage } from "@/modules/rnc/RncTratativasPage";
 import { NovaRncPage } from "@/modules/rnc/NovaRncPage";
 import { NovaOsPage } from "@/modules/pcm/NovaOsPage";
 import { PainelOsPage } from "@/modules/pcm/PainelOsPage";
+import { VerificacaoDiariaPage } from "@/modules/bpf/VerificacaoDiariaPage";
+import { NovaSolicitacaoPage } from "@/modules/bpf/NovaSolicitacaoPage";
+import { AprovacoesPage } from "@/modules/bpf/AprovacoesPage";
+import { PcmPage } from "@/modules/bpf/PcmPage";
+import { RelatoriosPage } from "@/modules/bpf/RelatoriosPage";
+import { ImportarOrdensPage } from "@/modules/bpf/ImportarOrdensPage";
 import { DashboardPage } from "@/modules/bi/DashboardPage";
 import { PainelBordo } from "@/modules/bordo/PainelBordo";
 import { PainelGestao } from "@/modules/gestao/PainelGestao";
@@ -40,7 +46,7 @@ const ROTA_INICIAL_POR_PERFIL: Record<string, string> = {
   ADMIN_MASTER: "/gestao",
   INSPECAO_FEDERAL: "/auditoria",
   GESTOR_SETOR: "/rnc",
-  INSPETOR_PCM: "/pcm",
+  INSPETOR_PCM: "/bpf/pcm",
 };
 
 function HomeRedirect() {
@@ -205,6 +211,54 @@ function AppRoutes() {
           element={
             <ProtectedRoute perfisPermitidos={["GESTOR_SETOR", "VERIFICADOR", "ADMIN_MASTER"]}>
               <RncTratativasPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/bpf"
+          element={
+            <ProtectedRoute perfisPermitidos={["INSPETOR_QUALIDADE", "ADMIN_MASTER"]}>
+              <VerificacaoDiariaPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/bpf/nova"
+          element={
+            <ProtectedRoute perfisPermitidos={["INSPETOR_QUALIDADE", "ADMIN_MASTER"]}>
+              <NovaSolicitacaoPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/bpf/aprovacoes"
+          element={
+            <ProtectedRoute perfisPermitidos={["ADMIN_MASTER"]}>
+              <AprovacoesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/bpf/importar"
+          element={
+            <ProtectedRoute perfisPermitidos={["ADMIN_MASTER"]}>
+              <ImportarOrdensPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/bpf/pcm"
+          element={
+            <ProtectedRoute perfisPermitidos={["INSPETOR_PCM", "ADMIN_MASTER"]}>
+              <PcmPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/bpf/relatorios"
+          element={
+            <ProtectedRoute perfisPermitidos={["INSPETOR_QUALIDADE", "VERIFICADOR", "ADMIN_MASTER", "INSPECAO_FEDERAL"]}>
+              <RelatoriosPage />
             </ProtectedRoute>
           }
         />

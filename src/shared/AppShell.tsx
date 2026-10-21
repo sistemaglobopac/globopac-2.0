@@ -16,12 +16,16 @@ import { GlobalInspectorAlerts } from "@/modules/bordo/GlobalInspectorAlerts";
 import { AlertaComunicado } from "@/modules/comunicados/AlertaComunicado";
 import { NIVEL_ACESSO_BADGE } from "@/modules/gestao/api";
 import { useRncsAbertas } from "@/modules/rnc/api";
+import { useSolicitacoes } from "@/modules/bpf/api";
+import { SETOR_BPF } from "@/modules/bpf/tipos";
 import { AlertaRncGestor } from "@/modules/rnc/AlertaRncGestor";
 import { SemConexaoBanner } from "@/shared/SemConexaoBanner";
 
 interface ItemMenu {
   rota: string;
   rotulo: string;
+  /** Item só aparece para o inspetor que tem este setor (ou acesso geral, "Todos"). */
+  exigeSetor?: string;
 }
 
 const NIVEL_ACESSO_ROTULO: Record<string, string> = {
@@ -56,6 +60,9 @@ const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
     { rota: "/painel", rotulo: "Painel de Bordo" },
     { rota: "/nova-rnc", rotulo: "Abrir RNC" },
     { rota: "/conferencia-cargas", rotulo: "Conferência de Cargas" },
+    { rota: "/bpf", rotulo: "BPF — Verificação diária", exigeSetor: SETOR_BPF },
+    { rota: "/bpf/nova", rotulo: "BPF — Solicitar serviço", exigeSetor: SETOR_BPF },
+    { rota: "/bpf/relatorios", rotulo: "BPF — Relatórios", exigeSetor: SETOR_BPF },
   ],
   VERIFICADOR: [
     { rota: "/verificacao", rotulo: "Painel de Verificação" },
@@ -64,16 +71,19 @@ const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
     { rota: "/gestao/cargas-aves", rotulo: "Cargas e Veículos" },
     { rota: "/conferencia-cargas", rotulo: "Conferência de Cargas" },
     { rota: "/trocar-setor", rotulo: "Trocar Setor / Cobertura" },
+    { rota: "/bpf/relatorios", rotulo: "BPF — Relatórios" },
     { rota: "/sif/liberar", rotulo: "Painel de Arquivo" },
   ],
-  INSPECAO_FEDERAL: [{ rota: "/auditoria", rotulo: "Painel de Auditoria" }],
+  INSPECAO_FEDERAL: [
+    { rota: "/auditoria", rotulo: "Painel de Auditoria" },
+    { rota: "/bpf/relatorios", rotulo: "BPF — Relatórios" },
+  ],
   GESTOR_SETOR: [
     { rota: "/rnc", rotulo: "Tratativas RNC" },
     { rota: "/dashboard", rotulo: "Painel de Indicadores" },
   ],
   INSPETOR_PCM: [
-    { rota: "/pcm", rotulo: "Ordens de Serviço" },
-    { rota: "/pcm/nova", rotulo: "Nova OS" },
+    { rota: "/bpf/pcm", rotulo: "PCM — Programação de OS" },
     { rota: "/dashboard", rotulo: "Painel de Indicadores" },
   ],
   ADMIN_MASTER: [
@@ -82,8 +92,10 @@ const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
     { rota: "/verificacao", rotulo: "Painel de Verificação" },
     { rota: "/conferencia-cargas", rotulo: "Conferência de Cargas" },
     { rota: "/rnc", rotulo: "Tratativas RNC" },
-    { rota: "/pcm", rotulo: "Ordens de Serviço" },
-    { rota: "/pcm/nova", rotulo: "Nova OS" },
+    { rota: "/bpf/aprovacoes", rotulo: "BPF — Aprovar solicitações" },
+    { rota: "/bpf", rotulo: "BPF — Verificação diária" },
+    { rota: "/bpf/pcm", rotulo: "PCM — Programação de OS" },
+    { rota: "/bpf/relatorios", rotulo: "BPF — Relatórios" },
     { rota: "/sif/liberar", rotulo: "Painel de Arquivo" },
     { rota: "/auditoria", rotulo: "Painel de Auditoria" },
     { rota: "/carimbos", rotulo: "Carimbos de tempo" },
@@ -186,9 +198,19 @@ function MenuLateral({ itens, onNavegar }: { itens: ItemMenu[]; onNavegar?: () =
   const { data: rncs } = useRncsAbertas({ habilitado: nivel === "GESTOR_SETOR" || nivel === "VERIFICADOR" });
   const paraResponder = (rncs ?? []).filter((r) => r.status !== "TRATADA").length;
   const paraJulgar = (rncs ?? []).filter((r) => r.status === "TRATADA").length;
+  // BPF Estrutural: o administrador vê quantas solicitações esperam a assinatura dele; o PCM,
+  // quantas aprovadas esperam programação. (RLS já restringe ao que cada um enxerga.)
+  const { data: solicitacoes } = useSolicitacoes({
+    status: ["AGUARDANDO_APROVACAO", "APROVADA"],
+    habilitado: nivel === "ADMIN_MASTER" || nivel === "INSPETOR_PCM",
+  });
+  const paraAprovar = (solicitacoes ?? []).filter((s) => s.status === "AGUARDANDO_APROVACAO").length;
+  const paraProgramar = (solicitacoes ?? []).filter((s) => s.status === "APROVADA").length;
   const contagem = (rota: string): number => {
     if (nivel === "GESTOR_SETOR" && rota === "/rnc") return paraResponder;
     if (nivel === "VERIFICADOR" && (rota === "/rnc" || rota === "/verificacao")) return paraJulgar;
+    if (nivel === "ADMIN_MASTER" && rota === "/bpf/aprovacoes") return paraAprovar;
+    if (nivel === "INSPETOR_PCM" && rota === "/bpf/pcm") return paraProgramar;
     return 0;
   };
   return (
@@ -214,8 +236,8 @@ function MenuLateral({ itens, onNavegar }: { itens: ItemMenu[]; onNavegar?: () =
               {contagem(item.rota) > 0 && (
                 <span
                   className="rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-bold leading-none text-destructive-foreground"
-                  aria-label={`${contagem(item.rota)} RNC(s) aguardando`}
-                  title="RNC(s) aguardando sua ação"
+                  aria-label={`${contagem(item.rota)} pendência(s) aguardando`}
+                  title="Pendência(s) aguardando sua ação"
                 >
                   {contagem(item.rota)}
                 </span>
@@ -239,7 +261,9 @@ export function AppShell() {
   const perfil = useSessionStore((s) => s.perfil);
   // Cópia dos rascunhos na nuvem: permite assinar de qualquer aparelho (ver lib/rascunhosNuvem.ts).
   useSincronizarRascunhosNuvem(perfil?.id);
-  const itens = perfil ? (MENU_POR_PERFIL[perfil.nivelAcesso] ?? []) : [];
+  const itens = (perfil ? (MENU_POR_PERFIL[perfil.nivelAcesso] ?? []) : []).filter(
+    (i) => !i.exigeSetor || perfil?.setoresPermitidos.includes(i.exigeSetor) || perfil?.setoresPermitidos.includes("Todos")
+  );
   const [menuAberto, setMenuAberto] = useState(false);
   const location = useLocation();
   // Presença global (qualquer perfil, não só ADMIN_MASTER) — o KPI "Usuários Ativos" do Painel
