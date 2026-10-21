@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { login, logout, selecionarTemplate, assinarComSenha, encerrarTurnosAbertos, clienteAdminDeTeste, idDoMonitoramentoPorMarcador, localizarCartaoRegistro } from "./helpers";
+import { login, logout, selecionarTemplate, assinarComSenha, encerrarTurnosAbertos, clienteAdminDeTeste, idDoMonitoramentoPorMarcador, localizarCartaoRegistro, clicarAgora } from "./helpers";
 
 // Fluxo E2E nº 2 (seção 10 do PROMPT MESTRE): "Verificador aprova → assina → Admin libera
 // SIF → aparece para Inspeção Federal." A liberação (Fase 3) é em lote, com hash agregador —
@@ -23,7 +23,7 @@ test("verificador aprova, admin libera ao SIF, e o registro aparece para a Inspe
   await page.locator("#temperatura_celsius").fill("22");
   await page.locator("#observacoes").fill(marcador);
   // Hora do monitoramento agora é obrigatória e informada pelo inspetor.
-  await page.getByRole("button", { name: "Agora" }).click();
+  await clicarAgora(page, admin);
   await page.getByRole("button", { name: "Criar e assinar" }).click();
   await assinarComSenha(page, "121072");
   await expect(page.getByText("Ficha criada e assinada com sucesso.")).toBeVisible({ timeout: 15_000 });

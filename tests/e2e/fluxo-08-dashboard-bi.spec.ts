@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { login, logout, clienteAdminDeTeste, selecionarTemplate, assinarComSenha } from "./helpers";
+import { login, logout, clienteAdminDeTeste, selecionarTemplate, assinarComSenha, clicarAgora } from "./helpers";
 
 // Fase 7 (BI/dashboards/exportação de relatórios, seção 7.7) — Painel de Indicadores com KPIs,
 // gráficos agregados e exportação CSV, sobre os mesmos dados que RLS já permite ao usuário ver
@@ -16,7 +16,7 @@ test("painel de BI mostra KPIs e permite exportar CSV de monitoramentos (Fase 7)
   await page.locator("#temperatura_celsius").fill("23");
   await page.locator("#observacoes").fill(marcador);
   // Hora do monitoramento agora é obrigatória e informada pelo inspetor.
-  await page.getByRole("button", { name: "Agora" }).click();
+  await clicarAgora(page, admin);
   await page.getByRole("button", { name: "Criar e assinar" }).click();
   await assinarComSenha(page, "121072");
   await expect(page.getByText("Ficha criada e assinada com sucesso.")).toBeVisible({ timeout: 15_000 });

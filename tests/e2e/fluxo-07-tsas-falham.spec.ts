@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { login, clienteAdminDeTeste, selecionarTemplate, assinarComSenha } from "./helpers";
+import { login, clienteAdminDeTeste, selecionarTemplate, assinarComSenha, clicarAgora } from "./helpers";
 
 // Fluxo E2E nº 7 (seção 10 do PROMPT MESTRE): "Falha simulada de todos os TSAs → sistema
 // marca carimbo como pendente e não trava a operação do usuário." Sobrescreve
@@ -36,7 +36,7 @@ test("falha simultânea de todas as TSAs marca o carimbo como pendente sem trava
 
     const antesDaCriacao = new Date().toISOString();
     // Hora do monitoramento agora é obrigatória e informada pelo inspetor.
-    await page.getByRole("button", { name: "Agora" }).click();
+    await clicarAgora(page, admin);
     await page.getByRole("button", { name: "Criar e assinar" }).click();
     await assinarComSenha(page, "121072");
 

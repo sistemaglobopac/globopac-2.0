@@ -2,6 +2,7 @@ import { execSync } from "node:child_process";
 import { createClient } from "@supabase/supabase-js";
 import type { Page } from "@playwright/test";
 import { expect } from "@playwright/test";
+import { horaMaisRecente, msAteMinutoLivre } from "./minuto";
 
 let saidaStatusCache: string | undefined;
 function statusEnv(chave: string): string | undefined {
@@ -94,16 +95,48 @@ export async function idDoMonitoramentoPorMarcador(
  * visível, procura de novo. */
 export async function localizarCartaoRegistro(page: Page, monitoramentoId: string) {
   const cartao = page.getByTestId(`registro-verificacao-${monitoramentoId}`);
+  // O painel tem abas: a ficha de um turno ainda ABERTO fica em "Dia / turno atual" (não dá para
+  // verificar); a de um turno já encerrado, em "Fichas por verificar". O painel abre em "Dia / turno
+  // atual", então procurar só na aba que estiver aberta falha para os testes que encerram o turno.
+  const abas = [/Fichas por verificar/, /Dia \/ turno atual/];
   const prazo = Date.now() + 15_000;
   while (Date.now() < prazo) {
-    if ((await cartao.count()) > 0) return cartao;
-    const botoesApuracoes = page.getByRole("button", { name: "Apurações" });
-    const total = await botoesApuracoes.count();
-    for (let i = 0; i < total; i++) await botoesApuracoes.nth(i).click().catch(() => {});
-    if ((await cartao.count()) > 0) return cartao;
+    for (const nomeAba of abas) {
+      await page.getByRole("tab", { name: nomeAba }).click().catch(() => {});
+      // A lista pode demorar um instante para montar depois de trocar de aba.
+      const apareceu = await cartao.first().waitFor({ state: "attached", timeout: 1_500 }).then(() => true, () => false);
+      if (apareceu) return cartao;
+      const botoesApuracoes = page.getByRole("button", { name: "Apurações" });
+      const total = await botoesApuracoes.count();
+      for (let i = 0; i < total; i++) await botoesApuracoes.nth(i).click().catch(() => {});
+      if ((await cartao.count()) > 0) return cartao;
+    }
     await page.waitForTimeout(500);
   }
   return cartao;
+}
+
+/** Espera o minuto virar quando o monitoramento mais recente é do minuto atual — a tela recusa uma
+ * hora igual ou anterior à da ficha anterior (resolução de minuto), e os testes criam fichas do mesmo
+ * template em sequência. Ver minuto.ts. */
+export async function aguardarMinutoLivre(admin: Awaited<ReturnType<typeof clienteAdminDeTeste>>) {
+  const { data } = await admin
+    .from("monitoramentos")
+    .select("criado_em, dados_dinamicos")
+    .order("criado_em", { ascending: false })
+    .limit(10);
+  const horas = (data ?? []).flatMap((m) => [
+    (m.dados_dinamicos as Record<string, unknown> | null)?.hora_monitoramento as string | undefined,
+    m.criado_em as string | undefined,
+  ]);
+  const ms = msAteMinutoLivre(horaMaisRecente(horas), Date.now());
+  if (ms > 0) await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Preenche a hora do monitoramento com "Agora", esperando antes o minuto livre. */
+export async function clicarAgora(page: Page, admin: Awaited<ReturnType<typeof clienteAdminDeTeste>>) {
+  await aguardarMinutoLivre(admin);
+  await page.getByRole("button", { name: "Agora" }).click();
 }
 
 export async function selecionarTemplate(page: Page, nomeTemplate: string) {
