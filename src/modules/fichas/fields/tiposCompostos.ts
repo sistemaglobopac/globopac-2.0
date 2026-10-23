@@ -362,6 +362,8 @@ export interface RastreabilidadeDoaValor {
   /** Sem limite normativo: DOA e diferença de saldo são registrados, nunca reprovam sozinhos. */
   conformidade: boolean;
   detalhesRNC: string | null;
+  /** Só existe (true) enquanto as apurações anteriores do dia ainda não foram carregadas: impede assinar um DOA sem herdá-las. */
+  aguardandoApuracoesAnteriores?: boolean;
 }
 
 /** Recepção de Aves / Bem-Estar Animal (Especial SIF): uma carga (GTA) por monitoramento. Datas e

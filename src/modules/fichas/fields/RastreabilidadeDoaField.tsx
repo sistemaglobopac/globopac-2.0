@@ -30,6 +30,8 @@ export function RastreabilidadeDoaField({ value, onChange, disabled, cargasUsada
   );
   const { data: rpc, isLoading, isError } = useCargasRastreabilidade(dataAbate);
   const { data: registradas } = useDoaCargasRegistradas(dataAbate);
+  // Online e sem a lista das cargas já apuradas: assinar agora gravaria essas cargas em branco, em vez de herdá-las.
+  const semApuracoesAnteriores = registradas === undefined && (typeof navigator === "undefined" || navigator.onLine !== false);
 
   // Cargas já gravadas em monitoramentos anteriores do dia entram no relatório como estão (somente
   // leitura); as desta própria ficha (edição) continuam editáveis.
@@ -73,8 +75,9 @@ export function RastreabilidadeDoaField({ value, onChange, disabled, cargasUsada
     const efetivas: Record<string, EntradaDoa> = { ...entradas };
     for (const c of anteriores.values()) efetivas[c.cargaId] = { avesRecebidas: c.avesRecebidas, avesMortas: c.avesMortas };
     // Com a consulta respondida, carga apagada da programação não volta pelas linhas salvas; sem resposta (offline) elas ficam.
-    return montarValorDoa(dataAbate, montarCargas(rpc ? herdadas : [], efetivas, rpc ? [] : salvas));
-  }, [rpc, herdadas, entradas, dataAbate, anteriores]);
+    const montado = montarValorDoa(dataAbate, montarCargas(rpc ? herdadas : [], efetivas, rpc ? [] : salvas));
+    return semApuracoesAnteriores ? { ...montado, aguardandoApuracoesAnteriores: true } : montado;
+  }, [rpc, herdadas, entradas, dataAbate, anteriores, semApuracoesAnteriores]);
 
   const faltas = motivosBloqueioDoa(valor);
   const completo = faltas.length === 0;

@@ -128,6 +128,13 @@ describe("DOA — bloqueio de assinatura", () => {
     expect(motivosBloqueioDoa(soMortas)).toHaveLength(1);
   });
 
+  it("sem as apurações anteriores do dia carregadas não se assina: o monitoramento tem de herdá-las", () => {
+    const v = montarValorDoa("2026-10-02", montarCargas([carga("A", "2026-10-02T05:10")], { A: { avesRecebidas: "1000", avesMortas: "1" } }));
+    expect(motivosBloqueioDoa({ ...v, aguardandoApuracoesAnteriores: true })[0]).toMatch(/apurações anteriores/);
+    expect(motivosDeBloqueioSpr(campos, { doa: { ...v, aguardandoApuracoesAnteriores: true } })).toHaveLength(1);
+    expect(motivosBloqueioDoa(v)).toEqual([]);
+  });
+
   it("carga informada exige recebidas e mortas (zero vale)", () => {
     const completo = montarValorDoa("2026-10-02", montarCargas([carga("A", "2026-10-02T05:10")], { A: { avesRecebidas: "1000", avesMortas: "0" } }));
     expect(motivosBloqueioDoa(completo)).toEqual([]);

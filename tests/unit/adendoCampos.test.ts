@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alvosDoCampo, aplicarNoCaminho } from "@/modules/fichas/utils/adendoCampos";
+import { alvosDoCampo, aplicarNoCaminho, erroDoValorNovoDoAdendo } from "@/modules/fichas/utils/adendoCampos";
 
 const doa = {
   dataAbate: "2026-10-03",
@@ -34,5 +34,26 @@ describe("aplicarNoCaminho", () => {
 
   it("caminho simples substitui o campo", () => {
     expect(aplicarNoCaminho({ a: "1" }, "a", "2")).toEqual({ a: "2" });
+  });
+});
+
+describe("erroDoValorNovoDoAdendo", () => {
+  const cur = "campo_1.tanques.coracao.cur";
+
+  it("aceita leitura numérica com vírgula ou ponto, e o gelo", () => {
+    expect(erroDoValorNovoDoAdendo(cur, "03974,66")).toBeNull();
+    expect(erroDoValorNovoDoAdendo("campo_1.tanques.coracao.prev", "3974.65")).toBeNull();
+    expect(erroDoValorNovoDoAdendo("campo_1.tanques.coracao.ice", "332")).toBeNull();
+  });
+
+  it("recusa texto (ex.: a explicação digitada no lugar do valor) e vazio", () => {
+    expect(erroDoValorNovoDoAdendo(cur, "no monitoramento anterior, a vírgula foi colocada no algarismo equivocado.")).not.toBeNull();
+    expect(erroDoValorNovoDoAdendo(cur, "")).not.toBeNull();
+    expect(erroDoValorNovoDoAdendo(cur, "3974,6,6")).not.toBeNull();
+  });
+
+  it("não interfere em campos que não são leitura/gelo", () => {
+    expect(erroDoValorNovoDoAdendo("c_1.cargas.0.placa", "AYR8A56")).toBeNull();
+    expect(erroDoValorNovoDoAdendo("obs", "qualquer texto")).toBeNull();
   });
 });

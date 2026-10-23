@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ChevronLeft, ChevronRight, ClipboardCheck, Filter, Layers, Loader2, Sparkles, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, ClipboardCheck, Filter, Layers, Loader2, RotateCcw, Sparkles, X } from "lucide-react";
 import { useSessionStore } from "@/store/session";
 import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/api";
 import { urlAbrirRnc, useRncsAbertas, useRncsDosMonitoramentos } from "@/modules/rnc/api";
@@ -18,6 +18,7 @@ import { ensureLocalTime } from "./utils/tempo";
 import { KpiCard } from "./components/KpiCard";
 import { AuditRecordCard } from "./components/AuditRecordCard";
 import { DossieVerificacaoCard } from "./components/DossieVerificacaoCard";
+import { ReabrirTurnoModal } from "./components/ReabrirTurnoModal";
 import { RelatorioModal } from "./components/relatorio/RelatorioModal";
 import type { DossieVerificacao } from "./utils/recordGrouping";
 import { Button } from "@/shared/ui/button";
@@ -61,6 +62,7 @@ export function PainelVerificacao() {
   const [aba, setAba] = useState<AbaVerificacao>("dia");
   const [showFilters, setShowFilters] = useState(false);
   const [showTrocaSetor, setShowTrocaSetor] = useState(false);
+  const [showReabrirTurno, setShowReabrirTurno] = useState(false);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBatchModal, setShowBatchModal] = useState(false);
@@ -455,6 +457,12 @@ export function PainelVerificacao() {
             <Button type="button" variant="outline" size="sm" onClick={() => setShowTrocaSetor(true)}>
               Trocar setor de inspetor
             </Button>
+            {(isAdmin || perfil.nivelAcesso === "VERIFICADOR") && (
+              <Button type="button" variant="outline" size="sm" onClick={() => setShowReabrirTurno(true)}>
+                <RotateCcw className="h-4 w-4" />
+                Reabrir turno
+              </Button>
+            )}
             <Button type="button" variant={filtrosAtivos ? "default" : "outline"} size="sm" onClick={() => setShowFilters(true)}>
               <Filter className="h-4 w-4" />
               Filtros Avançados
@@ -710,6 +718,20 @@ export function PainelVerificacao() {
             </div>
           </div>
         </ModalBase>
+      )}
+
+      {showReabrirTurno && (
+        <ReabrirTurnoModal
+          diaInicial={dateBase}
+          usuarios={usuarios}
+          onFechar={() => setShowReabrirTurno(false)}
+          onReaberto={(nome) => {
+            setShowReabrirTurno(false);
+            setMensagem({ tipo: "success", texto: `Turno de ${nome} reaberto.` });
+            setTurnosVersao((v) => v + 1);
+            void fila.refetch();
+          }}
+        />
       )}
 
       {relatorioIds && <RelatorioModal ids={relatorioIds} onFechar={() => setRelatorioIds(null)} />}

@@ -156,3 +156,16 @@ export function aplicarNoCaminho(dados: Record<string, unknown>, caminho: string
   };
   return atualizar(dados, 0) as Record<string, unknown>;
 }
+
+/** Últimas chaves de caminho que guardam número digitado (leitura de hidrômetro em m³ e gelo em kg). */
+const CHAVES_NUMERICAS = new Set(["cur", "prev", "ice"]);
+
+/** Valor novo de um adendo recusado para campo numérico (null = aceito). Sem isso, um texto digitado por engano em "Novo
+ * valor" (ex.: a explicação do erro) entrava na leitura do hidrômetro, zerava a vazão e era herdado pelo monitoramento seguinte. */
+export function erroDoValorNovoDoAdendo(caminho: string, valorNovo: unknown): string | null {
+  const ultima = caminho.split(".").pop() ?? "";
+  if (!CHAVES_NUMERICAS.has(ultima)) return null;
+  const texto = String(valorNovo ?? "").trim();
+  if (/^\d+([.,]\d+)?$/.test(texto)) return null;
+  return "Este campo é numérico: informe só o valor corrigido (ex.: 3974,66), sem texto. A explicação vai em Observação.";
+}

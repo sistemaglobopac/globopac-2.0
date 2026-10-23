@@ -10,6 +10,7 @@ import { useTurnoDoRegistro } from "./useTurnoDoRegistro";
 import { ensureLocalTime } from "./utils/tempo";
 import { alvosDoCampo } from "./utils/adendoCampos";
 import { alvoDaNaoConformidade, observacaoInicialDoAdendo } from "./utils/alvoNaoConformidade";
+import { erroDoValorNovoDoAdendo } from "./utils/adendoCampos";
 import { temNaoConformidade } from "./utils/desviosEspeciais";
 import { temAdendoRegistrado } from "./utils/adendosPendentes";
 import { urlAbrirRnc, useRncsDosMonitoramentos } from "@/modules/rnc/api";
@@ -446,8 +447,10 @@ function PainelAdendo({ pendentes, dados, verificadorNome, registroInicial, camp
   }, [campos, campo, registro, alvos]);
   const alvo = alvos.find((a) => a.caminho === alvoCaminho) ?? alvoSugerido;
 
+  const erroValor = alvo ? erroDoValorNovoDoAdendo(alvo.caminho, valorNovo) : null;
+
   async function confirmar() {
-    if (!registro || !alvo || !nota.trim()) return;
+    if (!registro || !alvo || !nota.trim() || erroValor) return;
     try {
       await abrirAdendo.mutateAsync({
         monitoramentoId: registro.id,
@@ -505,6 +508,11 @@ function PainelAdendo({ pendentes, dados, verificadorNome, registroInicial, camp
         )}
         <Label>Novo valor</Label>
         <Input value={valorNovo} onChange={(e) => setValorNovo(e.target.value)} disabled={!registro} autoFocus={!!campoInicial} data-testid="adendo-novo-valor" />
+        {erroValor && valorNovo.trim() !== "" && (
+          <p role="alert" className="text-xs font-medium text-destructive">
+            {erroValor}
+          </p>
+        )}
         <Label>Observação</Label>
         <Textarea value={nota} onChange={(e) => setNota(e.target.value)} disabled={!registro} />
       </div>
@@ -512,7 +520,7 @@ function PainelAdendo({ pendentes, dados, verificadorNome, registroInicial, camp
         <Button type="button" variant="outline" className="flex-1" onClick={onCancelar} disabled={abrirAdendo.isPending}>
           Cancelar
         </Button>
-        <Button type="button" className="flex-1" disabled={abrirAdendo.isPending || !registro || !alvo || !nota.trim()} onClick={confirmar}>
+        <Button type="button" className="flex-1" disabled={abrirAdendo.isPending || !registro || !alvo || !nota.trim() || !!erroValor} onClick={confirmar}>
           {abrirAdendo.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {abrirAdendo.isPending ? "Enviando…" : "Enviar Adendo"}
         </Button>

@@ -14,6 +14,7 @@ import { turnoParaHeranca, type TurnoHeranca } from "./utils/turnoUtils";
 import { horaEfetiva, instanteDoRegistro } from "./utils/horaMonitoramento";
 import { herdarInstanteDoOriginal } from "./utils/instanteDoAdendo";
 import { ensureLocalTime } from "./utils/tempo";
+import { erroDoValorNovoDoAdendo } from "./utils/adendoCampos";
 
 export interface TemplateAtivo {
   id: string;
@@ -785,6 +786,8 @@ export function useAbrirAdendo() {
       notes: string;
       verificadorNome: string;
     }) => {
+      const erroValor = erroDoValorNovoDoAdendo(input.campo, input.valorNovo);
+      if (erroValor) throw new Error(erroValor);
       const { data: original, error: erroOriginal } = await supabase
         .from("monitoramentos")
         .select("dados_dinamicos, user_id")

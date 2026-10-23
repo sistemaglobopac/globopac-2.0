@@ -198,6 +198,9 @@ export function motivosBloqueioDoa(v: RastreabilidadeDoaValor | undefined | null
     return [`${p}: informe as aves que vieram e as mortas de ao menos uma carga — as demais podem ficar para a próxima apuração.`];
   }
   const m: string[] = [];
+  if (v.aguardandoApuracoesAnteriores) {
+    m.push(`${p}: as apurações anteriores do dia ainda não foram carregadas — aguarde a conexão para que este monitoramento herde as aves já apuradas.`);
+  }
   for (const c of informadas) {
     const nome = `GTA ${c.gta || "?"}`;
     const recebidas = lerContagem(c.avesRecebidas);

@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Printer } from "lucide-react";
+import { RelatorioRnc } from "./RelatorioRnc";
 import { useQueryClient } from "@tanstack/react-query";
 import { type Rnc, enviarAnexosRnc, estaAtrasada, useMonitoramentoVerificado, useReabrirRnc, useRevisarRnc, useTratarRnc } from "./api";
 import { useSessionStore } from "@/store/session";
@@ -52,6 +54,7 @@ export function CartaoRnc({ rnc, podeTratar, podeRevisar, podeReabrir }: { rnc: 
   const [motivoDevolucao, setMotivoDevolucao] = useState("");
   const [novaDescricaoReabertura, setNovaDescricaoReabertura] = useState("");
   const [reabrindo, setReabrindo] = useState(false);
+  const [imprimindo, setImprimindo] = useState(false);
   const tratar = useTratarRnc();
   const revisar = useRevisarRnc();
   const reabrir = useReabrirRnc();
@@ -110,6 +113,10 @@ export function CartaoRnc({ rnc, podeTratar, podeRevisar, podeReabrir }: { rnc: 
           <Badge variant={VARIANTE_SEVERIDADE[rnc.severidade]}>{rnc.severidade}</Badge>
           <Badge variant={rnc.status === "FECHADA" ? "secondary" : "default"}>{RENOME_STATUS[rnc.status]}</Badge>
           {atrasada && <Badge variant="destructive">PRAZO VENCIDO</Badge>}
+          <Button type="button" size="sm" variant="outline" className="ml-auto" onClick={() => setImprimindo(true)} data-testid={`imprimir-rnc-${rnc.id}`}>
+            <Printer className="h-3.5 w-3.5" />
+            Imprimir RNC
+          </Button>
         </CardTitle>
         <p className="text-xs text-muted-foreground">Prazo limite: {new Date(rnc.prazo_sla).toLocaleString("pt-BR")}</p>
       </CardHeader>
@@ -268,6 +275,7 @@ export function CartaoRnc({ rnc, podeTratar, podeRevisar, podeReabrir }: { rnc: 
           </div>
         )}
       </CardContent>
+      {imprimindo && <RelatorioRnc rnc={rnc} onFechar={() => setImprimindo(false)} />}
       {assinandoResposta && (
         <ModalAssinaturaSenha
           titulo="Assinatura Eletrônica do Gestor de Setor"
