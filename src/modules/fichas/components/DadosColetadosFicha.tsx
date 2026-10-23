@@ -253,7 +253,7 @@ export function DadosColetados({
                 onClick={() => onCorrigirCampo(campo.chave)}
                 data-testid={`corrigir-campo-${campo.chave}`}
                 title="Corrigir este valor"
-                className="flex items-center gap-1 rounded-full border border-warning/60 bg-warning/10 px-2.5 py-0.5 text-[11px] font-bold text-warning-foreground hover:bg-warning/20"
+                className="flex items-center gap-1 rounded-full border border-warning bg-warning px-3 py-1 text-[11px] font-bold text-ink shadow-sm hover:bg-warning/85"
               >
                 <PenLine className="h-3 w-3" /> Corrigir {rotulo}
               </button>
