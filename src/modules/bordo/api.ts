@@ -1019,7 +1019,7 @@ export function useCorrigirMonitoramento() {
         status: "completed",
         origem: "inspetor",
         monitorId: input.quem.id,
-        verificadorName: `${input.quem.nome} (correção do próprio inspetor)`,
+        verificadorName: `${input.quem.nome} (${input.quem.nivelAcesso === "ADMIN_MASTER" ? "correção do administrador" : "correção do próprio inspetor"})`,
         notes: justificativa,
         corrections: correcoes,
         criadoEm: agora,
