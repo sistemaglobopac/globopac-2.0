@@ -217,21 +217,6 @@ export function RelatorioBpf({ relatorio }: { relatorio: Relatorio }) {
             <span className="text-amber-800">Aguardando verificação do Verificador</span>
           </SeloPendente>
         )}
-
-        {relatorio.liberado_por_nome ? (
-          <SeloAssinatura
-            titulo="Assinatura Eletrônica do Administrador — liberação ao SIF"
-            nome={relatorio.liberado_por_nome}
-            dataHora={formatarDataHora(relatorio.liberado_em)}
-            hash={relatorio.hash_liberacao}
-            integro={null}
-            corLabel="text-success"
-          />
-        ) : (
-          <SeloPendente titulo="Administrador — liberação ao SIF">
-            <span className="text-amber-800">{relatorio.verificado_por_nome ? "Aguardando liberação pelo Painel de Arquivo" : "Depende da verificação do Verificador"}</span>
-          </SeloPendente>
-        )}
       </section>
 
       {resumo.semAprovacaoNoSistema > 0 && (
@@ -243,7 +228,7 @@ export function RelatorioBpf({ relatorio }: { relatorio: Relatorio }) {
       <RodapeAtestado
         objeto="relatório"
         protocolo={protocolo}
-        hash={relatorio.hash_liberacao ?? relatorio.hash_verificacao ?? relatorio.hash_emissao}
+        hash={relatorio.hash_verificacao ?? relatorio.hash_emissao}
         integro={null}
         carimbo={
           <p className="mt-1">

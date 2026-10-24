@@ -99,13 +99,15 @@ describe("RelatorioBpf", () => {
     expect(screen.getByText(/Sistema GloboPac · Kaefer Agro Industrial LTDA\. · SIF 1606/)).toBeTruthy();
   });
 
-  it("depois da liberação mostra o Verificador e avisa das OS importadas sem assinatura no sistema", () => {
+  it("depois da verificação mostra o Verificador (e nenhum selo de liberação) e avisa das OS importadas sem assinatura no sistema", () => {
     render(
       <RelatorioBpf
-        relatorio={{ ...base, status: "liberado", liberado_por: "u2", liberado_por_nome: "Vera Verificadora", liberado_em: "2026-10-21T18:00:00-04:00", hash_liberacao: hash("f") }}
+        relatorio={{ ...base, status: "liberado", verificado_por: "u2", verificado_por_nome: "Vera Verificadora", verificado_em: "2026-10-21T18:00:00-04:00", hash_verificacao: hash("f"), liberado_por: "u3", liberado_por_nome: "Admin Que Libera", liberado_em: "2026-10-22T09:00:00-04:00" }}
       />
     );
     expect(within(screen.getByLabelText("Assinaturas")).getByText("Vera Verificadora")).toBeTruthy();
+    // Liberar ao SIF não é assinatura do administrador: quem liberou não aparece nos selos.
+    expect(within(screen.getByLabelText("Assinaturas")).queryByText("Admin Que Libera")).toBeNull();
     expect(screen.getByText(/1 OS deste relatório foram importadas/)).toBeTruthy();
   });
 });

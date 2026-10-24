@@ -4,18 +4,17 @@ import { useSessionStore } from "@/store/session";
 import type { Relatorio } from "@/modules/bpf/tipos";
 
 const verificarMutate = vi.fn();
-const liberarMutateAsync = vi.fn(async (_id: string) => undefined);
 let relatorios: Relatorio[] = [];
 
 vi.mock("@/modules/bpf/api", () => ({
   useRelatorios: () => ({ data: relatorios }),
   useVerificarRelatorio: () => ({ mutate: verificarMutate, isPending: false }),
-  useLiberarRelatorio: () => ({ mutateAsync: liberarMutateAsync, isPending: false }),
 }));
 vi.mock("@/modules/bpf/RelatorioBpf", () => ({ RelatorioBpf: () => <div>CORPO DO RELATORIO</div> }));
 
 import { RelatoriosOsParaVerificar } from "@/modules/bpf/RelatoriosOsParaVerificar";
 import { RelatoriosOsArquivo } from "@/modules/bpf/RelatoriosOsArquivo";
+import { relatoriosOsDoArquivo } from "@/modules/bpf/regras";
 
 function relatorio(id: string, data: string, status: Relatorio["status"], extra: Partial<Relatorio> = {}): Relatorio {
   return {
@@ -49,7 +48,6 @@ const comDialogo = (ui: React.ReactElement) => render(ui);
 describe("Relatório de OS (BPF): verificação no Painel de Verificação e liberação no Painel de Arquivo", () => {
   beforeEach(() => {
     verificarMutate.mockClear();
-    liberarMutateAsync.mockClear();
     relatorios = [relatorio("r-emitido", "2026-10-24", "emitido"), relatorio("r-verificado", "2026-10-23", "verificado"), relatorio("r-liberado", "2026-10-22", "liberado", { liberado_por_nome: "Admin" })];
     useSessionStore.setState({ perfil: { id: "ver", nomeCompleto: "Vera Verificadora", nivelAcesso: "VERIFICADOR", setoresPermitidos: ["Todos"] } });
   });
@@ -80,24 +78,27 @@ describe("Relatório de OS (BPF): verificação no Painel de Verificação e lib
     expect(screen.getByText(/Você emitiu este relatório/)).toBeInTheDocument();
   });
 
-  it("Painel de Arquivo: o relatório verificado aparece para seleção; o administrador seleciona e libera ao SIF", async () => {
-    comDialogo(<RelatoriosOsArquivo liberacao="pendentes" podeLiberar />);
+  it("Painel de Arquivo: o relatório verificado aparece para seleção (como as fichas); a liberação é pelo botão do painel", () => {
+    const alternar = vi.fn();
+    comDialogo(<RelatoriosOsArquivo liberacao="pendentes" podeLiberar selecionados={new Set()} aoAlternar={alternar} />);
     expect(screen.queryByTestId("arquivo-relatorio-os-2026-10-24")).toBeNull(); // ainda não verificado
     expect(screen.queryByTestId("arquivo-relatorio-os-2026-10-22")).toBeNull(); // já liberado: fora do filtro "pendentes"
-    const botao = screen.getByRole("button", { name: /Liberar relatórios de OS ao SIF \(0\)/ });
-    expect(botao).toBeDisabled();
+    expect(screen.queryByText(/Liberar relatórios de OS/)).toBeNull(); // sem botão próprio: é o botão do painel
 
     fireEvent.click(screen.getByLabelText(/Selecionar relatório de OS de 23\/10\/2026/));
-    fireEvent.click(screen.getByRole("button", { name: /Liberar relatórios de OS ao SIF \(1\)/ }));
-    fireEvent.click(await screen.findByRole("button", { name: /confirmar|sim|ok/i }));
-    await waitFor(() => expect(liberarMutateAsync).toHaveBeenCalledWith("r-verificado"));
+    expect(alternar).toHaveBeenCalledWith("r-verificado");
   });
 
-  it("Painel de Arquivo: sem permissão de liberar (Verificador) não há seleção nem botão", () => {
-    comDialogo(<RelatoriosOsArquivo liberacao="todas" podeLiberar={false} />);
+  it("Painel de Arquivo: sem permissão de liberar (Verificador) não há seleção", () => {
+    comDialogo(<RelatoriosOsArquivo liberacao="todas" podeLiberar={false} selecionados={new Set()} aoAlternar={vi.fn()} />);
     expect(screen.getByTestId("arquivo-relatorio-os-2026-10-23")).toBeInTheDocument();
     expect(screen.getByTestId("arquivo-relatorio-os-2026-10-22")).toBeInTheDocument();
     expect(screen.queryByRole("checkbox")).toBeNull();
-    expect(screen.queryByText(/Liberar relatórios de OS/)).toBeNull();
+  });
+
+  it("relatoriosOsDoArquivo respeita o filtro de liberação do painel", () => {
+    expect(relatoriosOsDoArquivo(relatorios, "pendentes").map((r) => r.id)).toEqual(["r-verificado"]);
+    expect(relatoriosOsDoArquivo(relatorios, "liberadas").map((r) => r.id)).toEqual(["r-liberado"]);
+    expect(relatoriosOsDoArquivo(relatorios, "todas").map((r) => r.id)).toEqual(["r-verificado", "r-liberado"]);
   });
 });

@@ -1,4 +1,4 @@
-import type { ItemRelatorio, Ordem, Programacao, ResultadoBpf, Verificacao } from "./tipos";
+import type { ItemRelatorio, Ordem, Programacao, Relatorio, ResultadoBpf, Verificacao } from "./tipos";
 
 const FUSO = "America/Manaus";
 
@@ -151,4 +151,17 @@ export function resumirAssinaturas(itens: ItemRelatorio[]): ResumoAssinaturas {
   }
   const porNome = <T extends { nome: string }>(a: T, b: T) => a.nome.localeCompare(b.nome, "pt-BR");
   return { administradores: [...admins.values()].sort(porNome), pcm: [...pcm.values()].sort(porNome), semAprovacaoNoSistema: semAprovacao };
+}
+
+export type FiltroLiberacaoRelatorios = "pendentes" | "liberadas" | "todas";
+
+/** Relatórios de OS que o Painel de Arquivo mostra para o filtro de liberação escolhido: os já verificados pelo Verificador
+ * (aguardando a liberação ao SIF) e/ou os já liberados. Os emitidos ainda não verificados não chegam ao arquivo. */
+export function relatoriosOsDoArquivo(relatorios: Relatorio[] | undefined, liberacao: FiltroLiberacaoRelatorios): Relatorio[] {
+  return (relatorios ?? []).filter((r) => {
+    if (r.status === "emitido") return false;
+    if (liberacao === "pendentes") return r.status === "verificado";
+    if (liberacao === "liberadas") return r.status === "liberado";
+    return true;
+  });
 }

@@ -6,7 +6,9 @@ import { useTurnoDoRegistro } from "@/modules/fichas/useTurnoDoRegistro";
 import { agruparPorDossie, setoresDoGrupo, tipoPorTemplate } from "@/modules/fichas/utils/recordGrouping";
 import { ensureLocalTime } from "@/modules/fichas/utils/tempo";
 import { instanteDoRegistro } from "@/modules/fichas/utils/horaMonitoramento";
+import { useLiberarRelatorio, useRelatorios } from "@/modules/bpf/api";
 import { RelatoriosOsArquivo } from "@/modules/bpf/RelatoriosOsArquivo";
+import { relatoriosOsDoArquivo } from "@/modules/bpf/regras";
 import { useLiberarLoteSif, useMonitoramentosArquivo } from "./api";
 import { FILTROS_ARQUIVO_INICIAIS, filtrarArquivo, filtrosAtivos, type FiltrosArquivo } from "./filtrosArquivo";
 import { Button } from "@/shared/ui/button";
@@ -27,6 +29,10 @@ export function PainelArquivoPage() {
   const { data: templates } = useFichasTemplatesTodas();
   const { data: usuarios } = useUsuariosMap();
   const liberar = useLiberarLoteSif();
+  // Relatórios de OS (BPF) verificados: selecionados aqui e liberados pelo mesmo botão das fichas.
+  const { data: relatoriosOs } = useRelatorios();
+  const liberarRelatorioOs = useLiberarRelatorio();
+  const [selecionadosOs, setSelecionadosOs] = useState<Set<string>>(new Set());
   // A liberação à Auditoria Oficial SIF é exclusiva do administrador (a Edge Function liberar-sif recusa os demais).
   const podeLiberar = useSessionStore((s) => s.perfil?.nivelAcesso === "ADMIN_MASTER");
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
@@ -102,11 +108,28 @@ export function PainelArquivoPage() {
   const idsParaLiberar = (arquivo ?? []).filter((m) => selecionados.has(m.id) && !m.liberado_sif).map((m) => m.id);
   const gruposSelecionados = grupos.filter((g) => g.items.some((m) => selecionados.has(m.id))).map((g) => g.items.map((m) => m.id));
 
+  const idsOsParaLiberar = relatoriosOsDoArquivo(relatoriosOs, filtros.liberacao)
+    .filter((r) => r.status === "verificado" && selecionadosOs.has(r.id))
+    .map((r) => r.id);
+  const totalParaLiberar = idsParaLiberar.length + idsOsParaLiberar.length;
+
+  function alternarRelatorioOs(id: string) {
+    setSelecionadosOs((atual) => {
+      const novo = new Set(atual);
+      if (novo.has(id)) novo.delete(id);
+      else novo.add(id);
+      return novo;
+    });
+  }
+
   async function liberarSelecionados() {
-    const ids = idsParaLiberar;
-    if (ids.length === 0) return;
-    await liberar.mutateAsync(ids);
-    setSelecionados(new Set());
+    if (totalParaLiberar === 0) return;
+    if (idsParaLiberar.length > 0) {
+      await liberar.mutateAsync(idsParaLiberar);
+      setSelecionados(new Set());
+    }
+    for (const id of idsOsParaLiberar) await liberarRelatorioOs.mutateAsync(id);
+    setSelecionadosOs(new Set());
   }
 
   const nFiltros = filtrosAtivos(filtros);
@@ -128,8 +151,8 @@ export function PainelArquivoPage() {
             Imprimir selecionados ({gruposSelecionados.length})
           </Button>
           {podeLiberar && (
-            <Button onClick={liberarSelecionados} disabled={idsParaLiberar.length === 0 || liberar.isPending}>
-              {liberar.isPending ? "Liberando…" : `Liberar selecionados para Auditoria (${idsParaLiberar.length})`}
+            <Button onClick={liberarSelecionados} disabled={totalParaLiberar === 0 || liberar.isPending || liberarRelatorioOs.isPending}>
+              {liberar.isPending || liberarRelatorioOs.isPending ? "Liberando…" : `Liberar selecionados para Auditoria (${totalParaLiberar})`}
             </Button>
           )}
         </div>
@@ -236,8 +259,10 @@ export function PainelArquivoPage() {
         </p>
       )}
       {liberar.isError && <p className="text-sm text-destructive">Falha ao liberar o lote selecionado.</p>}
+      {liberarRelatorioOs.isSuccess && <p className="text-sm text-success">Relatório(s) de OS liberado(s) — já visíveis para a Auditoria Oficial SIF.</p>}
+      {liberarRelatorioOs.isError && <p className="text-sm text-destructive">Falha ao liberar o relatório de OS selecionado.</p>}
 
-      <RelatoriosOsArquivo liberacao={filtros.liberacao} podeLiberar={podeLiberar} />
+      <RelatoriosOsArquivo liberacao={filtros.liberacao} podeLiberar={podeLiberar} selecionados={selecionadosOs} aoAlternar={alternarRelatorioOs} />
 
       {isLoading && <p className="text-muted-foreground">Carregando…</p>}
       {!isLoading && (
