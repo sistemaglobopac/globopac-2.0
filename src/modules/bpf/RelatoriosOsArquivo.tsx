@@ -3,7 +3,7 @@ import { Printer } from "lucide-react";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
-import { useAppDialog } from "@/modules/gestao/dialogSystem";
+import { DialogProvider, useAppDialog } from "@/modules/gestao/dialogSystem";
 import { imprimirElemento } from "@/modules/fichas/utils/printHelper";
 import { RelatorioBpf } from "./RelatorioBpf";
 import { useLiberarRelatorio, useRelatorios } from "./api";
@@ -13,7 +13,7 @@ export type FiltroLiberacaoRelatorios = "pendentes" | "liberadas" | "todas";
 
 /** Relatórios diários de OS (BPF Estrutural) no Painel de Arquivo: os já verificados pelo Verificador aguardam aqui a liberação ao
  * SIF — selecionados e liberados pelo administrador (como as fichas) — e os liberados ficam para consulta e impressão. */
-export function RelatoriosOsArquivo({ liberacao, podeLiberar }: { liberacao: FiltroLiberacaoRelatorios; podeLiberar: boolean }) {
+function Conteudo({ liberacao, podeLiberar }: { liberacao: FiltroLiberacaoRelatorios; podeLiberar: boolean }) {
   const dialog = useAppDialog();
   const { data: relatorios } = useRelatorios();
   const liberar = useLiberarRelatorio();
@@ -120,5 +120,14 @@ export function RelatoriosOsArquivo({ liberacao, podeLiberar }: { liberacao: Fil
         );
       })}
     </section>
+  );
+}
+
+/** Próprio DialogProvider: o Painel de Arquivo (onde esta seção aparece) não tem um. */
+export function RelatoriosOsArquivo(props: { liberacao: FiltroLiberacaoRelatorios; podeLiberar: boolean }) {
+  return (
+    <DialogProvider>
+      <Conteudo {...props} />
+    </DialogProvider>
   );
 }

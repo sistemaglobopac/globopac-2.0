@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Printer } from "lucide-react";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { useAppDialog } from "@/modules/gestao/dialogSystem";
+import { DialogProvider, useAppDialog } from "@/modules/gestao/dialogSystem";
 import { useSessionStore } from "@/store/session";
 import { imprimirElemento } from "@/modules/fichas/utils/printHelper";
 import { RelatorioBpf } from "./RelatorioBpf";
@@ -12,7 +12,7 @@ import { formatarData } from "./regras";
 /** Relatórios diários de OS (BPF Estrutural) emitidos pelo inspetor e aguardando a verificação do Verificador, feita aqui, no
  * Painel de Verificação. Verificar NÃO libera ao SIF: o relatório verificado segue para o Painel de Arquivo, de onde o
  * administrador o libera. Some quando não há nenhum. Quem emitiu o relatório não o verifica (o banco também recusa). */
-export function RelatoriosOsParaVerificar() {
+function Conteudo() {
   const dialog = useAppDialog();
   const perfil = useSessionStore((s) => s.perfil);
   const { data: relatorios } = useRelatorios();
@@ -76,5 +76,14 @@ export function RelatoriosOsParaVerificar() {
         );
       })}
     </section>
+  );
+}
+
+/** Próprio DialogProvider: o Painel de Verificação (onde esta seção aparece) não tem um. */
+export function RelatoriosOsParaVerificar() {
+  return (
+    <DialogProvider>
+      <Conteudo />
+    </DialogProvider>
   );
 }

@@ -1,6 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DialogProvider } from "@/modules/gestao/dialogSystem";
 import { useSessionStore } from "@/store/session";
 import type { Relatorio } from "@/modules/bpf/tipos";
 
@@ -44,7 +43,8 @@ function relatorio(id: string, data: string, status: Relatorio["status"], extra:
   };
 }
 
-const comDialogo = (ui: React.ReactElement) => render(<DialogProvider>{ui}</DialogProvider>);
+// Sem DialogProvider em volta: nos painéis de Verificação e de Arquivo não existe um (foi a causa da tela branca).
+const comDialogo = (ui: React.ReactElement) => render(ui);
 
 describe("Relatório de OS (BPF): verificação no Painel de Verificação e liberação no Painel de Arquivo", () => {
   beforeEach(() => {
