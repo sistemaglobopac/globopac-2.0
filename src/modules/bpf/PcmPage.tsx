@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Printer } from "lucide-react";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
@@ -8,8 +9,10 @@ import { Textarea } from "@/shared/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useAppDialog } from "@/modules/gestao/dialogSystem";
 import { useSessionStore } from "@/store/session";
+import { imprimirElemento } from "@/modules/fichas/utils/printHelper";
 import { CabecalhoBpf, PaginaBpf } from "./PaginaBpf";
 import { DadosSolicitacao } from "./componentesBpf";
+import { ListaImpressaAProgramar, ListaImpressaDevolvidas, ListaImpressaProgramadas } from "./ListasImpressasPcm";
 import { useOrdensProgramadas, useProgramarSolicitacao, useReprogramarOrdem, useSolicitacoes } from "./api";
 import { devolucaoAoPcm, formatarData, hojeManaus, rotuloProgramacao, situacaoPrazo } from "./regras";
 import type { Ordem, Solicitacao } from "./tipos";
@@ -222,6 +225,8 @@ function Conteudo() {
   );
   const vencidas = (ordens ?? []).filter((o) => o.prazo_atual < hojeManaus()).length;
   const devolvidas = useMemo(() => (ordens ?? []).filter((o) => devolucaoAoPcm(o)), [ordens]);
+  // A lista impressa é a da aba aberta: o que está na tela (a de programadas respeita a busca).
+  const qtdDaAba = aba === "programar" ? (aProgramar ?? []).length : aba === "devolvidas" ? devolvidas.length : filtradas.length;
 
   return (
     <>
@@ -230,7 +235,7 @@ function Conteudo() {
         descricao="Receba as solicitações aprovadas, programe a execução e reprograme o prazo quando necessário (sempre com justificativa)."
       />
 
-      <div className="flex gap-2" role="tablist">
+      <div className="flex flex-wrap items-center gap-2 print:hidden" role="tablist">
         <Button type="button" role="tab" aria-selected={aba === "programar"} variant={aba === "programar" ? "default" : "outline"} size="sm" onClick={() => setAba("programar")}>
           A programar ({(aProgramar ?? []).length})
         </Button>
@@ -240,10 +245,17 @@ function Conteudo() {
         <Button type="button" role="tab" aria-selected={aba === "programadas"} variant={aba === "programadas" ? "default" : "outline"} size="sm" onClick={() => setAba("programadas")}>
           OS programadas ({(ordens ?? []).length}){vencidas > 0 ? ` · ${vencidas} vencida(s)` : ""}
         </Button>
+        <Button type="button" size="sm" variant="outline" className="ml-auto" onClick={imprimirElemento} disabled={qtdDaAba === 0}>
+          <Printer className="h-4 w-4" /> Imprimir lista
+        </Button>
       </div>
 
+      {aba === "programar" && <ListaImpressaAProgramar solicitacoes={aProgramar ?? []} />}
+      {aba === "devolvidas" && <ListaImpressaDevolvidas ordens={devolvidas} />}
+      {aba === "programadas" && <ListaImpressaProgramadas ordens={filtradas} filtro={busca.trim() || undefined} />}
+
       {aba === "programar" && (
-        <section className="space-y-3">
+        <section className="space-y-3 print:hidden">
           {carregandoSs && <p className="text-muted-foreground">Carregando…</p>}
           {!carregandoSs && (aProgramar ?? []).length === 0 && <p className="text-muted-foreground">Nenhuma solicitação aprovada aguardando programação.</p>}
           {(aProgramar ?? []).map((ss) => (
@@ -253,7 +265,7 @@ function Conteudo() {
       )}
 
       {aba === "devolvidas" && (
-        <section className="space-y-3">
+        <section className="space-y-3 print:hidden">
           {carregandoOs && <p className="text-muted-foreground">Carregando…</p>}
           {!carregandoOs && devolvidas.length === 0 && (
             <p className="text-muted-foreground">Nenhuma OS marcada como não conforme aguardando reprogramação.</p>
@@ -265,7 +277,7 @@ function Conteudo() {
       )}
 
       {aba === "programadas" && (
-        <section className="space-y-3">
+        <section className="space-y-3 print:hidden">
           <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nº da OS, setor ou descrição" aria-label="Buscar OS" />
           {carregandoOs && <p className="text-muted-foreground">Carregando…</p>}
           {!carregandoOs && filtradas.length === 0 && <p className="text-muted-foreground">Nenhuma OS encontrada.</p>}
