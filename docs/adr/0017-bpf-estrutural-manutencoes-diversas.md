@@ -27,8 +27,9 @@ continuam existindo, só saíram do menu).
   `bpf_aprovar_solicitacao`, `bpf_programar_solicitacao`, `bpf_reprogramar_ordem`,
   `bpf_registrar_verificacao`, `bpf_emitir_relatorio`, `bpf_liberar_relatorio`,
   `bpf_importar_ordens`). As tabelas não têm INSERT/UPDATE/DELETE para o cliente.
-- **NP só com prazo vigente** (prazo ≥ hoje, inclusive no dia do prazo); **NC só com prazo
-  vencido**. Reforçado também por trigger.
+- **NP só com prazo vigente** (prazo ≥ hoje, inclusive no dia do prazo). **NC vale com prazo
+  vencido ou vigente**: dentro do prazo serve para a OS executada cujo resultado não sanou o
+  desvio apontado (migration `20261024120000`). Reforçado também por trigger.
 - **Segregação:** quem abriu a SS não a aprova; quem emitiu o relatório não o libera.
 - **Conforme (C)** conclui a OS e ela sai dos relatórios seguintes; desfazer no mesmo dia a reabre.
 - O dia só é encerrado (relatório emitido) com todas as OS que já existiam antes de hoje

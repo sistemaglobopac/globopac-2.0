@@ -13,9 +13,9 @@ import { dataParaIso, lerCsvOrdens } from "@/modules/bpf/importacao";
 import type { ItemRelatorio, Ordem } from "@/modules/bpf/tipos";
 
 describe("resultadosPermitidos", () => {
-  it("dentro do prazo (inclusive no dia do prazo): C ou NP", () => {
-    expect(resultadosPermitidos("2026-10-25", "2026-10-21")).toEqual(["C", "NP"]);
-    expect(resultadosPermitidos("2026-10-21", "2026-10-21")).toEqual(["C", "NP"]);
+  it("dentro do prazo (inclusive no dia do prazo): C, NP ou NC (executada sem sanar o desvio)", () => {
+    expect(resultadosPermitidos("2026-10-25", "2026-10-21")).toEqual(["C", "NP", "NC"]);
+    expect(resultadosPermitidos("2026-10-21", "2026-10-21")).toEqual(["C", "NP", "NC"]);
   });
   it("prazo vencido: C ou NC", () => {
     expect(resultadosPermitidos("2026-10-20", "2026-10-21")).toEqual(["C", "NC"]);

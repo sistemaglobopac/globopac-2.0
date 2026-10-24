@@ -51,9 +51,10 @@ export function diasEntre(de: string, ate: string): number {
 }
 
 /** Regra do monitoramento (espelha bpf_verificacoes_regras no banco): dentro do prazo (até o
- * dia do prazo, inclusive) o inspetor marca C ou NP; vencido, C ou NC. */
+ * dia do prazo, inclusive) o inspetor marca C, NP ou NC (NC quando a OS foi executada mas o
+ * desvio não foi sanado); vencido, só C ou NC. */
 export function resultadosPermitidos(prazoAtual: string, hoje: string): ResultadoBpf[] {
-  return prazoAtual >= hoje ? ["C", "NP"] : ["C", "NC"];
+  return prazoAtual >= hoje ? ["C", "NP", "NC"] : ["C", "NC"];
 }
 
 export function situacaoPrazo(prazoAtual: string, hoje: string): { vencido: boolean; dias: number; texto: string } {

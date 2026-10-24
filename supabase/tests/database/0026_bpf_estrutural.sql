@@ -137,7 +137,7 @@ select lives_ok(
 select is((select reprogramacoes from bpf_ordens where id = 'f3000000-0000-0000-0000-000000000001'), 1, 'A reprogramação é contada e registrada no histórico');
 
 -- ------------------------------------------------------------------------------------------
--- 4) Verificação diária: NP só com prazo vigente, NC só com prazo vencido
+-- 4) Verificação diária: NP só com prazo vigente; NC vale com prazo vencido ou vigente
 -- ------------------------------------------------------------------------------------------
 -- (a OS T-VENCIDA foi reprogramada acima; usa uma terceira, ainda vencida, para o cenário NC)
 reset role;
@@ -146,10 +146,9 @@ values ('f3000000-0000-0000-0000-000000000003', 'T-VENCIDA2', 'MANUTENÇÕES DIV
 select pg_temp.como('f1000000-0000-0000-0000-000000000001', 'INSPETOR_QUALIDADE', array['MANUTENÇÕES DIVERSAS']);
 set local role authenticated;
 
-select throws_matching(
-  $$ select public.bpf_registrar_verificacao('f3000000-0000-0000-0000-000000000002', 'NC') $$,
-  'dentro do prazo',
-  'NÃO CONFORME é recusado em OS ainda dentro do prazo'
+select lives_ok(
+  $$ select public.bpf_registrar_verificacao('f3000000-0000-0000-0000-000000000002', 'NC', 'Executada, mas o desvio continua') $$,
+  'NÃO CONFORME é aceito em OS dentro do prazo (executada sem sanar o desvio)'
 );
 select throws_matching(
   $$ select public.bpf_registrar_verificacao('f3000000-0000-0000-0000-000000000003', 'NP') $$,

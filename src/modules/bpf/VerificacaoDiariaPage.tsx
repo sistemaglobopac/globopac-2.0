@@ -88,7 +88,7 @@ function CartaoOs({ ordem, hoje, bloqueado }: { ordem: Ordem; hoje: string; bloq
                 onClick={() => marcar(r)}
                 className={cn("min-w-28", selecionado && ESTILO_SELECIONADO[r])}
                 aria-pressed={selecionado}
-                title={permitido ? undefined : r === "NP" ? "O prazo já venceu" : "A OS ainda está dentro do prazo"}
+                title={permitido ? undefined : "O prazo já venceu"}
               >
                 {ROTULO_RESULTADO[r]}
               </Button>
@@ -102,7 +102,7 @@ function CartaoOs({ ordem, hoje, bloqueado }: { ordem: Ordem; hoje: string; bloq
           <p className="text-xs text-muted-foreground">
             {prazo.vencido
               ? "Prazo vencido: se não foi executada, marque Não conforme."
-              : "Dentro do prazo: se ainda não foi executada, marque No prazo."}
+              : "Dentro do prazo: se ainda não foi executada, marque No prazo. Se foi executada mas o desvio não foi sanado, marque Não conforme."}
           </p>
         )}
 
