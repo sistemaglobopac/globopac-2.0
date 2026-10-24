@@ -9,7 +9,7 @@
 create extension if not exists pgtap with schema extensions;
 
 begin;
-select plan(25);
+select plan(29);
 
 create function pg_temp.como(p_id uuid, p_perfil text, p_setores text[])
 returns void
@@ -161,7 +161,7 @@ select lives_ok(
 );
 
 -- ------------------------------------------------------------------------------------------
--- 5) Relatório: emissão exige todas verificadas; liberação é do Verificador
+-- 5) Relatório: emissão exige todas verificadas; o Verificador verifica; o administrador libera ao SIF
 -- ------------------------------------------------------------------------------------------
 select throws_matching(
   $$ select public.bpf_emitir_relatorio() $$,
@@ -176,14 +176,41 @@ select lives_ok($$ select public.bpf_emitir_relatorio() $$, 'Inspetor emite o re
 reset role;
 select pg_temp.como('f1000000-0000-0000-0000-000000000006', 'INSPECAO_FEDERAL', array[]::text[]);
 set local role authenticated;
-select is((select count(*)::int from bpf_relatorios), 0, 'SIF não vê o relatório antes da liberação');
+select is((select count(*)::int from bpf_relatorios), 0, 'SIF não vê o relatório antes da verificação');
+
+reset role;
+select pg_temp.como('f1000000-0000-0000-0000-000000000003', 'ADMIN_MASTER', array[]::text[]);
+set local role authenticated;
+select throws_matching(
+  $$ select public.bpf_liberar_relatorio((select id from bpf_relatorios limit 1)) $$,
+  'ainda não foi verificado',
+  'Administrador não libera um relatório que o Verificador ainda não verificou'
+);
 
 reset role;
 select pg_temp.como('f1000000-0000-0000-0000-000000000005', 'VERIFICADOR', array['LINHA_DIF']);
 set local role authenticated;
+select throws_matching(
+  $$ select public.bpf_liberar_relatorio((select id from bpf_relatorios limit 1)) $$,
+  'Sem permissão',
+  'Verificador não libera ao SIF (a liberação é do administrador, no Painel de Arquivo)'
+);
+select lives_ok(
+  $$ select public.bpf_verificar_relatorio((select id from bpf_relatorios limit 1)) $$,
+  'Verificador verifica o relatório (Painel de Verificação)'
+);
+
+reset role;
+select pg_temp.como('f1000000-0000-0000-0000-000000000006', 'INSPECAO_FEDERAL', array[]::text[]);
+set local role authenticated;
+select is((select count(*)::int from bpf_relatorios), 0, 'SIF ainda não vê o relatório verificado (falta a liberação)');
+
+reset role;
+select pg_temp.como('f1000000-0000-0000-0000-000000000003', 'ADMIN_MASTER', array[]::text[]);
+set local role authenticated;
 select lives_ok(
   $$ select public.bpf_liberar_relatorio((select id from bpf_relatorios limit 1)) $$,
-  'Verificador confere e libera o relatório ao SIF'
+  'Administrador libera ao SIF o relatório verificado (Painel de Arquivo)'
 );
 
 reset role;

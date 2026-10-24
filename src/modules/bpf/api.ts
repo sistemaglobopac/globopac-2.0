@@ -125,9 +125,10 @@ export function useOrdensProgramadas() {
   });
 }
 
-export function useRelatorios() {
+export function useRelatorios({ habilitado = true }: { habilitado?: boolean } = {}) {
   return useQuery({
     queryKey: ["bpf", "relatorios"],
+    enabled: habilitado,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("bpf_relatorios")
@@ -233,6 +234,14 @@ export function useEmitirRelatorio() {
   const invalidar = useInvalidarBpf();
   return useMutation({
     mutationFn: (setor?: string) => chamar<Relatorio>("bpf_emitir_relatorio", { p_setor: setor ?? SETOR_BPF }),
+    onSuccess: invalidar,
+  });
+}
+
+export function useVerificarRelatorio() {
+  const invalidar = useInvalidarBpf();
+  return useMutation({
+    mutationFn: (id: string) => chamar<Relatorio>("bpf_verificar_relatorio", { p_id: id }),
     onSuccess: invalidar,
   });
 }

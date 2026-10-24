@@ -16,7 +16,7 @@ import { GlobalInspectorAlerts } from "@/modules/bordo/GlobalInspectorAlerts";
 import { AlertaComunicado } from "@/modules/comunicados/AlertaComunicado";
 import { NIVEL_ACESSO_BADGE } from "@/modules/gestao/api";
 import { useRncsAbertas } from "@/modules/rnc/api";
-import { useSolicitacoes } from "@/modules/bpf/api";
+import { useRelatorios, useSolicitacoes } from "@/modules/bpf/api";
 import { SETOR_BPF } from "@/modules/bpf/tipos";
 import { casaSomenteRotaExata } from "./menuRotas";
 import { AlertaRncGestor } from "@/modules/rnc/AlertaRncGestor";
@@ -72,7 +72,6 @@ const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
     { rota: "/gestao/cargas-aves", rotulo: "Cargas e Veículos" },
     { rota: "/conferencia-cargas", rotulo: "Conferência de Cargas" },
     { rota: "/trocar-setor", rotulo: "Trocar Setor / Cobertura" },
-    { rota: "/bpf/relatorios", rotulo: "BPF — Relatórios" },
     { rota: "/sif/liberar", rotulo: "Painel de Arquivo" },
   ],
   INSPECAO_FEDERAL: [
@@ -207,9 +206,13 @@ function MenuLateral({ itens, onNavegar }: { itens: ItemMenu[]; onNavegar?: () =
   });
   const paraAprovar = (solicitacoes ?? []).filter((s) => s.status === "AGUARDANDO_APROVACAO").length;
   const paraProgramar = (solicitacoes ?? []).filter((s) => s.status === "APROVADA").length;
+  // Relatórios diários de OS (BPF) emitidos e aguardando a verificação do Verificador, feita no Painel de Verificação.
+  const { data: relatoriosOs } = useRelatorios({ habilitado: nivel === "VERIFICADOR" });
+  const relatoriosOsParaVerificar = (relatoriosOs ?? []).filter((r) => r.status === "emitido").length;
   const contagem = (rota: string): number => {
     if (nivel === "GESTOR_SETOR" && rota === "/rnc") return paraResponder;
-    if (nivel === "VERIFICADOR" && (rota === "/rnc" || rota === "/verificacao")) return paraJulgar;
+    if (nivel === "VERIFICADOR" && rota === "/rnc") return paraJulgar;
+    if (nivel === "VERIFICADOR" && rota === "/verificacao") return paraJulgar + relatoriosOsParaVerificar;
     if (nivel === "ADMIN_MASTER" && rota === "/bpf/aprovacoes") return paraAprovar;
     if (nivel === "INSPETOR_PCM" && rota === "/bpf/pcm") return paraProgramar;
     return 0;

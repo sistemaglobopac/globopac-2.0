@@ -60,6 +60,10 @@ const base: Relatorio = {
   emitido_por_nome: "Inspetor Um",
   emitido_em: "2026-10-21T17:00:00-04:00",
   hash_emissao: hash("e"),
+  verificado_por: null,
+  verificado_por_nome: null,
+  verificado_em: null,
+  hash_verificacao: null,
   liberado_por: null,
   liberado_por_nome: null,
   liberado_em: null,
@@ -81,7 +85,7 @@ describe("RelatorioBpf", () => {
     expect(assinaturas.getByText("Inspetor Um")).toBeTruthy();
     expect(assinaturas.getByText("Ana Admin")).toBeTruthy();
     expect(assinaturas.getByText("Paulo PCM")).toBeTruthy();
-    expect(assinaturas.getByText(/Aguardando conferência do Verificador/)).toBeTruthy();
+    expect(assinaturas.getByText(/Aguardando verificação do Verificador/)).toBeTruthy();
   });
 
   it("usa o selo de assinatura e o atestado de validade jurídica dos relatórios de monitoramento", () => {

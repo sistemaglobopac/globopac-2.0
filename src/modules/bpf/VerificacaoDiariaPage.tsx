@@ -167,11 +167,11 @@ function Conteudo() {
   function encerrarDia() {
     dialog.confirm({
       titulo: "Encerrar o dia e emitir o relatório?",
-      mensagem: `Serão registradas ${contagem("NC")} não conformidade(s) e ${contagem("NP")} OS no prazo. Depois de emitido, o dia não pode mais ser alterado e o relatório segue para conferência do Verificador.`,
+      mensagem: `Serão registradas ${contagem("NC")} não conformidade(s) e ${contagem("NP")} OS no prazo. Depois de emitido, o dia não pode mais ser alterado e o relatório segue para verificação do Verificador.`,
       icone: "warning",
       aoConfirmar: () =>
         emitir.mutate(undefined, {
-          onSuccess: () => dialog.sucesso("Relatório do dia emitido. Ele agora aguarda a conferência do Verificador.", "Dia encerrado"),
+          onSuccess: () => dialog.sucesso("Relatório do dia emitido. Ele agora aguarda a verificação do Verificador.", "Dia encerrado"),
           onError: (erro) => dialog.erro(erro, "Não foi possível emitir o relatório"),
         }),
     });
@@ -192,7 +192,7 @@ function Conteudo() {
       {relatorioDeHoje && (
         <div className="rounded-lg border border-hairline bg-primary/5 p-4 text-sm">
           O relatório de hoje foi emitido por <strong>{relatorioDeHoje.emitido_por_nome}</strong> em {formatarDataHora(relatorioDeHoje.emitido_em)} (
-          {relatorioDeHoje.status === "liberado" ? "liberado ao SIF" : "aguardando o Verificador"}). As verificações do dia estão travadas.{" "}
+          {relatorioDeHoje.status === "liberado" ? "liberado ao SIF" : relatorioDeHoje.status === "verificado" ? "verificado, aguardando liberação ao SIF" : "aguardando o Verificador"}). As verificações do dia estão travadas.{" "}
           <Link to="/bpf/relatorios" className="font-semibold underline">
             Ver relatório
           </Link>

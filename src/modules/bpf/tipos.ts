@@ -1,7 +1,8 @@
 export type ResultadoBpf = "C" | "NP" | "NC";
 export type StatusSolicitacao = "AGUARDANDO_APROVACAO" | "APROVADA" | "REPROVADA" | "PROGRAMADA";
 export type StatusOrdem = "PROGRAMADA" | "CONCLUIDA";
-export type StatusRelatorio = "emitido" | "liberado";
+/** emitido (inspetor) → verificado (Verificador, Painel de Verificação) → liberado (administrador, Painel de Arquivo; só então o SIF vê). */
+export type StatusRelatorio = "emitido" | "verificado" | "liberado";
 
 /** Setor de inspeção do monitoramento de manutenções diversas (app_config.setores_cadastrados). */
 export const SETOR_BPF = "MANUTENÇÕES DIVERSAS";
@@ -144,6 +145,10 @@ export interface Relatorio {
   emitido_por_nome: string;
   emitido_em: string;
   hash_emissao: string;
+  verificado_por: string | null;
+  verificado_por_nome: string | null;
+  verificado_em: string | null;
+  hash_verificacao: string | null;
   liberado_por: string | null;
   liberado_por_nome: string | null;
   liberado_em: string | null;

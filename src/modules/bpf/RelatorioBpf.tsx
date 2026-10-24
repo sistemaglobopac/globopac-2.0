@@ -203,9 +203,24 @@ export function RelatorioBpf({ relatorio }: { relatorio: Relatorio }) {
           );
         })}
 
+        {relatorio.verificado_por_nome ? (
+          <SeloAssinatura
+            titulo="Assinatura Eletrônica do Verificador — verificação do monitoramento"
+            nome={relatorio.verificado_por_nome}
+            dataHora={formatarDataHora(relatorio.verificado_em)}
+            hash={relatorio.hash_verificacao}
+            integro={null}
+            corLabel="text-success"
+          />
+        ) : (
+          <SeloPendente titulo="Verificador — verificação do monitoramento">
+            <span className="text-amber-800">Aguardando verificação do Verificador</span>
+          </SeloPendente>
+        )}
+
         {relatorio.liberado_por_nome ? (
           <SeloAssinatura
-            titulo="Assinatura Eletrônica do Verificador — conferência do monitoramento"
+            titulo="Assinatura Eletrônica do Administrador — liberação ao SIF"
             nome={relatorio.liberado_por_nome}
             dataHora={formatarDataHora(relatorio.liberado_em)}
             hash={relatorio.hash_liberacao}
@@ -213,8 +228,8 @@ export function RelatorioBpf({ relatorio }: { relatorio: Relatorio }) {
             corLabel="text-success"
           />
         ) : (
-          <SeloPendente titulo="Verificador — conferência do monitoramento">
-            <span className="text-amber-800">Aguardando conferência do Verificador</span>
+          <SeloPendente titulo="Administrador — liberação ao SIF">
+            <span className="text-amber-800">{relatorio.verificado_por_nome ? "Aguardando liberação pelo Painel de Arquivo" : "Depende da verificação do Verificador"}</span>
           </SeloPendente>
         )}
       </section>
@@ -228,14 +243,15 @@ export function RelatorioBpf({ relatorio }: { relatorio: Relatorio }) {
       <RodapeAtestado
         objeto="relatório"
         protocolo={protocolo}
-        hash={relatorio.hash_liberacao ?? relatorio.hash_emissao}
+        hash={relatorio.hash_liberacao ?? relatorio.hash_verificacao ?? relatorio.hash_emissao}
         integro={null}
         carimbo={
           <p className="mt-1">
             Emissão registrada em {formatarDataHora(relatorio.emitido_em)}
-            {relatorio.liberado_em
-              ? ` · conferência do Verificador em ${formatarDataHora(relatorio.liberado_em)}`
-              : " · aguardando a conferência do Verificador"}
+            {relatorio.verificado_em
+              ? ` · verificação do Verificador em ${formatarDataHora(relatorio.verificado_em)}`
+              : " · aguardando a verificação do Verificador"}
+            {relatorio.liberado_em ? ` · liberação ao SIF em ${formatarDataHora(relatorio.liberado_em)}` : ""}
             .
           </p>
         }

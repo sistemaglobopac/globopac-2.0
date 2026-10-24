@@ -5,6 +5,7 @@ import { useSessionStore } from "@/store/session";
 import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/api";
 import { urlAbrirRnc, useRncsAbertas, useRncsDosMonitoramentos } from "@/modules/rnc/api";
 import { CartaoRnc } from "@/modules/rnc/CartaoRnc";
+import { RelatoriosOsParaVerificar } from "@/modules/bpf/RelatoriosOsParaVerificar";
 import { supabase } from "@/lib/supabase";
 import { useAutocorrigidos } from "@/modules/autocorrecao/api";
 import { temNaoConformidade } from "./utils/desviosEspeciais";
@@ -505,6 +506,8 @@ export function PainelVerificacao() {
           ))}
         </section>
       )}
+
+      <RelatoriosOsParaVerificar />
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Seções do painel" data-testid="abas-verificacao">

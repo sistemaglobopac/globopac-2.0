@@ -6,6 +6,7 @@ import { useTurnoDoRegistro } from "@/modules/fichas/useTurnoDoRegistro";
 import { agruparPorDossie, setoresDoGrupo, tipoPorTemplate } from "@/modules/fichas/utils/recordGrouping";
 import { ensureLocalTime } from "@/modules/fichas/utils/tempo";
 import { instanteDoRegistro } from "@/modules/fichas/utils/horaMonitoramento";
+import { RelatoriosOsArquivo } from "@/modules/bpf/RelatoriosOsArquivo";
 import { useLiberarLoteSif, useMonitoramentosArquivo } from "./api";
 import { FILTROS_ARQUIVO_INICIAIS, filtrarArquivo, filtrosAtivos, type FiltrosArquivo } from "./filtrosArquivo";
 import { Button } from "@/shared/ui/button";
@@ -235,6 +236,8 @@ export function PainelArquivoPage() {
         </p>
       )}
       {liberar.isError && <p className="text-sm text-destructive">Falha ao liberar o lote selecionado.</p>}
+
+      <RelatoriosOsArquivo liberacao={filtros.liberacao} podeLiberar={podeLiberar} />
 
       {isLoading && <p className="text-muted-foreground">Carregando…</p>}
       {!isLoading && (

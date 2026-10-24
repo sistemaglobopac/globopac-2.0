@@ -127,7 +127,7 @@ export interface ResumoAssinaturas {
 
 /** Quem assinou o quê nas OS do relatório do dia: administradores que aprovaram as SS e usuários
  * do PCM que programaram/reprogramaram. As assinaturas do inspetor (emissão) e do Verificador
- * (conferência) são do relatório em si. Programações sem hash (importadas) não contam como
+ * (verificação) e do administrador (liberação ao SIF) são do relatório em si. Programações sem hash (importadas) não contam como
  * assinatura. */
 export function resumirAssinaturas(itens: ItemRelatorio[]): ResumoAssinaturas {
   const admins = new Map<string, AssinaturaAdmin>();
