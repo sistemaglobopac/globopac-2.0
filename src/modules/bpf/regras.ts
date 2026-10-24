@@ -1,4 +1,4 @@
-import type { ItemRelatorio, Ordem, Programacao, ResultadoBpf } from "./tipos";
+import type { ItemRelatorio, Ordem, Programacao, ResultadoBpf, Verificacao } from "./tipos";
 
 const FUSO = "America/Manaus";
 
@@ -89,6 +89,23 @@ export function pendentesDeVerificacao(ordens: Ordem[], hoje: string): Ordem[] {
       new Date(o.criado_em).getTime() < inicio &&
       !o.verificacoes.some((v) => v.data_verificacao === hoje)
   );
+}
+
+/** Instante da verificação (data + hora de Manaus, UTC-4). */
+function instanteVerificacao(v: Pick<Verificacao, "data_verificacao" | "hora_verificacao">): number {
+  return new Date(`${v.data_verificacao}T${v.hora_verificacao.slice(0, 8)}-04:00`).getTime();
+}
+
+/** OS devolvida ao PCM: a última verificação do inspetor foi Não conforme e o PCM ainda não
+ * reprogramou depois dela. Retorna essa verificação (com a observação do inspetor) ou null.
+ * Espera `ordem.verificacoes` com a verificação mais recente da OS (ver useOrdensProgramadas). */
+export function devolucaoAoPcm(ordem: Pick<Ordem, "status" | "verificacoes" | "programacoes">): Verificacao | null {
+  if (ordem.status !== "PROGRAMADA") return null;
+  const ultima = [...ordem.verificacoes].sort((a, b) => instanteVerificacao(b) - instanteVerificacao(a))[0];
+  if (!ultima || ultima.resultado !== "NC") return null;
+  const ultimaProgramacao = ordenarProgramacoes(ordem.programacoes).at(-1);
+  if (ultimaProgramacao && new Date(ultimaProgramacao.criado_em).getTime() >= instanteVerificacao(ultima)) return null;
+  return ultima;
 }
 
 export interface AssinaturaAdmin {

@@ -102,16 +102,21 @@ export function useOrdensParaVerificar() {
   });
 }
 
-/** Todas as OS programadas (visão do PCM), com o histórico de prazos. */
+/** Todas as OS programadas (visão do PCM), com o histórico de prazos. `verificacoes` traz só a
+ * mais recente de cada OS — é ela que diz se a OS foi devolvida ao PCM como não conforme. */
 export function useOrdensProgramadas() {
   return useQuery({
     queryKey: ["bpf", "ordens", "programadas"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("bpf_ordens")
-        .select(`*, centros_custo(id, codigo, nome), bpf_programacoes(${COLUNAS_PROGRAMACAO})`)
+        .select(
+          `*, centros_custo(id, codigo, nome), bpf_programacoes(${COLUNAS_PROGRAMACAO}), bpf_verificacoes(${COLUNAS_VERIFICACAO})`
+        )
         .eq("status", "PROGRAMADA")
         .order("prazo_atual", { ascending: true })
+        .order("data_verificacao", { ascending: false, referencedTable: "bpf_verificacoes" })
+        .limit(1, { referencedTable: "bpf_verificacoes" })
         .overrideTypes<OrdemBruta[], { merge: false }>();
       if (error) throw error;
       return data.map(normalizarOrdem);

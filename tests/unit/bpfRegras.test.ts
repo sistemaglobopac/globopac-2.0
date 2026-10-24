@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  devolucaoAoPcm,
   diasEntre,
   formatarData,
   hojeManaus,
@@ -19,6 +20,27 @@ describe("resultadosPermitidos", () => {
   });
   it("prazo vencido: C ou NC", () => {
     expect(resultadosPermitidos("2026-10-20", "2026-10-21")).toEqual(["C", "NC"]);
+  });
+});
+
+describe("devolucaoAoPcm", () => {
+  const nc = { id: "v1", ordem_id: "o1", data_verificacao: "2026-10-24", hora_verificacao: "10:00:00", resultado: "NC" as const, prazo_vigente: "2026-11-05", observacao: "Desvio continua", inspetor_nome: "Ana" };
+  const prog = (sequencia: number, criado_em: string) => ({ sequencia, prazo: "2026-11-05", acao_corretiva: null, responsavel: null, justificativa: null, importada: false, programado_por_nome: null, hash_assinatura: null, criado_em });
+  const ordem = (extra: Partial<Parameters<typeof devolucaoAoPcm>[0]>) => ({ status: "PROGRAMADA" as const, verificacoes: [nc], programacoes: [prog(0, "2026-10-20T12:00:00Z")], ...extra });
+
+  it("devolve a OS cuja última verificação é NC e que não foi reprogramada depois", () => {
+    expect(devolucaoAoPcm(ordem({}))).toEqual(nc);
+  });
+  it("sai da lista quando o PCM reprograma depois da verificação", () => {
+    expect(devolucaoAoPcm(ordem({ programacoes: [prog(0, "2026-10-20T12:00:00Z"), prog(1, "2026-10-24T15:00:00Z")] }))).toBeNull();
+  });
+  it("uma reprogramação anterior à verificação não limpa a devolução", () => {
+    expect(devolucaoAoPcm(ordem({ programacoes: [prog(0, "2026-10-20T12:00:00Z"), prog(1, "2026-10-24T13:00:00Z")] }))).toEqual(nc);
+  });
+  it("não devolve OS sem verificação, com NP/C como última ou já concluída", () => {
+    expect(devolucaoAoPcm(ordem({ verificacoes: [] }))).toBeNull();
+    expect(devolucaoAoPcm(ordem({ verificacoes: [{ ...nc, resultado: "NP" }] }))).toBeNull();
+    expect(devolucaoAoPcm(ordem({ status: "CONCLUIDA" }))).toBeNull();
   });
 });
 

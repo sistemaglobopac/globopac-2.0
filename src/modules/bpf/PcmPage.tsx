@@ -11,7 +11,7 @@ import { useSessionStore } from "@/store/session";
 import { CabecalhoBpf, PaginaBpf } from "./PaginaBpf";
 import { DadosSolicitacao } from "./componentesBpf";
 import { useOrdensProgramadas, useProgramarSolicitacao, useReprogramarOrdem, useSolicitacoes } from "./api";
-import { formatarData, hojeManaus, rotuloProgramacao, situacaoPrazo } from "./regras";
+import { devolucaoAoPcm, formatarData, hojeManaus, rotuloProgramacao, situacaoPrazo } from "./regras";
 import type { Ordem, Solicitacao } from "./tipos";
 
 function CartaoProgramar({ ss }: { ss: Solicitacao }) {
@@ -91,6 +91,7 @@ function CartaoOsProgramada({ ordem }: { ordem: Ordem }) {
   const hoje = hojeManaus();
   const reprogramar = useReprogramarOrdem();
   const prazo = situacaoPrazo(ordem.prazo_atual, hoje);
+  const devolucao = devolucaoAoPcm(ordem);
   const [aberto, setAberto] = useState(false);
   const [novoPrazo, setNovoPrazo] = useState("");
   const [justificativa, setJustificativa] = useState("");
@@ -133,7 +134,17 @@ function CartaoOsProgramada({ ordem }: { ordem: Ordem }) {
           </Badge>
           {ordem.reprogramacoes > 0 && <Badge variant="warning">Reprogramada {ordem.reprogramacoes}×</Badge>}
           {ordem.origem === "importada" && <Badge variant="outline">Importada</Badge>}
+          {devolucao && <Badge variant="destructive">Devolvida pelo inspetor</Badge>}
         </div>
+        {devolucao && (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm" role="alert">
+            <p>
+              <strong>Não conforme</strong> em {formatarData(devolucao.data_verificacao)} ({devolucao.inspetor_nome}). Reprograme o prazo e
+              justifique para devolver a OS ao monitoramento.
+            </p>
+            {devolucao.observacao && <p className="mt-1 text-muted-foreground">Observação do inspetor: {devolucao.observacao}</p>}
+          </div>
+        )}
         <div className="space-y-1">
           <p className="text-sm font-medium">{ordem.descricao}</p>
           <p className="text-xs text-muted-foreground">
@@ -153,8 +164,8 @@ function CartaoOsProgramada({ ordem }: { ordem: Ordem }) {
         </ol>
 
         {!aberto ? (
-          <Button type="button" size="sm" variant="outline" onClick={() => setAberto(true)}>
-            Reprogramar prazo
+          <Button type="button" size="sm" variant={devolucao ? "default" : "outline"} onClick={() => setAberto(true)}>
+            {devolucao ? "Reprogramar e justificar" : "Reprogramar prazo"}
           </Button>
         ) : (
           <form onSubmit={enviar} className={cn("space-y-3 rounded-lg border border-hairline p-3")} noValidate>
@@ -192,7 +203,7 @@ function CartaoOsProgramada({ ordem }: { ordem: Ordem }) {
 }
 
 function Conteudo() {
-  const [aba, setAba] = useState<"programar" | "programadas">("programar");
+  const [aba, setAba] = useState<"programar" | "devolvidas" | "programadas">("programar");
   const [busca, setBusca] = useState("");
   const { data: aProgramar, isLoading: carregandoSs } = useSolicitacoes({ status: ["APROVADA"] });
   const { data: ordens, isLoading: carregandoOs } = useOrdensProgramadas();
@@ -210,6 +221,7 @@ function Conteudo() {
     [ordens, termo]
   );
   const vencidas = (ordens ?? []).filter((o) => o.prazo_atual < hojeManaus()).length;
+  const devolvidas = useMemo(() => (ordens ?? []).filter((o) => devolucaoAoPcm(o)), [ordens]);
 
   return (
     <>
@@ -222,6 +234,9 @@ function Conteudo() {
         <Button type="button" role="tab" aria-selected={aba === "programar"} variant={aba === "programar" ? "default" : "outline"} size="sm" onClick={() => setAba("programar")}>
           A programar ({(aProgramar ?? []).length})
         </Button>
+        <Button type="button" role="tab" aria-selected={aba === "devolvidas"} variant={aba === "devolvidas" ? "default" : "outline"} size="sm" onClick={() => setAba("devolvidas")}>
+          Devolvidas pelo inspetor ({devolvidas.length})
+        </Button>
         <Button type="button" role="tab" aria-selected={aba === "programadas"} variant={aba === "programadas" ? "default" : "outline"} size="sm" onClick={() => setAba("programadas")}>
           OS programadas ({(ordens ?? []).length}){vencidas > 0 ? ` · ${vencidas} vencida(s)` : ""}
         </Button>
@@ -233,6 +248,18 @@ function Conteudo() {
           {!carregandoSs && (aProgramar ?? []).length === 0 && <p className="text-muted-foreground">Nenhuma solicitação aprovada aguardando programação.</p>}
           {(aProgramar ?? []).map((ss) => (
             <CartaoProgramar key={ss.id} ss={ss} />
+          ))}
+        </section>
+      )}
+
+      {aba === "devolvidas" && (
+        <section className="space-y-3">
+          {carregandoOs && <p className="text-muted-foreground">Carregando…</p>}
+          {!carregandoOs && devolvidas.length === 0 && (
+            <p className="text-muted-foreground">Nenhuma OS marcada como não conforme aguardando reprogramação.</p>
+          )}
+          {devolvidas.map((o) => (
+            <CartaoOsProgramada key={o.id} ordem={o} />
           ))}
         </section>
       )}
