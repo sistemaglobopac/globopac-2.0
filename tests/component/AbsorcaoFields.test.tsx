@@ -108,7 +108,7 @@ describe("A) Teste de Absorção de Água — tela", () => {
   });
 });
 
-/** Fixa o relógio em 08:00 de Manaus (12:00 UTC) para a Hora Início automática ser previsível. */
+/** Fixa o relógio em 08:00 de Manaus (12:00 UTC) para a hora da Retirada (preenchida ao focar) ser previsível. */
 function iniciarTesteAs0800() {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-09-30T12:00:00Z"));
@@ -124,8 +124,9 @@ describe("B) Dripping Test — tela", () => {
     m1: screen.getAllByPlaceholderText("M1")[i]!,
     m3: screen.getAllByPlaceholderText("M3")[i]!,
     m2: screen.getAllByPlaceholderText("M2")[i]!,
-    retirada: document.querySelectorAll<HTMLInputElement>('input[type="time"]')[i]!,
+    retirada: document.querySelectorAll<HTMLInputElement>('input[type="time"]:not([data-testid="hora-inicio-dripping"])')[i]!,
   });
+  const horaInicioInput = () => screen.getByTestId("hora-inicio-dripping") as HTMLInputElement;
 
   it("6 linhas, cabeçalho e fórmula com os textos pedidos", () => {
     render(<HarnessB />);
@@ -158,6 +159,7 @@ describe("B) Dripping Test — tela", () => {
   it("mostra o tempo exigido (78min) sob o M0 e marca a Retirada em vermelho quando abaixo", () => {
     iniciarTesteAs0800();
     render(<HarnessB />);
+    digitar(horaInicioInput(), "08:00");
     const l = linha(0);
     digitar(l.m0, "1000");
     expect(screen.getByText("78min")).toBeInTheDocument();
@@ -171,6 +173,7 @@ describe("B) Dripping Test — tela", () => {
     ultimoB = undefined;
     iniciarTesteAs0800();
     render(<HarnessB />);
+    digitar(horaInicioInput(), "08:00");
     const l = linha(0);
     digitar(l.m0, "1000");
     digitar(l.retirada, "09:10");
@@ -183,6 +186,7 @@ describe("B) Dripping Test — tela", () => {
   it("selo 'TEMPO INFERIOR À META' quando só o tempo reprova", () => {
     iniciarTesteAs0800();
     render(<HarnessB />);
+    digitar(horaInicioInput(), "08:00");
     const l = linha(0);
     digitar(l.m0, "1000");
     digitar(l.m1, "10");
@@ -192,17 +196,40 @@ describe("B) Dripping Test — tela", () => {
     expect(screen.getByText("TEMPO INFERIOR À META")).toBeInTheDocument();
   });
 
-  it("Hora Início é automática: sem campo para digitar, registrada no 1º preenchimento e mantida depois", () => {
+  it("Hora Início é digitada pelo inspetor: nunca é preenchida sozinha e vale para o tempo de drenagem", () => {
     iniciarTesteAs0800();
     render(<HarnessB />);
-    // não há campo de Hora Início na tela: só os 6 inputs de hora da Retirada
-    expect(document.querySelectorAll('input[type="time"]')).toHaveLength(6);
-    expect(screen.queryByText(/Hora Início/i)).toBeNull();
+    expect(horaInicioInput().value).toBe("");
     digitar(linha(0).m0, "1000");
-    expect(ultimoB?.horaInicio).toBe("08:00");
-    vi.setSystemTime(new Date("2026-09-30T13:30:00Z")); // 09:30 em Manaus: a hora de início NÃO muda
-    digitar(linha(0).m1, "10");
-    expect(ultimoB?.horaInicio).toBe("08:00");
+    digitar(screen.getByPlaceholderText("Lote do teste"), "L-1");
+    expect(ultimoB?.horaInicio).toBe(""); // preencher o teste não registra a hora
+    digitar(horaInicioInput(), "07:30");
+    expect(ultimoB?.horaInicio).toBe("07:30");
+    digitar(linha(0).retirada, "08:40"); // 70 min < 78 min exigidos para M0 1000 g
+    expect(ultimoB?.timeNonConformity).toBe(true);
+    digitar(linha(0).retirada, "08:50"); // 80 min
+    expect(ultimoB?.timeNonConformity).toBe(false);
+  });
+
+  it("sem Hora Início o tempo de drenagem não é avaliado e não há hora de retirada prevista", () => {
+    iniciarTesteAs0800();
+    render(<HarnessB />);
+    digitar(linha(0).m0, "1000");
+    digitar(linha(0).retirada, "08:10");
+    expect(ultimoB?.timeNonConformity).toBe(false);
+    expect(screen.queryByTestId("retirada-prevista-0")).toBeNull();
+  });
+
+  it("informa a hora exata de retirada de cada carcaça (início + tempo da tabela do M0)", () => {
+    render(<HarnessB />);
+    digitar(horaInicioInput(), "08:00");
+    digitar(linha(0).m0, "1000"); // 78 min
+    digitar(linha(1).m0, "2400"); // 168 + 7 = 175 min
+    expect(screen.getByTestId("retirada-prevista-0").textContent).toContain("09:18");
+    expect(screen.getByTestId("retirada-prevista-1").textContent).toContain("10:55");
+    expect(screen.queryByTestId("retirada-prevista-2")).toBeNull(); // sem M0
+    digitar(horaInicioInput(), "23:00"); // vira a meia-noite
+    expect(screen.getByTestId("retirada-prevista-0").textContent).toContain("00:18");
   });
 
   it("Retirada: clicar no campo vazio registra a hora atual, e ela continua editável", () => {
@@ -225,6 +252,7 @@ describe("B) Dripping Test — tela", () => {
   it("rascunho da Fase 1: salvar mostra a mensagem; reabrir no mesmo dia carrega; sem valor do pai", () => {
     const { unmount } = render(<HarnessB />);
     digitar(screen.getByPlaceholderText("Lote do teste"), "L-77");
+    digitar(horaInicioInput(), "08:15");
     digitar(screen.getAllByPlaceholderText("Lacre")[0]!, "0001");
     digitar(linha(0).m0, "1000");
     act(() => {
@@ -240,6 +268,7 @@ describe("B) Dripping Test — tela", () => {
     expect((screen.getAllByPlaceholderText("M0")[0] as HTMLInputElement).value).toBe("1000");
     // o pai recebe o objeto completo já na abertura
     expect(ultimoB?.lote).toBe("L-77");
+    expect(horaInicioInput().value).toBe("08:15");
   });
 
   it("valor vindo do pai (edição) tem precedência sobre o rascunho", () => {
@@ -249,8 +278,11 @@ describe("B) Dripping Test — tela", () => {
     expect((screen.getByPlaceholderText("Lote do teste") as HTMLInputElement).value).toBe("DO-PAI");
   });
 
-  it("1ª etapa: só há o botão de salvar a 1ª etapa (exige lacre + M0); com Retirada/M2 vira 2ª etapa", () => {
+  it("1ª etapa: só há o botão de salvar a 1ª etapa (exige lacre + M0); com Retirada/M3/M2 vira 2ª etapa", () => {
     render(<HarnessB />);
+    fireEvent.click(screen.getByText("Salvar 1ª etapa do teste"));
+    expect(screen.getByText("Informe a hora de início da drenagem (banho-maria) antes de salvar a 1ª etapa.")).toBeInTheDocument();
+    digitar(horaInicioInput(), "08:00");
     fireEvent.click(screen.getByText("Salvar 1ª etapa do teste"));
     expect(screen.getByText("Preencha ao menos 1 carcaça com lacre e M0 antes de salvar a 1ª etapa.")).toBeInTheDocument();
     expect(localStorage.getItem("@globopac:dripping_test_draft")).toBeNull();
@@ -259,25 +291,34 @@ describe("B) Dripping Test — tela", () => {
     expect(screen.getByText(/2ª etapa em preenchimento/)).toBeInTheDocument();
   });
 
-  it("Salvar 1ª etapa grava o instante do salvamento como hora inicial do teste", () => {
+  it("Salvar 1ª etapa mantém a hora de início digitada (não troca pela hora do salvamento)", () => {
     iniciarTesteAs0800();
     render(<HarnessB />);
+    digitar(horaInicioInput(), "08:20");
     digitar(screen.getAllByPlaceholderText("Lacre")[0]!, "0001");
     digitar(linha(0).m0, "1000");
     vi.setSystemTime(new Date("2026-09-30T13:05:00Z")); // 09:05 em Manaus: hora do salvamento
     fireEvent.click(screen.getByText("Salvar 1ª etapa do teste"));
     expect(ultimoB?.primeiraEtapaSalvaEm).toBe("2026-09-30T13:05:00.000Z");
-    expect(ultimoB?.horaInicio).toBe("09:05");
+    expect(ultimoB?.horaInicio).toBe("08:20");
+    expect(JSON.parse(localStorage.getItem("@globopac:dripping_test_draft") ?? "{}").horaInicio).toBe("08:20");
     expect(JSON.parse(localStorage.getItem("@globopac:dripping_test_draft") ?? "{}").primeiraEtapaSalvaEm).toBe("2026-09-30T13:05:00.000Z");
   });
 
-  it("2ª etapa: os dados da 1ª etapa ficam travados (lote, lacre, M0, M1, M3); Retirada e M2 editáveis; descartar destrava", () => {
+  it("preencher só o M3 também leva o teste para a 2ª etapa", () => {
+    render(<HarnessB />);
+    digitar(linha(0).m3, "50");
+    expect(screen.queryByText("Salvar 1ª etapa do teste")).toBeNull();
+    expect(screen.getByText(/2ª etapa em preenchimento/)).toBeInTheDocument();
+  });
+
+  it("2ª etapa: os dados da 1ª etapa ficam travados (lote, lacre, M0, M1); Retirada, M3 e M2 editáveis; descartar destrava", () => {
     const { unmount } = render(<HarnessB />);
     digitar(screen.getByPlaceholderText("Lote do teste"), "L-9");
+    digitar(horaInicioInput(), "08:00");
     digitar(screen.getAllByPlaceholderText("Lacre")[0]!, "0001");
     digitar(linha(0).m0, "1000");
     digitar(linha(0).m1, "10");
-    digitar(linha(0).m3, "50");
     fireEvent.click(screen.getByText("Salvar 1ª etapa do teste"));
     unmount();
 
@@ -285,14 +326,17 @@ describe("B) Dripping Test — tela", () => {
     expect(screen.getByTestId("primeira-etapa-travada")).toBeInTheDocument();
     expect(screen.queryByText("Salvar 1ª etapa do teste")).toBeNull();
     expect((screen.getByPlaceholderText("Lote do teste") as HTMLInputElement).disabled).toBe(true);
+    expect(horaInicioInput().disabled).toBe(true);
     expect((screen.getAllByPlaceholderText("Lacre")[0] as HTMLInputElement).disabled).toBe(true);
     const l = linha(0);
     expect(l.m0.disabled).toBe(true);
     expect(l.m1.disabled).toBe(true);
-    expect(l.m3.disabled).toBe(true);
+    expect(l.m3.disabled).toBe(false);
     expect(l.m2.disabled).toBe(false);
     expect(l.retirada.disabled).toBe(false);
+    digitar(l.m3, "50");
     digitar(l.m2, "940");
+    expect(ultimoB?.items[0]?.m3).toBe("50");
     expect(ultimoB?.items[0]?.m2).toBe("940");
     expect(ultimoB?.items[0]?.m0).toBe("1000"); // a 1ª etapa não mudou
 
@@ -305,6 +349,7 @@ describe("B) Dripping Test — tela", () => {
   it("Descartar Teste pede confirmação e só então apaga tudo e o rascunho", () => {
     render(<HarnessB />);
     digitar(screen.getByPlaceholderText("Lote do teste"), "L-1");
+    digitar(horaInicioInput(), "08:00");
     digitar(screen.getAllByPlaceholderText("Lacre")[0]!, "0001");
     digitar(linha(0).m0, "1000");
     fireEvent.click(screen.getByText("Salvar 1ª etapa do teste"));
@@ -370,7 +415,7 @@ describe("Relatório impresso e dossiê", () => {
     expect(screen.getByTestId("dripping-absorcao-2").textContent).toBe("—");
   });
 
-  it("Dripping: o relatório mostra a hora inicial (1ª etapa salva) e a hora final (assinatura)", async () => {
+  it("Dripping: o relatório mostra a hora inicial informada pelo inspetor e a hora final (assinatura)", async () => {
     const { DrippingTestRelatorio } = await import("@/modules/fichas/components/relatorio/CamposEspeciaisRelatorio");
     const valor = {
       items: [],
@@ -383,11 +428,11 @@ describe("Relatório impresso e dossiê", () => {
       timeNonConformity: false,
     } as unknown as DrippingTestValor;
     render(<DrippingTestRelatorio valor={valor} assinadoEm="2026-09-30T14:30:00Z" />);
-    expect(screen.getByTestId("dripping-hora-inicial").textContent).toMatch(/30\/09\/2026,? 08:00:00/); // 12:00Z = 08:00 em Manaus
+    expect(screen.getByTestId("dripping-hora-inicial").textContent).toContain("08:00"); // a digitada pelo inspetor, não a do salvamento
     expect(screen.getByTestId("dripping-hora-final").textContent).toMatch(/30\/09\/2026,? 10:30:00/);
   });
 
-  it("Dripping: sem assinatura a hora final aparece como —; teste de uma vez usa a hora de início automática", async () => {
+  it("Dripping: sem assinatura a hora final aparece como —; teste de uma vez usa a hora de início digitada", async () => {
     const { DrippingTestRelatorio } = await import("@/modules/fichas/components/relatorio/CamposEspeciaisRelatorio");
     const valor = { items: [], lote: "", horaInicio: "07:45", status: "conforme", averagePercentage: 0, validCount: 0, timeNonConformity: false } as unknown as DrippingTestValor;
     render(<DrippingTestRelatorio valor={valor} />);

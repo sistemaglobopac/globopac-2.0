@@ -221,6 +221,16 @@ export function duracaoDrenagemMin(horaInicio: string, retirada: string): number
   return diff;
 }
 
+/** Hora exata (HH:MM) em que a carcaça pode sair do banho-maria: Hora Início (digitada pelo inspetor) + tempo mínimo da
+ * tabela para o M0 da linha, virando a meia-noite quando for o caso. Sem Hora Início ou sem M0 → null. */
+export function horaPrevistaRetirada(horaInicio: string, m0: string): string | null {
+  const inicio = minutosDaHora(horaInicio);
+  const minimo = tempoMinimoDrenagem(parseFloat(m0));
+  if (inicio === null || minimo === null) return null;
+  const total = (inicio + minimo) % 1440;
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
 /** Só avalia se existirem Hora Início E Retirada da linha E M0 numérico. */
 export function tempoNaoConforme(horaInicio: string, retirada: string, m0: string): boolean {
   const valorM0 = parseFloat(m0);
@@ -265,14 +275,16 @@ export function textoSeloDripping(averagePercentage: number, timeNonConformity: 
 
 // ---------------- Dripping Test: fases ----------------
 
-/** Fase 1 do Dripping Test = ainda sem nenhuma Retirada nem M2 (só lote, lacre, M0, M1 e M3). Ao
- * preencher Retirada/M2 o teste entra na fase 2 (finalização, com "Criar e assinar"). */
-export function drippingEmFase1(items: Pick<AmostraDrippingTest, "horaRetirada" | "m2">[] | undefined): boolean {
-  return !(items ?? []).some((i) => i.horaRetirada.trim() !== "" || i.m2.trim() !== "");
+/** Fase 1 do Dripping Test = ainda sem nenhuma Retirada, M3 nem M2 (só lote, lacre, M0 e M1). Ao
+ * preencher Retirada/M3/M2 o teste entra na fase 2 (finalização, com "Criar e assinar"). */
+export function drippingEmFase1(items: Pick<AmostraDrippingTest, "horaRetirada" | "m3" | "m2">[] | undefined): boolean {
+  return !(items ?? []).some((i) => i.horaRetirada.trim() !== "" || i.m3.trim() !== "" || i.m2.trim() !== "");
 }
 
-/** Fase 1 só pode ser salva com ao menos 1 linha com lacre e M0 preenchidos. Devolve o motivo (ou null). */
-export function validarPrimeiraEtapaDripping(items: Pick<AmostraDrippingTest, "seal" | "m0">[]): string | null {
+/** Fase 1 só pode ser salva com a Hora Início (digitada pelo inspetor) e ao menos 1 linha com lacre e M0
+ * preenchidos. Devolve o motivo (ou null). */
+export function validarPrimeiraEtapaDripping(items: Pick<AmostraDrippingTest, "seal" | "m0">[], horaInicio: string): string | null {
+  if (!horaInicio.trim()) return "Informe a hora de início da drenagem (banho-maria) antes de salvar a 1ª etapa.";
   const ok = items.some((i) => i.seal.trim() !== "" && !isNaN(parseFloat(i.m0)) && parseFloat(i.m0) > 0);
   return ok ? null : "Preencha ao menos 1 carcaça com lacre e M0 antes de salvar a 1ª etapa.";
 }

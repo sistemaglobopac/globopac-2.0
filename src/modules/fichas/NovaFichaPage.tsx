@@ -501,14 +501,19 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
       await salvarEtapa1Peso(dados);
       return;
     }
-    // Dripping em 1ª etapa (sem Retirada/M2): não assina — só "Salvar 1ª etapa do teste" (Enter no formulário não pode furar isso).
+    // Dripping em 1ª etapa (sem Retirada/M3/M2): não assina — só "Salvar 1ª etapa do teste" (Enter no formulário não pode furar isso).
     if (drippingFase1) {
-      setMotivosBloqueio(['Dripping Test: salve a 1ª etapa do teste. A assinatura só vem depois da Retirada e do M2 (2ª etapa).']);
+      setMotivosBloqueio(['Dripping Test: salve a 1ª etapa do teste. A assinatura só vem depois da Retirada, do M3 e do M2 (2ª etapa).']);
       return;
     }
     // Partes/Miúdos/Chuveiro dependem do SPR Carcaças: sem a base vinda dele (fora do 1º
     // monitoramento do dia) a ficha não pode ser assinada nem enfileirada offline.
     const motivos = motivosDeBloqueioSpr(camposVisiveis, dados);
+    const campoDrippingVisivel = camposVisiveis.find((c) => c.tipo === "dripping_test");
+    const valorDripping = campoDrippingVisivel ? (dados[campoDrippingVisivel.chave] as DrippingTestValor | null | undefined) : undefined;
+    if (valorDripping && !valorDripping.horaInicio?.trim()) {
+      motivos.push("Dripping Test: informe a hora de início da drenagem (banho-maria).");
+    }
     if (continuando && motivoContinuacao.trim().length < MOTIVO_CONTINUACAO_MIN_CARACTERES) {
       motivos.push(`Continuação: informe o motivo (mínimo ${MOTIVO_CONTINUACAO_MIN_CARACTERES} caracteres).`);
     }
@@ -532,7 +537,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
   /** Teste de Absorção em duas fases — fase 1: grava só a pesagem inicial (EM_ANDAMENTO), sem
    * conformidade, e assina como INSPETOR_PARCIAL. A pesagem final vem depois, no mesmo registro. */
   const campoAbsorcao = campos.find((c) => c.tipo === "absorcao_agua");
-  // Dripping Test: enquanto só a 1ª etapa foi preenchida (sem Retirada/M2) não existe "Criar e assinar".
+  // Dripping Test: enquanto só a 1ª etapa foi preenchida (sem Retirada/M3/M2) não existe "Criar e assinar".
   const campoDripping = campos.find((c) => c.tipo === "dripping_test");
   const drippingFase1 = Boolean(campoDripping) && drippingEmFase1((valoresForm?.[campoDripping?.chave ?? ""] as DrippingTestValor | null | undefined)?.items);
 
@@ -943,7 +948,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
               </Button>
             ) : drippingFase1 ? (
               <p className="rounded-md border border-primary/30 bg-primary/5 p-2 text-sm text-muted-foreground">
-                Dripping Test: a assinatura só vem na 2ª etapa, depois da drenagem (Retirada e M2). Na 1ª etapa use "Salvar 1ª etapa do teste".
+                Dripping Test: a assinatura só vem na 2ª etapa, depois da drenagem (Retirada, M3 e M2). Na 1ª etapa use "Salvar 1ª etapa do teste".
               </p>
             ) : (
               <div className="flex flex-wrap gap-2">

@@ -456,9 +456,9 @@ export function DrippingTestRelatorio({
       <div className="grid grid-cols-2 gap-2 text-[10px] print:text-[8px] sm:grid-cols-3">
         <div><span className="text-muted-foreground">Lote</span><br /><strong>{valor.lote || "—"}</strong></div>
         <div data-testid="dripping-hora-inicial">
-          <span className="text-muted-foreground">Hora inicial (salvamento da 1ª etapa)</span>
+          <span className="text-muted-foreground">Hora inicial (banho-maria, informada pelo inspetor)</span>
           <br />
-          <strong>{valor.primeiraEtapaSalvaEm ? horasCompletas(valor.primeiraEtapaSalvaEm) : valor.horaInicio || "—"}</strong>
+          <strong>{valor.horaInicio || "—"}</strong>
         </div>
         <div data-testid="dripping-hora-final">
           <span className="text-muted-foreground">Hora final (assinatura do monitoramento)</span>

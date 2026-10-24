@@ -11,6 +11,7 @@ import {
   amostrasDrippingIniciais,
   calcularDrippingTest,
   formatarPercentual,
+  horaPrevistaRetirada,
   LIMITE_DRIPPING,
   tempoMinimoDrenagem,
   textoSeloDripping,
@@ -27,7 +28,7 @@ interface DrippingTestFieldProps {
   aoSalvarPrimeiraEtapa?: () => void;
 }
 
-/** Hora local de Manaus (HH:MM) neste instante — a "Hora Início" do teste é registrada sozinha. */
+/** Hora local de Manaus (HH:MM) neste instante — só para preencher a Retirada ao focar o campo vazio. */
 function horaAgora(): string {
   return ensureLocalTime(new Date().toISOString()).time;
 }
@@ -35,10 +36,11 @@ function horaAgora(): string {
 /** Dripping Test (Portaria 210/1998): 6 carcaças. Média ARITMÉTICA dos percentuais das linhas
  * válidas (limite 6%) + tempo mínimo de drenagem por linha (tabela por M0) — ver
  * calculosAbsorcao.ts. Duas fases: a Fase 1 pode ser salva como rascunho no dispositivo (só do
- * mesmo dia). Precedência ao abrir: valor do pai (edição) > rascunho > vazio. */
+ * mesmo dia). A Hora Início da drenagem (banho-maria) é digitada pelo inspetor na 1ª etapa — nunca
+ * é registrada sozinha. Precedência ao abrir: valor do pai (edição) > rascunho > vazio. */
 export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraEtapa }: DrippingTestFieldProps) {
   const [rascunho] = useState(() => (value ? null : carregarRascunhoDripping()));
-  // 2ª etapa: os dados da 1ª etapa (lote, lacre, M0, M1, M3) vieram do rascunho salvo e ficam TRAVADOS —
+  // 2ª etapa: os dados da 1ª etapa (lote, hora início, lacre, M0, M1) vieram do rascunho salvo e ficam TRAVADOS —
   // só Retirada e M2 são preenchidos. "Descartar teste" apaga tudo e destrava.
   const [travaPrimeiraEtapa, setTravaPrimeiraEtapa] = useState(() => Boolean(rascunho && rascunho.items.some((i) => i.seal.trim() !== "" || i.m0.trim() !== "")));
   const [items, setItems] = useState<AmostraDrippingTest[]>(value?.items ?? rascunho?.items ?? amostrasDrippingIniciais());
@@ -46,7 +48,8 @@ export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraE
   const [horaInicio, setHoraInicio] = useState(value?.horaInicio ?? rascunho?.horaInicio ?? "");
   const [mensagemRascunho, setMensagemRascunho] = useState(false);
   const [erroPrimeiraEtapa, setErroPrimeiraEtapa] = useState<string | null>(null);
-  // Hora inicial oficial = quando a 1ª etapa foi SALVA (vem junto do rascunho ao voltar na 2ª etapa).
+  // Instante em que a 1ª etapa foi SALVA (vem junto do rascunho ao voltar na 2ª etapa) — só registro; a hora que
+  // conta para o tempo de drenagem é a Hora Início digitada pelo inspetor.
   const [primeiraEtapaEm, setPrimeiraEtapaEm] = useState<string | undefined>(value?.primeiraEtapaSalvaEm ?? rascunho?.primeiraEtapaSalvaEm);
 
   function disparar(novosItems: AmostraDrippingTest[], novoLote: string, novaHora: string, primeiraEtapa: string | undefined = primeiraEtapaEm) {
@@ -80,34 +83,22 @@ export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraE
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
-  /** Não existe campo de hora de início na tela: ela é gravada automaticamente na primeira vez em que o inspetor
-   * começa a preencher o teste (e permanece a mesma ao voltar para a Fase 2 pelo rascunho). */
-  function horaInicioAutomatica(): string {
-    return horaInicio || horaAgora();
-  }
-
   function alterarItem(indice: number, campo: keyof AmostraDrippingTest, valor: string) {
-    const hora = horaInicioAutomatica();
-    setHoraInicio(hora);
     disparar(
       items.map((item, i) => (i === indice ? { ...item, [campo]: valor } : item)),
       lote,
-      hora
+      horaInicio
     );
   }
 
   function salvarPrimeiraEtapa() {
-    const motivo = validarPrimeiraEtapaDripping(items);
+    const motivo = validarPrimeiraEtapaDripping(items, horaInicio);
     setErroPrimeiraEtapa(motivo);
     if (motivo) return;
-    // A hora inicial do teste passa a ser o instante em que a 1ª etapa é salva (e é ela que vale
-    // para o tempo de drenagem).
     const salvoEm = new Date().toISOString();
-    const hora = ensureLocalTime(salvoEm).time;
-    setHoraInicio(hora);
     setPrimeiraEtapaEm(salvoEm);
-    disparar(items, lote, hora, salvoEm);
-    salvarRascunhoDripping({ items, lote, horaInicio: hora, primeiraEtapaSalvaEm: salvoEm });
+    disparar(items, lote, horaInicio, salvoEm);
+    salvarRascunhoDripping({ items, lote, horaInicio, primeiraEtapaSalvaEm: salvoEm });
     setMensagemRascunho(true);
     setTimeout(() => setMensagemRascunho(false), 4000);
     aoSalvarPrimeiraEtapa?.();
@@ -142,13 +133,25 @@ export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraE
               className="h-8 w-32 text-xs"
               value={lote}
               onChange={(e) => {
-                const hora = e.target.value ? horaInicioAutomatica() : horaInicio;
                 setLote(e.target.value);
-                setHoraInicio(hora);
-                disparar(items, e.target.value, hora);
+                disparar(items, e.target.value, horaInicio);
               }}
               disabled={disabled || travaPrimeiraEtapa}
               placeholder="Lote do teste"
+            />
+          </div>
+          <div>
+            <Label className="text-[10px] uppercase text-muted-foreground">Hora início (banho-maria)</Label>
+            <Input
+              className="h-8 w-28 text-xs"
+              type="time"
+              data-testid="hora-inicio-dripping"
+              value={horaInicio}
+              onChange={(e) => {
+                setHoraInicio(e.target.value);
+                disparar(items, lote, e.target.value);
+              }}
+              disabled={disabled || travaPrimeiraEtapa}
             />
           </div>
         </div>
@@ -157,7 +160,7 @@ export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraE
       {travaPrimeiraEtapa && (
         <p className="flex items-center justify-center gap-2 border-b bg-primary/5 p-2 text-center text-xs text-muted-foreground" data-testid="primeira-etapa-travada">
           <Lock className="h-3.5 w-3.5 text-primary" />
-          Dados da 1ª etapa (lote, lacre, M0, M1 e M3) travados — nesta 2ª etapa só a Retirada e o M2 podem ser preenchidos.
+          Dados da 1ª etapa (lote, hora início, lacre, M0 e M1) travados — nesta 2ª etapa só a Retirada, o M3 e o M2 podem ser preenchidos.
         </p>
       )}
       <p className="border-b bg-muted/40 p-2 text-center text-[10px] font-bold uppercase text-muted-foreground">
@@ -175,7 +178,7 @@ export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraE
             <span className="min-w-[90px] flex-[1.4]" title="Embalagem Primária">
               M1 (g)
             </span>
-            <span className="min-w-[90px] flex-[1.4]" title="Miúdos">
+            <span className="min-w-[90px] flex-[1.4] rounded bg-amber-100 px-1 text-center text-amber-900" title="Miúdos">
               M3 (g)
             </span>
             <span className="w-20 shrink-0 rounded bg-amber-100 px-1 text-center text-amber-900">Retirada</span>
@@ -188,6 +191,7 @@ export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraE
           {items.map((item, i) => {
             const absorcao = absorcaoLinhaDripping(item);
             const minimoExigido = tempoMinimoDrenagem(parseFloat(item.m0));
+            const retiradaPrevista = horaPrevistaRetirada(horaInicio, item.m0);
             const acima = absorcao !== null && acimaDoLimite(absorcao, LIMITE_DRIPPING);
 
             return (
@@ -200,8 +204,8 @@ export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraE
                   )}
                 </label>
                 <label className="flex min-w-[40%] flex-1 flex-col gap-0.5 xl:min-w-[90px] xl:flex-[1.4]"><span className="text-[10px] font-bold uppercase text-muted-foreground xl:hidden">M1 (g)</span><Input className="h-8 font-mono text-xs" type="number" inputMode="decimal" step="0.001" value={item.m1} onChange={(e) => alterarItem(i, "m1", e.target.value)} disabled={disabled || travaPrimeiraEtapa} placeholder="M1" /></label>
-                <label className="flex min-w-[40%] flex-1 flex-col gap-0.5 xl:min-w-[90px] xl:flex-[1.4]"><span className="text-[10px] font-bold uppercase text-muted-foreground xl:hidden">M3 (g)</span><Input className="h-8 font-mono text-xs" type="number" inputMode="decimal" step="0.001" value={item.m3} onChange={(e) => alterarItem(i, "m3", e.target.value)} disabled={disabled || travaPrimeiraEtapa} placeholder="M3" /></label>
-                <label className="flex min-w-[40%] flex-1 flex-col gap-0.5 xl:w-20 xl:min-w-0 xl:flex-none xl:shrink-0"><span className="text-[10px] font-bold uppercase text-muted-foreground xl:hidden">Retirada</span><Input
+                <label className="flex min-w-[40%] flex-1 flex-col gap-0.5 xl:min-w-[90px] xl:flex-[1.4]"><span className="text-[10px] font-bold uppercase text-muted-foreground xl:hidden">M3 (g)</span><Input className="h-8 border-amber-300 bg-amber-50 font-mono text-xs" type="number" inputMode="decimal" step="0.001" value={item.m3} onChange={(e) => alterarItem(i, "m3", e.target.value)} disabled={disabled} placeholder="M3" /></label>
+                <label className="relative flex min-w-[40%] flex-1 flex-col gap-0.5 xl:w-20 xl:min-w-0 xl:flex-none xl:shrink-0"><span className="text-[10px] font-bold uppercase text-muted-foreground xl:hidden">Retirada</span><Input
                   className={`h-8 w-full text-[10px] font-bold ${item.timeNc ? "border-destructive bg-destructive/10 text-destructive" : "border-amber-300 bg-amber-50"}`}
                   type="time"
                   value={item.horaRetirada}
@@ -211,7 +215,11 @@ export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraE
                     if (!item.horaRetirada) alterarItem(i, "horaRetirada", horaAgora());
                   }}
                   disabled={disabled}
-                /></label>
+                />
+                  {retiradaPrevista !== null && (
+                    <span data-testid={`retirada-prevista-${i}`} className="pointer-events-none absolute -bottom-3.5 left-0 w-full text-center text-[9px] font-bold text-violet-600">Retirar {retiradaPrevista}</span>
+                  )}
+                </label>
                 <label className="flex min-w-[40%] flex-1 flex-col gap-0.5 xl:min-w-[100px] xl:flex-[1.6]"><span className="text-[10px] font-bold uppercase text-muted-foreground xl:hidden">M2 (g)</span><Input
                   className="h-8 border-amber-300 bg-amber-50 font-mono text-xs"
                   type="number" inputMode="decimal"
@@ -264,7 +272,7 @@ export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraE
               </Button>
             ) : (
               <p className="flex flex-1 items-center rounded-md border border-primary/30 bg-primary/5 px-3 text-xs text-muted-foreground">
-                2ª etapa em preenchimento — conclua Retirada e M2 e use "Criar e assinar".
+                2ª etapa em preenchimento — conclua Retirada, M3 e M2 e use "Criar e assinar".
               </p>
             )}
             <Button type="button" variant="outline" className="text-destructive" onClick={descartarTeste} title="Descartar Teste">
