@@ -1,4 +1,6 @@
 import { cn } from "@/lib/utils";
+import { RodapeAtestado } from "@/shared/relatorio/RodapeAtestado";
+import { SeloAssinatura } from "@/shared/relatorio/SeloAssinatura";
 import {
   formatarData,
   formatarDataHora,
@@ -74,20 +76,25 @@ function LinhaItem({ item }: { item: ItemRelatorio }) {
   );
 }
 
-function CaixaAssinatura({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+/** Espaço da assinatura que ainda não existe (ou que o relatório não tem): mesma moldura do selo. */
+function SeloPendente({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-1 rounded border border-slate-400 p-2">
-      <p className="border-b border-slate-300 pb-1 text-[10px] font-bold uppercase tracking-wide">{titulo}</p>
-      {children}
+    <div className="flex w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-ink/30 bg-white p-3 print:p-2">
+      <p className="mb-1 w-full border-b border-hairline pb-1 text-center text-[9px] font-bold uppercase tracking-tight text-muted-foreground print:pb-0.5 print:text-[8px]">
+        {titulo}
+      </p>
+      <p className="mt-1 text-center text-[10px] font-semibold text-muted-foreground">{children}</p>
     </div>
   );
 }
 
 /** Relatório diário de não conformidades — BPF Estrutural. Layout do formulário usado até aqui
  * (anomalia, setor, ação corretiva, nº da OS com datas, C/NC/NP, data e hora), acrescido do
- * centro de custo, da SS de origem e das quatro assinaturas eletrônicas do dia. */
+ * centro de custo, da SS de origem, dos selos das assinaturas eletrônicas do dia e do atestado de
+ * validade jurídica — os mesmos dos relatórios de monitoramento. */
 export function RelatorioBpf({ relatorio }: { relatorio: Relatorio }) {
   const resumo = resumirAssinaturas(relatorio.itens);
+  const protocolo = `GS-${relatorio.data_referencia.replaceAll("-", "")}-${relatorio.id.split("-")[0]!.toUpperCase()}-BPF`;
 
   return (
     <div id="relatorio-impressao" className="print-page print-compacto space-y-3 rounded-lg border bg-white p-4 text-[11px] text-black" data-testid="relatorio-bpf">
@@ -139,56 +146,77 @@ export function RelatorioBpf({ relatorio }: { relatorio: Relatorio }) {
         </tbody>
       </table>
 
-      <section className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4" aria-label="Assinaturas">
-        <CaixaAssinatura titulo="Inspetor de qualidade do dia — emissão">
-          <p className="font-semibold">{relatorio.emitido_por_nome}</p>
-          <p className="text-[10px]">Assinado em {formatarDataHora(relatorio.emitido_em)}</p>
-          <p className="break-all font-mono text-[9px] text-slate-600">#{hashCurto(relatorio.hash_emissao)}</p>
-        </CaixaAssinatura>
+      <section className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 print:grid-cols-4" aria-label="Assinaturas">
+        <SeloAssinatura
+          titulo="Assinatura Eletrônica do Inspetor de Qualidade do dia — emissão"
+          nome={relatorio.emitido_por_nome}
+          dataHora={formatarDataHora(relatorio.emitido_em)}
+          hash={relatorio.hash_emissao}
+          integro={null}
+        />
 
-        <CaixaAssinatura titulo="Administrador — aprovação das solicitações">
-          {resumo.administradores.length === 0 && <p className="text-[10px] text-slate-600">Sem solicitações aprovadas no sistema neste relatório.</p>}
-          {resumo.administradores.map((a) => (
-            <div key={a.nome}>
-              <p className="font-semibold">{a.nome}</p>
-              <ul className="text-[9px] text-slate-700">
+        {resumo.administradores.length === 0 && (
+          <SeloPendente titulo="Administrador — aprovação das solicitações">Sem solicitações aprovadas no sistema neste relatório.</SeloPendente>
+        )}
+        {resumo.administradores.map((a) => {
+          const ultima = a.solicitacoes.at(-1);
+          return (
+            <SeloAssinatura
+              key={a.nome}
+              titulo="Assinatura Eletrônica do Administrador — aprovação das solicitações"
+              nome={a.nome}
+              dataHora={formatarDataHora(ultima?.em)}
+              hash={ultima?.hash}
+              integro={null}
+            >
+              <ul className="mt-1 w-full text-center text-[9px] text-slate-700">
                 {a.solicitacoes.map((s, i) => (
                   <li key={`${s.numero}-${i}`}>
                     SS {s.numero ? String(s.numero).padStart(4, "0") : "—"} · {formatarDataHora(s.em)} · #{hashCurto(s.hash)}
                   </li>
                 ))}
               </ul>
-            </div>
-          ))}
-        </CaixaAssinatura>
+            </SeloAssinatura>
+          );
+        })}
 
-        <CaixaAssinatura titulo="PCM — programação das OS">
-          {resumo.pcm.length === 0 && <p className="text-[10px] text-slate-600">Sem programações assinadas no sistema neste relatório.</p>}
-          {resumo.pcm.map((u) => (
-            <div key={u.nome}>
-              <p className="font-semibold">{u.nome}</p>
-              <ul className="text-[9px] text-slate-700">
+        {resumo.pcm.length === 0 && <SeloPendente titulo="PCM — programação das OS">Sem programações assinadas no sistema neste relatório.</SeloPendente>}
+        {resumo.pcm.map((u) => {
+          const ultima = u.programacoes.at(-1);
+          return (
+            <SeloAssinatura
+              key={u.nome}
+              titulo="Assinatura Eletrônica do PCM — programação das OS"
+              nome={u.nome}
+              dataHora={formatarDataHora(ultima?.em)}
+              hash={ultima?.hash}
+              integro={null}
+            >
+              <ul className="mt-1 w-full text-center text-[9px] text-slate-700">
                 {u.programacoes.map((p, i) => (
                   <li key={`${p.numeroOs}-${p.rotulo}-${i}`}>
                     OS {p.numeroOs} · {p.rotulo} · {formatarDataHora(p.em)} · #{hashCurto(p.hash)}
                   </li>
                 ))}
               </ul>
-            </div>
-          ))}
-        </CaixaAssinatura>
+            </SeloAssinatura>
+          );
+        })}
 
-        <CaixaAssinatura titulo="Verificador — conferência do monitoramento">
-          {relatorio.liberado_por_nome ? (
-            <>
-              <p className="font-semibold">{relatorio.liberado_por_nome}</p>
-              <p className="text-[10px]">Assinado em {formatarDataHora(relatorio.liberado_em)}</p>
-              <p className="break-all font-mono text-[9px] text-slate-600">#{hashCurto(relatorio.hash_liberacao)}</p>
-            </>
-          ) : (
-            <p className="text-[10px] font-semibold text-amber-800">Aguardando conferência do Verificador</p>
-          )}
-        </CaixaAssinatura>
+        {relatorio.liberado_por_nome ? (
+          <SeloAssinatura
+            titulo="Assinatura Eletrônica do Verificador — conferência do monitoramento"
+            nome={relatorio.liberado_por_nome}
+            dataHora={formatarDataHora(relatorio.liberado_em)}
+            hash={relatorio.hash_liberacao}
+            integro={null}
+            corLabel="text-success"
+          />
+        ) : (
+          <SeloPendente titulo="Verificador — conferência do monitoramento">
+            <span className="text-amber-800">Aguardando conferência do Verificador</span>
+          </SeloPendente>
+        )}
       </section>
 
       {resumo.semAprovacaoNoSistema > 0 && (
@@ -196,9 +224,31 @@ export function RelatorioBpf({ relatorio }: { relatorio: Relatorio }) {
           {resumo.semAprovacaoNoSistema} OS deste relatório foram importadas do relatório manual anterior e não têm, no sistema, a assinatura de aprovação do administrador; as programações importadas também não têm assinatura eletrônica.
         </p>
       )}
-      <p className="doc-generated-by text-[9px] text-slate-500">
-        Documento gerado pelo GloboPac. Os códigos (#) são os primeiros caracteres do SHA-256 de cada assinatura, calculado pelo servidor no momento do ato.
-      </p>
+
+      <RodapeAtestado
+        objeto="relatório"
+        protocolo={protocolo}
+        hash={relatorio.hash_liberacao ?? relatorio.hash_emissao}
+        integro={null}
+        carimbo={
+          <p className="mt-1">
+            Emissão registrada em {formatarDataHora(relatorio.emitido_em)}
+            {relatorio.liberado_em
+              ? ` · conferência do Verificador em ${formatarDataHora(relatorio.liberado_em)}`
+              : " · aguardando a conferência do Verificador"}
+            .
+          </p>
+        }
+        auditoria={
+          <>
+            <p>
+              Os códigos (#) são os primeiros caracteres do SHA-256 de cada assinatura, calculado pelo servidor no momento do ato. Identificador único do
+              documento:
+            </p>
+            <p className="mt-1 break-all rounded border border-hairline bg-gray-50 px-2 py-1 font-mono text-[10px] font-bold text-ink print:text-[8px]">{relatorio.id}</p>
+          </>
+        }
+      />
     </div>
   );
 }

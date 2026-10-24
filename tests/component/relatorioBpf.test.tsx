@@ -84,6 +84,17 @@ describe("RelatorioBpf", () => {
     expect(assinaturas.getByText(/Aguardando conferência do Verificador/)).toBeTruthy();
   });
 
+  it("usa o selo de assinatura e o atestado de validade jurídica dos relatórios de monitoramento", () => {
+    render(<RelatorioBpf relatorio={base} />);
+    const assinaturas = within(screen.getByLabelText("Assinaturas"));
+    expect(assinaturas.getAllByText("SISTEMA GLOBOPAC").length).toBe(3); // inspetor, administrador e PCM; o Verificador ainda não assinou
+    expect(assinaturas.getAllByText(/LEI 14\.063\/2020/).length).toBe(3);
+    expect(assinaturas.getByText(/SHA-256: EEEEEEEEEEEEEEEEEEEE/)).toBeTruthy();
+    expect(screen.getByText(/Atestado de Validade Jurídica e Compliance Tecnológico/)).toBeTruthy();
+    expect(screen.getByText("GS-20261021-R1-BPF")).toBeTruthy();
+    expect(screen.getByText(/Sistema GloboPac · Kaefer Agro Industrial LTDA\. · SIF 1606/)).toBeTruthy();
+  });
+
   it("depois da liberação mostra o Verificador e avisa das OS importadas sem assinatura no sistema", () => {
     render(
       <RelatorioBpf

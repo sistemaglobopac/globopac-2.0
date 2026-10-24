@@ -7,7 +7,7 @@
 import { useEffect, useState } from "react";
 import { camposNaoConformes, type CampoNaoConforme } from "../../utils/desviosEspeciais";
 import { temAdendoRegistrado } from "../../utils/adendosPendentes";
-import { CheckCircle2, AlertTriangle, Clock, Scale, Search, Shield } from "lucide-react";
+import { CheckCircle2, AlertTriangle, Search, Shield } from "lucide-react";
 import { turnoDoDia } from "@/modules/bordo/api";
 import type { AssinaturaRelatorio, DadosRelatorio, MonitoramentoRelatorio, TemplateRelatorio } from "../../api";
 import type { AutocorrecaoImediata } from "@/modules/autocorrecao/api";
@@ -16,6 +16,8 @@ import { ensureLocalTime } from "../../utils/tempo";
 import { instanteDoRegistro } from "../../utils/horaMonitoramento";
 import { computarHashMonitoramento, resumoHash } from "../../utils/hashDocumento";
 import { DadosColetados } from "../DadosColetadosFicha";
+import { SeloAssinatura } from "@/shared/relatorio/SeloAssinatura";
+import { RodapeAtestado } from "@/shared/relatorio/RodapeAtestado";
 import type { AcoesNaoConformidade } from "../DadosColetadosFicha";
 
 // Razão social/SIF fixos — mesma planta/cliente do v1, só trocou de sistema (confirmado com o
@@ -36,45 +38,6 @@ interface AdendoBruto {
   criadoEm?: string;
   timestamp?: string;
   monitorSignedAt?: string;
-}
-
-function SeloAssinatura({
-  titulo,
-  nome,
-  dataHora,
-  hash,
-  integro,
-  corLabel = "text-primary",
-}: {
-  titulo: string;
-  nome: string;
-  dataHora: string;
-  hash: string | null | undefined;
-  integro: boolean | null;
-  corLabel?: string;
-}) {
-  return (
-    <div className="relative flex w-full flex-col items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-ink/70 bg-white p-3 print:p-2">
-      {/* Marca d'água da logo a 10% de opacidade (90% de transparência, a pedido do usuário) —
-          mesma ideia do selo de assinatura do v1, atrás do conteúdo, sem interferir na leitura. */}
-      <div className="pointer-events-none absolute inset-0 z-0 flex select-none items-center justify-center" style={{ opacity: 0.1 }}>
-        <img src="/logo-globopac.png" alt="" className="max-h-[85%] max-w-[85%] object-contain" />
-      </div>
-      <div className="relative z-10 flex w-full flex-col items-center">
-        <p className="mb-1 w-full border-b border-hairline pb-1 text-center text-[9px] font-bold uppercase tracking-tight text-muted-foreground print:pb-0.5 print:text-[8px]">
-          {titulo}
-        </p>
-        <p className="mt-1 max-w-full truncate text-sm font-bold text-ink print:text-[9px]">{nome}</p>
-        <p className="mt-1 font-mono text-xs font-bold text-muted-foreground print:text-[8px]">{dataHora}</p>
-        <p className={`mt-1 text-[10px] font-black uppercase print:text-[8px] ${corLabel}`}>SISTEMA GLOBOPAC</p>
-        <p className="mt-0.5 font-mono text-[8px] leading-tight text-muted-foreground print:text-[7px]">
-          SHA-256: {resumoHash(hash, 20) ?? "—"}
-          {integro !== null && (integro ? " · ÍNTEGRO" : " · VERIFIQUE")}
-        </p>
-        <p className="text-[7px] leading-none text-muted-foreground">LEI 14.063/2020 · Art. 4º §2º</p>
-      </div>
-    </div>
-  );
 }
 
 function BlocoAutocorrecao({ autocorrecao, nome, camposNc }: { autocorrecao: AutocorrecaoImediata; nome: string; camposNc: CampoNaoConforme[] }) {
@@ -592,78 +555,32 @@ export function RelatorioMonitoramento({ ids, dados, turnoDe = (r) => turnoDoDia
           </div>
         </div>
 
-        {/* Rodapé de conformidade legal */}
-        <div className="rodape-relatorio mt-4 overflow-hidden rounded-lg border border-hairline print:mt-2" style={{ breakInside: "avoid" }}>
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline bg-gray-50 px-4 py-2 print:px-3 print:py-1">
-            <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-primary print:text-[9px]">
-              <Shield className="h-4 w-4 print:h-3 print:w-3" /> Atestado de Validade Jurídica e Compliance Tecnológico
-            </h3>
-            {hashPrimario && (
-              <span className="rounded border border-emerald-300 bg-emerald-50 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-700 print:text-[8px]">
-                SHA-256: {resumoHash(hashPrimario, 16)}
-                {integroPrimario !== null && (integroPrimario ? " ✓ ÍNTEGRO" : " ≠ VERIFIQUE")}
-              </span>
-            )}
-          </div>
-          <div className="grid grid-cols-1 gap-x-8 gap-y-4 bg-white p-4 text-[11px] leading-relaxed text-muted-foreground sm:grid-cols-2 print:grid-cols-2 print:gap-x-4 print:gap-y-2 print:p-3 print:text-[8px]">
-            <div>
-              <p className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-ink print:text-[8px]">
-                <Scale className="h-3.5 w-3.5 text-primary print:h-3 print:w-3" /> Amparo Legal e Normativo
-              </p>
-              <p>
-                Documento oficial de autocontrole, gerado em conformidade com as exigências do MAPA para os agentes privados. As assinaturas e registros
-                atendem aos requisitos de evidência eletrônica e rastreabilidade industrial.
-              </p>
-            </div>
-            <div>
-              <p className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-ink print:text-[8px]">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 print:h-3 print:w-3" /> Criptografia e Imutabilidade
-              </p>
-              <p>
-                Após assinado digitalmente, este registro entra em modo estrito de bloqueio (Read-Only). O banco de dados em nuvem garante que o conteúdo
-                não pode ser corrompido, adulterado ou apagado sem gerar alertas no sistema mestre.
-              </p>
-            </div>
-            <div>
-              <p className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-ink print:text-[8px]">
-                <Clock className="h-3.5 w-3.5 text-primary print:h-3 print:w-3" /> Carimbo de Tempo (Timestamp)
-              </p>
-              <p>
-                A sincronização de data e hora deste monitoramento foi aferida por servidores seguros no momento exato do lançamento, prevenindo edições
-                retroativas. Protocolo Oficial: <strong className="text-primary">{protocolo}</strong>
-              </p>
-              {(() => {
-                const carimbo = assinaturaDe(dados.assinaturas, ancora.id, "VERIFICADOR") ?? assinaturaDe(dados.assinaturas, ancora.id, "INSPETOR");
-                if (!carimbo) return <p className="mt-1">Aguardando assinatura.</p>;
-                if (carimbo.tsa_emitido_em)
-                  return (
-                    <p className="mt-1">
-                      RFC 3161 — {carimbo.tsa_utilizada ?? "autoridade de carimbo de tempo"} em {new Date(carimbo.tsa_emitido_em).toLocaleString("pt-BR", { timeZone: "America/Manaus" })}
-                    </p>
-                  );
-                return <p className="mt-1">Carimbo RFC 3161 em processamento.</p>;
-              })()}
-            </div>
-            <div>
-              <p className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-ink print:text-[8px]">
-                <Search className="h-3.5 w-3.5 text-primary print:h-3 print:w-3" /> Auditoria Permanente
-              </p>
+        <RodapeAtestado
+          objeto="monitoramento"
+          protocolo={protocolo}
+          hash={hashPrimario}
+          integro={integroPrimario}
+          carimbo={(() => {
+            const carimbo = assinaturaDe(dados.assinaturas, ancora.id, "VERIFICADOR") ?? assinaturaDe(dados.assinaturas, ancora.id, "INSPETOR");
+            if (!carimbo) return <p className="mt-1">Aguardando assinatura.</p>;
+            if (carimbo.tsa_emitido_em)
+              return (
+                <p className="mt-1">
+                  RFC 3161 — {carimbo.tsa_utilizada ?? "autoridade de carimbo de tempo"} em {new Date(carimbo.tsa_emitido_em).toLocaleString("pt-BR", { timeZone: "America/Manaus" })}
+                </p>
+              );
+            return <p className="mt-1">Carimbo RFC 3161 em processamento.</p>;
+          })()}
+          auditoria={
+            <>
               <p>
                 Acesse <strong className="text-primary">{typeof window !== "undefined" ? window.location.host : ""}/verificar</strong> e informe o identificador único do
                 documento:
               </p>
               <p className="mt-1 break-all rounded border border-hairline bg-gray-50 px-2 py-1 font-mono text-[10px] font-bold text-ink print:text-[8px]">{ancora.id}</p>
-            </div>
-          </div>
-          <p className="border-t border-hairline bg-gray-50 px-4 py-1 text-[9px] text-muted-foreground print:px-3 print:text-[7px]">
-            Sistema GloboPac · Kaefer Agro Industrial LTDA. · SIF 1606
-            {hashPrimario ? ` · SHA-256: ${resumoHash(hashPrimario, 16)}` : ""}
-          </p>
-        </div>
-
-        <div className="doc-generated-by hidden pt-2 text-right text-[9px] uppercase text-muted-foreground print:block">
-          Relatório validado e gerado pelo Sistema GloboPac.
-        </div>
+            </>
+          }
+        />
       </div>
     </div>
   );
