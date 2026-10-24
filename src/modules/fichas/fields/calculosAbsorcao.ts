@@ -174,9 +174,11 @@ export function absorcaoLinhaDripping(item: Pick<AmostraDrippingTest, "m0" | "m1
 
 /** Tempo mínimo de imersão/drenagem (MINUTOS) por peso bruto congelado (M0, gramas): a primeira
  * faixa em que M0 ≤ limite; acima de 2300 g, 168 + 7 × ceil((M0 − 2300) / 100). M0 vazio/inválido
- * → null (sem tempo exigido). */
-export function tempoMinimoDrenagem(m0: number): number | null {
-  if (!m0 || isNaN(m0)) return null;
+ * → null (sem tempo exigido). A balança também é lida em kg (ex.: 2,345 kg): nenhuma ave pesa menos
+ * de 100 g, então valor abaixo de 100 é kg e vira gramas antes de consultar a tabela. */
+export function tempoMinimoDrenagem(valorM0: number): number | null {
+  if (!valorM0 || isNaN(valorM0)) return null;
+  const m0 = valorM0 < 100 ? Math.round(valorM0 * 1000) : valorM0;
   const faixas: [number, number][] = [
     [800, 65],
     [900, 72],

@@ -9,6 +9,7 @@ import {
   formatarPercentual,
   percentualIndividualAbsorcao,
   tempoMinimoDrenagem,
+  horaPrevistaRetirada,
   tempoNaoConforme,
   textoSeloDripping,
 } from "@/modules/fichas/fields/calculosAbsorcao";
@@ -139,6 +140,16 @@ describe("B) Dripping Test", () => {
     expect(tempoMinimoDrenagem(2450)).toBe(182);
     expect(tempoMinimoDrenagem(2500)).toBe(182);
     expect(tempoMinimoDrenagem(2501)).toBe(189);
+  });
+
+  it("M0 digitado em kg (abaixo de 100) é convertido para gramas antes de consultar a tabela", () => {
+    expect(tempoMinimoDrenagem(2.345)).toBe(175); // 2.345 g
+    expect(tempoMinimoDrenagem(1)).toBe(78); // 1.000 g
+    expect(tempoMinimoDrenagem(0.8)).toBe(65); // 800 g
+    expect(tempoMinimoDrenagem(4.3)).toBe(308); // 4.300 g
+    expect(tempoMinimoDrenagem(2345)).toBe(175); // em gramas continua igual
+    expect(tempoNaoConforme("08:00", "10:00", "2.345")).toBe(true); // 120 min < 175
+    expect(horaPrevistaRetirada("08:00", "2.345")).toBe("10:55");
   });
 
   it("tempo: M0=1000 exige 78 min; 08:00→09:10 (70) é NC; 08:00→09:20 (80) é ok", () => {
