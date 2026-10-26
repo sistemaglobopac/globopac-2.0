@@ -39,7 +39,7 @@ select is(
   public.refazer_conformidade_vazao('{"tanques":{"chiller1":{"prev":"22061","cur":"22063","ice":"332"},"chiller2":{"prev":"445","cur":"00457","ice":"332"}},"totalCondenacoes":562,"pesoMedioCarcaca":2.507}'::jsonb) -> 'detalhesRNC',
   'null'::jsonb, 'sem desvio, o texto da RNC some'
 );
-select like(
+select alike(
   public.refazer_conformidade_vazao('{"tanques":{"chiller1":{"prev":"22061","cur":"22063","ice":"332"},"chiller2":{"prev":"22057","cur":"00457","ice":"332"}},"totalCondenacoes":562,"pesoMedioCarcaca":2.507}'::jsonb) ->> 'detalhesRNC',
   'Vazão Insuficiente (Partes): Chiller 2 Partes (Apurado: -21900.720L/kg%', 'com a leitura errada, o desvio é apontado'
 );
