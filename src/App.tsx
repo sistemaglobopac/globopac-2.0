@@ -15,6 +15,7 @@ import { CargasAvesPage } from "@/modules/recepcao/CargasAvesPage";
 import { ConferenciaCargasPage } from "@/modules/recepcao/ConferenciaCargasPage";
 import { ComunicadosPage } from "@/modules/comunicados/ComunicadosPage";
 import { FinalizarAbsorcaoPage } from "@/modules/fichas/FinalizarAbsorcaoPage";
+import { CompletarDrippingPage } from "@/modules/fichas/CompletarDrippingPage";
 import { CompletarPesoPage } from "@/modules/fichas/CompletarPesoPage";
 import { CompletarChiller2Page } from "@/modules/fichas/CompletarChiller2Page";
 import { ConstrutorFichasPage } from "@/modules/fichas/ConstrutorFichasPage";
@@ -99,6 +100,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute perfisPermitidos={["INSPETOR_QUALIDADE", "ADMIN_MASTER"]}>
               <CompletarPesoPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/fichas/dripping/:id"
+          element={
+            <ProtectedRoute perfisPermitidos={["INSPETOR_QUALIDADE", "ADMIN_MASTER"]}>
+              <CompletarDrippingPage />
             </ProtectedRoute>
           }
         />

@@ -25,7 +25,7 @@ import { lotesSemPeso } from "./fields/preenchimentoSpr";
 import { motivosDeBloqueioSpr } from "./utils/bloqueiosSpr";
 import { desviosEspeciais, temNaoConformidade } from "./utils/desviosEspeciais";
 import { ModalAutocorrecao } from "@/modules/autocorrecao/ModalAutocorrecao";
-import { drippingEmFase1, validarFaseInicial } from "./fields/calculosAbsorcao";
+import { CHAVE_AGUARDANDO_DRIPPING, drippingEmFase1, validarFaseInicial, validarPrimeiraEtapaDripping } from "./fields/calculosAbsorcao";
 import type { AbsorcaoAguaValor, DrippingTestValor } from "./fields/tiposCompostos";
 import { MonitoramentosEmAndamento } from "./components/MonitoramentosEmAndamento";
 import { turnoAlvoHeranca } from "./utils/turnoUtils";
@@ -306,7 +306,7 @@ interface FichaFormProps {
 }
 
 function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervaloMin, setor, perfil, onVoltar }: FichaFormProps) {
-  const [sucesso, setSucesso] = useState<"online" | "offline" | "em_andamento" | "rascunho" | "rascunho_nc" | "aguardando_peso" | "aguardando_chiller2" | null>(null);
+  const [sucesso, setSucesso] = useState<"online" | "offline" | "em_andamento" | "rascunho" | "rascunho_nc" | "aguardando_peso" | "aguardando_chiller2" | "aguardando_dripping" | null>(null);
   // Avisos de carga já NÃO CONFORME ao salvar a etapa 1 do peso por caixa (as demais cargas ainda sem peso).
   const [avisosEtapa1, setAvisosEtapa1] = useState<string[]>([]);
   // Hora do monitoramento: informada MANUALMENTE (abrir a ficha só para olhar não registra hora).
@@ -501,9 +501,9 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
       await salvarEtapa1Peso(dados);
       return;
     }
-    // Dripping em 1ª etapa (sem Retirada/M3/M2): não assina — só "Salvar 1ª etapa do teste" (Enter no formulário não pode furar isso).
+    // Dripping em 1ª etapa (sem Retirada/M3/M2): não assina — grava a 1ª etapa em andamento (Enter no formulário também cai aqui).
     if (drippingFase1) {
-      setMotivosBloqueio(['Dripping Test: salve a 1ª etapa do teste. A assinatura só vem depois da Retirada, do M3 e do M2 (2ª etapa).']);
+      await salvarEtapa1Dripping(dados);
       return;
     }
     // Partes/Miúdos/Chuveiro dependem do SPR Carcaças: sem a base vinda dele (fora do 1º
@@ -636,6 +636,46 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
       setMotivoContinuacao("");
       reset(valoresIniciaisDe(campos));
       setSucesso("aguardando_chiller2");
+      setTimeout(onVoltar, 3500);
+    } catch {
+      // erro refletido em criarMonitoramento.isError.
+    }
+  }
+
+  /** Dripping Test — ETAPA 1: grava lote, hora de início, lacre, M0 e M1 (EM_ANDAMENTO, assinatura parcial). Retirada, M3 e M2
+   * vêm na etapa 2, pela lista "Monitoramentos em andamento", quando o registro é finalizado e assinado por inteiro. */
+  async function salvarEtapa1Dripping(dados: FieldValues) {
+    const valor = campoDripping ? (dados[campoDripping.chave] as DrippingTestValor | null | undefined) : undefined;
+    if (!campoDripping || !valor) return;
+    const motivos: string[] = [];
+    const motivoEtapa1 = validarPrimeiraEtapaDripping(valor.items, valor.horaInicio ?? "");
+    if (motivoEtapa1) motivos.push(`Dripping Test: ${motivoEtapa1}`);
+    motivos.push(...motivosDeBloqueioSpr(camposVisiveis, dados, opcoesBloqueio));
+    if (continuando && motivoContinuacao.trim().length < MOTIVO_CONTINUACAO_MIN_CARACTERES) {
+      motivos.push(`Continuação: informe o motivo (mínimo ${MOTIVO_CONTINUACAO_MIN_CARACTERES} caracteres).`);
+    }
+    setMotivosBloqueio(motivos);
+    if (motivos.length > 0) return;
+    if (await bloqueadoPorDadosRepetidos(dados)) return;
+
+    setSucesso(null);
+    try {
+      await criarMonitoramento.mutateAsync({
+        fichaTemplateId: templateId,
+        versaoTemplate,
+        userId: perfil.id,
+        setor,
+        statusFicha: "EM_ANDAMENTO",
+        dadosDinamicos: {
+          ...comContinuacao(dados),
+          [campoDripping.chave]: { ...valor, primeiraEtapaSalvaEm: valor.primeiraEtapaSalvaEm ?? new Date().toISOString() },
+          [CHAVE_AGUARDANDO_DRIPPING]: true,
+        },
+      });
+      setContinuando(false);
+      setMotivoContinuacao("");
+      reset(valoresIniciaisDe(campos));
+      setSucesso("aguardando_dripping");
       setTimeout(onVoltar, 3500);
     } catch {
       // erro refletido em criarMonitoramento.isError.
@@ -869,7 +909,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
                 cargasEmRascunho={cargasEmRascunho}
                 cargasUsadasEmRascunho={cargasUsadasEmRascunho}
                 faseAbsorcao={campoAbsorcao ? "INICIAL" : undefined}
-                aoSalvarPrimeiraEtapaDripping={onVoltar}
+                aoSalvarPrimeiraEtapaDripping={() => void handleSubmit(aoEnviar)()}
               />
             ))}
 
@@ -928,6 +968,13 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
                 )}
               </div>
             )}
+            {sucesso === "aguardando_dripping" && (
+              <div role="status" className="space-y-1 rounded border border-warning bg-warning/10 p-2 text-sm" data-testid="aguardando-dripping-salvo">
+                <p className="font-medium">
+                  1ª etapa do Dripping Test salva. Depois da drenagem, informe a <strong>Retirada, o M3 e o M2</strong> em "Monitoramentos em andamento".
+                </p>
+              </div>
+            )}
             {sucesso === "rascunho" && (
               <p className="text-sm text-success">Rascunho salvo neste aparelho. Assine pela lista de rascunhos em até 7 dias.</p>
             )}
@@ -948,7 +995,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
               </Button>
             ) : drippingFase1 ? (
               <p className="rounded-md border border-primary/30 bg-primary/5 p-2 text-sm text-muted-foreground">
-                Dripping Test: a assinatura só vem na 2ª etapa, depois da drenagem (Retirada, M3 e M2). Na 1ª etapa use "Salvar 1ª etapa do teste".
+                Dripping Test: a assinatura só vem na 2ª etapa, depois da drenagem (Retirada, M3 e M2). Na 1ª etapa use "Salvar 1ª etapa do teste": ela fica em "Monitoramentos em andamento" até a 2ª etapa.
               </p>
             ) : (
               <div className="flex flex-wrap gap-2">

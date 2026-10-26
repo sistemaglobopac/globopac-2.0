@@ -290,3 +290,39 @@ export function validarPrimeiraEtapaDripping(items: Pick<AmostraDrippingTest, "s
   const ok = items.some((i) => i.seal.trim() !== "" && !isNaN(parseFloat(i.m0)) && parseFloat(i.m0) > 0);
   return ok ? null : "Preencha ao menos 1 carcaça com lacre e M0 antes de salvar a 1ª etapa.";
 }
+
+/** Marca de dados_dinamicos do dripping com a 1ª etapa salva (EM_ANDAMENTO) e a 2ª ainda por fazer. */
+export const CHAVE_AGUARDANDO_DRIPPING = "aguardando_dripping";
+/** Quem completou a 2ª etapa e quando (entra no registro assinado). */
+export const CHAVE_DRIPPING_COMPLETADO = "dripping_completado";
+
+const NUMERO_SIMPLES = /^[0-9]+(\.[0-9]+)?$/;
+
+/** Carcaças da 1ª etapa (lacre + M0 > 0): são elas que a 2ª etapa precisa completar. Espelha `dripping_linhas` do banco. */
+export function linhasDripping<T extends Pick<AmostraDrippingTest, "seal" | "m0">>(items: T[] | undefined): T[] {
+  return (items ?? []).filter((i) => i.seal.trim() !== "" && NUMERO_SIMPLES.test(i.m0.trim()) && parseFloat(i.m0) > 0);
+}
+
+/** O que falta para finalizar o dripping (2ª etapa): toda carcaça da 1ª etapa precisa de Retirada, M3 e M2.
+ * Espelha `dripping_completo` do banco. Lista vazia = pode finalizar. */
+export function motivosFinalizacaoDripping(items: AmostraDrippingTest[] | undefined): string[] {
+  const linhas = linhasDripping(items);
+  if (linhas.length === 0) return ["Nenhuma carcaça com lacre e M0 neste teste."];
+  const motivos: string[] = [];
+  for (const l of linhas) {
+    const faltam: string[] = [];
+    if (!/^[0-9]{2}:[0-9]{2}$/.test(l.horaRetirada.trim())) faltam.push("a Retirada");
+    if (!NUMERO_SIMPLES.test(l.m3.trim())) faltam.push("o M3");
+    if (!NUMERO_SIMPLES.test(l.m2.trim())) faltam.push("o M2");
+    if (faltam.length > 0) motivos.push(`Carcaça ${(items ?? []).indexOf(l) + 1} (lacre ${l.seal.trim()}): informe ${faltam.join(", ")}.`);
+  }
+  return motivos;
+}
+
+/** Maior tempo mínimo de drenagem (min) entre as carcaças da 1ª etapa: quando todas já podem ser retiradas. */
+export function tempoMinimoDrenagemMax(items: Pick<AmostraDrippingTest, "seal" | "m0">[] | undefined): number | null {
+  const minimos = linhasDripping(items)
+    .map((i) => tempoMinimoDrenagem(parseFloat(i.m0)))
+    .filter((m): m is number => m !== null);
+  return minimos.length > 0 ? Math.max(...minimos) : null;
+}

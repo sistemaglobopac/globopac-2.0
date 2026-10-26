@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { AbsorcaoAguaField } from "@/modules/fichas/fields/AbsorcaoAguaField";
@@ -31,10 +31,11 @@ function HarnessA({ inicial }: { inicial?: AbsorcaoAguaValor }) {
   );
 }
 
-function HarnessB({ inicial }: { inicial?: DrippingTestValor }) {
+function HarnessB({ inicial, ...extras }: { inicial?: DrippingTestValor } & Partial<ComponentProps<typeof DrippingTestField>>) {
   const [valor, setValor] = useState<DrippingTestValor | undefined>(inicial);
   return (
     <DrippingTestField
+      {...extras}
       value={valor}
       onChange={(v) => {
         ultimoB = v;
@@ -249,8 +250,15 @@ describe("B) Dripping Test — tela", () => {
     expect(linha(0).retirada.value).toBe("09:20");
   });
 
-  it("rascunho da Fase 1: salvar mostra a mensagem; reabrir no mesmo dia carrega; sem valor do pai", () => {
-    const { unmount } = render(<HarnessB />);
+  it("valor vindo do pai (edição) alimenta o campo", () => {
+    const doPai = { items: Array.from({ length: 6 }, (_, i) => ({ id: i, seal: "", m0: "", m1: "", m3: "", horaRetirada: "", m2: "" })), lote: "DO-PAI", horaInicio: "", status: "conforme", averagePercentage: 0, validCount: 0, timeNonConformity: false } as DrippingTestValor;
+    render(<HarnessB inicial={doPai} />);
+    expect((screen.getByPlaceholderText("Lote do teste") as HTMLInputElement).value).toBe("DO-PAI");
+  });
+
+  it("nada é guardado no aparelho: a 1ª etapa é entregue a quem usa o campo (que grava no servidor)", () => {
+    const aoSalvar = vi.fn();
+    render(<HarnessB aoSalvarPrimeiraEtapa={aoSalvar} />);
     digitar(screen.getByPlaceholderText("Lote do teste"), "L-77");
     digitar(horaInicioInput(), "08:15");
     digitar(screen.getAllByPlaceholderText("Lacre")[0]!, "0001");
@@ -258,34 +266,21 @@ describe("B) Dripping Test — tela", () => {
     act(() => {
       fireEvent.click(screen.getByText("Salvar 1ª etapa do teste"));
     });
-    expect(screen.getByText("1ª etapa salva no dispositivo! Você pode fechar a tela e retornar depois para preencher a 2ª etapa.")).toBeInTheDocument();
-    expect(localStorage.getItem("@globopac:dripping_test_draft")).toContain("L-77");
-    unmount();
-
-    ultimoB = undefined;
-    render(<HarnessB />);
-    expect((screen.getByPlaceholderText("Lote do teste") as HTMLInputElement).value).toBe("L-77");
-    expect((screen.getAllByPlaceholderText("M0")[0] as HTMLInputElement).value).toBe("1000");
-    // o pai recebe o objeto completo já na abertura
+    expect(aoSalvar).toHaveBeenCalledTimes(1);
     expect(ultimoB?.lote).toBe("L-77");
-    expect(horaInicioInput().value).toBe("08:15");
+    expect(ultimoB?.horaInicio).toBe("08:15");
+    expect(localStorage.getItem("@globopac:dripping_test_draft")).toBeNull();
   });
 
-  it("valor vindo do pai (edição) tem precedência sobre o rascunho", () => {
-    localStorage.setItem("@globopac:dripping_test_draft", JSON.stringify({ items: [], lote: "RASCUNHO", horaInicio: "", date: new Date().toLocaleDateString("en-CA") }));
-    const doPai = { items: Array.from({ length: 6 }, (_, i) => ({ id: i, seal: "", m0: "", m1: "", m3: "", horaRetirada: "", m2: "" })), lote: "DO-PAI", horaInicio: "", status: "conforme", averagePercentage: 0, validCount: 0, timeNonConformity: false } as DrippingTestValor;
-    render(<HarnessB inicial={doPai} />);
-    expect((screen.getByPlaceholderText("Lote do teste") as HTMLInputElement).value).toBe("DO-PAI");
-  });
-
-  it("1ª etapa: só há o botão de salvar a 1ª etapa (exige lacre + M0); com Retirada/M3/M2 vira 2ª etapa", () => {
-    render(<HarnessB />);
+  it("1ª etapa: só há o botão de salvar a 1ª etapa (exige hora início + lacre + M0); com Retirada/M3/M2 vira 2ª etapa", () => {
+    const aoSalvar = vi.fn();
+    render(<HarnessB aoSalvarPrimeiraEtapa={aoSalvar} />);
     fireEvent.click(screen.getByText("Salvar 1ª etapa do teste"));
     expect(screen.getByText("Informe a hora de início da drenagem (banho-maria) antes de salvar a 1ª etapa.")).toBeInTheDocument();
     digitar(horaInicioInput(), "08:00");
     fireEvent.click(screen.getByText("Salvar 1ª etapa do teste"));
     expect(screen.getByText("Preencha ao menos 1 carcaça com lacre e M0 antes de salvar a 1ª etapa.")).toBeInTheDocument();
-    expect(localStorage.getItem("@globopac:dripping_test_draft")).toBeNull();
+    expect(aoSalvar).not.toHaveBeenCalled();
     digitar(linha(0).retirada, "09:20");
     expect(screen.queryByText("Salvar 1ª etapa do teste")).toBeNull();
     expect(screen.getByText(/2ª etapa em preenchimento/)).toBeInTheDocument();
@@ -293,7 +288,7 @@ describe("B) Dripping Test — tela", () => {
 
   it("Salvar 1ª etapa mantém a hora de início digitada (não troca pela hora do salvamento)", () => {
     iniciarTesteAs0800();
-    render(<HarnessB />);
+    render(<HarnessB aoSalvarPrimeiraEtapa={vi.fn()} />);
     digitar(horaInicioInput(), "08:20");
     digitar(screen.getAllByPlaceholderText("Lacre")[0]!, "0001");
     digitar(linha(0).m0, "1000");
@@ -301,8 +296,6 @@ describe("B) Dripping Test — tela", () => {
     fireEvent.click(screen.getByText("Salvar 1ª etapa do teste"));
     expect(ultimoB?.primeiraEtapaSalvaEm).toBe("2026-09-30T13:05:00.000Z");
     expect(ultimoB?.horaInicio).toBe("08:20");
-    expect(JSON.parse(localStorage.getItem("@globopac:dripping_test_draft") ?? "{}").horaInicio).toBe("08:20");
-    expect(JSON.parse(localStorage.getItem("@globopac:dripping_test_draft") ?? "{}").primeiraEtapaSalvaEm).toBe("2026-09-30T13:05:00.000Z");
   });
 
   it("preencher só o M3 também leva o teste para a 2ª etapa", () => {
@@ -312,19 +305,15 @@ describe("B) Dripping Test — tela", () => {
     expect(screen.getByText(/2ª etapa em preenchimento/)).toBeInTheDocument();
   });
 
-  it("2ª etapa: os dados da 1ª etapa ficam travados (lote, lacre, M0, M1); Retirada, M3 e M2 editáveis; descartar destrava", () => {
-    const { unmount } = render(<HarnessB />);
-    digitar(screen.getByPlaceholderText("Lote do teste"), "L-9");
-    digitar(horaInicioInput(), "08:00");
-    digitar(screen.getAllByPlaceholderText("Lacre")[0]!, "0001");
-    digitar(linha(0).m0, "1000");
-    digitar(linha(0).m1, "10");
-    fireEvent.click(screen.getByText("Salvar 1ª etapa do teste"));
-    unmount();
+  it("2ª etapa (registro em andamento reaberto): dados da 1ª etapa travados; Retirada, M3 e M2 editáveis; sem botões do rodapé", () => {
+    const items = Array.from({ length: 6 }, (_, i) => ({ id: i, seal: "", m0: "", m1: "", m3: "", horaRetirada: "", m2: "" }));
+    items[0] = { ...items[0]!, seal: "0001", m0: "1000", m1: "10" };
+    const etapa1 = { items, lote: "L-9", horaInicio: "08:00", primeiraEtapaSalvaEm: "2026-09-30T12:00:00.000Z", status: "conforme", averagePercentage: 0, validCount: 0, timeNonConformity: false } as DrippingTestValor;
+    render(<HarnessB inicial={etapa1} primeiraEtapaTravada semAcoes />);
 
-    render(<HarnessB />); // volta no mesmo dia: carrega o rascunho
     expect(screen.getByTestId("primeira-etapa-travada")).toBeInTheDocument();
     expect(screen.queryByText("Salvar 1ª etapa do teste")).toBeNull();
+    expect(screen.queryByTitle("Descartar Teste")).toBeNull();
     expect((screen.getByPlaceholderText("Lote do teste") as HTMLInputElement).disabled).toBe(true);
     expect(horaInicioInput().disabled).toBe(true);
     expect((screen.getAllByPlaceholderText("Lacre")[0] as HTMLInputElement).disabled).toBe(true);
@@ -336,35 +325,30 @@ describe("B) Dripping Test — tela", () => {
     expect(l.retirada.disabled).toBe(false);
     digitar(l.m3, "50");
     digitar(l.m2, "940");
+    digitar(l.retirada, "09:30");
     expect(ultimoB?.items[0]?.m3).toBe("50");
     expect(ultimoB?.items[0]?.m2).toBe("940");
     expect(ultimoB?.items[0]?.m0).toBe("1000"); // a 1ª etapa não mudou
-
-    vi.spyOn(window, "confirm").mockReturnValueOnce(true);
-    fireEvent.click(screen.getByTitle("Descartar Teste"));
-    expect(screen.queryByTestId("primeira-etapa-travada")).toBeNull();
-    expect(linha(0).m0.disabled).toBe(false);
+    expect(ultimoB?.lote).toBe("L-9");
+    expect(ultimoB?.primeiraEtapaSalvaEm).toBe("2026-09-30T12:00:00.000Z");
   });
 
-  it("Descartar Teste pede confirmação e só então apaga tudo e o rascunho", () => {
-    render(<HarnessB />);
+  it("Descartar Teste pede confirmação e só então apaga tudo", () => {
+    render(<HarnessB aoSalvarPrimeiraEtapa={vi.fn()} />);
     digitar(screen.getByPlaceholderText("Lote do teste"), "L-1");
     digitar(horaInicioInput(), "08:00");
     digitar(screen.getAllByPlaceholderText("Lacre")[0]!, "0001");
     digitar(linha(0).m0, "1000");
-    fireEvent.click(screen.getByText("Salvar 1ª etapa do teste"));
 
     const confirmar = vi.spyOn(window, "confirm").mockReturnValueOnce(false);
     fireEvent.click(screen.getByTitle("Descartar Teste"));
     expect(confirmar).toHaveBeenCalledWith("Tem certeza que deseja apagar os dados parciais desta ficha?");
     expect((screen.getByPlaceholderText("Lote do teste") as HTMLInputElement).value).toBe("L-1");
-    expect(localStorage.getItem("@globopac:dripping_test_draft")).not.toBeNull();
 
     confirmar.mockReturnValueOnce(true);
     fireEvent.click(screen.getByTitle("Descartar Teste"));
     expect((screen.getByPlaceholderText("Lote do teste") as HTMLInputElement).value).toBe("");
     expect((screen.getAllByPlaceholderText("M0")[0] as HTMLInputElement).value).toBe("");
-    expect(localStorage.getItem("@globopac:dripping_test_draft")).toBeNull();
     expect(ultimoB!.lote).toBe("");
   });
 });

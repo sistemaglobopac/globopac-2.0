@@ -15,6 +15,7 @@ import { horaEfetiva, instanteDoRegistro } from "./utils/horaMonitoramento";
 import { herdarInstanteDoOriginal } from "./utils/instanteDoAdendo";
 import { ensureLocalTime } from "./utils/tempo";
 import { erroDoValorNovoDoAdendo } from "./utils/adendoCampos";
+import { CHAVE_AGUARDANDO_DRIPPING } from "./fields/calculosAbsorcao";
 
 export interface TemplateAtivo {
   id: string;
@@ -1069,6 +1070,11 @@ export function aguardaPesoDaBalanca(m: Pick<MonitoramentoEmAndamento, "dados_di
 /** O monitoramento aguarda o chiller 02 (etapa 1 do controle de absorção)? */
 export function aguardaChiller2(m: Pick<MonitoramentoEmAndamento, "dados_dinamicos">): boolean {
   return m.dados_dinamicos.aguardando_chiller2 === true;
+}
+
+/** O monitoramento aguarda a 2ª etapa do dripping (Retirada, M3 e M2)? */
+export function aguardaDripping(m: Pick<MonitoramentoEmAndamento, "dados_dinamicos">): boolean {
+  return m.dados_dinamicos[CHAVE_AGUARDANDO_DRIPPING] === true;
 }
 
 /** Um registro em andamento (para reabrir na pesagem final). `null` se não existir, já foi

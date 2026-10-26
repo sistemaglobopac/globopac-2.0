@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   absorcaoLinhaDripping,
   amostrasAbsorcaoIniciais,
@@ -10,16 +10,13 @@ import {
   percentualIndividualAbsorcao,
   tempoMinimoDrenagem,
   horaPrevistaRetirada,
+  linhasDripping,
+  motivosFinalizacaoDripping,
+  tempoMinimoDrenagemMax,
   tempoNaoConforme,
   textoSeloDripping,
 } from "@/modules/fichas/fields/calculosAbsorcao";
 import { desviosEspeciais, mensagemDesvioAbsorcao, mensagemDesvioDripping } from "@/modules/fichas/utils/desviosEspeciais";
-import {
-  apagarRascunhoDripping,
-  carregarRascunhoDripping,
-  CHAVE_RASCUNHO_DRIPPING,
-  salvarRascunhoDripping,
-} from "@/modules/fichas/fields/rascunhoDripping";
 import { valoresIniciaisDe, zodFromSchemaCampos, type CampoTemplate } from "@/shared/schema-campos";
 
 const abs = (linhas: [string, string][]) => {
@@ -234,41 +231,52 @@ describe("mensagens de desvio", () => {
   });
 });
 
-describe("rascunho da Fase 1 (localStorage)", () => {
-  // localStorage em memória: o ambiente de teste não traz um completo.
-  beforeEach(() => {
-    const memoria = new Map<string, string>();
-    vi.stubGlobal("localStorage", {
-      getItem: (k: string) => memoria.get(k) ?? null,
-      setItem: (k: string, v: string) => void memoria.set(k, v),
-      removeItem: (k: string) => void memoria.delete(k),
-      clear: () => memoria.clear(),
-    });
-  });
-  const dados = { items: amostrasDrippingIniciais(), lote: "L1", horaInicio: "08:00" };
+describe("Dripping em duas etapas (1ª etapa gravada em andamento)", () => {
+  const linha = (i: number, parcial: Partial<ReturnType<typeof amostrasDrippingIniciais>[number]>) => ({ ...amostrasDrippingIniciais()[i]!, ...parcial });
+  const etapa1 = () => {
+    const items = amostrasDrippingIniciais();
+    items[0] = linha(0, { seal: "0001", m0: "1000", m1: "10" });
+    items[1] = linha(1, { seal: "0002", m0: "2400", m1: "12" });
+    return items;
+  };
 
-  it("guarda com a chave @globopac:dripping_test_draft e as chaves {items, lote, horaInicio, date}", () => {
-    salvarRascunhoDripping(dados, new Date(2026, 8, 29, 8));
-    const bruto = JSON.parse(localStorage.getItem("@globopac:dripping_test_draft")!);
-    expect(Object.keys(bruto).sort()).toEqual(["date", "horaInicio", "items", "lote"]);
-    expect(CHAVE_RASCUNHO_DRIPPING).toBe("@globopac:dripping_test_draft");
+  it("só conta como carcaça da 1ª etapa quem tem lacre e M0 maior que zero", () => {
+    const items = etapa1();
+    items[2] = linha(2, { seal: "0003", m0: "" });
+    items[3] = linha(3, { m0: "900" }); // sem lacre
+    items[4] = linha(4, { seal: "0005", m0: "0" });
+    expect(linhasDripping(items).map((i) => i.seal)).toEqual(["0001", "0002"]);
   });
 
-  it("carrega o rascunho do MESMO dia", () => {
-    salvarRascunhoDripping(dados, new Date(2026, 8, 29, 8));
-    expect(carregarRascunhoDripping(new Date(2026, 8, 29, 17))?.lote).toBe("L1");
+  it("2ª etapa exige Retirada, M3 e M2 de TODAS as carcaças da 1ª etapa (espelha o banco)", () => {
+    expect(motivosFinalizacaoDripping(amostrasDrippingIniciais())).toEqual(["Nenhuma carcaça com lacre e M0 neste teste."]);
+
+    const items = etapa1();
+    expect(motivosFinalizacaoDripping(items)).toEqual([
+      "Carcaça 1 (lacre 0001): informe a Retirada, o M3, o M2.",
+      "Carcaça 2 (lacre 0002): informe a Retirada, o M3, o M2.",
+    ]);
+
+    items[0] = { ...items[0]!, horaRetirada: "09:18", m3: "50", m2: "940" };
+    expect(motivosFinalizacaoDripping(items)).toEqual(["Carcaça 2 (lacre 0002): informe a Retirada, o M3, o M2."]);
+
+    items[1] = { ...items[1]!, horaRetirada: "10:55", m3: "50" };
+    expect(motivosFinalizacaoDripping(items)).toEqual(["Carcaça 2 (lacre 0002): informe o M2."]);
+
+    items[1] = { ...items[1]!, m2: "2300" };
+    expect(motivosFinalizacaoDripping(items)).toEqual([]);
   });
 
-  it("descarta o rascunho de OUTRO dia (apaga e ignora)", () => {
-    salvarRascunhoDripping(dados, new Date(2026, 8, 28, 8));
-    expect(carregarRascunhoDripping(new Date(2026, 8, 29, 8))).toBeNull();
-    expect(localStorage.getItem("@globopac:dripping_test_draft")).toBeNull();
+  it("carcaça sem lacre/M0 (linha não usada) não é exigida na 2ª etapa", () => {
+    const items = etapa1();
+    items[0] = { ...items[0]!, horaRetirada: "09:18", m3: "50", m2: "940" };
+    items[1] = { ...items[1]!, horaRetirada: "10:55", m3: "50", m2: "2300" };
+    expect(motivosFinalizacaoDripping(items)).toEqual([]);
   });
 
-  it("apagar remove o rascunho", () => {
-    salvarRascunhoDripping(dados);
-    apagarRascunhoDripping();
-    expect(carregarRascunhoDripping()).toBeNull();
+  it("maior tempo mínimo de drenagem entre as carcaças da 1ª etapa", () => {
+    expect(tempoMinimoDrenagemMax(etapa1())).toBe(175); // 2400 g: 168 + 7
+    expect(tempoMinimoDrenagemMax(amostrasDrippingIniciais())).toBeNull();
   });
 });
 

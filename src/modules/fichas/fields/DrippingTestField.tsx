@@ -17,15 +17,19 @@ import {
   textoSeloDripping,
 } from "./calculosAbsorcao";
 import { ensureLocalTime } from "../utils/tempo";
-import { apagarRascunhoDripping, carregarRascunhoDripping, salvarRascunhoDripping } from "./rascunhoDripping";
 import type { AmostraDrippingTest, DrippingTestValor } from "./tiposCompostos";
 
 interface DrippingTestFieldProps {
   value: DrippingTestValor | undefined;
   onChange: (valor: DrippingTestValor) => void;
   disabled?: boolean;
-  /** Chamado depois de "Salvar 1ª etapa do teste" (o rascunho já foi gravado no dispositivo). */
+  /** Chamado por "Salvar 1ª etapa do teste", já com a 1ª etapa validada e o valor entregue ao pai: quem usa o campo grava o
+   * monitoramento EM_ANDAMENTO no servidor. */
   aoSalvarPrimeiraEtapa?: () => void;
+  /** 2ª etapa (registro em andamento reaberto): lote, hora início, lacre, M0 e M1 travados; só Retirada, M3 e M2 editáveis. */
+  primeiraEtapaTravada?: boolean;
+  /** Esconde os botões do rodapé (a tela da 2ª etapa tem os seus: finalizar e assinar). */
+  semAcoes?: boolean;
 }
 
 /** Hora local de Manaus (HH:MM) neste instante — só para preencher a Retirada ao focar o campo vazio. */
@@ -35,22 +39,19 @@ function horaAgora(): string {
 
 /** Dripping Test (Portaria 210/1998): 6 carcaças. Média ARITMÉTICA dos percentuais das linhas
  * válidas (limite 6%) + tempo mínimo de drenagem por linha (tabela por M0) — ver
- * calculosAbsorcao.ts. Duas fases: a Fase 1 pode ser salva como rascunho no dispositivo (só do
- * mesmo dia). A Hora Início da drenagem (banho-maria) é digitada pelo inspetor na 1ª etapa — nunca
- * é registrada sozinha. Precedência ao abrir: valor do pai (edição) > rascunho > vazio. */
-export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraEtapa }: DrippingTestFieldProps) {
-  const [rascunho] = useState(() => (value ? null : carregarRascunhoDripping()));
-  // 2ª etapa: os dados da 1ª etapa (lote, hora início, lacre, M0, M1) vieram do rascunho salvo e ficam TRAVADOS —
-  // só Retirada e M2 são preenchidos. "Descartar teste" apaga tudo e destrava.
-  const [travaPrimeiraEtapa, setTravaPrimeiraEtapa] = useState(() => Boolean(rascunho && rascunho.items.some((i) => i.seal.trim() !== "" || i.m0.trim() !== "")));
-  const [items, setItems] = useState<AmostraDrippingTest[]>(value?.items ?? rascunho?.items ?? amostrasDrippingIniciais());
-  const [lote, setLote] = useState(value?.lote ?? rascunho?.lote ?? "");
-  const [horaInicio, setHoraInicio] = useState(value?.horaInicio ?? rascunho?.horaInicio ?? "");
-  const [mensagemRascunho, setMensagemRascunho] = useState(false);
+ * calculosAbsorcao.ts. Duas etapas: a 1ª (lote, hora início, lacre, M0, M1) é gravada no servidor como monitoramento
+ * EM_ANDAMENTO (quem usa o campo trata o "Salvar 1ª etapa"), e o inspetor volta depois da drenagem, pela lista de
+ * monitoramentos em andamento, para a 2ª (Retirada, M3 e M2 — `primeiraEtapaTravada`). A Hora Início da drenagem
+ * (banho-maria) é digitada pelo inspetor na 1ª etapa — nunca é registrada sozinha. */
+export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraEtapa, primeiraEtapaTravada = false, semAcoes = false }: DrippingTestFieldProps) {
+  const travaPrimeiraEtapa = primeiraEtapaTravada;
+  const [items, setItems] = useState<AmostraDrippingTest[]>(value?.items ?? amostrasDrippingIniciais());
+  const [lote, setLote] = useState(value?.lote ?? "");
+  const [horaInicio, setHoraInicio] = useState(value?.horaInicio ?? "");
   const [erroPrimeiraEtapa, setErroPrimeiraEtapa] = useState<string | null>(null);
-  // Instante em que a 1ª etapa foi SALVA (vem junto do rascunho ao voltar na 2ª etapa) — só registro; a hora que
+  // Instante em que a 1ª etapa foi SALVA (vem junto do registro ao voltar na 2ª etapa) — só registro; a hora que
   // conta para o tempo de drenagem é a Hora Início digitada pelo inspetor.
-  const [primeiraEtapaEm, setPrimeiraEtapaEm] = useState<string | undefined>(value?.primeiraEtapaSalvaEm ?? rascunho?.primeiraEtapaSalvaEm);
+  const [primeiraEtapaEm, setPrimeiraEtapaEm] = useState<string | undefined>(value?.primeiraEtapaSalvaEm);
 
   function disparar(novosItems: AmostraDrippingTest[], novoLote: string, novaHora: string, primeiraEtapa: string | undefined = primeiraEtapaEm) {
     const resultado = calcularDrippingTest(novosItems, novaHora);
@@ -66,13 +67,6 @@ export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraE
       timeNonConformity: resultado.timeNonConformity,
     });
   }
-
-  // Rascunho carregado: o pai recebe o objeto completo já na abertura (senão o campo obrigatório
-  // pareceria vazio ao assinar, mesmo com o rascunho na tela).
-  useEffect(() => {
-    if (rascunho) disparar(rascunho.items, rascunho.lote, rascunho.horaInicio, rascunho.primeiraEtapaSalvaEm);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Modo edição: o estado interno acompanha o valor vindo do pai.
   useEffect(() => {
@@ -98,9 +92,6 @@ export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraE
     const salvoEm = new Date().toISOString();
     setPrimeiraEtapaEm(salvoEm);
     disparar(items, lote, horaInicio, salvoEm);
-    salvarRascunhoDripping({ items, lote, horaInicio, primeiraEtapaSalvaEm: salvoEm });
-    setMensagemRascunho(true);
-    setTimeout(() => setMensagemRascunho(false), 4000);
     aoSalvarPrimeiraEtapa?.();
   }
 
@@ -108,12 +99,10 @@ export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraE
 
   function descartarTeste() {
     if (!window.confirm("Tem certeza que deseja apagar os dados parciais desta ficha?")) return;
-    apagarRascunhoDripping();
     const vazio = amostrasDrippingIniciais();
     setLote("");
     setHoraInicio("");
     setPrimeiraEtapaEm(undefined);
-    setTravaPrimeiraEtapa(false);
     disparar(vazio, "", "", undefined);
   }
 
@@ -262,7 +251,7 @@ export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraE
         </div>
       )}
 
-      {!disabled && (
+      {!disabled && !semAcoes && (
         <div className="flex flex-col gap-2 px-4 pb-4">
           <div className="flex gap-3">
             {/* Fase 1: um único botão. Com Retirada/M2 preenchidos o teste já é a fase 2 (finalizar e assinar). */}
@@ -280,11 +269,6 @@ export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraE
             </Button>
           </div>
           {erroPrimeiraEtapa && <p className="rounded border border-destructive bg-destructive/10 p-2 text-center text-xs font-bold text-destructive">{erroPrimeiraEtapa}</p>}
-          {mensagemRascunho && (
-            <p className="rounded border border-success bg-success/10 p-2 text-center text-xs font-bold text-success">
-              1ª etapa salva no dispositivo! Você pode fechar a tela e retornar depois para preencher a 2ª etapa.
-            </p>
-          )}
         </div>
       )}
     </div>
