@@ -17,6 +17,8 @@ import { EsperaAvesField } from "./fields/EsperaAvesField";
 import { PenduraAvesField } from "./fields/PenduraAvesField";
 import { EletronarcoseAvesField } from "./fields/EletronarcoseAvesField";
 import { CaixasVaziasField } from "./fields/CaixasVaziasField";
+import { RecebimentoEmbalagensField } from "./fields/RecebimentoEmbalagensField";
+import { varianteDoTipo } from "./fields/recebimentoEmbalagens";
 import { PesoCaixaField } from "./fields/PesoCaixaField";
 import type { CargasEmRascunhoPorTipo } from "./utils/rascunhosAnterior";
 import { RastreabilidadeDoaField } from "./fields/RastreabilidadeDoaField";
@@ -35,6 +37,7 @@ import type {
   LavagemFinalValor,
   MiniChillersValor,
   CaixasVaziasValor,
+  RecebimentoEmbalagensValor,
   OcorrenciaPragasValor,
   PenduraAvesValor,
   EletronarcoseAvesValor,
@@ -344,6 +347,16 @@ export function DynamicField({ campo, register, errors, control, prevAppointment
           name={campo.chave}
           control={control}
           render={({ field }) => <CaixasVaziasField value={field.value as CaixasVaziasValor | undefined} onChange={field.onChange} />}
+        />
+      )}
+
+      {(campo.tipo === "recebimento_embalagens" || campo.tipo === "recebimento_sacos" || campo.tipo === "recebimento_secundarias") && (
+        <Controller
+          name={campo.chave}
+          control={control}
+          render={({ field }) => (
+            <RecebimentoEmbalagensField value={field.value as RecebimentoEmbalagensValor | undefined} onChange={field.onChange} variante={varianteDoTipo(campo.tipo)} />
+          )}
         />
       )}
 

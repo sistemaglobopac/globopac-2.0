@@ -18,6 +18,7 @@ import type {
   MiniChillersValor,
   OcorrenciaPragasValor,
   CaixasVaziasValor,
+  RecebimentoEmbalagensValor,
   ParadaEquipamentoValor,
   PenduraAvesValor,
   PesoCaixaValor,
@@ -43,6 +44,7 @@ import { cloroPontoForaDoLimite, phPontoForaDoLimite, rotuloPonto } from "@/modu
 import { rotuloBorbulhamento, TANQUES_ABSORCAO, temperaturaAbsorcaoAcimaDoLimite } from "@/modules/fichas/fields/controleAbsorcao";
 import { defeitoAcimaDoMaximo, formatarPct, lerContagem, PARTES_MIUDOS, parteExiste, percentualDefeito } from "@/modules/fichas/fields/qualidadeMiudos";
 import { LIMITE_AGUA_C, LIMITE_AMBIENTE_C, LIMITE_PRODUTO_C, lerTemperatura, PONTOS_AGUA, PONTOS_AMBIENTE, PRODUTOS } from "@/modules/fichas/fields/temperaturaResfriamento";
+import { desviosRecebimentoEmbalagens, estatisticasAmostras, formatarMedida, ROTULOS_MEDIDA, rotuloSituacaoLote, type MedidaEmbalagem } from "@/modules/fichas/fields/recebimentoEmbalagens";
 import { CONDICOES_ANIMAIS, formatarDataHora, formatarDuracao, LIMITE_JEJUM_MAX_H } from "@/modules/fichas/fields/recepcaoAves";
 import {
   apuracaoCarcacas,
@@ -773,6 +775,77 @@ export function CaixasVaziasRelatorio({ valor, titulo = "Caixas de Transporte Va
           <strong>{valor.acaoCorretiva}</strong>
         </p>
       )}
+    </div>
+  );
+}
+
+export function RecebimentoEmbalagensRelatorio({ valor, titulo = "Recebimento de Embalagens" }: { valor: RecebimentoEmbalagensValor; titulo?: string }) {
+  // As colunas são as medidas que as amostras trazem (bobina, sacos e secundárias medem coisas diferentes).
+  const medidas = (Object.keys(ROTULOS_MEDIDA) as MedidaEmbalagem[]).filter((m) => (valor.amostras ?? []).some((a) => a[m] !== undefined));
+  const simNao = (b: boolean | null) => (b === null || b === undefined ? "—" : b ? "Sim" : "Não");
+  const aval = (a: string) => (a === "satisfatoria" ? "Satisfatória" : a === "insatisfatoria" ? "Insatisfatória" : "—");
+  const desvios = new Set(desviosRecebimentoEmbalagens(valor).map((d) => d.chave));
+  const cel = (rotulo: string, texto: string, chave?: string) => (
+    <div>
+      <span className="text-muted-foreground">{rotulo}</span>
+      <br />
+      <strong className={chave && desvios.has(chave) ? "text-destructive" : ""}>{texto}</strong>
+    </div>
+  );
+  const stats = estatisticasAmostras(valor);
+  return (
+    <div className="col-span-full space-y-2 rounded-lg border border-hairline bg-gray-50 p-3 print:p-2" data-testid="relatorio-recebimento-embalagens">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] font-black uppercase tracking-wider text-primary print:text-[9px]">{titulo}</span>
+        <SeloConformidade conforme={valor.conformidade !== false} />
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-[10px] sm:grid-cols-4 print:grid-cols-4 print:text-[8px]">
+        {cel("Fornecedor", valor.fornecedor || "—")}
+        {cel("Nota fiscal", valor.notaFiscal || "—")}
+        {cel("Código da embalagem", valor.codigoEmbalagem || "—")}
+        {cel("Quantidade recebida", valor.quantidadeRecebida || "—")}
+        {cel("Lote", valor.lote || "—")}
+        {cel("Situação do lote", rotuloSituacaoLote(valor.situacaoLote), "situacaoLote")}
+        {cel("Contaminação física", simNao(valor.contaminacaoFisica), "contaminacaoFisica")}
+        {cel("Contaminação química", simNao(valor.contaminacaoQuimica), "contaminacaoQuimica")}
+        {cel("Condensação, resíduos, umidade, sujidades, insetos", simNao(valor.condensacao), "condensacao")}
+        {cel("Higiene geral (veículo e embalagens)", aval(valor.higieneGeral), "higieneGeral")}
+        {valor.temRotulo !== null && cel("Há rótulo", simNao(valor.temRotulo))}
+        {valor.temRotulo === true && cel("Leiaute conforme a ficha técnica", simNao(valor.leiauteConforme), "leiauteConforme")}
+        {valor.temRotulo === true && cel("Descrição dos produtos", simNao(valor.descricaoProduto), "descricaoProduto")}
+        {valor.temRotulo === true && cel("Qualidade da impressão", aval(valor.qualidadeImpressao), "qualidadeImpressao")}
+        {cel("Relatório de ensaio de qualidade", simNao(valor.relatorioEnsaio), "relatorioEnsaio")}
+        {valor.aplicacaoResina !== undefined && valor.aplicacaoResina !== null && cel("Aplicação de resina", simNao(valor.aplicacaoResina), "aplicacaoResina")}
+        {valor.absorcaoAgua !== undefined && valor.absorcaoAgua !== null && cel("Absorção de água na caixa", simNao(valor.absorcaoAgua), "absorcaoAgua")}
+      </div>
+      <table className="w-full text-[10px] print:text-[8px]">
+        <thead>
+          <tr className="text-left text-muted-foreground">
+            <th className="py-0.5">Amostra</th>
+            {medidas.map((m) => (
+              <th key={m} className="py-0.5">{ROTULOS_MEDIDA[m]}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {(valor.amostras ?? []).map((a, i) => (
+            <tr key={i} className="border-t border-hairline">
+              <td className="py-0.5">{i + 1}</td>
+              {medidas.map((m) => (
+                <td key={m} className="py-0.5">{a[m] || "—"}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="border-t border-hairline font-bold">
+            <td className="py-0.5">Mín. / máx. / média</td>
+            {medidas.map((m) => (
+              <td key={m} className="py-0.5">{formatarMedida(stats[m].min)} / {formatarMedida(stats[m].max)} / {formatarMedida(stats[m].media)}</td>
+            ))}
+          </tr>
+        </tfoot>
+      </table>
     </div>
   );
 }

@@ -6,6 +6,7 @@ import type { CampoTemplate } from "@/shared/schema-campos";
 import { motivosBloqueioPragas } from "../fields/pragas";
 import { motivosBloqueioEspera } from "../fields/esperaAves";
 import { motivosBloqueioCaixasVazias } from "../fields/caixasVazias";
+import { motivosBloqueioRecebimentoEmbalagens, varianteDoTipo } from "../fields/recebimentoEmbalagens";
 import { motivosBloqueioPendura } from "../fields/penduraAves";
 import { motivosBloqueioEletronarcose } from "../fields/eletronarcoseAves";
 import { motivosBloqueioPesoCaixa } from "../fields/pesoCaixa";
@@ -18,7 +19,7 @@ import { motivosBloqueioQualidadeMiudos } from "../fields/qualidadeMiudos";
 import { motivosBloqueioControleAbsorcao } from "../fields/controleAbsorcao";
 import { motivosBloqueioChecklist } from "../fields/checklistConformidade";
 import { motivosPreenchimentoCarcacas, motivosPreenchimentoChuveiro, motivosPreenchimentoMiudos, motivosPreenchimentoPartes } from "../fields/preenchimentoSpr";
-import type { CaixasVaziasValor, ChillerCarcacasValor, ChillerPartesValor, EletronarcoseAvesValor, LavagemFinalValor, MiniChillersValor, EsperaAvesValor, OcorrenciaPragasValor, PenduraAvesValor, PesoCaixaValor, RastreabilidadeDoaValor, RecepcaoAvesValor, TemperaturaResfriamentoValor, PotabilidadeAguaValor, PotabilidadePontosValor, QualidadeMiudosValor, ControleAbsorcaoValor, ChecklistConformidadeValor } from "../fields/tiposCompostos";
+import type { CaixasVaziasValor, ChillerCarcacasValor, ChillerPartesValor, EletronarcoseAvesValor, LavagemFinalValor, MiniChillersValor, EsperaAvesValor, OcorrenciaPragasValor, PenduraAvesValor, PesoCaixaValor, RastreabilidadeDoaValor, RecepcaoAvesValor, TemperaturaResfriamentoValor, PotabilidadeAguaValor, PotabilidadePontosValor, QualidadeMiudosValor, ControleAbsorcaoValor, ChecklistConformidadeValor, RecebimentoEmbalagensValor } from "../fields/tiposCompostos";
 
 /** Campos simples: ASSINAR EXIGE 100% PREENCHIDO, tenham ou não `obrigatorio`. Número vazio/NaN, texto em branco e seleção sem
  * escolha bloqueiam. Caixa de marcar (booleano/simples) não entra: desmarcada é uma resposta ("não"), não um vazio. Foto e
@@ -93,6 +94,10 @@ export function motivosDeBloqueioSpr(
     }
     if (campo.tipo === "caixas_vazias") {
       motivos.push(...motivosBloqueioCaixasVazias(dados[campo.chave] as CaixasVaziasValor | undefined));
+      continue;
+    }
+    if (campo.tipo === "recebimento_embalagens" || campo.tipo === "recebimento_sacos" || campo.tipo === "recebimento_secundarias") {
+      motivos.push(...motivosBloqueioRecebimentoEmbalagens(dados[campo.chave] as RecebimentoEmbalagensValor | undefined, varianteDoTipo(campo.tipo)));
       continue;
     }
     if (campo.tipo === "eletronarcose_aves") {

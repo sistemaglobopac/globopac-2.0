@@ -57,6 +57,9 @@ type TipoCampo =
   | "pendura_aves"
   | "eletronarcose_aves"
   | "caixas_vazias"
+  | "recebimento_embalagens"
+  | "recebimento_sacos"
+  | "recebimento_secundarias"
   | "peso_caixa"
   | "rastreabilidade_doa"
   | "temperatura_resfriamento"
@@ -94,6 +97,9 @@ const TIPOS_CAMPO: { value: TipoCampo; label: string }[] = [
   { value: "pendura_aves", label: "Bem-Estar Animal — Sala de Pendura (Especial SIF)" },
   { value: "eletronarcose_aves", label: "Bem-Estar Animal — Eletronarcose (Especial SIF)" },
   { value: "caixas_vazias", label: "Caixas de Transporte Vazias antes da Imersão (Especial SIF)" },
+  { value: "recebimento_embalagens", label: "Recebimento de Embalagens Primárias e Terciárias — Bobina: fornecedor, higiene do veículo, rótulo, lote e medição de 10 amostras (Especial SIF)" },
+  { value: "recebimento_sacos", label: "Recebimento de Embalagens Primárias — Sacos: fornecedor, higiene do veículo, rótulo, lote e medição de 30 amostras (Especial SIF)" },
+  { value: "recebimento_secundarias", label: "Recebimento de Embalagens Secundárias (caixas): fornecedor, higiene do veículo, teste de resina, lote e medição de 32 amostras (Especial SIF)" },
   { value: "peso_caixa", label: "Peso Vivo por Caixa de Transporte (Especial SIF)" },
   { value: "rastreabilidade_doa", label: "Rastreabilidade e Controle de DOA (Especial SIF)" },
   { value: "temperatura_resfriamento", label: "Temperaturas do Pré-resfriamento: água e produtos (Especial SIF)" },
@@ -247,6 +253,12 @@ function paraCampoTemplate(campo: CampoForm): CampoTemplate {
       return { ...base, tipo: "eletronarcose_aves" };
     case "caixas_vazias":
       return { ...base, tipo: "caixas_vazias" };
+    case "recebimento_embalagens":
+      return { ...base, tipo: "recebimento_embalagens" };
+    case "recebimento_sacos":
+      return { ...base, tipo: "recebimento_sacos" };
+    case "recebimento_secundarias":
+      return { ...base, tipo: "recebimento_secundarias" };
     case "peso_caixa":
       return { ...base, tipo: "peso_caixa" };
     case "rastreabilidade_doa":

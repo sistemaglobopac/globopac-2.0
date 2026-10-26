@@ -13,6 +13,7 @@ import { valorNaoConforme } from "../utils/desviosEspeciais";
 import {
   AbsorcaoAguaRelatorio,
   CaixasVaziasRelatorio,
+  RecebimentoEmbalagensRelatorio,
   ChillerCarcacasRelatorio,
   ChillerPartesRelatorio,
   DrippingTestRelatorio,
@@ -36,6 +37,7 @@ import {
 import type {
   AbsorcaoAguaValor,
   CaixasVaziasValor,
+  RecebimentoEmbalagensValor,
   ChillerCarcacasValor,
   ChillerPartesValor,
   DrippingTestValor,
@@ -226,6 +228,10 @@ export function DadosColetados({
             return valor ? <ChecklistConformidadeRelatorio key={campo.chave} tipo={campo.tipo} valor={valor as ChecklistConformidadeValor} titulo={rotulo} /> : null;
           case "caixas_vazias":
             return valor ? <CaixasVaziasRelatorio key={campo.chave} valor={valor as CaixasVaziasValor} titulo={rotulo} /> : null;
+          case "recebimento_embalagens":
+          case "recebimento_sacos":
+          case "recebimento_secundarias":
+            return valor ? <RecebimentoEmbalagensRelatorio key={campo.chave} valor={valor as RecebimentoEmbalagensValor} titulo={rotulo} /> : null;
           case "foto":
           case "assinatura":
             return (

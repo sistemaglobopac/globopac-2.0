@@ -49,6 +49,28 @@ const ROTULOS: Record<string, string> = {
   aspersoresLigados: "Aspersores ligados",
   ventiladoresLigados: "Ventiladores ligados",
   condicaoVeiculo: "Condição do veículo",
+  fornecedor: "Fornecedor",
+  notaFiscal: "Nota fiscal",
+  contaminacaoFisica: "Contaminação física",
+  contaminacaoQuimica: "Contaminação química",
+  condensacao: "Condensação, resíduos, umidade, sujidades ou insetos",
+  higieneGeral: "Higiene geral do veículo e das embalagens",
+  temRotulo: "Há rótulo",
+  leiauteConforme: "Leiaute de acordo com a ficha técnica",
+  descricaoProduto: "Descrição dos produtos",
+  qualidadeImpressao: "Qualidade da impressão",
+  quantidadeRecebida: "Quantidade recebida",
+  codigoEmbalagem: "Código da embalagem",
+  relatorioEnsaio: "Relatório de ensaio",
+  lote: "Lote",
+  situacaoLote: "Situação do lote",
+  largura: "Largura (mm)",
+  comprimento: "Comprimento (mm)",
+  altura: "Altura (mm)",
+  peso: "Peso (g)",
+  aplicacaoResina: "Aplicação de resina",
+  absorcaoAgua: "Absorção de água na caixa",
+  micragem: "Micragem (µm)",
 };
 
 /** Objetos aninhados cujos dados escalares também podem ser corrigidos (leituras de hidrômetro por tanque, temperaturas da água). */
@@ -105,6 +127,7 @@ const ehObjeto = (v: unknown): v is Record<string, unknown> => !!v && typeof v =
 function nomeDoItem(item: Record<string, unknown>, indice: number): string {
   if (item.gta) return `GTA ${String(item.gta)}`;
   if (item.box) return `Box ${String(item.box)}`;
+  if ("largura" in item && "micragem" in item) return `Amostra ${indice + 1}`;
   return `Item ${indice + 1}`;
 }
 

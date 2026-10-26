@@ -58,6 +58,9 @@ export type CampoTemplate =
   | { chave: string; tipo: "pendura_aves"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
   | { chave: string; tipo: "eletronarcose_aves"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
   | { chave: string; tipo: "caixas_vazias"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
+  | { chave: string; tipo: "recebimento_embalagens"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
+  | { chave: string; tipo: "recebimento_sacos"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
+  | { chave: string; tipo: "recebimento_secundarias"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
   | { chave: string; tipo: "peso_caixa"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
   | { chave: string; tipo: "rastreabilidade_doa"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
   | { chave: string; tipo: "temperatura_resfriamento"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
@@ -266,6 +269,27 @@ export const campoTemplateSchema: z.ZodType<CampoTemplate> = z.discriminatedUnio
   }),
   z.object({
     chave: z.string().min(1),
+    tipo: z.literal("recebimento_embalagens"),
+    obrigatorio: z.boolean(),
+    label: z.string().optional(),
+    dependeDe: dependeDeSchema,
+  }),
+  z.object({
+    chave: z.string().min(1),
+    tipo: z.literal("recebimento_sacos"),
+    obrigatorio: z.boolean(),
+    label: z.string().optional(),
+    dependeDe: dependeDeSchema,
+  }),
+  z.object({
+    chave: z.string().min(1),
+    tipo: z.literal("recebimento_secundarias"),
+    obrigatorio: z.boolean(),
+    label: z.string().optional(),
+    dependeDe: dependeDeSchema,
+  }),
+  z.object({
+    chave: z.string().min(1),
     tipo: z.literal("peso_caixa"),
     obrigatorio: z.boolean(),
     label: z.string().optional(),
@@ -422,6 +446,9 @@ export function zodFromSchemaCampos(campos: CampoTemplate[]): z.ZodEffects<z.Zod
       case "pendura_aves":
       case "eletronarcose_aves":
       case "caixas_vazias":
+      case "recebimento_embalagens":
+      case "recebimento_sacos":
+      case "recebimento_secundarias":
       case "peso_caixa":
       case "temperatura_resfriamento":
       case "potabilidade_agua":
@@ -534,6 +561,9 @@ export function valoresIniciaisDe(campos: CampoTemplate[]): Record<string, unkno
       campo.tipo === "pendura_aves" ||
       campo.tipo === "eletronarcose_aves" ||
       campo.tipo === "caixas_vazias" ||
+      campo.tipo === "recebimento_embalagens" ||
+      campo.tipo === "recebimento_sacos" ||
+      campo.tipo === "recebimento_secundarias" ||
       campo.tipo === "peso_caixa" ||
       campo.tipo === "rastreabilidade_doa" ||
       campo.tipo === "temperatura_resfriamento" ||

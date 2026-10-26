@@ -15,6 +15,7 @@ import { cloroForaDoLimite, lerMedida, phForaDoLimite } from "../fields/potabili
 import { cloroPontoForaDoLimite, phPontoForaDoLimite } from "../fields/potabilidadePontos";
 import { defeitoAcimaDoMaximo, lerContagem, PARTES_MIUDOS, parteExiste } from "../fields/qualidadeMiudos";
 import { LIMITE_JEJUM_MAX_H, tempos } from "../fields/recepcaoAves";
+import { desviosRecebimentoEmbalagens } from "../fields/recebimentoEmbalagens";
 import { SISTEMAS_POTABILIDADE } from "../fields/potabilidadeAgua";
 import {
   LIMITE_AGUA_C,
@@ -43,6 +44,7 @@ import type {
   PotabilidadeAguaValor,
   PotabilidadePontosValor,
   QualidadeMiudosValor,
+  RecebimentoEmbalagensValor,
   RecepcaoAvesValor,
   TemperaturaResfriamentoValor,
 } from "../fields/tiposCompostos";
@@ -200,6 +202,9 @@ const RESOLVEDORES: Record<string, Resolvedor> = {
     return SINAIS_INSENSIBILIZACAO.find((s) => v[s.chave] === !s.simConforme)?.chave;
   }),
   caixas_vazias: r((v: CaixasVaziasValor) => (v.todasVazias === false ? "todasVazias" : undefined)),
+  recebimento_embalagens: r((v: RecebimentoEmbalagensValor) => desviosRecebimentoEmbalagens(v)[0]?.chave),
+  recebimento_sacos: r((v: RecebimentoEmbalagensValor) => desviosRecebimentoEmbalagens(v)[0]?.chave),
+  recebimento_secundarias: r((v: RecebimentoEmbalagensValor) => desviosRecebimentoEmbalagens(v)[0]?.chave),
 
   // ---- Checklists
   ...(Object.fromEntries((Object.keys(CHECKLISTS) as TipoChecklist[]).map((tipo) => [tipo, resolverChecklist(tipo)])) as Record<string, Resolvedor>),

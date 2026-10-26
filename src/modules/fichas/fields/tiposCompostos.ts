@@ -502,3 +502,58 @@ export interface ChecklistConformidadeValor {
   conformidade: boolean;
   detalhesRNC: string | null;
 }
+
+export type AvaliacaoSatisfatoria = "satisfatoria" | "insatisfatoria" | "";
+
+export type SituacaoLoteEmbalagem = "aprovado" | "reprovado" | "utilizado" | "";
+
+/** Uma amostra da medição de embalagens, como digitada (texto, aceita vírgula). Bobina: largura e micragem; sacos:
+ * mais o comprimento; secundárias: mais a altura e o peso. */
+export interface AmostraEmbalagem {
+  largura: string;
+  /** Sacos e secundárias. */
+  comprimento?: string;
+  /** Só nas secundárias. */
+  altura?: string;
+  micragem: string;
+  /** Só nas secundárias. */
+  peso?: string;
+}
+
+/** Recebimento de Embalagens — Bobina (primárias e terciárias, 10 amostras), Sacos (primárias, 30 amostras) e
+ * Secundárias (caixas, 32 amostras) — Especial SIF; os três monitoramentos gravam o mesmo valor. Nas perguntas de
+ * sim/não, `null` = ainda não respondido; `true` = "Sim". As de contaminação e condensação têm "Sim" como desvio. As
+ * respostas sobre o rótulo só existem quando `temRotulo` é true; as da resina e da absorção só nas secundárias. */
+export interface RecebimentoEmbalagensValor {
+  fornecedor: string;
+  /** Número da nota fiscal da entrega, como digitado. */
+  notaFiscal: string;
+  /** Contaminação física no compartimento de cargas (cabelo, metal, vidro, madeira, terra). Sim = desvio. */
+  contaminacaoFisica: boolean | null;
+  /** Contaminação química (resíduos de substância). Sim = desvio. */
+  contaminacaoQuimica: boolean | null;
+  /** Condensação, resíduos orgânicos, umidade, sujidades ou insetos. Sim = desvio. */
+  condensacao: boolean | null;
+  higieneGeral: AvaliacaoSatisfatoria;
+  temRotulo: boolean | null;
+  /** Leiaute de acordo com a ficha técnica da embalagem. Não = desvio. */
+  leiauteConforme: boolean | null;
+  /** Presença da descrição dos produtos. Não = desvio. */
+  descricaoProduto: boolean | null;
+  qualidadeImpressao: AvaliacaoSatisfatoria;
+  quantidadeRecebida: string;
+  codigoEmbalagem: string;
+  /** Acompanha relatório de ensaio de qualidade. Não = desvio. */
+  relatorioEnsaio: boolean | null;
+  /** Teste de resina (secundárias): há aplicação de resina na caixa. Não = desvio. */
+  aplicacaoResina?: boolean | null;
+  /** Teste de resina (secundárias): houve absorção de água em alguma parte da caixa. Sim = desvio. */
+  absorcaoAgua?: boolean | null;
+  /** Número do lote da embalagem, como digitado. */
+  lote: string;
+  /** Situação do lote: aprovado, reprovado (desvio) ou utilizado. */
+  situacaoLote: SituacaoLoteEmbalagem;
+  amostras: AmostraEmbalagem[];
+  conformidade: boolean;
+  detalhesRNC: string | null;
+}
