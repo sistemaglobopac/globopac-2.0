@@ -25,7 +25,7 @@ import { lotesSemPeso } from "./fields/preenchimentoSpr";
 import { motivosDeBloqueioSpr } from "./utils/bloqueiosSpr";
 import { desviosEspeciais, temNaoConformidade } from "./utils/desviosEspeciais";
 import { ModalAutocorrecao } from "@/modules/autocorrecao/ModalAutocorrecao";
-import { CHAVE_AGUARDANDO_DRIPPING, drippingEmFase1, validarFaseInicial, validarPrimeiraEtapaDripping } from "./fields/calculosAbsorcao";
+import { CHAVE_AGUARDANDO_DRIPPING, validarFaseInicial, validarPrimeiraEtapaDripping } from "./fields/calculosAbsorcao";
 import type { AbsorcaoAguaValor, DrippingTestValor } from "./fields/tiposCompostos";
 import { MonitoramentosEmAndamento } from "./components/MonitoramentosEmAndamento";
 import { turnoAlvoHeranca } from "./utils/turnoUtils";
@@ -537,9 +537,9 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
   /** Teste de Absorção em duas fases — fase 1: grava só a pesagem inicial (EM_ANDAMENTO), sem
    * conformidade, e assina como INSPETOR_PARCIAL. A pesagem final vem depois, no mesmo registro. */
   const campoAbsorcao = campos.find((c) => c.tipo === "absorcao_agua");
-  // Dripping Test: enquanto só a 1ª etapa foi preenchida (sem Retirada/M3/M2) não existe "Criar e assinar".
+  // Dripping Test: a ficha nova é SEMPRE a 1ª etapa (só Lacre, M0 e M1) — não existe "Criar e assinar"; Retirada, M3 e M2 vêm na 2ª etapa.
   const campoDripping = campos.find((c) => c.tipo === "dripping_test");
-  const drippingFase1 = Boolean(campoDripping) && drippingEmFase1((valoresForm?.[campoDripping?.chave ?? ""] as DrippingTestValor | null | undefined)?.items);
+  const drippingFase1 = Boolean(campoDripping);
 
   async function aoSalvarDepois(dadosForm: FieldValues) {
     if (!campoAbsorcao) return;
@@ -910,6 +910,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
                 cargasUsadasEmRascunho={cargasUsadasEmRascunho}
                 faseAbsorcao={campoAbsorcao ? "INICIAL" : undefined}
                 aoSalvarPrimeiraEtapaDripping={() => void handleSubmit(aoEnviar)()}
+                somentePrimeiraEtapaDripping
               />
             ))}
 

@@ -58,6 +58,8 @@ interface DynamicFieldProps {
   faseAbsorcao?: "INICIAL" | "FINAL";
   /** Só para `dripping_test`: chamado depois de "Salvar 1ª etapa do teste" (ex.: voltar à lista). */
   aoSalvarPrimeiraEtapaDripping?: () => void;
+  /** Só para `dripping_test` na ficha nova: na 1ª etapa só Lacre, M0 e M1 aceitam valor. */
+  somentePrimeiraEtapaDripping?: boolean;
   campo: CampoTemplate;
   register: UseFormRegister<FieldValues>;
   errors: FieldErrors;
@@ -87,7 +89,7 @@ interface DynamicFieldProps {
 /** Renderiza um campo de formulário a partir da definição declarativa de schema_campos —
  * o mesmo dado que gera o Zod de validação (src/shared/schema-campos.ts), garantindo que
  * UI e validação nunca divirjam (seção 7.1 do PROMPT MESTRE). */
-export function DynamicField({ campo, register, errors, control, prevAppointment, carcacasAtual, diaMonitoramento, cargasEmRascunho, cargasUsadasEmRascunho, horaMonitoramento, modoCompletarPeso, faseAbsorcao, aoSalvarPrimeiraEtapaDripping }: DynamicFieldProps) {
+export function DynamicField({ campo, register, errors, control, prevAppointment, carcacasAtual, diaMonitoramento, cargasEmRascunho, cargasUsadasEmRascunho, horaMonitoramento, modoCompletarPeso, faseAbsorcao, aoSalvarPrimeiraEtapaDripping, somentePrimeiraEtapaDripping }: DynamicFieldProps) {
   const erro = errors[campo.chave]?.message as string | undefined;
 
   return (
@@ -211,6 +213,7 @@ export function DynamicField({ campo, register, errors, control, prevAppointment
               value={field.value as DrippingTestValor | undefined}
               onChange={field.onChange}
               aoSalvarPrimeiraEtapa={aoSalvarPrimeiraEtapaDripping}
+              somentePrimeiraEtapa={somentePrimeiraEtapaDripping}
             />
           )}
         />

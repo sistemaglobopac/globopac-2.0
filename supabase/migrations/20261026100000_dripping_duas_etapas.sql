@@ -1,6 +1,7 @@
 -- Dripping Test em DUAS ETAPAS (mesmo mecanismo EM_ANDAMENTO da absorção de água, do peso por caixa e do controle de absorção).
 --
--- Etapa 1 (na hora): lote, hora de início da drenagem (banho-maria), lacre, M0 e M1 de cada carcaça. Grava EM_ANDAMENTO com a
+-- Etapa 1 (na hora): lote, hora de início da drenagem (banho-maria), lacre, M0 e M1 de cada carcaça (Retirada, M3 e M2 NÃO são
+--   aceitos nesta etapa — o banco recusa). Grava EM_ANDAMENTO com a
 --   marca dados_dinamicos.aguardando_dripping = true e assina como INSPETOR_PARCIAL.
 -- Etapa 2 (depois da drenagem, no MESMO registro): hora da Retirada, M3 e M2 de cada carcaça; o registro vira FINALIZADO e o
 --   inspetor assina como INSPETOR sobre o registro inteiro. Enquanto estiver em andamento NÃO vai para a verificação nem para o SIF.
@@ -69,6 +70,25 @@ as $$
   from jsonb_each(
     case when jsonb_typeof(p) = 'object' then p - 'aguardando_dripping' - 'dripping_completado' else '{}'::jsonb end
   ) as e (k, v);
+$$;
+
+-- Alguma carcaça já tem Retirada, M3 ou M2 preenchido? (a 1ª etapa só aceita lacre, M0 e M1)
+create or replace function public.dripping_etapa2_preenchida(p jsonb)
+returns boolean
+language sql
+immutable
+as $$
+  select exists (
+    select 1
+    from jsonb_each(case when jsonb_typeof(p) = 'object' then p else '{}'::jsonb end) as e (k, v),
+         jsonb_array_elements(case when public.eh_valor_dripping(e.v) then e.v -> 'items' else '[]'::jsonb end) as t (i)
+    where jsonb_typeof(i) = 'object'
+      and (
+        trim(coalesce(i ->> 'horaRetirada', '')) <> ''
+        or trim(coalesce(i ->> 'm3', '')) <> ''
+        or trim(coalesce(i ->> 'm2', '')) <> ''
+      )
+  );
 $$;
 
 -- Toda carcaça com lacre e M0 tem Retirada (HH:MM), M3 e M2 numéricos? (e há ao menos uma carcaça)
@@ -200,8 +220,8 @@ begin
         if not exists (select 1 from public.dripping_linhas(new.dados_dinamicos)) then
           raise exception 'Dripping Test: a 1ª etapa exige ao menos 1 carcaça com lacre e M0 maior que zero (monitoramento %).', new.id;
         end if;
-        if public.dripping_completo(new.dados_dinamicos) then
-          raise exception 'Registro aguardando a 2ª etapa do dripping, mas Retirada, M3 e M2 já foram informados: assine o monitoramento normalmente (monitoramento %).', new.id;
+        if public.dripping_etapa2_preenchida(new.dados_dinamicos) then
+          raise exception 'Dripping Test: a 1ª etapa só aceita lacre, M0 e M1 — Retirada, M3 e M2 são informados na 2ª etapa (monitoramento %).', new.id;
         end if;
         return new;
       end if;

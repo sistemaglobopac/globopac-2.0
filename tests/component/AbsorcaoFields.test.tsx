@@ -305,6 +305,23 @@ describe("B) Dripping Test — tela", () => {
     expect(screen.getByText(/2ª etapa em preenchimento/)).toBeInTheDocument();
   });
 
+  it("1ª etapa da ficha nova: só Lacre, M0 e M1 (e lote/hora início) aceitam valor; Retirada, M3 e M2 ficam bloqueados", () => {
+    render(<HarnessB somentePrimeiraEtapa aoSalvarPrimeiraEtapa={vi.fn()} />);
+    expect((screen.getByPlaceholderText("Lote do teste") as HTMLInputElement).disabled).toBe(false);
+    expect(horaInicioInput().disabled).toBe(false);
+    expect((screen.getAllByPlaceholderText("Lacre")[0] as HTMLInputElement).disabled).toBe(false);
+    for (let i = 0; i < 6; i++) {
+      const l = linha(i);
+      expect(l.m0.disabled).toBe(false);
+      expect(l.m1.disabled).toBe(false);
+      expect(l.m3.disabled).toBe(true);
+      expect(l.m2.disabled).toBe(true);
+      expect(l.retirada.disabled).toBe(true);
+    }
+    // continua sendo a 1ª etapa: o botão de salvar existe
+    expect(screen.getByText("Salvar 1ª etapa do teste")).toBeInTheDocument();
+  });
+
   it("2ª etapa (registro em andamento reaberto): dados da 1ª etapa travados; Retirada, M3 e M2 editáveis; sem botões do rodapé", () => {
     const items = Array.from({ length: 6 }, (_, i) => ({ id: i, seal: "", m0: "", m1: "", m3: "", horaRetirada: "", m2: "" }));
     items[0] = { ...items[0]!, seal: "0001", m0: "1000", m1: "10" };

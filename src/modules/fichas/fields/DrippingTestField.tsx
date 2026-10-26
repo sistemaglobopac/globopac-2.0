@@ -28,6 +28,8 @@ interface DrippingTestFieldProps {
   aoSalvarPrimeiraEtapa?: () => void;
   /** 2ª etapa (registro em andamento reaberto): lote, hora início, lacre, M0 e M1 travados; só Retirada, M3 e M2 editáveis. */
   primeiraEtapaTravada?: boolean;
+  /** Preenchimento da 1ª etapa (nova ficha): só Lacre, M0 e M1 (e lote / hora início) aceitam valor; Retirada, M3 e M2 ficam bloqueados até a 2ª etapa. */
+  somentePrimeiraEtapa?: boolean;
   /** Esconde os botões do rodapé (a tela da 2ª etapa tem os seus: finalizar e assinar). */
   semAcoes?: boolean;
 }
@@ -43,7 +45,7 @@ function horaAgora(): string {
  * EM_ANDAMENTO (quem usa o campo trata o "Salvar 1ª etapa"), e o inspetor volta depois da drenagem, pela lista de
  * monitoramentos em andamento, para a 2ª (Retirada, M3 e M2 — `primeiraEtapaTravada`). A Hora Início da drenagem
  * (banho-maria) é digitada pelo inspetor na 1ª etapa — nunca é registrada sozinha. */
-export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraEtapa, primeiraEtapaTravada = false, semAcoes = false }: DrippingTestFieldProps) {
+export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraEtapa, primeiraEtapaTravada = false, somentePrimeiraEtapa = false, semAcoes = false }: DrippingTestFieldProps) {
   const travaPrimeiraEtapa = primeiraEtapaTravada;
   const [items, setItems] = useState<AmostraDrippingTest[]>(value?.items ?? amostrasDrippingIniciais());
   const [lote, setLote] = useState(value?.lote ?? "");
@@ -193,7 +195,7 @@ export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraE
                   )}
                 </label>
                 <label className="flex min-w-[40%] flex-1 flex-col gap-0.5 xl:min-w-[90px] xl:flex-[1.4]"><span className="text-[10px] font-bold uppercase text-muted-foreground xl:hidden">M1 (g)</span><Input className="h-8 font-mono text-xs" type="number" inputMode="decimal" step="0.001" value={item.m1} onChange={(e) => alterarItem(i, "m1", e.target.value)} disabled={disabled || travaPrimeiraEtapa} placeholder="M1" /></label>
-                <label className="flex min-w-[40%] flex-1 flex-col gap-0.5 xl:min-w-[90px] xl:flex-[1.4]"><span className="text-[10px] font-bold uppercase text-muted-foreground xl:hidden">M3 (g)</span><Input className="h-8 border-amber-300 bg-amber-50 font-mono text-xs" type="number" inputMode="decimal" step="0.001" value={item.m3} onChange={(e) => alterarItem(i, "m3", e.target.value)} disabled={disabled} placeholder="M3" /></label>
+                <label className="flex min-w-[40%] flex-1 flex-col gap-0.5 xl:min-w-[90px] xl:flex-[1.4]"><span className="text-[10px] font-bold uppercase text-muted-foreground xl:hidden">M3 (g)</span><Input className="h-8 border-amber-300 bg-amber-50 font-mono text-xs" type="number" inputMode="decimal" step="0.001" value={item.m3} onChange={(e) => alterarItem(i, "m3", e.target.value)} disabled={disabled || somentePrimeiraEtapa} placeholder="M3" /></label>
                 <label className="relative flex min-w-[40%] flex-1 flex-col gap-0.5 xl:w-20 xl:min-w-0 xl:flex-none xl:shrink-0"><span className="text-[10px] font-bold uppercase text-muted-foreground xl:hidden">Retirada</span><Input
                   className={`h-8 w-full text-[10px] font-bold ${item.timeNc ? "border-destructive bg-destructive/10 text-destructive" : "border-amber-300 bg-amber-50"}`}
                   type="time"
@@ -203,7 +205,7 @@ export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraE
                   onFocus={() => {
                     if (!item.horaRetirada) alterarItem(i, "horaRetirada", horaAgora());
                   }}
-                  disabled={disabled}
+                  disabled={disabled || somentePrimeiraEtapa}
                 />
                   {retiradaPrevista !== null && (
                     <span data-testid={`retirada-prevista-${i}`} className="pointer-events-none absolute -bottom-3.5 left-0 w-full text-center text-[9px] font-bold text-violet-600">Retirar {retiradaPrevista}</span>
@@ -215,7 +217,7 @@ export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraE
                   step="0.001"
                   value={item.m2}
                   onChange={(e) => alterarItem(i, "m2", e.target.value)}
-                  disabled={disabled}
+                  disabled={disabled || somentePrimeiraEtapa}
                   placeholder="M2"
                 /></label>
                 <span className={`w-full text-right font-mono text-xs font-bold xl:w-16 xl:shrink-0 ${acima ? "text-destructive" : absorcao !== null ? "text-success" : "text-muted-foreground"}`}>
