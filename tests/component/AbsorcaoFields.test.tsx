@@ -128,6 +128,16 @@ describe("B) Dripping Test — tela", () => {
     retirada: document.querySelectorAll<HTMLInputElement>('input[type="time"]:not([data-testid="hora-inicio-dripping"])')[i]!,
   });
   const horaInicioInput = () => screen.getByTestId("hora-inicio-dripping") as HTMLInputElement;
+  /** Preenche TODA a 1ª etapa: lote, hora de início e lacre, M0 e M1 das 6 carcaças. */
+  const preencherPrimeiraEtapa = (lote = "L-77", hora = "08:15") => {
+    digitar(screen.getByPlaceholderText("Lote do teste"), lote);
+    digitar(horaInicioInput(), hora);
+    for (let i = 0; i < 6; i++) {
+      digitar(screen.getAllByPlaceholderText("Lacre")[i]!, String(i + 1));
+      digitar(linha(i).m0, "1000");
+      digitar(linha(i).m1, "10");
+    }
+  };
 
   it("6 linhas, cabeçalho e fórmula com os textos pedidos", () => {
     render(<HarnessB />);
@@ -256,13 +266,10 @@ describe("B) Dripping Test — tela", () => {
     expect((screen.getByPlaceholderText("Lote do teste") as HTMLInputElement).value).toBe("DO-PAI");
   });
 
-  it("nada é guardado no aparelho: a 1ª etapa é entregue a quem usa o campo (que grava no servidor)", () => {
+  it("nada é guardado no aparelho: a 1ª etapa completa é entregue a quem usa o campo (que grava no servidor)", () => {
     const aoSalvar = vi.fn();
     render(<HarnessB aoSalvarPrimeiraEtapa={aoSalvar} />);
-    digitar(screen.getByPlaceholderText("Lote do teste"), "L-77");
-    digitar(horaInicioInput(), "08:15");
-    digitar(screen.getAllByPlaceholderText("Lacre")[0]!, "0001");
-    digitar(linha(0).m0, "1000");
+    preencherPrimeiraEtapa();
     act(() => {
       fireEvent.click(screen.getByText("Salvar 1ª etapa do teste"));
     });
@@ -272,15 +279,31 @@ describe("B) Dripping Test — tela", () => {
     expect(localStorage.getItem("@globopac:dripping_test_draft")).toBeNull();
   });
 
-  it("1ª etapa: só há o botão de salvar a 1ª etapa (exige hora início + lacre + M0); com Retirada/M3/M2 vira 2ª etapa", () => {
+  it("1ª etapa: não salva com qualquer campo em branco (lote, hora início, lacre, M0 ou M1 de qualquer carcaça)", () => {
     const aoSalvar = vi.fn();
     render(<HarnessB aoSalvarPrimeiraEtapa={aoSalvar} />);
     fireEvent.click(screen.getByText("Salvar 1ª etapa do teste"));
-    expect(screen.getByText("Informe a hora de início da drenagem (banho-maria) antes de salvar a 1ª etapa.")).toBeInTheDocument();
-    digitar(horaInicioInput(), "08:00");
-    fireEvent.click(screen.getByText("Salvar 1ª etapa do teste"));
-    expect(screen.getByText("Preencha ao menos 1 carcaça com lacre e M0 antes de salvar a 1ª etapa.")).toBeInTheDocument();
+    const faltas = screen.getByTestId("dripping-faltas-etapa1");
+    expect(faltas).toHaveTextContent("Informe o lote do teste.");
+    expect(faltas).toHaveTextContent("Informe a hora de início da drenagem (banho-maria).");
+    expect(faltas).toHaveTextContent("Carcaça 1: informe o lacre, o M0, o M1.");
+    expect(faltas).toHaveTextContent("Carcaça 6: informe o lacre, o M0, o M1.");
     expect(aoSalvar).not.toHaveBeenCalled();
+
+    preencherPrimeiraEtapa();
+    digitar(linha(5).m1, ""); // só a última carcaça sem M1
+    fireEvent.click(screen.getByText("Salvar 1ª etapa do teste"));
+    expect(screen.getByTestId("dripping-faltas-etapa1").textContent).toBe("Carcaça 6: informe o M1.");
+    expect(aoSalvar).not.toHaveBeenCalled();
+
+    digitar(linha(5).m1, "10");
+    fireEvent.click(screen.getByText("Salvar 1ª etapa do teste"));
+    expect(screen.queryByTestId("dripping-faltas-etapa1")).toBeNull();
+    expect(aoSalvar).toHaveBeenCalledTimes(1);
+  });
+
+  it("Retirada/M3/M2 preenchidos levam o teste para a 2ª etapa (sem o botão de salvar a 1ª)", () => {
+    render(<HarnessB aoSalvarPrimeiraEtapa={vi.fn()} />);
     digitar(linha(0).retirada, "09:20");
     expect(screen.queryByText("Salvar 1ª etapa do teste")).toBeNull();
     expect(screen.getByText(/2ª etapa em preenchimento/)).toBeInTheDocument();
@@ -289,9 +312,7 @@ describe("B) Dripping Test — tela", () => {
   it("Salvar 1ª etapa mantém a hora de início digitada (não troca pela hora do salvamento)", () => {
     iniciarTesteAs0800();
     render(<HarnessB aoSalvarPrimeiraEtapa={vi.fn()} />);
-    digitar(horaInicioInput(), "08:20");
-    digitar(screen.getAllByPlaceholderText("Lacre")[0]!, "0001");
-    digitar(linha(0).m0, "1000");
+    preencherPrimeiraEtapa("L-1", "08:20");
     vi.setSystemTime(new Date("2026-09-30T13:05:00Z")); // 09:05 em Manaus: hora do salvamento
     fireEvent.click(screen.getByText("Salvar 1ª etapa do teste"));
     expect(ultimoB?.primeiraEtapaSalvaEm).toBe("2026-09-30T13:05:00.000Z");

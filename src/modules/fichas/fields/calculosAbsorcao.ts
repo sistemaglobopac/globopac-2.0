@@ -283,12 +283,24 @@ export function drippingEmFase1(items: Pick<AmostraDrippingTest, "horaRetirada" 
   return !(items ?? []).some((i) => i.horaRetirada.trim() !== "" || i.m3.trim() !== "" || i.m2.trim() !== "");
 }
 
-/** Fase 1 só pode ser salva com a Hora Início (digitada pelo inspetor) e ao menos 1 linha com lacre e M0
- * preenchidos. Devolve o motivo (ou null). */
-export function validarPrimeiraEtapaDripping(items: Pick<AmostraDrippingTest, "seal" | "m0">[], horaInicio: string): string | null {
-  if (!horaInicio.trim()) return "Informe a hora de início da drenagem (banho-maria) antes de salvar a 1ª etapa.";
-  const ok = items.some((i) => i.seal.trim() !== "" && !isNaN(parseFloat(i.m0)) && parseFloat(i.m0) > 0);
-  return ok ? null : "Preencha ao menos 1 carcaça com lacre e M0 antes de salvar a 1ª etapa.";
+const NUMERO_SIMPLES = /^[0-9]+(\.[0-9]+)?$/;
+
+/** 1ª etapa só pode ser salva/assinada com TUDO preenchido: lote, Hora Início (digitada pelo inspetor) e, em TODAS as carcaças,
+ * lacre, M0 (> 0) e M1. Lista vazia = pode salvar. Espelha `dripping_etapa1_completa` do banco. */
+export function motivosPrimeiraEtapaDripping(items: Pick<AmostraDrippingTest, "seal" | "m0" | "m1">[] | undefined, horaInicio: string, lote: string): string[] {
+  const motivos: string[] = [];
+  if (!lote.trim()) motivos.push("Informe o lote do teste.");
+  if (!horaInicio.trim()) motivos.push("Informe a hora de início da drenagem (banho-maria).");
+  const linhas = items ?? [];
+  if (linhas.length === 0) motivos.push("O teste não tem carcaças.");
+  linhas.forEach((i, indice) => {
+    const faltam: string[] = [];
+    if (!i.seal.trim()) faltam.push("o lacre");
+    if (!NUMERO_SIMPLES.test(i.m0.trim()) || !(parseFloat(i.m0) > 0)) faltam.push("o M0");
+    if (!NUMERO_SIMPLES.test(i.m1.trim())) faltam.push("o M1");
+    if (faltam.length > 0) motivos.push(`Carcaça ${indice + 1}: informe ${faltam.join(", ")}.`);
+  });
+  return motivos;
 }
 
 /** Marca de dados_dinamicos do dripping com a 1ª etapa salva (EM_ANDAMENTO) e a 2ª ainda por fazer. */
@@ -296,26 +308,24 @@ export const CHAVE_AGUARDANDO_DRIPPING = "aguardando_dripping";
 /** Quem completou a 2ª etapa e quando (entra no registro assinado). */
 export const CHAVE_DRIPPING_COMPLETADO = "dripping_completado";
 
-const NUMERO_SIMPLES = /^[0-9]+(\.[0-9]+)?$/;
-
 /** Carcaças da 1ª etapa (lacre + M0 > 0): são elas que a 2ª etapa precisa completar. Espelha `dripping_linhas` do banco. */
 export function linhasDripping<T extends Pick<AmostraDrippingTest, "seal" | "m0">>(items: T[] | undefined): T[] {
   return (items ?? []).filter((i) => i.seal.trim() !== "" && NUMERO_SIMPLES.test(i.m0.trim()) && parseFloat(i.m0) > 0);
 }
 
-/** O que falta para finalizar o dripping (2ª etapa): toda carcaça da 1ª etapa precisa de Retirada, M3 e M2.
- * Espelha `dripping_completo` do banco. Lista vazia = pode finalizar. */
+/** O que falta para finalizar o dripping (2ª etapa): TODAS as carcaças precisam de Retirada, M3 e M2. Espelha `dripping_completo`
+ * do banco. Lista vazia = pode finalizar. */
 export function motivosFinalizacaoDripping(items: AmostraDrippingTest[] | undefined): string[] {
-  const linhas = linhasDripping(items);
-  if (linhas.length === 0) return ["Nenhuma carcaça com lacre e M0 neste teste."];
+  const linhas = items ?? [];
+  if (linhas.length === 0) return ["O teste não tem carcaças."];
   const motivos: string[] = [];
-  for (const l of linhas) {
+  linhas.forEach((l, indice) => {
     const faltam: string[] = [];
     if (!/^[0-9]{2}:[0-9]{2}$/.test(l.horaRetirada.trim())) faltam.push("a Retirada");
     if (!NUMERO_SIMPLES.test(l.m3.trim())) faltam.push("o M3");
     if (!NUMERO_SIMPLES.test(l.m2.trim())) faltam.push("o M2");
-    if (faltam.length > 0) motivos.push(`Carcaça ${(items ?? []).indexOf(l) + 1} (lacre ${l.seal.trim()}): informe ${faltam.join(", ")}.`);
-  }
+    if (faltam.length > 0) motivos.push(`Carcaça ${indice + 1}: informe ${faltam.join(", ")}.`);
+  });
   return motivos;
 }
 

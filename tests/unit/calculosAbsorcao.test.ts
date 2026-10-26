@@ -10,8 +10,8 @@ import {
   percentualIndividualAbsorcao,
   tempoMinimoDrenagem,
   horaPrevistaRetirada,
-  linhasDripping,
   motivosFinalizacaoDripping,
+  motivosPrimeiraEtapaDripping,
   tempoMinimoDrenagemMax,
   tempoNaoConforme,
   textoSeloDripping,
@@ -231,47 +231,41 @@ describe("mensagens de desvio", () => {
   });
 });
 
-describe("Dripping em duas etapas (1ª etapa gravada em andamento)", () => {
+describe("Dripping em duas etapas (nada pode ficar em branco)", () => {
   const linha = (i: number, parcial: Partial<ReturnType<typeof amostrasDrippingIniciais>[number]>) => ({ ...amostrasDrippingIniciais()[i]!, ...parcial });
-  const etapa1 = () => {
-    const items = amostrasDrippingIniciais();
-    items[0] = linha(0, { seal: "0001", m0: "1000", m1: "10" });
-    items[1] = linha(1, { seal: "0002", m0: "2400", m1: "12" });
-    return items;
-  };
+  const etapa1 = () => amostrasDrippingIniciais().map((_, i) => linha(i, { seal: String(i + 1), m0: i === 1 ? "2400" : "1000", m1: "10" }));
+  const completo = () => etapa1().map((x) => ({ ...x, horaRetirada: "10:00", m3: "50", m2: "900" }));
 
-  it("só conta como carcaça da 1ª etapa quem tem lacre e M0 maior que zero", () => {
-    const items = etapa1();
-    items[2] = linha(2, { seal: "0003", m0: "" });
-    items[3] = linha(3, { m0: "900" }); // sem lacre
-    items[4] = linha(4, { seal: "0005", m0: "0" });
-    expect(linhasDripping(items).map((i) => i.seal)).toEqual(["0001", "0002"]);
-  });
+  it("1ª etapa: exige lote, hora de início e lacre, M0 e M1 de TODAS as carcaças", () => {
+    expect(motivosPrimeiraEtapaDripping(etapa1(), "08:00", "L-1")).toEqual([]);
 
-  it("2ª etapa exige Retirada, M3 e M2 de TODAS as carcaças da 1ª etapa (espelha o banco)", () => {
-    expect(motivosFinalizacaoDripping(amostrasDrippingIniciais())).toEqual(["Nenhuma carcaça com lacre e M0 neste teste."]);
-
-    const items = etapa1();
-    expect(motivosFinalizacaoDripping(items)).toEqual([
-      "Carcaça 1 (lacre 0001): informe a Retirada, o M3, o M2.",
-      "Carcaça 2 (lacre 0002): informe a Retirada, o M3, o M2.",
+    expect(motivosPrimeiraEtapaDripping(amostrasDrippingIniciais(), "", "")).toEqual([
+      "Informe o lote do teste.",
+      "Informe a hora de início da drenagem (banho-maria).",
+      ...[1, 2, 3, 4, 5, 6].map((n) => `Carcaça ${n}: informe o lacre, o M0, o M1.`),
     ]);
+    expect(motivosPrimeiraEtapaDripping(etapa1(), "", "L-1")).toEqual(["Informe a hora de início da drenagem (banho-maria)."]);
+    expect(motivosPrimeiraEtapaDripping(etapa1(), "08:00", "  ")).toEqual(["Informe o lote do teste."]);
 
-    items[0] = { ...items[0]!, horaRetirada: "09:18", m3: "50", m2: "940" };
-    expect(motivosFinalizacaoDripping(items)).toEqual(["Carcaça 2 (lacre 0002): informe a Retirada, o M3, o M2."]);
-
-    items[1] = { ...items[1]!, horaRetirada: "10:55", m3: "50" };
-    expect(motivosFinalizacaoDripping(items)).toEqual(["Carcaça 2 (lacre 0002): informe o M2."]);
-
-    items[1] = { ...items[1]!, m2: "2300" };
-    expect(motivosFinalizacaoDripping(items)).toEqual([]);
+    const items = etapa1();
+    items[5] = { ...items[5]!, m1: "" };
+    items[2] = { ...items[2]!, seal: "" };
+    items[0] = { ...items[0]!, m0: "0" };
+    expect(motivosPrimeiraEtapaDripping(items, "08:00", "L-1")).toEqual(["Carcaça 1: informe o M0.", "Carcaça 3: informe o lacre.", "Carcaça 6: informe o M1."]);
   });
 
-  it("carcaça sem lacre/M0 (linha não usada) não é exigida na 2ª etapa", () => {
+  it("2ª etapa: exige Retirada, M3 e M2 de TODAS as carcaças (espelha o banco)", () => {
+    expect(motivosFinalizacaoDripping(completo())).toEqual([]);
+    expect(motivosFinalizacaoDripping([])).toEqual(["O teste não tem carcaças."]);
+
     const items = etapa1();
-    items[0] = { ...items[0]!, horaRetirada: "09:18", m3: "50", m2: "940" };
-    items[1] = { ...items[1]!, horaRetirada: "10:55", m3: "50", m2: "2300" };
-    expect(motivosFinalizacaoDripping(items)).toEqual([]);
+    expect(motivosFinalizacaoDripping(items)).toEqual([1, 2, 3, 4, 5, 6].map((n) => `Carcaça ${n}: informe a Retirada, o M3, o M2.`));
+
+    const parcial = completo();
+    parcial[3] = { ...parcial[3]!, horaRetirada: "" };
+    parcial[5] = { ...parcial[5]!, m2: "" };
+    parcial[1] = { ...parcial[1]!, m3: "" };
+    expect(motivosFinalizacaoDripping(parcial)).toEqual(["Carcaça 2: informe o M3.", "Carcaça 4: informe a Retirada.", "Carcaça 6: informe o M2."]);
   });
 
   it("maior tempo mínimo de drenagem entre as carcaças da 1ª etapa", () => {

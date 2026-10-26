@@ -1,10 +1,11 @@
 -- Dripping Test em DUAS ETAPAS (mesmo mecanismo EM_ANDAMENTO da absorção de água, do peso por caixa e do controle de absorção).
 --
--- Etapa 1 (na hora): lote, hora de início da drenagem (banho-maria), lacre, M0 e M1 de cada carcaça (Retirada, M3 e M2 NÃO são
---   aceitos nesta etapa — o banco recusa). Grava EM_ANDAMENTO com a
---   marca dados_dinamicos.aguardando_dripping = true e assina como INSPETOR_PARCIAL.
--- Etapa 2 (depois da drenagem, no MESMO registro): hora da Retirada, M3 e M2 de cada carcaça; o registro vira FINALIZADO e o
---   inspetor assina como INSPETOR sobre o registro inteiro. Enquanto estiver em andamento NÃO vai para a verificação nem para o SIF.
+-- Etapa 1 (na hora): lote, hora de início da drenagem (banho-maria), lacre, M0 e M1 de TODAS as carcaças — nada pode ficar em
+--   branco, e Retirada, M3 e M2 NÃO são aceitos nesta etapa (o banco recusa). Grava EM_ANDAMENTO com a marca
+--   dados_dinamicos.aguardando_dripping = true e assina como INSPETOR_PARCIAL.
+-- Etapa 2 (depois da drenagem, no MESMO registro): hora da Retirada, M3 e M2 de TODAS as carcaças (nada em branco); o registro
+--   vira FINALIZADO e o inspetor assina como INSPETOR sobre o registro inteiro. Enquanto estiver em andamento NÃO vai para a
+--   verificação nem para o SIF.
 --
 -- Garantia: depois da etapa 1 os dados assinados são imutáveis — só mudam, por carcaça, a Retirada, o M3 e o M2 (e o que deriva
 -- deles: timeNc e, no valor do campo, status / averagePercentage / validCount / timeNonConformity), mais as marcas
@@ -21,20 +22,6 @@ as $$
     and v ? 'lote'
     and v ? 'horaInicio'
     and jsonb_typeof(v -> 'items') = 'array';
-$$;
-
--- Carcaças (linhas) com lacre e M0 > 0 de todos os campos dripping do monitoramento.
-create or replace function public.dripping_linhas(p jsonb)
-returns setof jsonb
-language sql
-immutable
-as $$
-  select i
-  from jsonb_each(case when jsonb_typeof(p) = 'object' then p else '{}'::jsonb end) as e (k, v),
-       jsonb_array_elements(case when public.eh_valor_dripping(e.v) then e.v -> 'items' else '[]'::jsonb end) as t (i)
-  where jsonb_typeof(i) = 'object'
-    and trim(coalesce(i ->> 'seal', '')) <> ''
-    and coalesce(public.num_seguro(trim(i ->> 'm0')), 0) > 0;
 $$;
 
 -- Dados do monitoramento sem o que a etapa 2 pode alterar (para comparar antes × depois).
@@ -91,19 +78,54 @@ as $$
   );
 $$;
 
--- Toda carcaça com lacre e M0 tem Retirada (HH:MM), M3 e M2 numéricos? (e há ao menos uma carcaça)
+-- 1ª etapa completa? Todo valor de dripping tem lote e hora de início e TODAS as carcaças têm lacre, M0 (> 0) e M1.
+create or replace function public.dripping_etapa1_completa(p jsonb)
+returns boolean
+language sql
+immutable
+as $$
+  select exists (
+           select 1 from jsonb_each(case when jsonb_typeof(p) = 'object' then p else '{}'::jsonb end) as e (k, v)
+           where public.eh_valor_dripping(e.v)
+         )
+    and not exists (
+      select 1
+      from jsonb_each(case when jsonb_typeof(p) = 'object' then p else '{}'::jsonb end) as e (k, v)
+      where public.eh_valor_dripping(e.v)
+        and (
+          trim(coalesce(e.v ->> 'lote', '')) = ''
+          or trim(coalesce(e.v ->> 'horaInicio', '')) = ''
+          or jsonb_array_length(e.v -> 'items') = 0
+          or exists (
+            select 1
+            from jsonb_array_elements(e.v -> 'items') as t (i)
+            where jsonb_typeof(t.i) <> 'object'
+               or trim(coalesce(t.i ->> 'seal', '')) = ''
+               or coalesce(public.num_seguro(trim(t.i ->> 'm0')), 0) <= 0
+               or public.num_seguro(trim(t.i ->> 'm1')) is null
+          )
+        )
+    );
+$$;
+
+-- 2ª etapa completa? TODAS as carcaças têm Retirada (HH:MM), M3 e M2 numéricos.
 create or replace function public.dripping_completo(p jsonb)
 returns boolean
 language sql
 immutable
 as $$
-  select exists (select 1 from public.dripping_linhas(p))
+  select exists (
+           select 1 from jsonb_each(case when jsonb_typeof(p) = 'object' then p else '{}'::jsonb end) as e (k, v)
+           where public.eh_valor_dripping(e.v)
+         )
     and not exists (
       select 1
-      from public.dripping_linhas(p) as l (i)
-      where coalesce(trim(l.i ->> 'horaRetirada'), '') !~ '^[0-9]{2}:[0-9]{2}$'
-         or public.num_seguro(trim(l.i ->> 'm3')) is null
-         or public.num_seguro(trim(l.i ->> 'm2')) is null
+      from jsonb_each(case when jsonb_typeof(p) = 'object' then p else '{}'::jsonb end) as e (k, v),
+           jsonb_array_elements(case when public.eh_valor_dripping(e.v) then e.v -> 'items' else '[]'::jsonb end) as t (i)
+      where jsonb_typeof(t.i) <> 'object'
+         or coalesce(trim(t.i ->> 'horaRetirada'), '') !~ '^[0-9]{2}:[0-9]{2}$'
+         or public.num_seguro(trim(t.i ->> 'm3')) is null
+         or public.num_seguro(trim(t.i ->> 'm2')) is null
     );
 $$;
 
@@ -217,8 +239,8 @@ begin
 
       -- Dripping aguardando a etapa 2: não há linhas de absorção a validar.
       if aguarda_dripping_novo then
-        if not exists (select 1 from public.dripping_linhas(new.dados_dinamicos)) then
-          raise exception 'Dripping Test: a 1ª etapa exige ao menos 1 carcaça com lacre e M0 maior que zero (monitoramento %).', new.id;
+        if not public.dripping_etapa1_completa(new.dados_dinamicos) then
+          raise exception 'Dripping Test: a 1ª etapa exige lote, hora de início e lacre, M0 e M1 de todas as carcaças (monitoramento %).', new.id;
         end if;
         if public.dripping_etapa2_preenchida(new.dados_dinamicos) then
           raise exception 'Dripping Test: a 1ª etapa só aceita lacre, M0 e M1 — Retirada, M3 e M2 são informados na 2ª etapa (monitoramento %).', new.id;
@@ -340,7 +362,7 @@ begin
         raise exception 'Ao finalizar, retire a marca de aguardando a 2ª etapa do dripping (monitoramento %).', old.id;
       end if;
       if not public.dripping_completo(new.dados_dinamicos) then
-        raise exception 'Finalização exige Retirada, M3 e M2 de todas as carcaças com lacre e M0 (monitoramento %).', old.id;
+        raise exception 'Finalização exige Retirada, M3 e M2 de todas as carcaças (monitoramento %).', old.id;
       end if;
       new.finalizado_em := now();
     else

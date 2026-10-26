@@ -25,7 +25,7 @@ import { lotesSemPeso } from "./fields/preenchimentoSpr";
 import { motivosDeBloqueioSpr } from "./utils/bloqueiosSpr";
 import { desviosEspeciais, temNaoConformidade } from "./utils/desviosEspeciais";
 import { ModalAutocorrecao } from "@/modules/autocorrecao/ModalAutocorrecao";
-import { CHAVE_AGUARDANDO_DRIPPING, validarFaseInicial, validarPrimeiraEtapaDripping } from "./fields/calculosAbsorcao";
+import { CHAVE_AGUARDANDO_DRIPPING, motivosPrimeiraEtapaDripping, validarFaseInicial } from "./fields/calculosAbsorcao";
 import type { AbsorcaoAguaValor, DrippingTestValor } from "./fields/tiposCompostos";
 import { MonitoramentosEmAndamento } from "./components/MonitoramentosEmAndamento";
 import { turnoAlvoHeranca } from "./utils/turnoUtils";
@@ -647,9 +647,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
   async function salvarEtapa1Dripping(dados: FieldValues) {
     const valor = campoDripping ? (dados[campoDripping.chave] as DrippingTestValor | null | undefined) : undefined;
     if (!campoDripping || !valor) return;
-    const motivos: string[] = [];
-    const motivoEtapa1 = validarPrimeiraEtapaDripping(valor.items, valor.horaInicio ?? "");
-    if (motivoEtapa1) motivos.push(`Dripping Test: ${motivoEtapa1}`);
+    const motivos: string[] = motivosPrimeiraEtapaDripping(valor.items, valor.horaInicio ?? "", valor.lote ?? "").map((m) => `Dripping Test: ${m}`);
     motivos.push(...motivosDeBloqueioSpr(camposVisiveis, dados, opcoesBloqueio));
     if (continuando && motivoContinuacao.trim().length < MOTIVO_CONTINUACAO_MIN_CARACTERES) {
       motivos.push(`Continuação: informe o motivo (mínimo ${MOTIVO_CONTINUACAO_MIN_CARACTERES} caracteres).`);

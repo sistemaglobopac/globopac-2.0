@@ -6,7 +6,7 @@ import { Label } from "@/shared/ui/label";
 import {
   absorcaoLinhaDripping,
   drippingEmFase1,
-  validarPrimeiraEtapaDripping,
+  motivosPrimeiraEtapaDripping,
   acimaDoLimite,
   amostrasDrippingIniciais,
   calcularDrippingTest,
@@ -50,7 +50,7 @@ export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraE
   const [items, setItems] = useState<AmostraDrippingTest[]>(value?.items ?? amostrasDrippingIniciais());
   const [lote, setLote] = useState(value?.lote ?? "");
   const [horaInicio, setHoraInicio] = useState(value?.horaInicio ?? "");
-  const [erroPrimeiraEtapa, setErroPrimeiraEtapa] = useState<string | null>(null);
+  const [errosPrimeiraEtapa, setErrosPrimeiraEtapa] = useState<string[]>([]);
   // Instante em que a 1ª etapa foi SALVA (vem junto do registro ao voltar na 2ª etapa) — só registro; a hora que
   // conta para o tempo de drenagem é a Hora Início digitada pelo inspetor.
   const [primeiraEtapaEm, setPrimeiraEtapaEm] = useState<string | undefined>(value?.primeiraEtapaSalvaEm);
@@ -88,9 +88,9 @@ export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraE
   }
 
   function salvarPrimeiraEtapa() {
-    const motivo = validarPrimeiraEtapaDripping(items, horaInicio);
-    setErroPrimeiraEtapa(motivo);
-    if (motivo) return;
+    const motivos = motivosPrimeiraEtapaDripping(items, horaInicio, lote);
+    setErrosPrimeiraEtapa(motivos);
+    if (motivos.length > 0) return;
     const salvoEm = new Date().toISOString();
     setPrimeiraEtapaEm(salvoEm);
     disparar(items, lote, horaInicio, salvoEm);
@@ -270,7 +270,13 @@ export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraE
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>
-          {erroPrimeiraEtapa && <p className="rounded border border-destructive bg-destructive/10 p-2 text-center text-xs font-bold text-destructive">{erroPrimeiraEtapa}</p>}
+          {errosPrimeiraEtapa.length > 0 && (
+            <ul role="alert" className="list-disc rounded border border-destructive bg-destructive/10 p-2 pl-6 text-xs font-bold text-destructive" data-testid="dripping-faltas-etapa1">
+              {errosPrimeiraEtapa.map((m) => (
+                <li key={m}>{m}</li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </div>
