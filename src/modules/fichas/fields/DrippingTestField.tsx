@@ -30,6 +30,8 @@ interface DrippingTestFieldProps {
   primeiraEtapaTravada?: boolean;
   /** Preenchimento da 1ª etapa (nova ficha): só Lacre, M0 e M1 (e lote / hora início) aceitam valor; Retirada, M3 e M2 ficam bloqueados até a 2ª etapa. */
   somentePrimeiraEtapa?: boolean;
+  /** A 1ª etapa está sendo gravada: bloqueia o botão para um segundo clique não criar um registro duplicado. */
+  salvando?: boolean;
   /** Esconde os botões do rodapé (a tela da 2ª etapa tem os seus: finalizar e assinar). */
   semAcoes?: boolean;
 }
@@ -45,7 +47,7 @@ function horaAgora(): string {
  * EM_ANDAMENTO (quem usa o campo trata o "Salvar 1ª etapa"), e o inspetor volta depois da drenagem, pela lista de
  * monitoramentos em andamento, para a 2ª (Retirada, M3 e M2 — `primeiraEtapaTravada`). A Hora Início da drenagem
  * (banho-maria) é digitada pelo inspetor na 1ª etapa — nunca é registrada sozinha. */
-export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraEtapa, primeiraEtapaTravada = false, somentePrimeiraEtapa = false, semAcoes = false }: DrippingTestFieldProps) {
+export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraEtapa, primeiraEtapaTravada = false, somentePrimeiraEtapa = false, salvando = false, semAcoes = false }: DrippingTestFieldProps) {
   const travaPrimeiraEtapa = primeiraEtapaTravada;
   const [items, setItems] = useState<AmostraDrippingTest[]>(value?.items ?? amostrasDrippingIniciais());
   const [lote, setLote] = useState(value?.lote ?? "");
@@ -258,8 +260,8 @@ export function DrippingTestField({ value, onChange, disabled, aoSalvarPrimeiraE
           <div className="flex gap-3">
             {/* Fase 1: um único botão. Com Retirada/M2 preenchidos o teste já é a fase 2 (finalizar e assinar). */}
             {fase1 ? (
-              <Button type="button" variant="secondary" className="flex-1" onClick={salvarPrimeiraEtapa}>
-                <Save className="h-4 w-4" /> Salvar 1ª etapa do teste
+              <Button type="button" variant="secondary" className="flex-1" onClick={salvarPrimeiraEtapa} disabled={salvando}>
+                <Save className="h-4 w-4" /> {salvando ? "Salvando…" : "Salvar 1ª etapa do teste"}
               </Button>
             ) : (
               <p className="flex flex-1 items-center rounded-md border border-primary/30 bg-primary/5 px-3 text-xs text-muted-foreground">

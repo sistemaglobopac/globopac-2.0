@@ -302,6 +302,17 @@ describe("B) Dripping Test — tela", () => {
     expect(aoSalvar).toHaveBeenCalledTimes(1);
   });
 
+  it("enquanto a 1ª etapa é gravada o botão fica bloqueado (duplo clique não cria registro duplicado)", () => {
+    const aoSalvar = vi.fn();
+    render(<HarnessB aoSalvarPrimeiraEtapa={aoSalvar} salvando />);
+    preencherPrimeiraEtapa();
+    const botao = screen.getByText("Salvando…").closest("button") as HTMLButtonElement;
+    expect(botao.disabled).toBe(true);
+    fireEvent.click(botao);
+    fireEvent.click(botao);
+    expect(aoSalvar).not.toHaveBeenCalled();
+  });
+
   it("Retirada/M3/M2 preenchidos levam o teste para a 2ª etapa (sem o botão de salvar a 1ª)", () => {
     render(<HarnessB aoSalvarPrimeiraEtapa={vi.fn()} />);
     digitar(linha(0).retirada, "09:20");

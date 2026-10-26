@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm, useWatch, type FieldValues } from "react-hook-form";
@@ -306,6 +306,8 @@ interface FichaFormProps {
 }
 
 function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervaloMin, setor, perfil, onVoltar }: FichaFormProps) {
+  // Dripping: a 1ª etapa está sendo gravada (ou já foi) — impede o segundo registro por duplo clique.
+  const gravandoEtapa1Dripping = useRef(false);
   const [sucesso, setSucesso] = useState<"online" | "offline" | "em_andamento" | "rascunho" | "rascunho_nc" | "aguardando_peso" | "aguardando_chiller2" | "aguardando_dripping" | null>(null);
   // Avisos de carga já NÃO CONFORME ao salvar a etapa 1 do peso por caixa (as demais cargas ainda sem peso).
   const [avisosEtapa1, setAvisosEtapa1] = useState<string[]>([]);
@@ -645,19 +647,24 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
   /** Dripping Test — ETAPA 1: grava lote, hora de início, lacre, M0 e M1 (EM_ANDAMENTO, assinatura parcial). Retirada, M3 e M2
    * vêm na etapa 2, pela lista "Monitoramentos em andamento", quando o registro é finalizado e assinado por inteiro. */
   async function salvarEtapa1Dripping(dados: FieldValues) {
-    const valor = campoDripping ? (dados[campoDripping.chave] as DrippingTestValor | null | undefined) : undefined;
-    if (!campoDripping || !valor) return;
-    const motivos: string[] = motivosPrimeiraEtapaDripping(valor.items, valor.horaInicio ?? "", valor.lote ?? "").map((m) => `Dripping Test: ${m}`);
-    motivos.push(...motivosDeBloqueioSpr(camposVisiveis, dados, opcoesBloqueio));
-    if (continuando && motivoContinuacao.trim().length < MOTIVO_CONTINUACAO_MIN_CARACTERES) {
-      motivos.push(`Continuação: informe o motivo (mínimo ${MOTIVO_CONTINUACAO_MIN_CARACTERES} caracteres).`);
-    }
-    setMotivosBloqueio(motivos);
-    if (motivos.length > 0) return;
-    if (await bloqueadoPorDadosRepetidos(dados)) return;
-
-    setSucesso(null);
+    // Duplo clique (ou Enter + clique) não pode gravar a 1ª etapa duas vezes: só uma tentativa por vez e, gravada, nenhuma outra
+    // (a tela volta à lista logo depois). A trava vale desde o primeiro instante — antes das validações assíncronas.
+    if (gravandoEtapa1Dripping.current) return;
+    gravandoEtapa1Dripping.current = true;
+    let gravada = false;
     try {
+      const valor = campoDripping ? (dados[campoDripping.chave] as DrippingTestValor | null | undefined) : undefined;
+      if (!campoDripping || !valor) return;
+      const motivos: string[] = motivosPrimeiraEtapaDripping(valor.items, valor.horaInicio ?? "", valor.lote ?? "").map((m) => `Dripping Test: ${m}`);
+      motivos.push(...motivosDeBloqueioSpr(camposVisiveis, dados, opcoesBloqueio));
+      if (continuando && motivoContinuacao.trim().length < MOTIVO_CONTINUACAO_MIN_CARACTERES) {
+        motivos.push(`Continuação: informe o motivo (mínimo ${MOTIVO_CONTINUACAO_MIN_CARACTERES} caracteres).`);
+      }
+      setMotivosBloqueio(motivos);
+      if (motivos.length > 0) return;
+      if (await bloqueadoPorDadosRepetidos(dados)) return;
+
+      setSucesso(null);
       await criarMonitoramento.mutateAsync({
         fichaTemplateId: templateId,
         versaoTemplate,
@@ -670,6 +677,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
           [CHAVE_AGUARDANDO_DRIPPING]: true,
         },
       });
+      gravada = true;
       setContinuando(false);
       setMotivoContinuacao("");
       reset(valoresIniciaisDe(campos));
@@ -677,6 +685,9 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
       setTimeout(onVoltar, 3500);
     } catch {
       // erro refletido em criarMonitoramento.isError.
+    } finally {
+      // Só a 1ª etapa gravada mantém a trava; validação recusada ou erro liberam o inspetor para tentar de novo.
+      if (!gravada) gravandoEtapa1Dripping.current = false;
     }
   }
 
@@ -909,6 +920,7 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
                 faseAbsorcao={campoAbsorcao ? "INICIAL" : undefined}
                 aoSalvarPrimeiraEtapaDripping={() => void handleSubmit(aoEnviar)()}
                 somentePrimeiraEtapaDripping
+                salvandoPrimeiraEtapaDripping={isSubmitting || criarMonitoramento.isPending}
               />
             ))}
 
