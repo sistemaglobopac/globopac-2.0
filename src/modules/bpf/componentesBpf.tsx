@@ -1,4 +1,5 @@
 import { Badge } from "@/shared/ui/badge";
+import { FotosDaSolicitacao } from "./FotosSolicitacao";
 import { formatarData, formatarDataHora, hashCurto } from "./regras";
 import type { Solicitacao, StatusSolicitacao } from "./tipos";
 
@@ -35,6 +36,7 @@ export function DadosSolicitacao({ ss, mostrarAssinatura }: { ss: Solicitacao; m
       <p className="text-xs text-muted-foreground">
         Constatada em {formatarDataHora(ss.constatado_em)} por {ss.aberta_por_nome}
       </p>
+      <FotosDaSolicitacao solicitacaoId={ss.id} />
       {ss.status === "REPROVADA" && ss.motivo_reprovacao && (
         <p className="text-xs text-destructive">
           Reprovada por {ss.reprovada_por_nome} em {formatarData(ss.reprovada_em)}: {ss.motivo_reprovacao}

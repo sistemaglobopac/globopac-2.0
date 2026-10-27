@@ -52,6 +52,21 @@ export interface Solicitacao {
   criado_em: string;
 }
 
+/** Foto anexada pelo inspetor à SS (bucket privado bpf-fotos). */
+export interface FotoSolicitacao {
+  id: string;
+  solicitacao_id: string;
+  nome: string;
+  caminho: string;
+  tipo_mime: string | null;
+  tamanho_bytes: number | null;
+  enviado_por: string;
+  criado_em: string;
+}
+
+export const MAX_FOTOS_SOLICITACAO = 10;
+export const TAMANHO_MAXIMO_FOTO_BYTES = 10 * 1024 * 1024;
+
 export interface Programacao {
   sequencia: number;
   prazo: string;

@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { hojeManaus, inicioDoDiaManausIso } from "./regras";
+import { nomeSeguroArquivo } from "@/modules/rnc/api";
 import type {
   CentroCustoRef,
+  FotoSolicitacao,
   ItemImportacao,
   Ordem,
   Programacao,
@@ -12,7 +14,7 @@ import type {
   StatusSolicitacao,
   Verificacao,
 } from "./tipos";
-import { SETOR_BPF } from "./tipos";
+import { SETOR_BPF, TAMANHO_MAXIMO_FOTO_BYTES } from "./tipos";
 
 const COLUNAS_PROGRAMACAO =
   "sequencia, prazo, acao_corretiva, responsavel, justificativa, importada, programado_por_nome, hash_assinatura, criado_em";
@@ -80,6 +82,59 @@ export function useSolicitacoes(opcoes?: { status?: StatusSolicitacao[]; limite?
     },
     refetchInterval: 30_000,
   });
+}
+
+const BUCKET_FOTOS_SS = "bpf-fotos";
+
+/** Envia as fotos para o storage privado e registra cada uma em bpf_solicitacao_fotos. Devolve quantas
+ * falharam (a SS já foi gravada — a foto não pode derrubar a abertura). */
+export async function enviarFotosSolicitacao(solicitacaoId: string, fotos: File[], userId: string): Promise<number> {
+  let falhas = 0;
+  for (const foto of fotos) {
+    if (foto.size > TAMANHO_MAXIMO_FOTO_BYTES) {
+      falhas += 1;
+      continue;
+    }
+    const caminho = `${solicitacaoId}/${crypto.randomUUID()}-${nomeSeguroArquivo(foto.name)}`;
+    const { error: erroUpload } = await supabase.storage.from(BUCKET_FOTOS_SS).upload(caminho, foto, { contentType: foto.type || undefined });
+    if (erroUpload) {
+      falhas += 1;
+      continue;
+    }
+    const { error: erroRegistro } = await supabase.from("bpf_solicitacao_fotos").insert({
+      solicitacao_id: solicitacaoId,
+      nome: foto.name,
+      caminho,
+      tipo_mime: foto.type || null,
+      tamanho_bytes: foto.size,
+      enviado_por: userId,
+    });
+    if (erroRegistro) falhas += 1;
+  }
+  return falhas;
+}
+
+export function useFotosSolicitacao(solicitacaoId: string) {
+  return useQuery({
+    queryKey: ["bpf", "fotos", solicitacaoId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("bpf_solicitacao_fotos")
+        .select("*")
+        .eq("solicitacao_id", solicitacaoId)
+        .order("criado_em", { ascending: true })
+        .overrideTypes<FotoSolicitacao[], { merge: false }>();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+/** URL temporária (5 min) para abrir uma foto do bucket privado. */
+export async function urlFotoSolicitacao(caminho: string): Promise<string> {
+  const { data, error } = await supabase.storage.from(BUCKET_FOTOS_SS).createSignedUrl(caminho, 300);
+  if (error || !data) throw error ?? new Error("Não foi possível abrir a foto.");
+  return data.signedUrl;
 }
 
 /** OS que o inspetor monitora hoje: as programadas e as que foram dadas como conformes hoje

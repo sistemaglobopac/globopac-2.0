@@ -10,7 +10,9 @@ import { useAppDialog } from "@/modules/gestao/dialogSystem";
 import { useCentrosCusto } from "@/modules/gestao/api";
 import { CabecalhoBpf, PaginaBpf } from "./PaginaBpf";
 import { DadosSolicitacao } from "./componentesBpf";
-import { useAbrirSolicitacao, useSolicitacoes } from "./api";
+import { useSessionStore } from "@/store/session";
+import { enviarFotosSolicitacao, useAbrirSolicitacao, useSolicitacoes } from "./api";
+import { AdicionarFotos, SeletorFotos } from "./FotosSolicitacao";
 import { CATEGORIAS_BPF } from "./tipos";
 
 /** Data/hora atual de Manaus no formato do <input type="datetime-local"> (AAAA-MM-DDTHH:mm). */
@@ -39,6 +41,34 @@ function Conteudo() {
   const [local, setLocal] = useState("");
   const [descricao, setDescricao] = useState("");
   const [constatadoEm, setConstatadoEm] = useState(agoraManausParaInput);
+  const [fotos, setFotos] = useState<File[]>([]);
+  const [enviandoFotos, setEnviandoFotos] = useState(false);
+  const perfil = useSessionStore((s) => s.perfil);
+
+  async function aposAbrir(ssId: string) {
+    let falhas = 0;
+    if (fotos.length > 0 && perfil) {
+      setEnviandoFotos(true);
+      try {
+        falhas = await enviarFotosSolicitacao(ssId, fotos, perfil.id);
+      } finally {
+        setEnviandoFotos(false);
+      }
+    }
+    if (falhas > 0) {
+      dialog.alert({
+        titulo: "Solicitação aberta, mas faltaram fotos",
+        mensagem: `${falhas} foto(s) não foram enviadas. Anexe de novo em "Solicitações recentes", enquanto a solicitação aguarda aprovação.`,
+        icone: "warning",
+      });
+    } else {
+      dialog.sucesso("Solicitação enviada. Ela aguarda a assinatura de um administrador.", "Solicitação aberta");
+    }
+    setDescricao("");
+    setLocal("");
+    setFotos([]);
+    setConstatadoEm(agoraManausParaInput());
+  }
 
   function enviar(e: React.FormEvent) {
     e.preventDefault();
@@ -60,12 +90,7 @@ function Conteudo() {
         constatadoEm: `${constatadoEm}:00-04:00`,
       },
       {
-        onSuccess: () => {
-          dialog.sucesso("Solicitação enviada. Ela aguarda a assinatura de um administrador.", "Solicitação aberta");
-          setDescricao("");
-          setLocal("");
-          setConstatadoEm(agoraManausParaInput());
-        },
+        onSuccess: (ss) => void aposAbrir(ss.id),
         onError: (erro) => dialog.erro(erro, "Não foi possível abrir a solicitação"),
       }
     );
@@ -143,8 +168,12 @@ function Conteudo() {
                 className="max-w-xs"
               />
             </div>
-            <Button type="submit" disabled={abrir.isPending}>
-              {abrir.isPending ? "Enviando…" : "Enviar para aprovação"}
+            <div className="space-y-2">
+              <Label>Fotos (opcional)</Label>
+              <SeletorFotos fotos={fotos} onChange={setFotos} disabled={abrir.isPending || enviandoFotos} />
+            </div>
+            <Button type="submit" disabled={abrir.isPending || enviandoFotos}>
+              {abrir.isPending ? "Enviando…" : enviandoFotos ? "Enviando fotos…" : "Enviar para aprovação"}
             </Button>
           </form>
         </CardContent>
@@ -158,6 +187,17 @@ function Conteudo() {
           <Card key={ss.id}>
             <CardContent className="p-4">
               <DadosSolicitacao ss={ss} mostrarAssinatura />
+              {perfil && ss.aberta_por === perfil.id && ss.status === "AGUARDANDO_APROVACAO" && (
+                <AdicionarFotos
+                  solicitacaoId={ss.id}
+                  userId={perfil.id}
+                  aoEnviar={(falhas) =>
+                    falhas > 0
+                      ? dialog.alert({ titulo: "Algumas fotos não foram enviadas", mensagem: `${falhas} foto(s) falharam. Tente de novo.`, icone: "warning" })
+                      : dialog.sucesso("Fotos anexadas à solicitação.", "Fotos enviadas")
+                  }
+                />
+              )}
             </CardContent>
           </Card>
         ))}

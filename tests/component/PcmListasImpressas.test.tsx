@@ -11,6 +11,7 @@ vi.mock("@/modules/bpf/api", () => ({
   useOrdensProgramadas: () => ({ data: ordens, isLoading: false }),
   useProgramarSolicitacao: () => ({ mutate: vi.fn(), isPending: false }),
   useReprogramarOrdem: () => ({ mutate: vi.fn(), isPending: false }),
+  useFotosSolicitacao: () => ({ data: [] }),
 }));
 
 import { PcmPage } from "@/modules/bpf/PcmPage";
