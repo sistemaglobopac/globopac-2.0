@@ -64,7 +64,7 @@ function CartaoOs({ ordem, hoje, bloqueado }: { ordem: Ordem; hoje: string; bloq
           <p className="text-sm font-medium">{ordem.descricao}</p>
           {ordem.acao_corretiva && <p className="text-xs text-muted-foreground">Ação do PCM: {ordem.acao_corretiva}</p>}
           <p className="text-xs text-muted-foreground">
-            {ordem.responsavel ? `Resp.: ${ordem.responsavel} · ` : ""}Constatada em {formatarData(ordem.constatado_em)}
+            {ordem.constatado_por ? `Inspetor: ${ordem.constatado_por} · ` : ordem.responsavel ? `Resp.: ${ordem.responsavel} · ` : ""}Constatada em {formatarData(ordem.constatado_em)}
             {ordem.local_detalhe ? ` · ${ordem.local_detalhe}` : ""}
           </p>
           {ordem.programacoes.length > 1 && (

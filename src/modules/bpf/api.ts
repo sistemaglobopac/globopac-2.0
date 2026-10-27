@@ -19,17 +19,20 @@ const COLUNAS_PROGRAMACAO =
 const COLUNAS_VERIFICACAO =
   "id, ordem_id, data_verificacao, hora_verificacao, resultado, prazo_vigente, observacao, inspetor_nome";
 
-type OrdemBruta = Omit<Ordem, "centro" | "programacoes" | "verificacoes"> & {
+type OrdemBruta = Omit<Ordem, "centro" | "programacoes" | "verificacoes" | "constatado_por"> & {
   centros_custo: CentroCustoRef | null;
   bpf_programacoes: Programacao[] | null;
   bpf_verificacoes: Verificacao[] | null;
+  /** SS de origem (nula nas OS importadas): de lá vem o inspetor que constatou a não conformidade. */
+  bpf_solicitacoes: { aberta_por_nome: string } | null;
 };
 
 function normalizarOrdem(o: OrdemBruta): Ordem {
-  const { centros_custo, bpf_programacoes, bpf_verificacoes, ...resto } = o;
+  const { centros_custo, bpf_programacoes, bpf_verificacoes, bpf_solicitacoes, ...resto } = o;
   return {
     ...resto,
     centro: centros_custo,
+    constatado_por: bpf_solicitacoes?.aberta_por_nome ?? null,
     programacoes: [...(bpf_programacoes ?? [])].sort((a, b) => a.sequencia - b.sequencia),
     verificacoes: bpf_verificacoes ?? [],
   };
@@ -89,7 +92,7 @@ export function useOrdensParaVerificar() {
       const { data, error } = await supabase
         .from("bpf_ordens")
         .select(
-          `*, centros_custo(id, codigo, nome), bpf_programacoes(${COLUNAS_PROGRAMACAO}), bpf_verificacoes(${COLUNAS_VERIFICACAO})`
+          `*, centros_custo(id, codigo, nome), bpf_solicitacoes(aberta_por_nome), bpf_programacoes(${COLUNAS_PROGRAMACAO}), bpf_verificacoes(${COLUNAS_VERIFICACAO})`
         )
         .or(`status.eq.PROGRAMADA,concluida_em.gte.${inicioDoDiaManausIso(hoje)}`)
         .eq("bpf_verificacoes.data_verificacao", hoje)
@@ -111,7 +114,7 @@ export function useOrdensProgramadas() {
       const { data, error } = await supabase
         .from("bpf_ordens")
         .select(
-          `*, centros_custo(id, codigo, nome), bpf_programacoes(${COLUNAS_PROGRAMACAO}), bpf_verificacoes(${COLUNAS_VERIFICACAO})`
+          `*, centros_custo(id, codigo, nome), bpf_solicitacoes(aberta_por_nome), bpf_programacoes(${COLUNAS_PROGRAMACAO}), bpf_verificacoes(${COLUNAS_VERIFICACAO})`
         )
         .eq("status", "PROGRAMADA")
         .order("prazo_atual", { ascending: true })

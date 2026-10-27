@@ -56,7 +56,12 @@ function LinhaItem({ item }: { item: ItemRelatorio }) {
             {p.justificativa && <p className="italic text-slate-700">Motivo: {p.justificativa}</p>}
           </div>
         ))}
-        {item.responsavel && <p className="text-[10px]">Resp.: {item.responsavel}</p>}
+        {/* Quem constatou é o inspetor que abriu a SS; o "responsável" digitado pelo PCM só aparece nas OS sem SS (importadas). */}
+        {item.constatado_por ? (
+          <p className="text-[10px]">Inspetor: {item.constatado_por}</p>
+        ) : (
+          item.responsavel && <p className="text-[10px]">Resp.: {item.responsavel}</p>
+        )}
         {item.aprovada_por && (
           <p className="text-[10px] text-slate-600">
             SS aprovada por {item.aprovada_por} em {formatarData(item.aprovada_em)}

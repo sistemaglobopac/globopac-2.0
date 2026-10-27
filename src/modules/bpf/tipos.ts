@@ -88,6 +88,8 @@ export interface Ordem {
   constatado_em: string;
   acao_corretiva: string | null;
   responsavel: string | null;
+  /** Inspetor que abriu a SS de origem; nulo nas OS importadas, que não têm SS. */
+  constatado_por: string | null;
   prazo_atual: string;
   reprogramacoes: number;
   status: StatusOrdem;
