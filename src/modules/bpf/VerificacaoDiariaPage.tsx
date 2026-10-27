@@ -4,8 +4,8 @@ import { MessageSquare } from "lucide-react";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
-import { Input } from "@/shared/ui/input";
 import { Select } from "@/shared/ui/select";
+import { Textarea } from "@/shared/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useAppDialog } from "@/modules/gestao/dialogSystem";
 import { CabecalhoBpf, PaginaBpf } from "./PaginaBpf";
@@ -86,7 +86,11 @@ function CartaoOs({ ordem, hoje, bloqueado }: { ordem: Ordem; hoje: string; bloq
                 size="sm"
                 variant="outline"
                 disabled={!permitido || bloqueado || registrar.isPending}
-                onClick={() => marcar(r)}
+                onClick={() => {
+                  // Não conforme pede o motivo (ex.: executada pela metade): já deixa o campo aberto.
+                  if (r === "NC") setMostrarObs(true);
+                  marcar(r);
+                }}
                 className={cn("min-w-28", selecionado && ESTILO_SELECIONADO[r])}
                 aria-pressed={selecionado}
                 title={permitido ? undefined : "O prazo já venceu"}
@@ -108,17 +112,21 @@ function CartaoOs({ ordem, hoje, bloqueado }: { ordem: Ordem; hoje: string; bloq
         )}
 
         {mostrarObs && (
-          <div className="flex items-center gap-2">
-            <Input
+          <div className="space-y-2">
+            <Textarea
               value={obs}
               onChange={(e) => setObs(e.target.value)}
-              placeholder="Observação do inspetor (opcional)"
+              rows={3}
+              placeholder="Observação do inspetor (opcional). Ex.: instalaram o chuveiro, mas a fiação continua solta."
               disabled={bloqueado}
               aria-label={`Observação da OS ${ordem.numero_os}`}
             />
+            <p className="text-xs text-muted-foreground">
+              A observação vai para o relatório do dia e para o PCM, que a vê ao reprogramar a OS.
+            </p>
             {verificacao && !bloqueado && obs.trim() !== (verificacao.observacao ?? "") && (
               <Button type="button" size="sm" onClick={() => marcar(verificacao.resultado)} disabled={registrar.isPending}>
-                Salvar
+                Salvar observação
               </Button>
             )}
           </div>
