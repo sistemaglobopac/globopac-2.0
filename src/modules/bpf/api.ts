@@ -234,6 +234,21 @@ export function useAprovarSolicitacao() {
   });
 }
 
+/** Administrador ajusta descrição, local e tipo da SS antes de assinar (histórico gravado no banco). */
+export function useEditarSolicitacao() {
+  const invalidar = useInvalidarBpf();
+  return useMutation({
+    mutationFn: (input: { id: string; descricao: string; localDetalhe: string; categoria: string }) =>
+      chamar<Solicitacao>("bpf_editar_solicitacao", {
+        p_id: input.id,
+        p_descricao: input.descricao,
+        p_local_detalhe: input.localDetalhe || null,
+        p_categoria: input.categoria,
+      }),
+    onSuccess: invalidar,
+  });
+}
+
 export function useReprovarSolicitacao() {
   const invalidar = useInvalidarBpf();
   return useMutation({

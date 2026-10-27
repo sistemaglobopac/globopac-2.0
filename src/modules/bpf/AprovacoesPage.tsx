@@ -1,23 +1,59 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { Pencil } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
+import { Input } from "@/shared/ui/input";
+import { Label } from "@/shared/ui/label";
+import { Select } from "@/shared/ui/select";
 import { Textarea } from "@/shared/ui/textarea";
 import { useAppDialog } from "@/modules/gestao/dialogSystem";
 import { useSessionStore } from "@/store/session";
 import { CabecalhoBpf, PaginaBpf } from "./PaginaBpf";
 import { DadosSolicitacao } from "./componentesBpf";
-import { useAprovarSolicitacao, useReprovarSolicitacao, useSolicitacoes } from "./api";
-import type { Solicitacao } from "./tipos";
+import { useAprovarSolicitacao, useEditarSolicitacao, useReprovarSolicitacao, useSolicitacoes } from "./api";
+import { CATEGORIAS_BPF, type Solicitacao } from "./tipos";
 
 function CartaoAprovacao({ ss }: { ss: Solicitacao }) {
   const dialog = useAppDialog();
   const meuId = useSessionStore((s) => s.perfil?.id);
   const aprovar = useAprovarSolicitacao();
   const reprovar = useReprovarSolicitacao();
+  const editar = useEditarSolicitacao();
   const [reprovando, setReprovando] = useState(false);
   const [motivo, setMotivo] = useState("");
+  const [editando, setEditando] = useState(false);
+  const [descricao, setDescricao] = useState(ss.descricao);
+  const [local, setLocal] = useState(ss.local_detalhe ?? "");
+  const [categoria, setCategoria] = useState(ss.categoria);
   const propria = ss.aberta_por === meuId;
+  // Se o tipo gravado não está mais na lista (ou veio de outra versão), mantém-no como opção.
+  const tipos = (CATEGORIAS_BPF as readonly string[]).includes(ss.categoria) ? [...CATEGORIAS_BPF] : [ss.categoria, ...CATEGORIAS_BPF];
+
+  function abrirEdicao() {
+    setDescricao(ss.descricao);
+    setLocal(ss.local_detalhe ?? "");
+    setCategoria(ss.categoria);
+    setEditando(true);
+  }
+
+  function salvarEdicao() {
+    if (descricao.trim().length < 10 || !categoria) {
+      dialog.alert({
+        titulo: "Preencha os campos obrigatórios",
+        mensagem: "Informe o tipo da não conformidade e a descrição (mínimo de 10 caracteres).",
+        icone: "warning",
+      });
+      return;
+    }
+    editar.mutate(
+      { id: ss.id, descricao, localDetalhe: local, categoria },
+      {
+        onSuccess: () => setEditando(false),
+        onError: (erro) => dialog.erro(erro, "Não foi possível salvar a edição"),
+      }
+    );
+  }
 
   function confirmarAprovacao() {
     dialog.confirm({
@@ -52,7 +88,48 @@ function CartaoAprovacao({ ss }: { ss: Solicitacao }) {
   return (
     <Card>
       <CardContent className="space-y-3 p-4">
-        <DadosSolicitacao ss={ss} />
+        {editando ? (
+          <div className="space-y-3 rounded-lg border border-hairline p-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label htmlFor={`ed-tipo-${ss.id}`}>Tipo de não conformidade</Label>
+                <Select id={`ed-tipo-${ss.id}`} value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+                  {tipos.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor={`ed-local-${ss.id}`}>Onde exatamente</Label>
+                <Input id={`ed-local-${ss.id}`} value={local} onChange={(e) => setLocal(e.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor={`ed-desc-${ss.id}`}>Descrição da não conformidade</Label>
+              <Textarea id={`ed-desc-${ss.id}`} rows={4} value={descricao} onChange={(e) => setDescricao(e.target.value)} />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              O ajuste fica registrado (quem alterou, quando e o texto anterior) e a assinatura vale para o texto já ajustado.
+            </p>
+            <div className="flex gap-2">
+              <Button type="button" size="sm" onClick={salvarEdicao} disabled={editar.isPending}>
+                {editar.isPending ? "Salvando…" : "Salvar ajuste"}
+              </Button>
+              <Button type="button" size="sm" variant="ghost" onClick={() => setEditando(false)} disabled={editar.isPending}>
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <DadosSolicitacao ss={ss} />
+            <Button type="button" size="sm" variant="ghost" onClick={abrirEdicao} disabled={reprovando}>
+              <Pencil className="h-4 w-4" /> Editar texto, local e tipo
+            </Button>
+          </>
+        )}
         {propria && (
           <p className="text-xs text-warning">Você abriu esta solicitação; por segregação de funções, outro administrador precisa aprová-la.</p>
         )}
@@ -76,7 +153,7 @@ function CartaoAprovacao({ ss }: { ss: Solicitacao }) {
           </div>
         ) : (
           <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" onClick={confirmarAprovacao} disabled={propria || aprovar.isPending}>
+            <Button type="button" size="sm" onClick={confirmarAprovacao} disabled={propria || aprovar.isPending || editando}>
               Assinar e aprovar
             </Button>
             <Button type="button" size="sm" variant="outline" onClick={() => setReprovando(true)} disabled={propria}>

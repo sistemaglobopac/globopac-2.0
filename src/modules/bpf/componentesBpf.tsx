@@ -36,6 +36,11 @@ export function DadosSolicitacao({ ss, mostrarAssinatura }: { ss: Solicitacao; m
       <p className="text-xs text-muted-foreground">
         Constatada em {formatarDataHora(ss.constatado_em)} por {ss.aberta_por_nome}
       </p>
+      {ss.editada_em && (
+        <p className="text-xs text-muted-foreground">
+          Texto ajustado pelo administrador {ss.editada_por_nome} em {formatarDataHora(ss.editada_em)}
+        </p>
+      )}
       <FotosDaSolicitacao solicitacaoId={ss.id} />
       {ss.status === "REPROVADA" && ss.motivo_reprovacao && (
         <p className="text-xs text-destructive">

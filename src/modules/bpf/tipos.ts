@@ -59,6 +59,9 @@ export interface Solicitacao {
   reprovada_por_nome: string | null;
   reprovada_em: string | null;
   motivo_reprovacao: string | null;
+  /** Último ajuste do administrador antes da assinatura (descrição, local ou tipo). */
+  editada_por_nome: string | null;
+  editada_em: string | null;
   criado_em: string;
 }
 
