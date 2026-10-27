@@ -14,7 +14,7 @@ import { CabecalhoBpf, PaginaBpf } from "./PaginaBpf";
 import { DadosSolicitacao } from "./componentesBpf";
 import { ListaImpressaAProgramar, ListaImpressaDevolvidas, ListaImpressaProgramadas } from "./ListasImpressasPcm";
 import { useOrdensProgramadas, useProgramarSolicitacao, useReprogramarOrdem, useSolicitacoes } from "./api";
-import { devolucaoAoPcm, formatarData, hojeManaus, rotuloProgramacao, situacaoPrazo } from "./regras";
+import { devolucaoAoPcm, formatarData, hojeManaus, rotuloInspetorOuResp, rotuloProgramacao, situacaoPrazo } from "./regras";
 import type { Ordem, Solicitacao } from "./tipos";
 
 function CartaoProgramar({ ss }: { ss: Solicitacao }) {
@@ -152,7 +152,7 @@ function CartaoOsProgramada({ ordem }: { ordem: Ordem }) {
           <p className="text-sm font-medium">{ordem.descricao}</p>
           <p className="text-xs text-muted-foreground">
             {ordem.acao_corretiva ? `Ação: ${ordem.acao_corretiva} · ` : ""}
-            {ordem.responsavel ? `Resp.: ${ordem.responsavel} · ` : ""}Constatada em {formatarData(ordem.constatado_em)}
+            {rotuloInspetorOuResp(ordem)}Constatada em {formatarData(ordem.constatado_em)}
           </p>
         </div>
 

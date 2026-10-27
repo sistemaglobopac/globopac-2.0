@@ -69,6 +69,13 @@ export function situacaoPrazo(prazoAtual: string, hoje: string): { vencido: bool
 
 const ROMANOS = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
 
+/** Quem aparece na linha de identificação da OS: o inspetor que abriu a SS. O "responsável" digitado pelo
+ * PCM (que vem preenchido com o nome de quem programa) só vale nas OS sem SS (importadas). Já traz o " · " final. */
+export function rotuloInspetorOuResp(ordem: Pick<Ordem, "constatado_por" | "responsavel">): string {
+  if (ordem.constatado_por) return `Inspetor: ${ordem.constatado_por} · `;
+  return ordem.responsavel ? `Resp.: ${ordem.responsavel} · ` : "";
+}
+
 /** "Prog" para a programação original; "Rep. I", "Rep. II"... para as reprogramações. */
 export function rotuloProgramacao(sequencia: number): string {
   if (sequencia === 0) return "Prog";

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { formatarData, formatarDataHora, devolucaoAoPcm, hojeManaus, rotuloProgramacao, situacaoPrazo } from "./regras";
+import { formatarData, formatarDataHora, devolucaoAoPcm, hojeManaus, rotuloInspetorOuResp, rotuloProgramacao, situacaoPrazo } from "./regras";
 import type { Ordem, Solicitacao } from "./tipos";
 
 /** Folha de impressão do PCM: fica oculta na tela e é a única coisa impressa (o CSS de impressão do app mostra só
@@ -80,7 +80,7 @@ function DescricaoDaOs({ ordem }: { ordem: Ordem }) {
       <p className="font-semibold">{ordem.descricao}</p>
       <p className="text-slate-600">
         {ordem.acao_corretiva ? `Ação: ${ordem.acao_corretiva} · ` : ""}
-        {ordem.responsavel ? `Resp.: ${ordem.responsavel} · ` : ""}Constatada em {formatarData(ordem.constatado_em)}
+        {rotuloInspetorOuResp(ordem)}Constatada em {formatarData(ordem.constatado_em)}
       </p>
     </>
   );
