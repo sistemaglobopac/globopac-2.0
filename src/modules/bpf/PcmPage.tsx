@@ -14,7 +14,7 @@ import { CabecalhoBpf, PaginaBpf } from "./PaginaBpf";
 import { DadosSolicitacao } from "./componentesBpf";
 import { ListaImpressaAProgramar, ListaImpressaDevolvidas, ListaImpressaProgramadas } from "./ListasImpressasPcm";
 import { useOrdensProgramadas, useProgramarSolicitacao, useReprogramarOrdem, useSolicitacoes } from "./api";
-import { devolucaoAoPcm, formatarData, hojeManaus, rotuloInspetorOuResp, rotuloProgramacao, situacaoPrazo } from "./regras";
+import { devolucaoAoPcm, formatarData, hojeManaus, rotuloInspetorOuResp, rotuloProgramacao, situacaoPrazo, ultimaObservacaoDoInspetor } from "./regras";
 import type { Ordem, Solicitacao } from "./tipos";
 
 function CartaoProgramar({ ss }: { ss: Solicitacao }) {
@@ -95,6 +95,9 @@ function CartaoOsProgramada({ ordem }: { ordem: Ordem }) {
   const reprogramar = useReprogramarOrdem();
   const prazo = situacaoPrazo(ordem.prazo_atual, hoje);
   const devolucao = devolucaoAoPcm(ordem);
+  // Observação do inspetor em qualquer resultado (até dentro do prazo); a da devolução já aparece no aviso vermelho.
+  const observacao = ultimaObservacaoDoInspetor(ordem);
+  const observacaoAparte = observacao && observacao.id !== devolucao?.id ? observacao : null;
   const [aberto, setAberto] = useState(false);
   const [novoPrazo, setNovoPrazo] = useState("");
   const [justificativa, setJustificativa] = useState("");
@@ -138,14 +141,24 @@ function CartaoOsProgramada({ ordem }: { ordem: Ordem }) {
           {ordem.reprogramacoes > 0 && <Badge variant="warning">Reprogramada {ordem.reprogramacoes}×</Badge>}
           {ordem.origem === "importada" && <Badge variant="outline">Importada</Badge>}
           {devolucao && <Badge variant="destructive">Devolvida pelo inspetor</Badge>}
+          {observacaoAparte && <Badge variant="warning">Observação do inspetor</Badge>}
         </div>
+        {observacaoAparte && (
+          <div className="rounded-lg border-2 border-warning bg-warning/10 p-3 text-sm" role="alert">
+            <p className="font-semibold">
+              Observação do inspetor — {formatarData(observacaoAparte.data_verificacao)} ({observacaoAparte.inspetor_nome})
+            </p>
+            <p className="mt-1 whitespace-pre-wrap">{observacaoAparte.observacao}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Providencie a adequação antes da próxima verificação.</p>
+          </div>
+        )}
         {devolucao && (
           <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm" role="alert">
             <p>
               <strong>Não conforme</strong> em {formatarData(devolucao.data_verificacao)} ({devolucao.inspetor_nome}). Reprograme o prazo e
               justifique para devolver a OS ao monitoramento.
             </p>
-            {devolucao.observacao && <p className="mt-1 text-muted-foreground">Observação do inspetor: {devolucao.observacao}</p>}
+            {devolucao.observacao && <p className="mt-1 whitespace-pre-wrap font-medium">Observação do inspetor: {devolucao.observacao}</p>}
           </div>
         )}
         <div className="space-y-1">
@@ -225,6 +238,7 @@ function Conteudo() {
   );
   const vencidas = (ordens ?? []).filter((o) => o.prazo_atual < hojeManaus()).length;
   const devolvidas = useMemo(() => (ordens ?? []).filter((o) => devolucaoAoPcm(o)), [ordens]);
+  const comObservacao = useMemo(() => (ordens ?? []).filter((o) => ultimaObservacaoDoInspetor(o)).length, [ordens]);
   // A lista impressa é a da aba aberta: o que está na tela (a de programadas respeita a busca).
   const qtdDaAba = aba === "programar" ? (aProgramar ?? []).length : aba === "devolvidas" ? devolvidas.length : filtradas.length;
 
@@ -244,6 +258,7 @@ function Conteudo() {
         </Button>
         <Button type="button" role="tab" aria-selected={aba === "programadas"} variant={aba === "programadas" ? "default" : "outline"} size="sm" onClick={() => setAba("programadas")}>
           OS programadas ({(ordens ?? []).length}){vencidas > 0 ? ` · ${vencidas} vencida(s)` : ""}
+          {comObservacao > 0 ? ` · ${comObservacao} com observação` : ""}
         </Button>
         <Button type="button" size="sm" variant="outline" className="ml-auto" onClick={imprimirElemento} disabled={qtdDaAba === 0}>
           <Printer className="h-4 w-4" /> Imprimir lista

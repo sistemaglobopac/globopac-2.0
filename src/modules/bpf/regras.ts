@@ -103,9 +103,20 @@ function instanteVerificacao(v: Pick<Verificacao, "data_verificacao" | "hora_ver
   return new Date(`${v.data_verificacao}T${v.hora_verificacao.slice(0, 8)}-04:00`).getTime();
 }
 
+/** Observação mais recente que o inspetor deixou na OS (em qualquer resultado e mesmo dentro do prazo):
+ * o PCM precisa vê-la para providenciar a adequação. Espera `ordem.verificacoes` com o histórico
+ * da OS (ver useOrdensProgramadas). Retorna a verificação que a contém ou null. */
+export function ultimaObservacaoDoInspetor(ordem: Pick<Ordem, "verificacoes">): Verificacao | null {
+  return (
+    [...ordem.verificacoes]
+      .filter((v) => (v.observacao ?? "").trim().length > 0)
+      .sort((a, b) => instanteVerificacao(b) - instanteVerificacao(a))[0] ?? null
+  );
+}
+
 /** OS devolvida ao PCM: a última verificação do inspetor foi Não conforme e o PCM ainda não
  * reprogramou depois dela. Retorna essa verificação (com a observação do inspetor) ou null.
- * Espera `ordem.verificacoes` com a verificação mais recente da OS (ver useOrdensProgramadas). */
+ * Espera `ordem.verificacoes` com o histórico da OS (ver useOrdensProgramadas). */
 export function devolucaoAoPcm(ordem: Pick<Ordem, "status" | "verificacoes" | "programacoes">): Verificacao | null {
   if (ordem.status !== "PROGRAMADA") return null;
   const ultima = [...ordem.verificacoes].sort((a, b) => instanteVerificacao(b) - instanteVerificacao(a))[0];

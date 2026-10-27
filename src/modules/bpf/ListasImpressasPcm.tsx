@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { formatarData, formatarDataHora, devolucaoAoPcm, hojeManaus, rotuloInspetorOuResp, rotuloProgramacao, situacaoPrazo } from "./regras";
+import { formatarData, formatarDataHora, devolucaoAoPcm, hojeManaus, rotuloInspetorOuResp, rotuloProgramacao, situacaoPrazo, ultimaObservacaoDoInspetor } from "./regras";
 import type { Ordem, Solicitacao } from "./tipos";
 
 /** Folha de impressão do PCM: fica oculta na tela e é a única coisa impressa (o CSS de impressão do app mostra só
@@ -135,6 +135,9 @@ export function ListaImpressaProgramadas({ ordens, filtro }: { ordens: Ordem[]; 
             <td className={CELULA}>
               <span className={prazo.vencido ? "font-semibold text-red-700" : ""}>{prazo.texto}</span>
               {devolucaoAoPcm(o) && <p className="text-red-700">Devolvida pelo inspetor</p>}
+              {ultimaObservacaoDoInspetor(o)?.observacao && (
+                <p className="font-semibold">Obs. do inspetor: {ultimaObservacaoDoInspetor(o)?.observacao}</p>
+              )}
             </td>
           </tr>
         );

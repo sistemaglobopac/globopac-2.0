@@ -9,6 +9,7 @@ import {
   resumirAssinaturas,
   rotuloProgramacao,
   situacaoPrazo,
+  ultimaObservacaoDoInspetor,
 } from "@/modules/bpf/regras";
 import { dataParaIso, lerCsvOrdens } from "@/modules/bpf/importacao";
 import type { ItemRelatorio, Ordem } from "@/modules/bpf/tipos";
@@ -41,6 +42,27 @@ describe("devolucaoAoPcm", () => {
     expect(devolucaoAoPcm(ordem({ verificacoes: [] }))).toBeNull();
     expect(devolucaoAoPcm(ordem({ verificacoes: [{ ...nc, resultado: "NP" }] }))).toBeNull();
     expect(devolucaoAoPcm(ordem({ status: "CONCLUIDA" }))).toBeNull();
+  });
+});
+
+describe("ultimaObservacaoDoInspetor", () => {
+  const ver = (id: string, data: string, resultado: "C" | "NP" | "NC", observacao: string | null) => ({
+    id, ordem_id: "o1", data_verificacao: data, hora_verificacao: "10:00:00", resultado, prazo_vigente: "2026-11-05", observacao, inspetor_nome: "Ana",
+  });
+
+  it("devolve a observação mais recente, mesmo de uma OS dentro do prazo (NP)", () => {
+    const antiga = ver("v1", "2026-10-22", "NP", "Fiação solta");
+    const nova = ver("v2", "2026-10-24", "NP", "Chuveiro instalado, fiação continua solta");
+    expect(ultimaObservacaoDoInspetor({ verificacoes: [antiga, nova] })).toEqual(nova);
+  });
+  it("uma verificação mais nova sem texto não apaga a observação anterior", () => {
+    const comTexto = ver("v1", "2026-10-22", "NC", "Falta a fiação");
+    const semTexto = ver("v2", "2026-10-24", "NP", null);
+    expect(ultimaObservacaoDoInspetor({ verificacoes: [semTexto, comTexto] })).toEqual(comTexto);
+  });
+  it("ignora observação vazia ou só com espaços", () => {
+    expect(ultimaObservacaoDoInspetor({ verificacoes: [ver("v1", "2026-10-22", "NP", "   ")] })).toBeNull();
+    expect(ultimaObservacaoDoInspetor({ verificacoes: [] })).toBeNull();
   });
 });
 
