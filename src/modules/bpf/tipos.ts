@@ -21,6 +21,14 @@ export const CATEGORIAS_BPF = [
   "Oxidação / ferrugem",
   "Solda não sanitária",
   "Portas / maçanetas",
+  "Aberturas, frestas",
+  "Água residual",
+  "Reparo improvisado",
+  "Uso de material indevido",
+  "Sujidade",
+  "Zinabre, graxa",
+  "Entupimentos, obstruções",
+  "Risco de contaminação cruzada",
   "Outros",
 ] as const;
 
