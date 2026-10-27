@@ -71,6 +71,7 @@ const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
     { rota: "/comunicados", rotulo: "Comunicados" },
     { rota: "/gestao/cargas-aves", rotulo: "Cargas e Veículos" },
     { rota: "/conferencia-cargas", rotulo: "Conferência de Cargas" },
+    { rota: "/bpf/relatorios", rotulo: "BPF — Relatórios" },
     { rota: "/trocar-setor", rotulo: "Trocar Setor / Cobertura" },
     { rota: "/sif/liberar", rotulo: "Painel de Arquivo" },
   ],
