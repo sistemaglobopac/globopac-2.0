@@ -29,6 +29,8 @@ export const CATEGORIAS_BPF = [
   "Zinabre, graxa",
   "Entupimentos, obstruções",
   "Risco de contaminação cruzada",
+  "Goteira",
+  "Condensação",
   "Outros",
 ] as const;
 
