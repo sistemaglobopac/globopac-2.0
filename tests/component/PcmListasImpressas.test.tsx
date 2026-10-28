@@ -11,6 +11,7 @@ vi.mock("@/modules/bpf/api", () => ({
   useOrdensProgramadas: () => ({ data: ordens, isLoading: false }),
   useProgramarSolicitacao: () => ({ mutate: vi.fn(), isPending: false }),
   useReprogramarOrdem: () => ({ mutate: vi.fn(), isPending: false }),
+  useClassificarEspecialidade: () => ({ mutate: vi.fn(), isPending: false }),
   useFotosSolicitacao: () => ({ data: [] }),
 }));
 
@@ -73,7 +74,8 @@ describe("PCM — listas imprimíveis", () => {
   it("a aba 'A programar' imprime a lista das solicitações aprovadas", () => {
     render(<PcmPage />);
     const lista = within(screen.getByTestId("lista-impressa-pcm"));
-    expect(lista.getByText("Lista de OS a programar")).toBeInTheDocument();
+    // Sem filtro, cada especialidade sai numa folha própria: o título leva o sufixo "— <especialidade>".
+    expect(lista.getByText(/^Lista de OS a programar — Sem classificação$/i)).toBeInTheDocument();
     expect(lista.getByText("Luminária apagada")).toBeInTheDocument();
     expect(lista.getByText("Porta quebrada")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Imprimir lista/ }));
@@ -84,7 +86,7 @@ describe("PCM — listas imprimíveis", () => {
     render(<PcmPage />);
     fireEvent.click(screen.getByRole("tab", { name: /Devolvidas pelo inspetor/ }));
     const lista = within(screen.getByTestId("lista-impressa-pcm"));
-    expect(lista.getByText("Lista de OS devolvidas pelo inspetor")).toBeInTheDocument();
+    expect(lista.getByText(/^Lista de OS devolvidas pelo inspetor — Sem classificação$/i)).toBeInTheDocument();
     expect(lista.getByText("Porta com prazo vencido")).toBeInTheDocument();
     expect(lista.getByText("Continua sem reparo")).toBeInTheDocument();
     expect(lista.queryByText("Luminária no prazo")).toBeNull();
@@ -94,7 +96,7 @@ describe("PCM — listas imprimíveis", () => {
     render(<PcmPage />);
     fireEvent.click(screen.getByRole("tab", { name: /OS programadas/ }));
     let lista = within(screen.getByTestId("lista-impressa-pcm"));
-    expect(lista.getByText("Lista de OS programadas")).toBeInTheDocument();
+    expect(lista.getByText(/^Lista de OS programadas — Sem classificação$/i)).toBeInTheDocument();
     expect(lista.getByText("Porta com prazo vencido")).toBeInTheDocument();
     expect(lista.getByText("Luminária no prazo")).toBeInTheDocument();
 
