@@ -1,4 +1,4 @@
--- Testes pgTAP — BPF Estrutural: especialidade da SS/OS (migration 20261028130000_bpf_especialidade.sql).
+-- Testes pgTAP — BPF Estrutural: especialidade da SS/OS (migration 20261028150249_bpf_especialidade.sql).
 -- Mesma técnica de 0026_bpf_estrutural.sql (JWT simulado + `set local role authenticated`).
 -- Executar com: supabase test db
 
