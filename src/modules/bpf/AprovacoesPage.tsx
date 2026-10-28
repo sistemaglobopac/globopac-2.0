@@ -175,7 +175,7 @@ function AbaSolicitacoes() {
   return (
     <>
       <CabecalhoBpf
-        titulo="Aprovação de solicitações de serviço"
+        titulo="Painel de Infraestrutura e Equipamentos"
         descricao="Confira o que o inspetor encontrou e assine. Depois da assinatura, a solicitação chega ao PCM."
         acoes={
           <Button asChild variant="outline" size="sm">

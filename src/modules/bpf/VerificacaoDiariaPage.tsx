@@ -229,7 +229,7 @@ function Conteudo() {
   return (
     <>
       <CabecalhoBpf
-        titulo="Verificação diária — BPF Estrutural"
+        titulo="Verificação de Infraestrutura e Equipamentos"
         descricao={`${formatarData(hoje)} · marque cada OS programada pelo PCM como Conforme, No prazo ou Não conforme.`}
         acoes={
           <Button asChild variant="outline" size="sm">

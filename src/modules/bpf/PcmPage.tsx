@@ -245,7 +245,7 @@ function Conteudo() {
   return (
     <>
       <CabecalhoBpf
-        titulo="PCM — Planejamento e Controle da Manutenção"
+        titulo="Programação de Ações Corretivas para Infraestrutura e Equipamentos"
         descricao="Receba as solicitações aprovadas, programe a execução e reprograme o prazo quando necessário (sempre com justificativa)."
       />
 

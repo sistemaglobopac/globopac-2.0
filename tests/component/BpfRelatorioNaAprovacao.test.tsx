@@ -24,6 +24,7 @@ const montar = (ui: React.ReactElement) => render(<MemoryRouter>{ui}</MemoryRout
 describe("relatório diário de OS na aprovação de solicitações", () => {
   it("abre nas solicitações, sem relatório pronto na tela", () => {
     montar(<AprovacoesPage />);
+    expect(screen.getByRole("heading", { name: "Painel de Infraestrutura e Equipamentos" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Solicitações" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText(/Aguardando sua assinatura/)).toBeInTheDocument();
     expect(screen.queryByTestId("relatorio-por-data")).toBeNull();
@@ -46,7 +47,7 @@ describe("relatório diário de OS na aprovação de solicitações", () => {
 describe("verificação diária é só do inspetor", () => {
   it("não tem aba nem opção de gerar relatório", () => {
     montar(<VerificacaoDiariaPage />);
-    expect(screen.getByRole("heading", { name: /Verificação diária/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Verificação de Infraestrutura e Equipamentos" })).toBeInTheDocument();
     expect(screen.queryByRole("tab")).toBeNull();
     expect(screen.queryByTestId("relatorio-por-data")).toBeNull();
     expect(screen.queryByText(/Gerar relatório/)).toBeNull();

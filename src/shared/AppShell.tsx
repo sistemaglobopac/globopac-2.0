@@ -61,7 +61,7 @@ const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
     { rota: "/painel", rotulo: "Painel de Bordo" },
     { rota: "/nova-rnc", rotulo: "Abrir RNC" },
     { rota: "/conferencia-cargas", rotulo: "Conferência de Cargas" },
-    { rota: "/bpf", rotulo: "BPF — Verificação diária", exigeSetor: SETOR_BPF },
+    { rota: "/bpf", rotulo: "Verificação de Infraestrutura e Equipamentos", exigeSetor: SETOR_BPF },
     { rota: "/bpf/nova", rotulo: "BPF — Solicitar serviço", exigeSetor: SETOR_BPF },
   ],
   VERIFICADOR: [
@@ -83,7 +83,7 @@ const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
     { rota: "/dashboard", rotulo: "Painel de Indicadores" },
   ],
   INSPETOR_PCM: [
-    { rota: "/bpf/pcm", rotulo: "PCM — Programação de OS" },
+    { rota: "/bpf/pcm", rotulo: "Programação de Ações Corretivas para Infraestrutura e Equipamentos" },
     { rota: "/dashboard", rotulo: "Painel de Indicadores" },
   ],
   ADMIN_MASTER: [
@@ -92,9 +92,9 @@ const MENU_POR_PERFIL: Record<string, ItemMenu[]> = {
     { rota: "/verificacao", rotulo: "Painel de Verificação" },
     { rota: "/conferencia-cargas", rotulo: "Conferência de Cargas" },
     { rota: "/rnc", rotulo: "Tratativas RNC" },
-    { rota: "/bpf/aprovacoes", rotulo: "BPF — Aprovar solicitações e relatório" },
-    { rota: "/bpf", rotulo: "BPF — Verificação diária" },
-    { rota: "/bpf/pcm", rotulo: "PCM — Programação de OS" },
+    { rota: "/bpf/aprovacoes", rotulo: "Painel de Infraestrutura e Equipamentos" },
+    { rota: "/bpf", rotulo: "Verificação de Infraestrutura e Equipamentos" },
+    { rota: "/bpf/pcm", rotulo: "Programação de Ações Corretivas para Infraestrutura e Equipamentos" },
     { rota: "/sif/liberar", rotulo: "Painel de Arquivo" },
     { rota: "/auditoria", rotulo: "Painel de Auditoria" },
     { rota: "/carimbos", rotulo: "Carimbos de tempo" },
