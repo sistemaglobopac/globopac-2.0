@@ -7,6 +7,11 @@ export type StatusRelatorio = "emitido" | "verificado" | "liberado";
 /** Setor de inspeção do monitoramento de manutenções diversas (app_config.setores_cadastrados). */
 export const SETOR_BPF = "MANUTENÇÕES DIVERSAS";
 
+/** Identificação do relatório diário de OS como ficha de monitoramento (nome, código de ficha e PAC), como nas demais fichas. */
+export const NOME_RELATORIO_BPF = "Monitoramento de Infraestrutura e Equipamentos";
+export const CODIGO_FICHA_BPF = "RAC 002/001";
+export const PAC_BPF = "PAC 1";
+
 export const CATEGORIAS_BPF = [
   "Prédio / estrutura",
   "Piso",
@@ -129,6 +134,16 @@ export interface Ordem {
   verificacoes: Verificacao[];
 }
 
+/** Reprogramação feita pelo PCM, no mesmo dia, de uma OS que o inspetor marcou Não conforme. */
+export interface ReprogramacaoDaNc {
+  sequencia: number;
+  prazo: string;
+  justificativa: string | null;
+  por: string | null;
+  em: string;
+  hash: string | null;
+}
+
 export interface ItemRelatorio {
   numero_os: string;
   solicitacao_numero: number | null;
@@ -156,10 +171,16 @@ export interface ItemRelatorio {
     hash: string | null;
   }[];
   resultado: ResultadoBpf;
-  data_verificacao: string;
-  hora_verificacao: string;
-  inspetor: string;
+  /** Nulos nas OS programadas pelo PCM que o inspetor ainda não verificou (`sem_verificacao`). */
+  data_verificacao: string | null;
+  hora_verificacao: string | null;
+  inspetor: string | null;
   observacao: string | null;
+  /** OS programada pelo PCM no dia e incluída no relatório como "no prazo" sem passar pela verificação do inspetor. */
+  sem_verificacao?: boolean;
+  programada_em?: string | null;
+  /** NC do inspetor que o PCM reprogramou no mesmo dia: o veredito segue NC, mas não conta como não conformidade. */
+  reprogramada?: ReprogramacaoDaNc | null;
 }
 
 export interface Relatorio {
@@ -168,9 +189,15 @@ export interface Relatorio {
   data_referencia: string;
   status: StatusRelatorio;
   itens: ItemRelatorio[];
+  /** OS programadas pelo PCM depois da emissão (fora do hash de emissão, que cobre só os `itens`). */
+  itens_posteriores: ItemRelatorio[];
+  /** Reprogramações do PCM feitas depois da emissão, de OS que constam como NC em `itens`. */
+  reprogramacoes_posteriores: { numero_os: string; reprogramada: ReprogramacaoDaNc }[];
   qtd_nc: number;
   qtd_np: number;
   qtd_conformes: number;
+  /** NC do dia reprogramadas pelo PCM no mesmo dia (não entram em qtd_nc). */
+  qtd_nc_reprogramadas: number;
   emitido_por: string;
   emitido_por_nome: string;
   emitido_em: string;
@@ -184,6 +211,26 @@ export interface Relatorio {
   liberado_em: string | null;
   hash_liberacao: string | null;
 }
+
+/** Relatório do dia montado na hora (bpf_relatorio_do_dia) quando o inspetor ainda não emitiu: não é o documento assinado. */
+export interface RelatorioProvisorio {
+  provisorio: true;
+  setor: string;
+  data_referencia: string;
+  gerado_em: string;
+  itens: ItemRelatorio[];
+  itens_posteriores: ItemRelatorio[];
+  reprogramacoes_posteriores: { numero_os: string; reprogramada: ReprogramacaoDaNc }[];
+  qtd_nc: number;
+  qtd_np: number;
+  qtd_conformes: number;
+  qtd_nc_reprogramadas: number;
+  /** OS abertas no dia que o inspetor não verificou: sem veredito, não constam no relatório. */
+  sem_verificacao_pendentes: number;
+}
+
+/** O que a consulta por data devolve: o relatório emitido (assinado) ou o gerado na hora. */
+export type RelatorioDoDia = (Relatorio & { provisorio: false }) | RelatorioProvisorio;
 
 export interface ItemImportacao {
   numero_os: string;

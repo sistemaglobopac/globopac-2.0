@@ -4,7 +4,10 @@ import {
   diasEntre,
   formatarData,
   hojeManaus,
+  itensComReprogramacao,
+  ordensNaVerificacaoDiaria,
   pendentesDeVerificacao,
+  relatoriosOsDoArquivo,
   resultadosPermitidos,
   resumirAssinaturas,
   rotuloProgramacao,
@@ -12,7 +15,7 @@ import {
   ultimaObservacaoDoInspetor,
 } from "@/modules/bpf/regras";
 import { dataParaIso, lerCsvOrdens } from "@/modules/bpf/importacao";
-import type { ItemRelatorio, Ordem } from "@/modules/bpf/tipos";
+import type { ItemRelatorio, Ordem, Relatorio } from "@/modules/bpf/tipos";
 
 describe("resultadosPermitidos", () => {
   it("dentro do prazo (inclusive no dia do prazo): C, NP ou NC (executada sem sanar o desvio)", () => {
@@ -104,6 +107,89 @@ describe("pendentesDeVerificacao", () => {
       verificacoes: [{ data_verificacao: "2026-10-21" }],
     } as unknown as Ordem;
     expect(pendentesDeVerificacao([antiga, nova, feita], "2026-10-21").map((o) => o.id)).toEqual(["a"]);
+  });
+});
+
+describe("ordensNaVerificacaoDiaria", () => {
+  const os = (id: string, centro: string, marcada = false) =>
+    ({ id, centro: { id: centro }, verificacoes: marcada ? [{ data_verificacao: "2026-10-21" }] : [] }) as unknown as Ordem;
+  const lista = [os("a", "c1"), os("b", "c1", true), os("c", "c2"), os("d", "c2", true)];
+  const ids = (o: Ordem[]) => o.map((x) => x.id);
+
+  it("a OS some da lista assim que recebe C, NP ou NC hoje", () => {
+    expect(ids(ordensNaVerificacaoDiaria(lista, "2026-10-21"))).toEqual(["a", "c"]);
+  });
+  it("verificação de outro dia não tira a OS da lista de hoje", () => {
+    const ontem = { id: "e", centro: { id: "c1" }, verificacoes: [{ data_verificacao: "2026-10-20" }] } as unknown as Ordem;
+    expect(ids(ordensNaVerificacaoDiaria([ontem], "2026-10-21"))).toEqual(["e"]);
+  });
+  it("as retidas (NC aguardando observação) continuam à vista", () => {
+    expect(ids(ordensNaVerificacaoDiaria(lista, "2026-10-21", { retidas: new Set(["b"]) }))).toEqual(["a", "b", "c"]);
+  });
+  it("pode trazer de volta as já verificadas, para corrigir uma marcação", () => {
+    expect(ids(ordensNaVerificacaoDiaria(lista, "2026-10-21", { incluirVerificadas: true }))).toEqual(["a", "b", "c", "d"]);
+  });
+  it("filtra por setor junto com o resto", () => {
+    expect(ids(ordensNaVerificacaoDiaria(lista, "2026-10-21", { centroId: "c2" }))).toEqual(["c"]);
+    expect(ids(ordensNaVerificacaoDiaria(lista, "2026-10-21", { centroId: "c2", incluirVerificadas: true }))).toEqual(["c", "d"]);
+  });
+});
+
+describe("itensComReprogramacao", () => {
+  const item = (numero_os: string, resultado: "NC" | "NP") => ({ numero_os, resultado }) as unknown as ItemRelatorio;
+  const repro = { sequencia: 1, prazo: "2026-11-05", justificativa: null, por: "Paulo", em: "2026-10-28T18:00:00Z", hash: null };
+
+  it("aplica a reprogramação feita depois da emissão só à OS que consta como NC, sem mutar os itens gravados", () => {
+    const itens = [item("A", "NC"), item("B", "NC"), item("C", "NP")];
+    const r = itensComReprogramacao({ itens, reprogramacoes_posteriores: [{ numero_os: "A", reprogramada: repro }, { numero_os: "C", reprogramada: repro }] });
+    expect(r[0]!.reprogramada).toEqual(repro);
+    expect(r[1]!.reprogramada).toBeUndefined();
+    expect(r[2]!.reprogramada).toBeUndefined(); // NP não vira "NC reprogramada"
+    expect(itens[0]!.reprogramada).toBeUndefined();
+  });
+  it("mantém a reprogramação que já vinha no item e aceita relatório sem reprogramações posteriores", () => {
+    const ja = { ...item("A", "NC"), reprogramada: repro } as ItemRelatorio;
+    expect(itensComReprogramacao({ itens: [ja] })[0]!.reprogramada).toEqual(repro);
+  });
+});
+
+describe("relatoriosOsDoArquivo com os recortes do Painel de Arquivo", () => {
+  const rel = (id: string, data: string, extra: Record<string, unknown> = {}) =>
+    ({ id, data_referencia: data, status: "verificado", setor: "MANUTENÇÕES DIVERSAS", emitido_por: "u1", qtd_nc: 2, ...extra }) as unknown as Relatorio;
+  const lista = [rel("a", "2026-10-20"), rel("b", "2026-10-25"), rel("c", "2026-10-28", { qtd_nc: 0, emitido_por: "u2" })];
+  const vazio = { de: "", ate: "", pac: "", setor: "", turno: "", ficha: "", situacao: "", inspetor: "" };
+  const ids = (f: Partial<typeof vazio>) => relatoriosOsDoArquivo(lista, "todas", { ...vazio, ...f }).map((r) => r.id);
+
+  it("sem recortes traz todos os verificados/liberados", () => {
+    expect(ids({})).toEqual(["a", "b", "c"]);
+  });
+  it("busca por data (inclusive nas pontas)", () => {
+    expect(ids({ de: "2026-10-25" })).toEqual(["b", "c"]);
+    expect(ids({ ate: "2026-10-25" })).toEqual(["a", "b"]);
+    expect(ids({ de: "2026-10-21", ate: "2026-10-27" })).toEqual(["b"]);
+  });
+  it("busca por PAC: o relatório de OS é do PAC 1 e some nos outros PACs", () => {
+    expect(ids({ pac: "PAC 1" })).toEqual(["a", "b", "c"]);
+    expect(ids({ pac: "PAC 8" })).toEqual([]);
+  });
+  it("PAC 1 e data juntos", () => {
+    expect(ids({ pac: "PAC 1", de: "2026-10-26" })).toEqual(["c"]);
+  });
+  it("ficha RAC 002/001, setor, inspetor e situação valem como nas demais fichas; turno não se aplica", () => {
+    expect(ids({ ficha: "RAC 002/001" })).toEqual(["a", "b", "c"]);
+    expect(ids({ ficha: "RAC 001/003" })).toEqual([]);
+    expect(ids({ setor: "MANUTENÇÕES DIVERSAS" })).toEqual(["a", "b", "c"]);
+    expect(ids({ setor: "OUTRO" })).toEqual([]);
+    expect(ids({ inspetor: "u2" })).toEqual(["c"]);
+    expect(ids({ situacao: "NAO_CONFORME" })).toEqual(["a", "b"]);
+    expect(ids({ situacao: "CONFORME" })).toEqual(["c"]);
+    expect(ids({ situacao: "TRATADO" })).toEqual([]);
+    expect(ids({ turno: "1º Turno" })).toEqual([]);
+  });
+  it("continua respeitando a liberação e nunca traz o relatório só emitido", () => {
+    const l = [rel("e", "2026-10-28", { status: "emitido" }), rel("v", "2026-10-27"), rel("l", "2026-10-26", { status: "liberado" })];
+    expect(relatoriosOsDoArquivo(l, "todas", { ...vazio, pac: "PAC 1" }).map((r) => r.id)).toEqual(["v", "l"]);
+    expect(relatoriosOsDoArquivo(l, "pendentes", { ...vazio, de: "2026-10-01" }).map((r) => r.id)).toEqual(["v"]);
   });
 });
 

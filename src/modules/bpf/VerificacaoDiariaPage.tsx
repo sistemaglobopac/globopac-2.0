@@ -9,11 +9,13 @@ import { Textarea } from "@/shared/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useAppDialog } from "@/modules/gestao/dialogSystem";
 import { CabecalhoBpf, PaginaBpf } from "./PaginaBpf";
+import { RelatorioPorData } from "./RelatorioPorData";
 import { useEmitirRelatorio, useOrdensParaVerificar, useRegistrarVerificacao, useRelatorios } from "./api";
 import {
   formatarData,
   formatarDataHora,
   hojeManaus,
+  ordensNaVerificacaoDiaria,
   pendentesDeVerificacao,
   ROTULO_RESULTADO,
   resultadosPermitidos,
@@ -21,7 +23,7 @@ import {
   rotuloProgramacao,
   situacaoPrazo,
 } from "./regras";
-import type { Ordem, ResultadoBpf } from "./tipos";
+import { CODIGO_FICHA_BPF, NOME_RELATORIO_BPF, PAC_BPF, type Ordem, type ResultadoBpf } from "./tipos";
 
 const ESTILO_SELECIONADO: Record<ResultadoBpf, string> = {
   C: "border-transparent bg-success text-success-foreground hover:bg-success hover:text-success-foreground",
@@ -29,7 +31,17 @@ const ESTILO_SELECIONADO: Record<ResultadoBpf, string> = {
   NC: "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive hover:text-destructive-foreground",
 };
 
-function CartaoOs({ ordem, hoje, bloqueado }: { ordem: Ordem; hoje: string; bloqueado: boolean }) {
+interface CartaoOsProps {
+  ordem: Ordem;
+  hoje: string;
+  bloqueado: boolean;
+  /** Marcada Não conforme e ainda à vista, para o inspetor escrever a observação antes de a OS sair da lista. */
+  retida: boolean;
+  aoReter: (ordemId: string) => void;
+  aoLiberar: (ordemId: string) => void;
+}
+
+function CartaoOs({ ordem, hoje, bloqueado, retida, aoReter, aoLiberar }: CartaoOsProps) {
   const dialog = useAppDialog();
   const registrar = useRegistrarVerificacao();
   const verificacao = ordem.verificacoes.find((v) => v.data_verificacao === hoje);
@@ -37,11 +49,22 @@ function CartaoOs({ ordem, hoje, bloqueado }: { ordem: Ordem; hoje: string; bloq
   const prazo = situacaoPrazo(ordem.prazo_atual, hoje);
   const [obs, setObs] = useState(verificacao?.observacao ?? "");
   const [mostrarObs, setMostrarObs] = useState(Boolean(verificacao?.observacao));
+  const obsAlterada = Boolean(verificacao) && obs.trim() !== (verificacao?.observacao ?? "");
 
-  function marcar(resultado: ResultadoBpf) {
+  /** `retem`: Não conforme mantém a OS à vista com a observação aberta; C e NP fazem a OS sair da lista. */
+  function marcar(resultado: ResultadoBpf, depois?: () => void) {
+    const retem = resultado === "NC";
+    if (retem) aoReter(ordem.id);
+    else aoLiberar(ordem.id);
     registrar.mutate(
       { ordemId: ordem.id, resultado, observacao: obs.trim() || undefined },
-      { onError: (erro) => dialog.erro(erro, "Não foi possível registrar") }
+      {
+        onSuccess: depois,
+        onError: (erro) => {
+          if (retem && !verificacao) aoLiberar(ordem.id);
+          dialog.erro(erro, "Não foi possível registrar");
+        },
+      }
     );
   }
 
@@ -124,7 +147,17 @@ function CartaoOs({ ordem, hoje, bloqueado }: { ordem: Ordem; hoje: string; bloq
             <p className="text-xs text-muted-foreground">
               A observação vai para o relatório do dia e para o PCM, que a vê ao reprogramar a OS.
             </p>
-            {verificacao && !bloqueado && obs.trim() !== (verificacao.observacao ?? "") && (
+            {verificacao && !bloqueado && retida && (
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => (obsAlterada ? marcar(verificacao.resultado, () => aoLiberar(ordem.id)) : aoLiberar(ordem.id))}
+                disabled={registrar.isPending}
+              >
+                {obsAlterada ? "Salvar observação e concluir" : "Concluir"}
+              </Button>
+            )}
+            {verificacao && !bloqueado && !retida && obsAlterada && (
               <Button type="button" size="sm" onClick={() => marcar(verificacao.resultado)} disabled={registrar.isPending}>
                 Salvar observação
               </Button>
@@ -136,14 +169,23 @@ function CartaoOs({ ordem, hoje, bloqueado }: { ordem: Ordem; hoje: string; bloq
   );
 }
 
-function Conteudo() {
+function AbaVerificacao({ aoVerRelatorio }: { aoVerRelatorio: () => void }) {
   const hoje = hojeManaus();
   const dialog = useAppDialog();
   const { data: ordens, isLoading, isError } = useOrdensParaVerificar();
   const { data: relatorios } = useRelatorios();
   const emitir = useEmitirRelatorio();
   const [centroFiltro, setCentroFiltro] = useState("");
-  const [soPendentes, setSoPendentes] = useState(false);
+  const [mostrarVerificadas, setMostrarVerificadas] = useState(false);
+  const [retidas, setRetidas] = useState<ReadonlySet<string>>(new Set());
+  const reter = (id: string) => setRetidas((atual) => new Set(atual).add(id));
+  const liberar = (id: string) =>
+    setRetidas((atual) => {
+      if (!atual.has(id)) return atual;
+      const proximo = new Set(atual);
+      proximo.delete(id);
+      return proximo;
+    });
 
   const lista = useMemo(() => ordens ?? [], [ordens]);
   const relatorioDeHoje = (relatorios ?? []).find((r) => r.data_referencia === hoje);
@@ -159,10 +201,9 @@ function Conteudo() {
     return [...mapa.entries()].sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
   }, [lista]);
 
-  const visiveis = lista.filter(
-    (o) =>
-      (!centroFiltro || o.centro?.id === centroFiltro) &&
-      (!soPendentes || !o.verificacoes.some((v) => v.data_verificacao === hoje))
+  const visiveis = useMemo(
+    () => ordensNaVerificacaoDiaria(lista, hoje, { centroId: centroFiltro || undefined, incluirVerificadas: mostrarVerificadas, retidas }),
+    [lista, hoje, centroFiltro, mostrarVerificadas, retidas]
   );
   const grupos = useMemo(() => {
     const mapa = new Map<string, Ordem[]>();
@@ -202,9 +243,9 @@ function Conteudo() {
         <div className="rounded-lg border border-hairline bg-primary/5 p-4 text-sm">
           O relatório de hoje foi emitido por <strong>{relatorioDeHoje.emitido_por_nome}</strong> em {formatarDataHora(relatorioDeHoje.emitido_em)} (
           {relatorioDeHoje.status === "liberado" ? "liberado ao SIF" : relatorioDeHoje.status === "verificado" ? "verificado, aguardando liberação ao SIF" : "aguardando o Verificador"}). As verificações do dia estão travadas.{" "}
-          <Link to="/bpf/relatorios" className="font-semibold underline">
+          <button type="button" onClick={aoVerRelatorio} className="font-semibold underline">
             Ver relatório
-          </Link>
+          </button>
         </div>
       )}
 
@@ -225,8 +266,8 @@ function Conteudo() {
           ))}
         </Select>
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={soPendentes} onChange={(e) => setSoPendentes(e.target.checked)} className="h-4 w-4" />
-          Só as que faltam verificar
+          <input type="checkbox" checked={mostrarVerificadas} onChange={(e) => setMostrarVerificadas(e.target.checked)} className="h-4 w-4" />
+          Mostrar também as já verificadas (para corrigir uma marcação)
         </label>
       </div>
 
@@ -235,6 +276,11 @@ function Conteudo() {
       {!isLoading && !isError && lista.length === 0 && (
         <p className="text-muted-foreground">Nenhuma OS programada para monitorar no momento.</p>
       )}
+      {!isLoading && !isError && lista.length > 0 && visiveis.length === 0 && (
+        <p className="text-muted-foreground">
+          {centroFiltro ? "Nenhuma OS a verificar neste setor." : "Todas as OS foram verificadas hoje."}
+        </p>
+      )}
 
       {grupos.map(([nome, itens]) => (
         <section key={nome} className="space-y-3">
@@ -242,7 +288,7 @@ function Conteudo() {
             {nome} <span className="font-normal">({itens.length})</span>
           </h2>
           {itens.map((o) => (
-            <CartaoOs key={o.id} ordem={o} hoje={hoje} bloqueado={bloqueado} />
+            <CartaoOs key={o.id} ordem={o} hoje={hoje} bloqueado={bloqueado} retida={retidas.has(o.id)} aoReter={reter} aoLiberar={liberar} />
           ))}
         </section>
       ))}
@@ -275,6 +321,51 @@ function Resumo({ rotulo, valor, destaque }: { rotulo: string; valor: string | n
       <p className="text-xs text-muted-foreground">{rotulo}</p>
       <p className={cn("text-2xl font-bold tabular-nums", destaque && "text-destructive")}>{valor}</p>
     </div>
+  );
+}
+
+type Aba = "verificacao" | "relatorio";
+
+const ABAS: { id: Aba; rotulo: string }[] = [
+  { id: "verificacao", rotulo: "Verificação do dia" },
+  { id: "relatorio", rotulo: "Relatório" },
+];
+
+/** Verificação diária e relatório numa tela só: a aba Relatório não mostra nada pronto, o usuário escolhe a data e gera. */
+function Conteudo() {
+  const [aba, setAba] = useState<Aba>("verificacao");
+  return (
+    <>
+      <div role="tablist" aria-label="Verificação diária e relatório" className="flex gap-2 border-b border-hairline print:hidden">
+        {ABAS.map((a) => (
+          <button
+            key={a.id}
+            type="button"
+            role="tab"
+            id={`aba-bpf-${a.id}`}
+            aria-selected={aba === a.id}
+            aria-controls="painel-bpf"
+            onClick={() => setAba(a.id)}
+            className={cn(
+              "-mb-px border-b-2 px-4 py-2 text-sm font-semibold",
+              aba === a.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {a.rotulo}
+          </button>
+        ))}
+      </div>
+      <div id="painel-bpf" role="tabpanel" aria-labelledby={`aba-bpf-${aba}`} className="space-y-6">
+        {aba === "verificacao" ? (
+          <AbaVerificacao aoVerRelatorio={() => setAba("relatorio")} />
+        ) : (
+          <>
+            <CabecalhoBpf titulo={NOME_RELATORIO_BPF} descricao={`${CODIGO_FICHA_BPF} · ${PAC_BPF} — escolha a data e gere o relatório.`} />
+            <RelatorioPorData />
+          </>
+        )}
+      </div>
+    </>
   );
 }
 

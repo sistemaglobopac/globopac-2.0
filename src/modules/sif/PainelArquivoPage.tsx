@@ -7,8 +7,9 @@ import { agruparPorDossie, setoresDoGrupo, tipoPorTemplate } from "@/modules/fic
 import { ensureLocalTime } from "@/modules/fichas/utils/tempo";
 import { instanteDoRegistro } from "@/modules/fichas/utils/horaMonitoramento";
 import { useLiberarRelatorio, useRelatorios } from "@/modules/bpf/api";
-import { RelatoriosOsArquivo } from "@/modules/bpf/RelatoriosOsArquivo";
+import { CartaoRelatorioOsArquivo } from "@/modules/bpf/RelatoriosOsArquivo";
 import { relatoriosOsDoArquivo } from "@/modules/bpf/regras";
+import { CODIGO_FICHA_BPF, NOME_RELATORIO_BPF, PAC_BPF } from "@/modules/bpf/tipos";
 import { useLiberarLoteSif, useMonitoramentosArquivo } from "./api";
 import { FILTROS_ARQUIVO_INICIAIS, filtrarArquivo, filtrosAtivos, type FiltrosArquivo } from "./filtrosArquivo";
 import { Button } from "@/shared/ui/button";
@@ -67,14 +68,23 @@ export function PainelArquivoPage() {
       fichas.set(tipoDaFicha(m.ficha_template_id), nomePorTemplateId.get(m.ficha_template_id) ?? tipoDaFicha(m.ficha_template_id));
       inspetores.add(m.user_id);
     }
+    // Relatórios de OS (BPF) verificados ou liberados: PAC 1, o setor deles, a ficha RAC 002/001 e quem os emitiu.
+    const nomesEmissores = new Map<string, string>();
+    for (const r of relatoriosOsDoArquivo(relatoriosOs, "todas")) {
+      pacs.add(PAC_BPF);
+      setores.add(r.setor);
+      fichas.set(CODIGO_FICHA_BPF, NOME_RELATORIO_BPF);
+      inspetores.add(r.emitido_por);
+      nomesEmissores.set(r.emitido_por, r.emitido_por_nome);
+    }
     const ordenar = (a: string, b: string) => a.localeCompare(b, "pt-BR", { numeric: true });
     return {
       pacs: [...pacs].sort(ordenar),
       setores: [...setores].sort(ordenar),
       fichas: [...fichas.entries()].sort((a, b) => ordenar(a[1], b[1])),
-      inspetores: [...inspetores].map((id) => [id, usuarios?.get(id) ?? "Inspetor"] as const).sort((a, b) => ordenar(a[1], b[1])),
+      inspetores: [...inspetores].map((id) => [id, usuarios?.get(id) ?? nomesEmissores.get(id) ?? "Inspetor"] as const).sort((a, b) => ordenar(a[1], b[1])),
     };
-  }, [arquivo, ctx, tipoDaFicha, nomePorTemplateId, usuarios]);
+  }, [arquivo, relatoriosOs, ctx, tipoDaFicha, nomePorTemplateId, usuarios]);
 
   const filtrados = useMemo(() => filtrarArquivo(arquivo ?? [], filtros, ctx), [arquivo, filtros, ctx]);
 
@@ -108,10 +118,22 @@ export function PainelArquivoPage() {
   const idsParaLiberar = (arquivo ?? []).filter((m) => selecionados.has(m.id) && !m.liberado_sif).map((m) => m.id);
   const gruposSelecionados = grupos.filter((g) => g.items.some((m) => selecionados.has(m.id))).map((g) => g.items.map((m) => m.id));
 
-  const idsOsParaLiberar = relatoriosOsDoArquivo(relatoriosOs, filtros.liberacao)
+  // Só o que está à vista (liberação + data, PAC e demais recortes) entra na liberação.
+  const relatoriosOsVisiveis = useMemo(() => relatoriosOsDoArquivo(relatoriosOs, filtros.liberacao, filtros), [relatoriosOs, filtros]);
+  const idsOsParaLiberar = relatoriosOsVisiveis
     .filter((r) => r.status === "verificado" && selecionadosOs.has(r.id))
     .map((r) => r.id);
   const totalParaLiberar = idsParaLiberar.length + idsOsParaLiberar.length;
+
+  // O relatório de OS fica junto dos monitoramentos, na mesma lista, do mais recente para o mais antigo.
+  const entradas = useMemo(
+    () =>
+      [
+        ...grupos.map((g) => ({ tipo: "monitoramentos" as const, ...g, instante: new Date(instanteDoRegistro(g.items[0]!)).getTime() })),
+        ...relatoriosOsVisiveis.map((r) => ({ tipo: "os" as const, relatorio: r, instante: new Date(r.emitido_em).getTime() })),
+      ].sort((a, b) => b.instante - a.instante),
+    [grupos, relatoriosOsVisiveis]
+  );
 
   function alternarRelatorioOs(id: string) {
     setSelecionadosOs((atual) => {
@@ -140,7 +162,7 @@ export function PainelArquivoPage() {
         <div>
           <h1 className="text-2xl font-semibold">Painel de Arquivo</h1>
           <p className="text-sm text-muted-foreground">
-            Todas as fichas já verificadas. Busque por data, PAC, setor e mais, selecione os cards e imprima os relatórios ou libere para a
+            Todas as fichas já verificadas, inclusive o relatório de {NOME_RELATORIO_BPF} ({PAC_BPF}, {CODIGO_FICHA_BPF}). Busque por data, PAC, setor e mais, selecione os cards e imprima os relatórios ou libere para a
             Auditoria Oficial SIF — a liberação gera um hash agregador do lote, assina cada documento como LIBERACAO_DIARIA e só então
             o auditor passa a vê-los.
           </p>
@@ -262,20 +284,30 @@ export function PainelArquivoPage() {
       {liberarRelatorioOs.isSuccess && <p className="text-sm text-success">Relatório(s) de OS liberado(s) — já visíveis para a Auditoria Oficial SIF.</p>}
       {liberarRelatorioOs.isError && <p className="text-sm text-destructive">Falha ao liberar o relatório de OS selecionado.</p>}
 
-      <RelatoriosOsArquivo liberacao={filtros.liberacao} podeLiberar={podeLiberar} selecionados={selecionadosOs} aoAlternar={alternarRelatorioOs} />
-
       {isLoading && <p className="text-muted-foreground">Carregando…</p>}
       {!isLoading && (
         <p className="text-sm text-muted-foreground" data-testid="resumo-arquivo">
-          {filtrados.length} monitoramento(s) em {grupos.length} relatório(s)
-          {nFiltros > 0 ? ` — filtrado de ${arquivo?.length ?? 0}` : ""}.
+          {filtrados.length + relatoriosOsVisiveis.length} monitoramento(s) em {entradas.length} relatório(s)
+          {nFiltros > 0 ? ` — filtrado de ${(arquivo?.length ?? 0) + relatoriosOsDoArquivo(relatoriosOs, "todas").length}` : ""}.
         </p>
       )}
-      {!isLoading && filtrados.length === 0 && (
+      {!isLoading && filtrados.length === 0 && relatoriosOsVisiveis.length === 0 && (
         <p className="text-muted-foreground">{nFiltros > 0 ? "Nenhuma ficha corresponde aos filtros." : "Nenhuma ficha verificada ainda."}</p>
       )}
 
-      {grupos.map(({ chave, items }) => {
+      {entradas.map((entrada) => {
+        if (entrada.tipo === "os") {
+          return (
+            <CartaoRelatorioOsArquivo
+              key={entrada.relatorio.id}
+              relatorio={entrada.relatorio}
+              podeLiberar={podeLiberar}
+              selecionado={selecionadosOs.has(entrada.relatorio.id)}
+              aoAlternar={alternarRelatorioOs}
+            />
+          );
+        }
+        const { chave, items } = entrada;
         const primeiro = items[0]!;
         const ids = items.map((m) => m.id);
         const idsPendentes = items.filter((m) => !m.liberado_sif).map((m) => m.id);

@@ -8,6 +8,7 @@ import { imprimirElemento } from "@/modules/fichas/utils/printHelper";
 import { RelatorioBpf } from "./RelatorioBpf";
 import { useRelatorios, useVerificarRelatorio } from "./api";
 import { formatarData } from "./regras";
+import { CODIGO_FICHA_BPF, NOME_RELATORIO_BPF } from "./tipos";
 
 /** Relatórios diários de OS (BPF Estrutural) emitidos pelo inspetor e aguardando a verificação do Verificador, feita aqui, no
  * Painel de Verificação. Verificar NÃO libera ao SIF: o relatório verificado segue para o Painel de Arquivo, de onde o
@@ -38,7 +39,7 @@ function Conteudo() {
   return (
     <section className="space-y-3 rounded-xl border-2 border-primary/40 bg-primary/5 p-4" data-testid="relatorios-os-para-verificar">
       <div>
-        <h2 className="text-lg font-medium">Relatório de OS (BPF) — aguardando sua verificação ({pendentes.length})</h2>
+        <h2 className="text-lg font-medium">{NOME_RELATORIO_BPF} ({CODIGO_FICHA_BPF}) — aguardando sua verificação ({pendentes.length})</h2>
         <p className="text-sm text-muted-foreground">
           Confira as não conformidades apontadas pelo inspetor, a programação do PCM e as assinaturas do dia. Depois de verificado, o relatório vai para o
           Painel de Arquivo, onde é selecionado para liberação ao SIF.

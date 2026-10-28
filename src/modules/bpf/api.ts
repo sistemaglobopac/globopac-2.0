@@ -9,6 +9,7 @@ import type {
   Ordem,
   Programacao,
   Relatorio,
+  RelatorioDoDia,
   ResultadoBpf,
   Solicitacao,
   StatusSolicitacao,
@@ -306,6 +307,13 @@ export function useEmitirRelatorio() {
   return useMutation({
     mutationFn: (setor?: string) => chamar<Relatorio>("bpf_emitir_relatorio", { p_setor: setor ?? SETOR_BPF }),
     onSuccess: invalidar,
+  });
+}
+
+/** Gera na hora o relatório da data escolhida: o já emitido (assinado), se houve emissão, ou um montado com os registros do dia. */
+export function useGerarRelatorioDoDia() {
+  return useMutation({
+    mutationFn: (dia: string) => chamar<RelatorioDoDia>("bpf_relatorio_do_dia", { p_dia: dia, p_setor: SETOR_BPF }),
   });
 }
 

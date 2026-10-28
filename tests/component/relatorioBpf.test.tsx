@@ -73,7 +73,8 @@ const base: Relatorio = {
 describe("RelatorioBpf", () => {
   it("mostra as linhas no formato do formulário, com rótulos de programação e reprogramação", () => {
     render(<RelatorioBpf relatorio={base} />);
-    expect(screen.getByText(/RELATÓRIO DE NÃO CONFORMIDADES/i)).toBeTruthy();
+    expect(screen.getByText("Monitoramento de Infraestrutura e Equipamentos")).toBeTruthy();
+    expect(screen.getByTestId("codigo-ficha-bpf")).toHaveTextContent("RAC 002/001");
     expect(screen.getByText("OS: 463597")).toBeTruthy();
     expect(screen.getByText(/Rep\. I: 20\/10\/2026/)).toBeTruthy();
     expect(screen.getByText(/Prog: 22\/09\/2026/)).toBeTruthy();

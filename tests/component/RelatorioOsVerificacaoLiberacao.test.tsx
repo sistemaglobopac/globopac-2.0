@@ -13,7 +13,7 @@ vi.mock("@/modules/bpf/api", () => ({
 vi.mock("@/modules/bpf/RelatorioBpf", () => ({ RelatorioBpf: () => <div>CORPO DO RELATORIO</div> }));
 
 import { RelatoriosOsParaVerificar } from "@/modules/bpf/RelatoriosOsParaVerificar";
-import { RelatoriosOsArquivo } from "@/modules/bpf/RelatoriosOsArquivo";
+import { CartaoRelatorioOsArquivo } from "@/modules/bpf/RelatoriosOsArquivo";
 import { relatoriosOsDoArquivo } from "@/modules/bpf/regras";
 
 function relatorio(id: string, data: string, status: Relatorio["status"], extra: Partial<Relatorio> = {}): Relatorio {
@@ -80,17 +80,34 @@ describe("Relatório de OS (BPF): verificação no Painel de Verificação e lib
 
   it("Painel de Arquivo: o relatório verificado aparece para seleção (como as fichas); a liberação é pelo botão do painel", () => {
     const alternar = vi.fn();
-    comDialogo(<RelatoriosOsArquivo liberacao="pendentes" podeLiberar selecionados={new Set()} aoAlternar={alternar} />);
+    // O painel monta um card por relatório que passa nos filtros; o emitido (ainda não verificado) e o liberado não passam em "pendentes".
+    const naLista = relatoriosOsDoArquivo(relatorios, "pendentes");
+    comDialogo(
+      <>
+        {naLista.map((r) => (
+          <CartaoRelatorioOsArquivo key={r.id} relatorio={r} podeLiberar selecionado={false} aoAlternar={alternar} />
+        ))}
+      </>
+    );
     expect(screen.queryByTestId("arquivo-relatorio-os-2026-10-24")).toBeNull(); // ainda não verificado
     expect(screen.queryByTestId("arquivo-relatorio-os-2026-10-22")).toBeNull(); // já liberado: fora do filtro "pendentes"
     expect(screen.queryByText(/Liberar relatórios de OS/)).toBeNull(); // sem botão próprio: é o botão do painel
+    expect(screen.getByText("Monitoramento de Infraestrutura e Equipamentos")).toBeInTheDocument();
+    expect(screen.getByText(/RAC 002\/001/)).toBeInTheDocument();
+    expect(screen.getByText("PAC 1")).toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText(/Selecionar relatório de OS de 23\/10\/2026/));
     expect(alternar).toHaveBeenCalledWith("r-verificado");
   });
 
   it("Painel de Arquivo: sem permissão de liberar (Verificador) não há seleção", () => {
-    comDialogo(<RelatoriosOsArquivo liberacao="todas" podeLiberar={false} selecionados={new Set()} aoAlternar={vi.fn()} />);
+    comDialogo(
+      <>
+        {relatoriosOsDoArquivo(relatorios, "todas").map((r) => (
+          <CartaoRelatorioOsArquivo key={r.id} relatorio={r} podeLiberar={false} selecionado={false} aoAlternar={vi.fn()} />
+        ))}
+      </>
+    );
     expect(screen.getByTestId("arquivo-relatorio-os-2026-10-23")).toBeInTheDocument();
     expect(screen.getByTestId("arquivo-relatorio-os-2026-10-22")).toBeInTheDocument();
     expect(screen.queryByRole("checkbox")).toBeNull();
