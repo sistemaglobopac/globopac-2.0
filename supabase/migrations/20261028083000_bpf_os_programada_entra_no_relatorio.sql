@@ -16,12 +16,11 @@
 -- novo prazo, quem e quando) e conta em qtd_nc_reprogramadas, não em qtd_nc. Vale na emissão, na geração do dia e
 -- também quando o PCM reprograma DEPOIS da emissão (reprogramacoes_posteriores, sem mexer nos itens assinados).
 
+-- Idempotente (if not exists): pode ser rodada de novo sem erro, por exemplo se for aplicada pelo painel do Supabase e depois pelo pipeline.
 alter table bpf_relatorios
-  add column itens_posteriores jsonb not null default '[]'::jsonb;
-
-alter table bpf_relatorios
-  add column reprogramacoes_posteriores jsonb not null default '[]'::jsonb,
-  add column qtd_nc_reprogramadas integer not null default 0;
+  add column if not exists itens_posteriores jsonb not null default '[]'::jsonb,
+  add column if not exists reprogramacoes_posteriores jsonb not null default '[]'::jsonb,
+  add column if not exists qtd_nc_reprogramadas integer not null default 0;
 
 comment on column bpf_relatorios.reprogramacoes_posteriores is
   'Reprogramações feitas pelo PCM, no mesmo dia, depois da emissão, de OS que constam como NC nos itens: '
