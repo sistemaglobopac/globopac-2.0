@@ -131,18 +131,61 @@ describe("ModalObservacoesPcm: observações do inspetor ao PCM que entra", () =
     expect(screen.queryByTestId("modal-observacoes-pcm")).toBeNull();
   });
 
-  it("observação que chega com o modal aberto não entra na lista na hora", () => {
-    ordensAtuais = [ordem("OS-1", [verificacao("v1", "Primeira observação")])];
-    const { rerender } = montar();
-    ordensAtuais = [ordem("OS-1", [verificacao("v1", "Primeira observação")]), ordem("OS-9", [verificacao("v9", "Chegou agora")])];
+  // O PCM fica logado e o inspetor inclui uma observação: a lista (atualizada a cada 30 s) passa a trazê-la.
+  const remontar = (rerender: (ui: React.ReactElement) => void) =>
     rerender(
       <MemoryRouter initialEntries={["/qualquer"]}>
         <Routes>
           <Route path="/qualquer" element={<ModalObservacoesPcm />} />
+          <Route path="/bpf/pcm" element={<div>PAGINA DO PCM</div>} />
         </Routes>
       </MemoryRouter>
     );
+
+  it("com o PCM logado, a observação que o inspetor inclui faz o modal aparecer na hora", () => {
+    ordensAtuais = [];
+    const { rerender } = montar();
+    expect(screen.queryByTestId("modal-observacoes-pcm")).toBeNull();
+
+    ordensAtuais = [ordem("OS-9", [verificacao("v9", "Chegou agora, sem material")])];
+    remontar(rerender);
     expect(screen.getByTestId("modal-observacoes-pcm")).toHaveTextContent("Observações do inspetor nas OS (1)");
-    expect(screen.queryByTestId("obs-pcm-OS-9")).toBeNull();
+    expect(screen.getByTestId("obs-pcm-OS-9")).toHaveTextContent("Chegou agora, sem material");
+  });
+
+  it("depois do Estou ciente, uma nova observação reabre o modal só com a nova", () => {
+    ordensAtuais = [ordem("OS-1", [verificacao("v1", "Primeira")])];
+    const { rerender } = montar();
+    fireEvent.click(screen.getByRole("button", { name: "Estou ciente" }));
+    expect(screen.queryByTestId("modal-observacoes-pcm")).toBeNull();
+
+    ordensAtuais = [ordem("OS-1", [verificacao("v1", "Primeira")]), ordem("OS-9", [verificacao("v9", "Nova")])];
+    remontar(rerender);
+    expect(screen.getByTestId("modal-observacoes-pcm")).toHaveTextContent("Observações do inspetor nas OS (1)");
+    expect(screen.queryByTestId("obs-pcm-OS-1")).toBeNull();
+    expect(screen.getByTestId("obs-pcm-OS-9")).toBeInTheDocument();
+  });
+
+  it("fechado no X, o modal não volta sozinho com as mesmas observações; uma nova o reabre com todas as não lidas", () => {
+    ordensAtuais = [ordem("OS-1", [verificacao("v1", "Primeira")])];
+    const { rerender } = montar();
+    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    expect(screen.queryByTestId("modal-observacoes-pcm")).toBeNull();
+
+    remontar(rerender); // a lista se atualiza (30 s) sem nada novo: continua fechado
+    expect(screen.queryByTestId("modal-observacoes-pcm")).toBeNull();
+
+    ordensAtuais = [ordem("OS-1", [verificacao("v1", "Primeira")]), ordem("OS-9", [verificacao("v9", "Nova")])];
+    remontar(rerender);
+    expect(screen.getByTestId("modal-observacoes-pcm")).toHaveTextContent("Observações do inspetor nas OS (2)");
+  });
+
+  it("com o modal aberto, a observação nova entra na lista", () => {
+    ordensAtuais = [ordem("OS-1", [verificacao("v1", "Primeira")])];
+    const { rerender } = montar();
+    ordensAtuais = [ordem("OS-1", [verificacao("v1", "Primeira")]), ordem("OS-9", [verificacao("v9", "Chegou agora")])];
+    remontar(rerender);
+    expect(screen.getByTestId("modal-observacoes-pcm")).toHaveTextContent("Observações do inspetor nas OS (2)");
+    expect(screen.getByTestId("obs-pcm-OS-9")).toBeInTheDocument();
   });
 });

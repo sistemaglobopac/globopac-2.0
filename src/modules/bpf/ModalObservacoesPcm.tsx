@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MessageSquareWarning, X } from "lucide-react";
 import { Badge } from "@/shared/ui/badge";
@@ -8,30 +8,31 @@ import { useOrdensProgramadas } from "./api";
 import { lerCienciaObservacoes, registrarCienciaObservacoes } from "./cienciaObservacoes";
 import { formatarData, formatarHora, observacoesParaCienciaDoPcm, ROTULO_RESULTADO, rotuloInspetorOuResp, situacaoPrazo, hojeManaus } from "./regras";
 
-/** Modal de entrada do programador do PCM: assim que ele loga, vê as OS em que o inspetor deixou observação e que ele ainda não leu
- * (ou que ainda não reprogramou depois da observação). "Estou ciente" registra a leitura neste aparelho e o modal só volta a mostrar
- * observações novas; fechar no X mantém tudo para o próximo acesso. Aparece uma vez por abertura do sistema, sem interromper o
- * trabalho quando uma observação chega depois. */
+/** Modal das observações do inspetor para o programador do PCM: aparece quando ele loga e, com ele logado, assim que o inspetor inclui
+ * uma observação numa OS (a lista se atualiza a cada 30 s e ao voltar para a aba). Mostra as OS cuja observação ele ainda não leu e que
+ * ainda não reprogramou depois dela. "Estou ciente" registra a leitura neste aparelho; o X só fecha por enquanto — o modal volta quando
+ * chegar uma observação nova, e as não lidas continuam no próximo acesso. */
 export function ModalObservacoesPcm() {
   const perfilId = useSessionStore((s) => s.perfil?.id);
   const navigate = useNavigate();
   const { data: ordens } = useOrdensProgramadas();
-  const [fechado, setFechado] = useState(false);
-  // A lista congela na primeira vez em que há o que mostrar: observação que chega depois fica para o próximo acesso (o Painel do PCM a destaca).
-  const congelada = useRef<ReturnType<typeof observacoesParaCienciaDoPcm> | null>(null);
-  const calculada = useMemo(
-    () => (ordens && perfilId ? observacoesParaCienciaDoPcm(ordens, lerCienciaObservacoes(perfilId)) : null),
-    [ordens, perfilId]
-  );
-  if (congelada.current === null && calculada && calculada.length > 0) congelada.current = calculada;
+  const [cientes, setCientes] = useState<ReadonlySet<string>>(() => (perfilId ? lerCienciaObservacoes(perfilId) : new Set()));
+  // Observações que estavam na lista quando o PCM fechou no X: não reabrem o modal sozinhas, só uma observação nova.
+  const [dispensadas, setDispensadas] = useState<ReadonlySet<string>>(new Set());
 
-  const itens = congelada.current;
-  if (fechado || !perfilId || !itens || itens.length === 0) return null;
+  const itens = useMemo(() => (ordens ? observacoesParaCienciaDoPcm(ordens, cientes) : []), [ordens, cientes]);
+  const temNova = itens.some((i) => !dispensadas.has(i.verificacao.id));
+  if (!perfilId || itens.length === 0 || !temNova) return null;
 
   function ciente(depois?: () => void) {
-    registrarCienciaObservacoes(perfilId!, itens!.map((i) => i.verificacao.id));
-    setFechado(true);
+    const ids = itens.map((i) => i.verificacao.id);
+    registrarCienciaObservacoes(perfilId!, ids);
+    setCientes((atual) => new Set([...atual, ...ids]));
     depois?.();
+  }
+
+  function fecharPorEnquanto() {
+    setDispensadas(new Set(itens.map((i) => i.verificacao.id)));
   }
 
   const hoje = hojeManaus();
@@ -48,7 +49,7 @@ export function ModalObservacoesPcm() {
           <span className="flex items-center gap-2 font-semibold">
             <MessageSquareWarning className="h-5 w-5" /> Observações do inspetor nas OS ({itens.length})
           </span>
-          <button type="button" onClick={() => setFechado(true)} aria-label="Fechar">
+          <button type="button" onClick={fecharPorEnquanto} aria-label="Fechar">
             <X className="h-5 w-5" />
           </button>
         </div>
