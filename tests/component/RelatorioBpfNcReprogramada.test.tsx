@@ -116,6 +116,15 @@ describe("RelatorioBpf: gerado na hora (provisório)", () => {
     expect(screen.getByText("Programada pelo PCM")).toBeInTheDocument();
   });
 
+  it("usa o mesmo cabeçalho, mas com protocolo provisório, \"Gerado em\" e o status de dia não emitido", () => {
+    render(<RelatorioBpf relatorio={provisorio} />);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Monitoramento de Infraestrutura e Equipamentos");
+    expect(screen.getByText("GS-20261028-PROVISORIO-BPF")).toBeInTheDocument();
+    expect(screen.getByText(/Gerado em/)).toBeInTheDocument();
+    expect(screen.getByText("Gerado na hora · dia não emitido")).toBeInTheDocument();
+    expect(screen.getByTestId("codigo-ficha-bpf")).toHaveTextContent("RAC 002/001");
+  });
+
   it("o relatório emitido não mostra o aviso de provisório", () => {
     render(<RelatorioBpf relatorio={emitido()} />);
     expect(screen.queryByTestId("aviso-provisorio")).toBeNull();

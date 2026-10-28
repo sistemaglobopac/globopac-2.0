@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { RodapeAtestado } from "@/shared/relatorio/RodapeAtestado";
 import { SeloAssinatura } from "@/shared/relatorio/SeloAssinatura";
+import { CabecalhoRelatorioOficial } from "@/shared/relatorio/CabecalhoRelatorioOficial";
 import {
   formatarData,
   formatarDataHora,
@@ -114,6 +115,21 @@ function SeloPendente({ titulo, children }: { titulo: string; children: React.Re
   );
 }
 
+const formatarHoraManaus = (iso: string) => new Date(iso).toLocaleTimeString("pt-BR", { timeZone: "America/Manaus", hour: "2-digit", minute: "2-digit" });
+
+/** Situação do documento no campo "Status" do cabeçalho. */
+function statusDoRelatorio(dado: Relatorio | RelatorioProvisorio): string {
+  if ("provisorio" in dado && dado.provisorio === true) return "Gerado na hora · dia não emitido";
+  switch ((dado as Relatorio).status) {
+    case "liberado":
+      return "Liberado ao SIF";
+    case "verificado":
+      return "Verificado · aguardando liberação";
+    default:
+      return "Emitido · aguardando verificação";
+  }
+}
+
 /** Relatório diário de não conformidades — BPF Estrutural. Layout do formulário usado até aqui
  * (anomalia, setor, ação corretiva, nº da OS com datas, C/NC/NP, data e hora), acrescido do
  * centro de custo, da SS de origem, dos selos das assinaturas eletrônicas do dia e do atestado de
@@ -125,187 +141,195 @@ export function RelatorioBpf({ relatorio: dado }: { relatorio: Relatorio | Relat
   const itens = itensComReprogramacao(dado);
   const posteriores = dado.itens_posteriores ?? [];
   const resumo = resumirAssinaturas([...itens, ...posteriores]);
-  const protocolo = relatorio ? `GS-${relatorio.data_referencia.replaceAll("-", "")}-${relatorio.id.split("-")[0]!.toUpperCase()}-BPF` : "";
+  const protocolo = relatorio
+    ? `GS-${relatorio.data_referencia.replaceAll("-", "")}-${relatorio.id.split("-")[0]!.toUpperCase()}-BPF`
+    : `GS-${dado.data_referencia.replaceAll("-", "")}-PROVISORIO-BPF`;
 
   return (
-    <div id="relatorio-impressao" className="print-page print-compacto space-y-3 rounded-lg border bg-white p-4 text-[11px] text-black" data-testid="relatorio-bpf">
+    <div id="relatorio-impressao" className="print-page print-compacto overflow-hidden rounded-lg border bg-white text-[11px] text-black" data-testid="relatorio-bpf">
       <style>{"@media print { @page { size: A4 landscape; margin: 8mm; } }"}</style>
 
-      <header className="flex flex-wrap items-start justify-between gap-2 border-b-2 border-black pb-2">
-        <div>
-          <h2 className="text-base font-extrabold uppercase">{NOME_RELATORIO_BPF}</h2>
-          <p className="text-[11px] text-slate-700">
-            <span className="mr-2 rounded bg-slate-200 px-1.5 py-0.5 font-black tracking-wider" data-testid="codigo-ficha-bpf">
-              {CODIGO_FICHA_BPF}
-            </span>
-            {PAC_BPF} · Relatório diário de não conformidades · BPF Estrutural · Manutenções diversas
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="text-[11px] font-semibold">DATA: {formatarData(dado.data_referencia)}</p>
-          <p className="text-[10px] text-slate-700">
-            {dado.qtd_nc} não conforme(s) · {dado.qtd_np} no prazo · {dado.qtd_conformes} conforme(s) no dia
-            {dado.qtd_nc_reprogramadas > 0 ? ` · ${dado.qtd_nc_reprogramadas} NC reprogramada(s) pelo PCM` : ""}
-          </p>
-        </div>
-      </header>
+      <CabecalhoRelatorioOficial
+        subtitulo={`Sistema de Gestão de Qualidade — Relatório Oficial${provisorio ? " (gerado na hora)" : ""}`}
+        protocolo={protocolo}
+        rotuloEmissao={provisorio ? "Gerado em" : "Emitido em"}
+        emitidoEm={formatarDataHora(provisorio ? provisorio.gerado_em : relatorio!.emitido_em)}
+        titulo={NOME_RELATORIO_BPF}
+        codigo={CODIGO_FICHA_BPF}
+        codigoTestId="codigo-ficha-bpf"
+        metadados={[
+          ["Setor", dado.setor.toUpperCase()],
+          ["PAC", PAC_BPF],
+          ["Data", formatarData(dado.data_referencia)],
+          ["Horário", formatarHoraManaus(provisorio ? provisorio.gerado_em : relatorio!.emitido_em)],
+          ["Turno", "Dia todo"],
+          ["Status", statusDoRelatorio(dado)],
+        ]}
+      />
 
-      <table className="w-full table-fixed border-collapse text-[11px]">
-        <colgroup>
-          <col style={{ width: "26%" }} />
-          <col style={{ width: "15%" }} />
-          <col style={{ width: "15%" }} />
-          <col style={{ width: "22%" }} />
-          <col style={{ width: "8%" }} />
-          <col style={{ width: "14%" }} />
-        </colgroup>
-        <thead className="table-header-group">
-          <tr className="bg-slate-200 text-left text-[10px] uppercase">
-            <th className="border border-slate-400 p-1.5">Anomalia</th>
-            <th className="border border-slate-400 p-1.5">Setor</th>
-            <th className="border border-slate-400 p-1.5">Ação corretiva (PCM)</th>
-            <th className="border border-slate-400 p-1.5">Nº O.S.</th>
-            <th className="border border-slate-400 p-1.5 text-center">C, NC ou NP</th>
-            <th className="border border-slate-400 p-1.5 text-center">Data / hora verif.</th>
-          </tr>
-        </thead>
-        <tbody>
-          {itens.length === 0 && posteriores.length === 0 && (
-            <tr>
-              <td colSpan={6} className="border border-slate-400 p-3 text-center text-slate-600">
-                Nenhuma não conformidade em aberto neste dia.
-              </td>
+      <div className="space-y-3 p-4">
+        <p className="text-[11px] font-semibold text-slate-800" data-testid="resumo-relatorio-bpf">
+          {dado.qtd_nc} não conforme(s) · {dado.qtd_np} no prazo · {dado.qtd_conformes} conforme(s) no dia
+          {dado.qtd_nc_reprogramadas > 0 ? ` · ${dado.qtd_nc_reprogramadas} NC reprogramada(s) pelo PCM` : ""}
+        </p>
+
+        <table className="w-full table-fixed border-collapse text-[11px]">
+          <colgroup>
+            <col style={{ width: "26%" }} />
+            <col style={{ width: "15%" }} />
+            <col style={{ width: "15%" }} />
+            <col style={{ width: "22%" }} />
+            <col style={{ width: "8%" }} />
+            <col style={{ width: "14%" }} />
+          </colgroup>
+          <thead className="table-header-group">
+            <tr className="bg-slate-200 text-left text-[10px] uppercase">
+              <th className="border border-slate-400 p-1.5">Anomalia</th>
+              <th className="border border-slate-400 p-1.5">Setor</th>
+              <th className="border border-slate-400 p-1.5">Ação corretiva (PCM)</th>
+              <th className="border border-slate-400 p-1.5">Nº O.S.</th>
+              <th className="border border-slate-400 p-1.5 text-center">C, NC ou NP</th>
+              <th className="border border-slate-400 p-1.5 text-center">Data / hora verif.</th>
             </tr>
-          )}
-          {itens.map((item) => (
-            <LinhaItem key={item.numero_os} item={item} />
-          ))}
-          {posteriores.length > 0 && (
-            <tr>
-              <td colSpan={6} className="border border-slate-400 bg-slate-100 p-1.5 text-[10px] font-bold uppercase" data-testid="separador-posteriores">
-                OS programadas pelo PCM depois da emissão do relatório
-              </td>
-            </tr>
-          )}
-          {posteriores.map((item) => (
-            <LinhaItem key={item.numero_os} item={item} />
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {itens.length === 0 && posteriores.length === 0 && (
+              <tr>
+                <td colSpan={6} className="border border-slate-400 p-3 text-center text-slate-600">
+                  Nenhuma não conformidade em aberto neste dia.
+                </td>
+              </tr>
+            )}
+            {itens.map((item) => (
+              <LinhaItem key={item.numero_os} item={item} />
+            ))}
+            {posteriores.length > 0 && (
+              <tr>
+                <td colSpan={6} className="border border-slate-400 bg-slate-100 p-1.5 text-[10px] font-bold uppercase" data-testid="separador-posteriores">
+                  OS programadas pelo PCM depois da emissão do relatório
+                </td>
+              </tr>
+            )}
+            {posteriores.map((item) => (
+              <LinhaItem key={item.numero_os} item={item} />
+            ))}
+          </tbody>
+        </table>
 
-      <section className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 print:grid-cols-4" aria-label="Assinaturas">
-        {relatorio ? (
-          <SeloAssinatura
-            titulo="Assinatura Eletrônica do Inspetor de Qualidade do dia — emissão"
-            nome={relatorio.emitido_por_nome}
-            dataHora={formatarDataHora(relatorio.emitido_em)}
-            hash={relatorio.hash_emissao}
-            integro={null}
-          />
-        ) : (
-          <SeloPendente titulo="Inspetor de Qualidade do dia — emissão">
-            <span className="text-amber-800">Dia ainda não encerrado pelo inspetor</span>
-          </SeloPendente>
-        )}
-
-        {resumo.administradores.length === 0 && (
-          <SeloPendente titulo="Administrador — aprovação das solicitações">Sem solicitações aprovadas no sistema neste relatório.</SeloPendente>
-        )}
-        {resumo.administradores.map((a) => {
-          const ultima = a.solicitacoes.at(-1);
-          return (
+        <section className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 print:grid-cols-4" aria-label="Assinaturas">
+          {relatorio ? (
             <SeloAssinatura
-              key={a.nome}
-              titulo="Assinatura Eletrônica do Administrador — aprovação das solicitações"
-              nome={a.nome}
-              dataHora={formatarDataHora(ultima?.em)}
-              hash={ultima?.hash}
+              titulo="Assinatura Eletrônica do Inspetor de Qualidade do dia — emissão"
+              nome={relatorio.emitido_por_nome}
+              dataHora={formatarDataHora(relatorio.emitido_em)}
+              hash={relatorio.hash_emissao}
               integro={null}
             />
-          );
-        })}
+          ) : (
+            <SeloPendente titulo="Inspetor de Qualidade do dia — emissão">
+              <span className="text-amber-800">Dia ainda não encerrado pelo inspetor</span>
+            </SeloPendente>
+          )}
 
-        {resumo.pcm.length === 0 && <SeloPendente titulo="PCM — programação das OS">Sem programações assinadas no sistema neste relatório.</SeloPendente>}
-        {resumo.pcm.map((u) => {
-          const ultima = u.programacoes.at(-1);
-          return (
+          {resumo.administradores.length === 0 && (
+            <SeloPendente titulo="Administrador — aprovação das solicitações">Sem solicitações aprovadas no sistema neste relatório.</SeloPendente>
+          )}
+          {resumo.administradores.map((a) => {
+            const ultima = a.solicitacoes.at(-1);
+            return (
+              <SeloAssinatura
+                key={a.nome}
+                titulo="Assinatura Eletrônica do Administrador — aprovação das solicitações"
+                nome={a.nome}
+                dataHora={formatarDataHora(ultima?.em)}
+                hash={ultima?.hash}
+                integro={null}
+              />
+            );
+          })}
+
+          {resumo.pcm.length === 0 && <SeloPendente titulo="PCM — programação das OS">Sem programações assinadas no sistema neste relatório.</SeloPendente>}
+          {resumo.pcm.map((u) => {
+            const ultima = u.programacoes.at(-1);
+            return (
+              <SeloAssinatura
+                key={u.nome}
+                titulo="Assinatura Eletrônica do PCM — programação das OS"
+                nome={u.nome}
+                dataHora={formatarDataHora(ultima?.em)}
+                hash={ultima?.hash}
+                integro={null}
+              />
+            );
+          })}
+
+          {relatorio?.verificado_por_nome ? (
             <SeloAssinatura
-              key={u.nome}
-              titulo="Assinatura Eletrônica do PCM — programação das OS"
-              nome={u.nome}
-              dataHora={formatarDataHora(ultima?.em)}
-              hash={ultima?.hash}
+              titulo="Assinatura Eletrônica do Verificador — verificação do monitoramento"
+              nome={relatorio.verificado_por_nome}
+              dataHora={formatarDataHora(relatorio.verificado_em)}
+              hash={relatorio.hash_verificacao}
               integro={null}
+              corLabel="text-success"
             />
-          );
-        })}
+          ) : (
+            <SeloPendente titulo="Verificador — verificação do monitoramento">
+              <span className="text-amber-800">Aguardando verificação do Verificador</span>
+            </SeloPendente>
+          )}
+        </section>
 
-        {relatorio?.verificado_por_nome ? (
-          <SeloAssinatura
-            titulo="Assinatura Eletrônica do Verificador — verificação do monitoramento"
-            nome={relatorio.verificado_por_nome}
-            dataHora={formatarDataHora(relatorio.verificado_em)}
-            hash={relatorio.hash_verificacao}
-            integro={null}
-            corLabel="text-success"
-          />
-        ) : (
-          <SeloPendente titulo="Verificador — verificação do monitoramento">
-            <span className="text-amber-800">Aguardando verificação do Verificador</span>
-          </SeloPendente>
+        {provisorio && (
+          <p className="rounded border border-amber-500/50 bg-amber-50 p-2 text-[10px] font-semibold text-amber-900" data-testid="aviso-provisorio">
+            Relatório gerado em {formatarDataHora(provisorio.gerado_em)} a partir dos registros do dia. Ainda não foi emitido e assinado pelo inspetor: não tem
+            validade como documento assinado.
+            {provisorio.sem_verificacao_pendentes > 0
+              ? ` ${provisorio.sem_verificacao_pendentes} OS em aberto no dia ainda não foram verificadas pelo inspetor e não constam neste relatório.`
+              : ""}
+          </p>
         )}
-      </section>
 
-      {provisorio && (
-        <p className="rounded border border-amber-500/50 bg-amber-50 p-2 text-[10px] font-semibold text-amber-900" data-testid="aviso-provisorio">
-          Relatório gerado em {formatarDataHora(provisorio.gerado_em)} a partir dos registros do dia. Ainda não foi emitido e assinado pelo inspetor: não tem
-          validade como documento assinado.
-          {provisorio.sem_verificacao_pendentes > 0
-            ? ` ${provisorio.sem_verificacao_pendentes} OS em aberto no dia ainda não foram verificadas pelo inspetor e não constam neste relatório.`
-            : ""}
-        </p>
-      )}
+        {posteriores.length > 0 && (
+          <p className="text-[10px] text-slate-600">
+            As OS listadas após a emissão foram programadas pelo PCM depois da assinatura do inspetor e entram como "no prazo", sem verificação do inspetor; a
+            assinatura de emissão abrange apenas as OS anteriores a elas.
+          </p>
+        )}
 
-      {posteriores.length > 0 && (
-        <p className="text-[10px] text-slate-600">
-          As OS listadas após a emissão foram programadas pelo PCM depois da assinatura do inspetor e entram como "no prazo", sem verificação do inspetor; a
-          assinatura de emissão abrange apenas as OS anteriores a elas.
-        </p>
-      )}
+        {resumo.semAprovacaoNoSistema > 0 && (
+          <p className="text-[10px] text-slate-600">
+            {resumo.semAprovacaoNoSistema} OS deste relatório foram importadas do relatório manual anterior e não têm, no sistema, a assinatura de aprovação do administrador; as programações importadas também não têm assinatura eletrônica.
+          </p>
+        )}
 
-      {resumo.semAprovacaoNoSistema > 0 && (
-        <p className="text-[10px] text-slate-600">
-          {resumo.semAprovacaoNoSistema} OS deste relatório foram importadas do relatório manual anterior e não têm, no sistema, a assinatura de aprovação do administrador; as programações importadas também não têm assinatura eletrônica.
-        </p>
-      )}
-
-      {relatorio && (
-        <RodapeAtestado
-          objeto="relatório"
-          protocolo={protocolo}
-          hash={relatorio.hash_verificacao ?? relatorio.hash_emissao}
-          integro={null}
-          carimbo={
-            <p className="mt-1">
-              Emissão registrada em {formatarDataHora(relatorio.emitido_em)}
-              {relatorio.verificado_em
-                ? ` · verificação do Verificador em ${formatarDataHora(relatorio.verificado_em)}`
-                : " · aguardando a verificação do Verificador"}
-              {relatorio.liberado_em ? ` · liberação ao SIF em ${formatarDataHora(relatorio.liberado_em)}` : ""}
-              .
-            </p>
-          }
-          auditoria={
-            <>
-              <p>
-                Os códigos (#) são os primeiros caracteres do SHA-256 de cada assinatura, calculado pelo servidor no momento do ato. Identificador único do
-                documento:
+        {relatorio && (
+          <RodapeAtestado
+            objeto="relatório"
+            protocolo={protocolo}
+            hash={relatorio.hash_verificacao ?? relatorio.hash_emissao}
+            integro={null}
+            carimbo={
+              <p className="mt-1">
+                Emissão registrada em {formatarDataHora(relatorio.emitido_em)}
+                {relatorio.verificado_em
+                  ? ` · verificação do Verificador em ${formatarDataHora(relatorio.verificado_em)}`
+                  : " · aguardando a verificação do Verificador"}
+                {relatorio.liberado_em ? ` · liberação ao SIF em ${formatarDataHora(relatorio.liberado_em)}` : ""}
+                .
               </p>
-              <p className="mt-1 break-all rounded border border-hairline bg-gray-50 px-2 py-1 font-mono text-[10px] font-bold text-ink print:text-[8px]">{relatorio.id}</p>
-            </>
-          }
-        />
-      )}
+            }
+            auditoria={
+              <>
+                <p>
+                  Os códigos (#) são os primeiros caracteres do SHA-256 de cada assinatura, calculado pelo servidor no momento do ato. Identificador único do
+                  documento:
+                </p>
+                <p className="mt-1 break-all rounded border border-hairline bg-gray-50 px-2 py-1 font-mono text-[10px] font-bold text-ink print:text-[8px]">{relatorio.id}</p>
+              </>
+            }
+          />
+        )}
+      </div>
     </div>
   );
 }

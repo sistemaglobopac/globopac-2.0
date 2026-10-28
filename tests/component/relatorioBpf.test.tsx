@@ -80,6 +80,20 @@ describe("RelatorioBpf", () => {
     expect(screen.getByText(/Prog: 22\/09\/2026/)).toBeTruthy();
   });
 
+  it("tem o mesmo cabeçalho dos relatórios de monitoramento: razão social, protocolo, nome, código de ficha e grade de metadados", () => {
+    render(<RelatorioBpf relatorio={base} />);
+    expect(screen.getByText("KAEFER AGRO INDUSTRIAL LTDA. - SIF1606")).toBeTruthy();
+    expect(screen.getByText(/Sistema de Gestão de Qualidade — Relatório Oficial/)).toBeTruthy();
+    expect(screen.getByText("Protocolo")).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Monitoramento de Infraestrutura e Equipamentos");
+    expect(screen.getByTestId("codigo-ficha-bpf")).toHaveTextContent("RAC 002/001");
+    const grade = within(document.querySelector("dl") as HTMLElement);
+    for (const rotulo of ["Setor", "PAC", "Data", "Horário", "Turno", "Status"]) expect(grade.getByText(rotulo)).toBeTruthy();
+    expect(grade.getByText("PAC 1")).toBeTruthy();
+    expect(grade.getByText("Dia todo")).toBeTruthy();
+    expect(grade.getByText(/Emitido · aguardando verificação/)).toBeTruthy();
+  });
+
   it("traz as quatro assinaturas: inspetor, administrador, PCM e Verificador", () => {
     render(<RelatorioBpf relatorio={base} />);
     const assinaturas = within(screen.getByLabelText("Assinaturas"));
@@ -96,7 +110,7 @@ describe("RelatorioBpf", () => {
     expect(assinaturas.getAllByText(/LEI 14\.063\/2020/).length).toBe(3);
     expect(assinaturas.getByText(/SHA-256: EEEEEEEEEEEEEEEEEEEE/)).toBeTruthy();
     expect(screen.getByText(/Atestado de Validade Jurídica e Compliance Tecnológico/)).toBeTruthy();
-    expect(screen.getByText("GS-20261021-R1-BPF")).toBeTruthy();
+    expect(screen.getAllByText("GS-20261021-R1-BPF")).toHaveLength(2); // protocolo no cabeçalho e no atestado
     expect(screen.getByText(/Sistema GloboPac · Kaefer Agro Industrial LTDA\. · SIF 1606/)).toBeTruthy();
   });
 

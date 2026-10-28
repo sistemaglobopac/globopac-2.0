@@ -19,11 +19,8 @@ import { computarHashMonitoramento, resumoHash } from "../../utils/hashDocumento
 import { DadosColetados } from "../DadosColetadosFicha";
 import { SeloAssinatura } from "@/shared/relatorio/SeloAssinatura";
 import { RodapeAtestado } from "@/shared/relatorio/RodapeAtestado";
+import { CabecalhoRelatorioOficial } from "@/shared/relatorio/CabecalhoRelatorioOficial";
 import type { AcoesNaoConformidade } from "../DadosColetadosFicha";
-
-// Razão social/SIF fixos — mesma planta/cliente do v1, só trocou de sistema (confirmado com o
-// usuário). Não há hoje um app_config para isso; se um dia mudar, esse é o único lugar a tocar.
-const RAZAO_SOCIAL = "KAEFER AGRO INDUSTRIAL LTDA. - SIF1606";
 
 const ADENDO_STATUS_ROTULO: Record<string, string> = {
   pending_monitor: "Aguardando assinatura do inspetor",
@@ -427,54 +424,23 @@ export function RelatorioMonitoramento({ ids, dados, turnoDe = (r) => turnoDoDia
 
   return (
     <div className={`print-page mx-auto flex w-full max-w-4xl flex-col bg-white font-sans text-ink shadow-2xl print:max-w-[210mm] ${isGrouped ? "" : "print-fit-one-page"} ${impressaoCompacta ? "print-compacto" : ""}`} style={{ margin: "0 auto" }}>
-      {/* Cabeçalho — identificação no topo, título da ficha e uma grade de metadados rotulados
-          (antes eram chips soltos + uma seção "Dados Gerais" separada, que repetia data/turno). */}
-      <div className="cabecalho-relatorio w-full rounded-t-lg bg-surface-dark p-6 text-ondark">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <Shield className="h-9 w-9 shrink-0 opacity-80" />
-            <div className="min-w-0">
-              <p className="text-lg font-black leading-tight tracking-wide">{RAZAO_SOCIAL}</p>
-              <p className="mt-0.5 text-[10px] uppercase tracking-widest opacity-80">
-                Sistema de Gestão de Qualidade — Relatório Oficial{isGrouped ? " Consolidado" : ""}
-              </p>
-            </div>
-          </div>
-          <div className="shrink-0 rounded-lg border border-ondark/20 bg-ondark/10 px-3 py-2 text-right">
-            <p className="text-[9px] uppercase tracking-widest opacity-80">Protocolo</p>
-            <p className="font-mono text-base font-black tracking-wider">{protocolo}</p>
-            <p className="mt-0.5 text-[10px] opacity-80">Emitido em {emitidoEm}</p>
-          </div>
-        </div>
-
-        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-ondark/20 pt-3">
-          <h1 className="min-w-0 text-lg font-extrabold leading-snug">{template?.nome ?? "Ficha de Monitoramento"}</h1>
-          {template?.codigo && (
-            <span className="whitespace-nowrap rounded bg-lime/15 px-2 py-0.5 text-xs font-black tracking-wider text-lime">{template.codigo}</span>
-          )}
-          {isGrouped && (
-            <span className="whitespace-nowrap rounded bg-lime/15 px-2 py-0.5 text-xs font-black tracking-wider text-lime">
-              {records.length} APURAÇÕES NO DIA
-            </span>
-          )}
-        </div>
-
-        <dl className="mt-3 grid grid-cols-2 gap-px overflow-hidden rounded-md border border-ondark/20 bg-ondark/20 sm:grid-cols-3">
-          {[
-            ["Setor", primary.setor.toUpperCase()],
-            ["PAC", template?.pac_correspondente ?? "PAC não definido"],
-            ["Data", diaDocumento],
-            ["Horário", horarioDocumento],
-            ["Turno", turnos.length === 1 ? turnos[0] : "Múltiplos Turnos"],
-            ["Status", isGrouped ? `Concluído · ${records.length} apurações` : "Concluído · Assinado digitalmente"],
-          ].map(([rotulo, valor]) => (
-            <div key={rotulo} className="min-w-0 bg-surface-dark px-3 py-1.5">
-              <dt className="text-[9px] font-bold uppercase tracking-widest opacity-70">{rotulo}</dt>
-              <dd className="truncate text-sm font-bold">{valor}</dd>
-            </div>
-          ))}
-        </dl>
-      </div>
+      {/* Cabeçalho — o mesmo componente do relatório de OS (BPF): identificação no topo, título da ficha e uma grade de metadados. */}
+      <CabecalhoRelatorioOficial
+        subtitulo={`Sistema de Gestão de Qualidade — Relatório Oficial${isGrouped ? " Consolidado" : ""}`}
+        protocolo={protocolo}
+        emitidoEm={emitidoEm}
+        titulo={template?.nome ?? "Ficha de Monitoramento"}
+        codigo={template?.codigo}
+        etiquetas={isGrouped ? [`${records.length} APURAÇÕES NO DIA`] : []}
+        metadados={[
+          ["Setor", primary.setor.toUpperCase()],
+          ["PAC", template?.pac_correspondente ?? "PAC não definido"],
+          ["Data", diaDocumento],
+          ["Horário", horarioDocumento],
+          ["Turno", turnos.length === 1 ? turnos[0]! : "Múltiplos Turnos"],
+          ["Status", isGrouped ? `Concluído · ${records.length} apurações` : "Concluído · Assinado digitalmente"],
+        ]}
+      />
 
       {/* Banner de conformidade */}
       <div
