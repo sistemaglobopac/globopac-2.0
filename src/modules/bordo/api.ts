@@ -3,7 +3,7 @@ import { temNaoConformidade } from "@/modules/fichas/utils/desviosEspeciais";
 import { aplicarNoCaminho } from "@/modules/fichas/utils/adendoCampos";
 import { aditivosVigentes, idsAdendosConcluidos } from "@/modules/fichas/utils/adendosPendentes";
 import { propagarLeituraNosSeguintes } from "@/modules/fichas/utils/propagacaoCorrecao";
-import { ajustesDeCargaDoa, ajustesQueSeAplicam, recalcularDoaNoRegistro } from "@/modules/fichas/utils/doaCorrecao";
+import { ajustesDeCargaDoa, ajustesQueSeAplicam, motivosBloqueioAdendoDoa, recalcularDoaNoRegistro } from "@/modules/fichas/utils/doaCorrecao";
 import { horaEfetiva } from "@/modules/fichas/utils/horaMonitoramento";
 import { diffCorrecoes, MOTIVO_CORRECAO_MIN_CARACTERES, podeCorrigirMonitoramento, type ResultadoPodeCorrigir } from "@/modules/fichas/utils/correcaoInspetor";
 import { turnoParaHeranca } from "@/modules/fichas/utils/turnoUtils";
@@ -912,6 +912,8 @@ export function useAssinarAdendo() {
       }
       // DOA: o adendo troca o valor digitado; a % de DOA, o saldo e a SOMA do dia são refeitos a partir dele.
       dadosCorrigidos = recalcularDoaNoRegistro(dadosCorrigidos);
+      const motivosDoa = motivosBloqueioAdendoDoa(dadosCorrigidos, input.corrections);
+      if (motivosDoa.length > 0) throw new Error(motivosDoa.join(" "));
 
       const { error: erroInsert } = await supabase.from("monitoramentos").insert({
         ficha_template_id: original.ficha_template_id,

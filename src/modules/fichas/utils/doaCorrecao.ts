@@ -3,7 +3,7 @@
 // precisam seguir para as apurações seguintes do mesmo dia de abate (cada apuração guarda a própria cópia da carga e os totais).
 // Quem grava os aditivos é useAssinarAdendo / a função do banco propagar_correcao_carga_doa. Testado em tests/unit/doaCorrecao.test.ts.
 
-import { calcularCarga, montarValorDoa } from "../fields/rastreabilidadeDoa";
+import { calcularCarga, lerContagem, montarValorDoa } from "../fields/rastreabilidadeDoa";
 import type { CargaDoa } from "../fields/tiposCompostos";
 
 /** Dados da carga que um adendo pode corrigir e que valem para as demais apurações do dia (a função do banco aceita só estes). */
@@ -58,6 +58,28 @@ export function ajustesDeCargaDoa(dadosCorrigidos: Record<string, unknown>, corr
     saida.push({ campo, cargaId, prop, antigo: c.old === null || c.old === undefined ? "" : String(c.old), novo: c.new === null || c.new === undefined ? "" : String(c.new), dataAbate: typeof valor.dataAbate === "string" ? valor.dataAbate : "" });
   }
   return saida;
+}
+
+/** Carga que ficaria com as aves recebidas informadas e as mortas em branco (0 vale) depois do adendo. A assinatura normal já
+ * exige as duas; o adendo precisa da mesma regra. Só confere as cargas cujas aves recebidas/mortas o adendo mexe: dado antigo
+ * incompleto de outra carga não trava uma correção que não tem relação com ele. */
+export function motivosBloqueioAdendoDoa(dadosCorrigidos: Record<string, unknown>, correcoes: Record<string, { old: unknown; new: unknown }>): string[] {
+  const vistas = new Set<string>();
+  const motivos: string[] = [];
+  for (const a of ajustesDeCargaDoa(dadosCorrigidos, correcoes)) {
+    if (a.prop !== "avesRecebidas" && a.prop !== "avesMortas") continue;
+    if (vistas.has(`${a.campo}|${a.cargaId}`)) continue;
+    vistas.add(`${a.campo}|${a.cargaId}`);
+    const valor = dadosCorrigidos[a.campo];
+    const carga = ehValorDoa(valor) ? valor.cargas.find((c) => ehObjeto(c) && c.cargaId === a.cargaId) : undefined;
+    if (!ehObjeto(carga)) continue;
+    const recebidas = lerContagem(String(carga.avesRecebidas ?? ""));
+    const mortas = lerContagem(String(carga.avesMortas ?? ""));
+    if (recebidas !== null && mortas === null) {
+      motivos.push(`DOA (GTA ${String(carga.gta ?? "?")}): a carga não pode ficar com as aves que vieram informadas e as aves mortas em branco. Corrija primeiro as aves mortas (use 0 se não houve) e depois as aves recebidas.`);
+    }
+  }
+  return motivos;
 }
 
 /** Ajustes que se aplicam a um registro seguinte: mesmo dia de abate, a carga existe nele e o valor dela ainda é o antigo. */

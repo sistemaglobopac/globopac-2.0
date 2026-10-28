@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ajustesDeCargaDoa, ajustesQueSeAplicam, recalcularDoaNoRegistro } from "@/modules/fichas/utils/doaCorrecao";
+import { ajustesDeCargaDoa, ajustesQueSeAplicam, motivosBloqueioAdendoDoa, recalcularDoaNoRegistro } from "@/modules/fichas/utils/doaCorrecao";
 
 const carga = (cargaId: string, recebidas: string, mortas: string, extra: Record<string, unknown> = {}) => ({
   cargaId, gta: `G-${cargaId}`, qtdPrevista: 1000, avesRecebidas: recebidas, avesMortas: mortas, doaPct: null, saldoDiferenca: null, notaSaldo: null, ...extra,
@@ -25,6 +25,39 @@ describe("recalcularDoaNoRegistro", () => {
     const v = (recalcularDoaNoRegistro(registro([carga("a", "", ""), antiga])) as ReturnType<typeof registro>).campo_1 as Record<string, unknown> & { cargas: unknown[] };
     expect(v.cargas[1]).toEqual(antiga);
     expect(v).toMatchObject({ totalRecebidas: 5, totalMortas: 1, doaTotalPct: 20 });
+  });
+});
+
+describe("motivosBloqueioAdendoDoa", () => {
+  const corrigir = (cargas: unknown[], correcoes: Record<string, { old: unknown; new: unknown }>) => motivosBloqueioAdendoDoa(registro(cargas), correcoes);
+
+  it("bloqueia o adendo que deixa a carga com aves recebidas e mortas em branco", () => {
+    const m = corrigir([carga("a", "2989", "")], { "campo_1.cargas.0.avesRecebidas": { old: "", new: "2989" } });
+    expect(m).toHaveLength(1);
+    expect(m[0]).toContain("G-a");
+  });
+
+  it("aceita quando as mortas estão informadas, inclusive 0", () => {
+    expect(corrigir([carga("a", "2989", "0")], { "campo_1.cargas.0.avesRecebidas": { old: "", new: "2989" } })).toEqual([]);
+    expect(corrigir([carga("a", "2989", "3")], { "campo_1.cargas.0.avesMortas": { old: "", new: "3" } })).toEqual([]);
+  });
+
+  it("bloqueia também apagar as mortas de carga com recebidas", () => {
+    expect(corrigir([carga("a", "2989", "")], { "campo_1.cargas.0.avesMortas": { old: "3", new: "" } })).toHaveLength(1);
+  });
+
+  it("corrigir só as mortas de carga ainda sem recebidas é aceito (a ordem certa: mortas primeiro)", () => {
+    expect(corrigir([carga("a", "", "0")], { "campo_1.cargas.0.avesMortas": { old: "", new: "0" } })).toEqual([]);
+  });
+
+  it("não trava correção sem relação: outra prop da carga ou outra carga com dado antigo incompleto", () => {
+    const cargas = [carga("a", "2989", ""), carga("b", "1000", "2")];
+    expect(corrigir(cargas, { "campo_1.cargas.0.placa": { old: "x", new: "y" } })).toEqual([]);
+    expect(corrigir(cargas, { "campo_1.cargas.1.avesRecebidas": { old: "900", new: "1000" } })).toEqual([]);
+  });
+
+  it("aceita valor novo numérico (não só texto)", () => {
+    expect(corrigir([carga("a", 2989 as unknown as string, "")], { "campo_1.cargas.0.avesRecebidas": { old: "", new: 2989 } })).toHaveLength(1);
   });
 });
 

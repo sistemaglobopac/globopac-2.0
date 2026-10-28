@@ -14,7 +14,8 @@ import { turnoParaHeranca, type TurnoHeranca } from "./utils/turnoUtils";
 import { horaEfetiva, instanteDoRegistro } from "./utils/horaMonitoramento";
 import { herdarInstanteDoOriginal } from "./utils/instanteDoAdendo";
 import { ensureLocalTime } from "./utils/tempo";
-import { erroDoValorNovoDoAdendo } from "./utils/adendoCampos";
+import { aplicarNoCaminho, erroDoValorNovoDoAdendo } from "./utils/adendoCampos";
+import { motivosBloqueioAdendoDoa } from "./utils/doaCorrecao";
 import { CHAVE_AGUARDANDO_DRIPPING } from "./fields/calculosAbsorcao";
 
 export interface TemplateAtivo {
@@ -796,6 +797,10 @@ export function useAbrirAdendo() {
         .single()
         .overrideTypes<{ dados_dinamicos: Record<string, unknown>; user_id: string }, { merge: false }>();
       if (erroOriginal) throw erroOriginal;
+
+      // Mesma regra da assinatura do adendo: sem isso o adendo nasceria e nunca poderia ser assinado pelo inspetor.
+      const motivosDoa = motivosBloqueioAdendoDoa(aplicarNoCaminho(original.dados_dinamicos, input.campo, input.valorNovo), { [input.campo]: { old: input.valorAntigo, new: input.valorNovo } });
+      if (motivosDoa.length > 0) throw new Error(motivosDoa.join(" "));
 
       const dadosOriginais = original.dados_dinamicos as { adendos?: AdendoBruto[] } & Record<string, unknown>;
       const novoAdendo: AdendoBruto = {
