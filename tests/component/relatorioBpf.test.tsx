@@ -94,6 +94,13 @@ describe("RelatorioBpf", () => {
     expect(grade.getByText(/Emitido · aguardando verificação/)).toBeTruthy();
   });
 
+  it("no relatório verificado o status do cabeçalho é só \"Verificado\", sem aguardando liberação", () => {
+    render(<RelatorioBpf relatorio={{ ...base, status: "verificado" }} />);
+    const grade = within(document.querySelector("dl") as HTMLElement);
+    expect(grade.getByText("Verificado")).toBeTruthy();
+    expect(screen.queryByText(/aguardando liberação/)).toBeNull();
+  });
+
   it("traz as quatro assinaturas: inspetor, administrador, PCM e Verificador", () => {
     render(<RelatorioBpf relatorio={base} />);
     const assinaturas = within(screen.getByLabelText("Assinaturas"));

@@ -124,7 +124,7 @@ function statusDoRelatorio(dado: Relatorio | RelatorioProvisorio): string {
     case "liberado":
       return "Liberado ao SIF";
     case "verificado":
-      return "Verificado · aguardando liberação";
+      return "Verificado";
     default:
       return "Emitido · aguardando verificação";
   }

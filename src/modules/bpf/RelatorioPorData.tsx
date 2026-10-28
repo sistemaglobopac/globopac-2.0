@@ -11,9 +11,9 @@ import { useGerarRelatorioDoDia } from "./api";
 import { hojeManaus } from "./regras";
 import type { RelatorioDoDia, StatusRelatorio } from "./tipos";
 
-const ROTULO_STATUS: Record<StatusRelatorio, string> = {
+/** Selo do estado do relatório ao lado do botão. O verificado não tem selo: a liberação ao SIF é do Painel de Arquivo. */
+const ROTULO_STATUS: Partial<Record<StatusRelatorio, string>> = {
   emitido: "emitido, aguardando verificação",
-  verificado: "verificado, aguardando liberação ao SIF",
   liberado: "liberado ao SIF",
 };
 const BADGE_STATUS: Record<StatusRelatorio, "warning" | "info" | "success"> = { emitido: "warning", verificado: "info", liberado: "success" };
@@ -57,7 +57,7 @@ export function RelatorioPorData() {
         </Button>
         {gerado && (
           <>
-            {gerado.provisorio ? <Badge variant="warning">gerado na hora — dia ainda não emitido</Badge> : <Badge variant={BADGE_STATUS[gerado.status]}>{ROTULO_STATUS[gerado.status]}</Badge>}
+            {gerado.provisorio ? <Badge variant="warning">gerado na hora — dia ainda não emitido</Badge> : ROTULO_STATUS[gerado.status] ? <Badge variant={BADGE_STATUS[gerado.status]}>{ROTULO_STATUS[gerado.status]}</Badge> : null}
             <div className="ml-auto">
               <Button type="button" variant="outline" onClick={imprimirElemento}>
                 <Printer className="h-4 w-4" /> Imprimir

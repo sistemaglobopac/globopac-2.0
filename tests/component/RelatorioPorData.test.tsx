@@ -76,11 +76,21 @@ describe("RelatorioPorData", () => {
   });
 
   it("data com relatório emitido mostra o status do emitido, não o aviso de gerado na hora", () => {
+    resposta = { ...provisorio("2026-10-27"), provisorio: false, id: "r1", status: "emitido" } as unknown as RelatorioDoDia;
+    montar();
+    fireEvent.change(screen.getByLabelText("Data do relatório"), { target: { value: "2026-10-27" } });
+    fireEvent.click(screen.getByRole("button", { name: "Gerar relatório" }));
+    expect(screen.getByText("emitido, aguardando verificação")).toBeInTheDocument();
+    expect(screen.queryByText(/gerado na hora/)).toBeNull();
+  });
+
+  it("relatório verificado não leva selo de aguardando liberação ao SIF", () => {
     resposta = { ...provisorio("2026-10-27"), provisorio: false, id: "r1", status: "verificado" } as unknown as RelatorioDoDia;
     montar();
     fireEvent.change(screen.getByLabelText("Data do relatório"), { target: { value: "2026-10-27" } });
     fireEvent.click(screen.getByRole("button", { name: "Gerar relatório" }));
-    expect(screen.getByText("verificado, aguardando liberação ao SIF")).toBeInTheDocument();
+    expect(screen.getByTestId("corpo")).toBeInTheDocument();
+    expect(screen.queryByText(/aguardando liberação/)).toBeNull();
     expect(screen.queryByText(/gerado na hora/)).toBeNull();
   });
 });
