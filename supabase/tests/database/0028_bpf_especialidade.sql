@@ -1,4 +1,4 @@
--- Testes pgTAP — BPF Estrutural: especialidade da SS/OS (migration 20261028120000_bpf_especialidade.sql).
+-- Testes pgTAP — BPF Estrutural: especialidade da SS/OS (migration 20261028130000_bpf_especialidade.sql).
 -- Mesma técnica de 0026_bpf_estrutural.sql (JWT simulado + `set local role authenticated`).
 -- Executar com: supabase test db
 
@@ -44,10 +44,14 @@ select throws_matching(
 );
 reset role;
 
+-- O id é guardado antes de trocar de perfil: a RLS esconde do PCM a SS ainda não aprovada, então um
+-- `select id from bpf_solicitacoes` feito como PCM devolveria NULL ("não encontrada").
+select set_config('test.ss_id', (select id::text from bpf_solicitacoes limit 1), true);
+
 select pg_temp.como('f4000000-0000-0000-0000-000000000003', 'INSPETOR_PCM', array['MANUTENCAO']);
 set local role authenticated;
 select throws_matching(
-  $$ select public.bpf_classificar_solicitacao((select id from bpf_solicitacoes limit 1), 'Elétrica') $$,
+  $$ select public.bpf_classificar_solicitacao(current_setting('test.ss_id')::uuid, 'Elétrica') $$,
   'ainda não foi aprovada',
   'PCM não classifica SS que o administrador ainda não aprovou'
 );
