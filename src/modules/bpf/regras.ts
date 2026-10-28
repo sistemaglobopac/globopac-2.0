@@ -131,6 +131,27 @@ export function ultimaObservacaoDoInspetor(ordem: Pick<Ordem, "verificacoes">): 
   );
 }
 
+/** OS com observação do inspetor que o PCM ainda precisa ler: OS ainda programada, cuja última observação do inspetor ainda não teve
+ * ciência do PCM e é mais recente que a última programação/reprogramação (se o PCM já reprogramou depois dela, já tratou). Da
+ * observação mais recente para a mais antiga. Espera `ordem.verificacoes` com o histórico da OS (ver useOrdensProgramadas). */
+export interface ObservacaoParaPcm {
+  ordem: Ordem;
+  verificacao: Verificacao;
+}
+
+export function observacoesParaCienciaDoPcm(ordens: readonly Ordem[], cientes: ReadonlySet<string>): ObservacaoParaPcm[] {
+  const lista: ObservacaoParaPcm[] = [];
+  for (const ordem of ordens) {
+    if (ordem.status !== "PROGRAMADA") continue;
+    const verificacao = ultimaObservacaoDoInspetor(ordem);
+    if (!verificacao || cientes.has(verificacao.id)) continue;
+    const ultimaProgramacao = ordenarProgramacoes(ordem.programacoes).at(-1);
+    if (ultimaProgramacao && new Date(ultimaProgramacao.criado_em).getTime() >= instanteVerificacao(verificacao)) continue;
+    lista.push({ ordem, verificacao });
+  }
+  return lista.sort((a, b) => instanteVerificacao(b.verificacao) - instanteVerificacao(a.verificacao));
+}
+
 /** OS devolvida ao PCM: a última verificação do inspetor foi Não conforme e o PCM ainda não
  * reprogramou depois dela. Retorna essa verificação (com a observação do inspetor) ou null.
  * Espera `ordem.verificacoes` com o histórico da OS (ver useOrdensProgramadas). */

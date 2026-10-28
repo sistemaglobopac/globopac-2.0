@@ -5,6 +5,7 @@ import {
   formatarData,
   hojeManaus,
   itensComReprogramacao,
+  observacoesParaCienciaDoPcm,
   ordensNaVerificacaoDiaria,
   pendentesDeVerificacao,
   relatoriosOsDoArquivo,
@@ -190,6 +191,40 @@ describe("relatoriosOsDoArquivo com os recortes do Painel de Arquivo", () => {
     const l = [rel("e", "2026-10-28", { status: "emitido" }), rel("v", "2026-10-27"), rel("l", "2026-10-26", { status: "liberado" })];
     expect(relatoriosOsDoArquivo(l, "todas", { ...vazio, pac: "PAC 1" }).map((r) => r.id)).toEqual(["v", "l"]);
     expect(relatoriosOsDoArquivo(l, "pendentes", { ...vazio, de: "2026-10-01" }).map((r) => r.id)).toEqual(["v"]);
+  });
+});
+
+describe("observacoesParaCienciaDoPcm", () => {
+  const prog = (criado_em: string, sequencia = 0) => ({ sequencia, prazo: "2026-11-30", criado_em });
+  const ver = (id: string, data: string, hora: string, observacao: string | null) => ({ id, data_verificacao: data, hora_verificacao: hora, resultado: "NP", observacao, inspetor_nome: "Ana" });
+  const os = (id: string, verificacoes: unknown[], extra: Record<string, unknown> = {}) =>
+    ({ id, status: "PROGRAMADA", programacoes: [prog("2026-10-20T12:00:00Z")], verificacoes, ...extra }) as unknown as Ordem;
+  const ids = (l: ReturnType<typeof observacoesParaCienciaDoPcm>) => l.map((i) => i.ordem.id);
+
+  it("traz a OS programada cuja última observação do inspetor ainda não teve ciência", () => {
+    const l = observacoesParaCienciaDoPcm([os("a", [ver("v1", "2026-10-27", "08:00:00", "Chuveiro instalado, fiação solta")])], new Set());
+    expect(ids(l)).toEqual(["a"]);
+    expect(l[0]!.verificacao.id).toBe("v1");
+  });
+  it("ignora OS sem observação (vazia ou só espaços) e OS já concluída", () => {
+    expect(observacoesParaCienciaDoPcm([os("a", [ver("v1", "2026-10-27", "08:00:00", null)]), os("b", [ver("v2", "2026-10-27", "08:00:00", "   ")]), os("c", [ver("v3", "2026-10-27", "08:00:00", "ok")], { status: "CONCLUIDA" })], new Set())).toEqual([]);
+  });
+  it("não traz o que o PCM já leu, mas traz a observação nova da mesma OS", () => {
+    const o = os("a", [ver("v1", "2026-10-26", "08:00:00", "primeira"), ver("v2", "2026-10-27", "08:00:00", "segunda")]);
+    expect(observacoesParaCienciaDoPcm([o], new Set(["v1"])).map((i) => i.verificacao.id)).toEqual(["v2"]);
+    expect(observacoesParaCienciaDoPcm([o], new Set(["v2"]))).toEqual([]);
+  });
+  it("OS que o PCM reprogramou depois da observação já foi tratada; reprogramada antes dela ainda conta", () => {
+    const depois = os("a", [ver("v1", "2026-10-27", "08:00:00", "x")], { programacoes: [prog("2026-10-20T12:00:00Z"), prog("2026-10-28T12:00:00Z", 1)] });
+    const antes = os("b", [ver("v2", "2026-10-27", "08:00:00", "y")], { programacoes: [prog("2026-10-20T12:00:00Z"), prog("2026-10-26T12:00:00Z", 1)] });
+    expect(ids(observacoesParaCienciaDoPcm([depois, antes], new Set()))).toEqual(["b"]);
+  });
+  it("ordena da observação mais recente para a mais antiga", () => {
+    const l = observacoesParaCienciaDoPcm(
+      [os("velha", [ver("v1", "2026-10-25", "08:00:00", "a")]), os("nova", [ver("v2", "2026-10-28", "08:00:00", "b")]), os("meio", [ver("v3", "2026-10-27", "08:00:00", "c")])],
+      new Set()
+    );
+    expect(ids(l)).toEqual(["nova", "meio", "velha"]);
   });
 });
 
