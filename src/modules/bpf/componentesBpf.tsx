@@ -1,4 +1,9 @@
 import { Badge } from "@/shared/ui/badge";
+import { Label } from "@/shared/ui/label";
+import { Select } from "@/shared/ui/select";
+import { useAppDialog } from "@/modules/gestao/dialogSystem";
+import { useClassificarEspecialidade } from "./api";
+import { ESPECIALIDADES_BPF, SEM_ESPECIALIDADE } from "./especialidades";
 import { FotosDaSolicitacao } from "./FotosSolicitacao";
 import { formatarData, formatarDataHora, hashCurto } from "./regras";
 import type { Solicitacao, StatusSolicitacao } from "./tipos";
@@ -19,6 +24,40 @@ const VARIANTE_STATUS: Record<StatusSolicitacao, "warning" | "info" | "destructi
 
 export function BadgeStatusSolicitacao({ status }: { status: StatusSolicitacao }) {
   return <Badge variant={VARIANTE_STATUS[status]}>{ROTULO_STATUS[status]}</Badge>;
+}
+
+/** O PCM classifica a SS (aprovada) ou a OS por especialidade; grava ao escolher. */
+export function SeletorEspecialidade({ tipo, id, valor }: { tipo: "solicitacao" | "ordem"; id: string; valor: string | null }) {
+  const dialog = useAppDialog();
+  const classificar = useClassificarEspecialidade();
+  // Mantém visível uma especialidade gravada que já não está na lista.
+  const opcoes = valor && !(ESPECIALIDADES_BPF as readonly string[]).includes(valor) ? [...ESPECIALIDADES_BPF, valor] : ESPECIALIDADES_BPF;
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Label htmlFor={`esp-${tipo}-${id}`} className="text-xs">
+        Especialidade
+      </Label>
+      <Select
+        id={`esp-${tipo}-${id}`}
+        className="h-8 w-auto min-w-44 text-xs"
+        value={valor ?? ""}
+        disabled={classificar.isPending}
+        onChange={(e) =>
+          classificar.mutate(
+            { tipo, id, especialidade: e.target.value || null },
+            { onError: (erro) => dialog.erro(erro, "Não foi possível classificar") }
+          )
+        }
+      >
+        <option value="">{SEM_ESPECIALIDADE}</option>
+        {opcoes.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+      </Select>
+    </div>
+  );
 }
 
 /** Dados da SS exibidos da mesma forma para o inspetor, o administrador e o PCM. */

@@ -52,6 +52,8 @@ export interface Solicitacao {
   centro_custo_id: string;
   centro: CentroCustoRef | null;
   categoria: string;
+  /** Especialidade de manutenção (elétrica, obra civil...), definida pelo PCM; nula = sem classificação. */
+  especialidade: string | null;
   descricao: string;
   local_detalhe: string | null;
   constatado_em: string;
@@ -116,6 +118,8 @@ export interface Ordem {
   centro_custo_id: string;
   centro: CentroCustoRef | null;
   categoria: string;
+  /** Especialidade de manutenção, definida pelo PCM (herdada da SS ao programar); nula = sem classificação. */
+  especialidade: string | null;
   descricao: string;
   local_detalhe: string | null;
   constatado_em: string;

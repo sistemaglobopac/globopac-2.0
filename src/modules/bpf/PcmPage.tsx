@@ -11,7 +11,9 @@ import { useAppDialog } from "@/modules/gestao/dialogSystem";
 import { useSessionStore } from "@/store/session";
 import { imprimirElemento } from "@/modules/fichas/utils/printHelper";
 import { CabecalhoBpf, PaginaBpf } from "./PaginaBpf";
-import { DadosSolicitacao } from "./componentesBpf";
+import { DadosSolicitacao, SeletorEspecialidade } from "./componentesBpf";
+import { Select } from "@/shared/ui/select";
+import { contarPorEspecialidade, ESPECIALIDADES_BPF, FILTRO_SEM_CLASSIFICACAO, FILTRO_TODAS, filtrarPorEspecialidade, SEM_ESPECIALIDADE } from "./especialidades";
 import { ListaImpressaAProgramar, ListaImpressaDevolvidas, ListaImpressaProgramadas } from "./ListasImpressasPcm";
 import { useOrdensProgramadas, useProgramarSolicitacao, useReprogramarOrdem, useSolicitacoes } from "./api";
 import { devolucaoAoPcm, formatarData, hojeManaus, rotuloInspetorOuResp, rotuloProgramacao, situacaoPrazo, ultimaObservacaoDoInspetor } from "./regras";
@@ -50,6 +52,7 @@ function CartaoProgramar({ ss }: { ss: Solicitacao }) {
     <Card>
       <CardContent className="space-y-3 p-4">
         <DadosSolicitacao ss={ss} mostrarAssinatura />
+        <SeletorEspecialidade tipo="solicitacao" id={ss.id} valor={ss.especialidade} />
         {!aberto ? (
           <Button type="button" size="sm" onClick={() => setAberto(true)}>
             Programar OS
@@ -135,6 +138,7 @@ function CartaoOsProgramada({ ordem }: { ordem: Ordem }) {
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="outline">OS {ordem.numero_os}</Badge>
           {ordem.centro && <Badge variant="secondary">{ordem.centro.nome}</Badge>}
+          {ordem.especialidade && <Badge variant="outline">{ordem.especialidade}</Badge>}
           <Badge variant={prazo.vencido ? "destructive" : "info"}>
             {prazo.texto} · {formatarData(ordem.prazo_atual)}
           </Badge>
@@ -168,6 +172,8 @@ function CartaoOsProgramada({ ordem }: { ordem: Ordem }) {
             {rotuloInspetorOuResp(ordem)}Constatada em {formatarData(ordem.constatado_em)}
           </p>
         </div>
+
+        <SeletorEspecialidade tipo="ordem" id={ordem.id} valor={ordem.especialidade} />
 
         <ol className="space-y-1 text-xs text-muted-foreground">
           {ordem.programacoes.map((p) => (
@@ -221,13 +227,22 @@ function CartaoOsProgramada({ ordem }: { ordem: Ordem }) {
 function Conteudo() {
   const [aba, setAba] = useState<"programar" | "devolvidas" | "programadas">("programar");
   const [busca, setBusca] = useState("");
-  const { data: aProgramar, isLoading: carregandoSs } = useSolicitacoes({ status: ["APROVADA"] });
-  const { data: ordens, isLoading: carregandoOs } = useOrdensProgramadas();
+  const [especialidade, setEspecialidade] = useState(FILTRO_TODAS);
+  const { data: todasAProgramar, isLoading: carregandoSs } = useSolicitacoes({ status: ["APROVADA"] });
+  const { data: todasOrdens, isLoading: carregandoOs } = useOrdensProgramadas();
+  // O filtro de especialidade vale para as três abas e para a lista impressa.
+  const aProgramar = useMemo(() => filtrarPorEspecialidade(todasAProgramar ?? [], especialidade), [todasAProgramar, especialidade]);
+  const ordens = useMemo(() => filtrarPorEspecialidade(todasOrdens ?? [], especialidade), [todasOrdens, especialidade]);
+  const contagem = useMemo(() => contarPorEspecialidade([...(todasAProgramar ?? []), ...(todasOrdens ?? [])]), [todasAProgramar, todasOrdens]);
+  const especialidadesNaTela = useMemo(
+    () => [...new Set([...ESPECIALIDADES_BPF, ...[...contagem.keys()].filter((k) => k !== FILTRO_SEM_CLASSIFICACAO)])],
+    [contagem]
+  );
 
   const termo = busca.trim().toLowerCase();
   const filtradas = useMemo(
     () =>
-      (ordens ?? []).filter(
+      ordens.filter(
         (o) =>
           !termo ||
           o.numero_os.toLowerCase().includes(termo) ||
@@ -236,11 +251,11 @@ function Conteudo() {
       ),
     [ordens, termo]
   );
-  const vencidas = (ordens ?? []).filter((o) => o.prazo_atual < hojeManaus()).length;
-  const devolvidas = useMemo(() => (ordens ?? []).filter((o) => devolucaoAoPcm(o)), [ordens]);
-  const comObservacao = useMemo(() => (ordens ?? []).filter((o) => ultimaObservacaoDoInspetor(o)).length, [ordens]);
+  const vencidas = ordens.filter((o) => o.prazo_atual < hojeManaus()).length;
+  const devolvidas = useMemo(() => ordens.filter((o) => devolucaoAoPcm(o)), [ordens]);
+  const comObservacao = useMemo(() => ordens.filter((o) => ultimaObservacaoDoInspetor(o)).length, [ordens]);
   // A lista impressa é a da aba aberta: o que está na tela (a de programadas respeita a busca).
-  const qtdDaAba = aba === "programar" ? (aProgramar ?? []).length : aba === "devolvidas" ? devolvidas.length : filtradas.length;
+  const qtdDaAba = aba === "programar" ? aProgramar.length : aba === "devolvidas" ? devolvidas.length : filtradas.length;
 
   return (
     <>
@@ -251,29 +266,45 @@ function Conteudo() {
 
       <div className="flex flex-wrap items-center gap-2 print:hidden" role="tablist">
         <Button type="button" role="tab" aria-selected={aba === "programar"} variant={aba === "programar" ? "default" : "outline"} size="sm" onClick={() => setAba("programar")}>
-          A programar ({(aProgramar ?? []).length})
+          A programar ({aProgramar.length})
         </Button>
         <Button type="button" role="tab" aria-selected={aba === "devolvidas"} variant={aba === "devolvidas" ? "default" : "outline"} size="sm" onClick={() => setAba("devolvidas")}>
           Devolvidas pelo inspetor ({devolvidas.length})
         </Button>
         <Button type="button" role="tab" aria-selected={aba === "programadas"} variant={aba === "programadas" ? "default" : "outline"} size="sm" onClick={() => setAba("programadas")}>
-          OS programadas ({(ordens ?? []).length}){vencidas > 0 ? ` · ${vencidas} vencida(s)` : ""}
+          OS programadas ({ordens.length}){vencidas > 0 ? ` · ${vencidas} vencida(s)` : ""}
           {comObservacao > 0 ? ` · ${comObservacao} com observação` : ""}
         </Button>
-        <Button type="button" size="sm" variant="outline" className="ml-auto" onClick={imprimirElemento} disabled={qtdDaAba === 0}>
-          <Printer className="h-4 w-4" /> Imprimir lista
-        </Button>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <Label htmlFor="pcm-filtro-especialidade" className="text-xs">
+            Especialidade
+          </Label>
+          <Select id="pcm-filtro-especialidade" className="h-9 w-auto min-w-48 text-sm" value={especialidade} onChange={(e) => setEspecialidade(e.target.value)}>
+            <option value={FILTRO_TODAS}>Todas (impressão separada por especialidade)</option>
+            {especialidadesNaTela.map((e) => (
+              <option key={e} value={e}>
+                {e} ({contagem.get(e) ?? 0})
+              </option>
+            ))}
+            <option value={FILTRO_SEM_CLASSIFICACAO}>
+              {SEM_ESPECIALIDADE} ({contagem.get(FILTRO_SEM_CLASSIFICACAO) ?? 0})
+            </option>
+          </Select>
+          <Button type="button" size="sm" variant="outline" onClick={imprimirElemento} disabled={qtdDaAba === 0}>
+            <Printer className="h-4 w-4" /> Imprimir lista
+          </Button>
+        </div>
       </div>
 
-      {aba === "programar" && <ListaImpressaAProgramar solicitacoes={aProgramar ?? []} />}
-      {aba === "devolvidas" && <ListaImpressaDevolvidas ordens={devolvidas} />}
-      {aba === "programadas" && <ListaImpressaProgramadas ordens={filtradas} filtro={busca.trim() || undefined} />}
+      {aba === "programar" && <ListaImpressaAProgramar solicitacoes={aProgramar} especialidade={especialidade} />}
+      {aba === "devolvidas" && <ListaImpressaDevolvidas ordens={devolvidas} especialidade={especialidade} />}
+      {aba === "programadas" && <ListaImpressaProgramadas ordens={filtradas} filtro={busca.trim() || undefined} especialidade={especialidade} />}
 
       {aba === "programar" && (
         <section className="space-y-3 print:hidden">
           {carregandoSs && <p className="text-muted-foreground">Carregando…</p>}
-          {!carregandoSs && (aProgramar ?? []).length === 0 && <p className="text-muted-foreground">Nenhuma solicitação aprovada aguardando programação.</p>}
-          {(aProgramar ?? []).map((ss) => (
+          {!carregandoSs && aProgramar.length === 0 && <p className="text-muted-foreground">Nenhuma solicitação aprovada aguardando programação.</p>}
+          {aProgramar.map((ss) => (
             <CartaoProgramar key={ss.id} ss={ss} />
           ))}
         </section>

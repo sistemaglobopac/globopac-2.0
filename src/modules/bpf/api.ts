@@ -274,6 +274,19 @@ export function useProgramarSolicitacao() {
   });
 }
 
+/** PCM classifica por especialidade a SS aprovada (a OS dela acompanha) ou a OS; `null` remove a classificação. */
+export function useClassificarEspecialidade() {
+  const invalidar = useInvalidarBpf();
+  return useMutation({
+    mutationFn: (input: { tipo: "solicitacao" | "ordem"; id: string; especialidade: string | null }) =>
+      chamar<Solicitacao | Ordem>(input.tipo === "solicitacao" ? "bpf_classificar_solicitacao" : "bpf_classificar_ordem", {
+        p_id: input.id,
+        p_especialidade: input.especialidade,
+      }),
+    onSuccess: invalidar,
+  });
+}
+
 export function useReprogramarOrdem() {
   const invalidar = useInvalidarBpf();
   return useMutation({
