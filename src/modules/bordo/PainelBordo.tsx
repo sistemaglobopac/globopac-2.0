@@ -20,6 +20,7 @@ import {
   ShieldCheck,
   CheckCircle2,
   PauseCircle,
+  ClipboardX,
   X,
   FileText,
 } from "lucide-react";
@@ -46,6 +47,8 @@ import {
   paradasVigentes,
   fichasAplicaveisAoInspetor,
   calcularFichasAtrasadas,
+  paradasParaAtraso,
+  referenciaDoProcessoParado,
   pragasPendentes,
   resumoFichasPorSetor,
   urlNovaFicha,
@@ -58,6 +61,8 @@ import {
   type AdendoPendente,
 } from "./api";
 import { ModalProcessoParado } from "./ModalProcessoParado";
+import { JustificativasDoTurno, ModalJustificarNaoRealizado } from "./JustificarNaoRealizado";
+import { fichaJustificavel } from "@/modules/fichas/utils/justificativaHorario";
 import { PreviaMonitoramentoModal } from "./PreviaMonitoramentoModal";
 import { RelatorioDoMonitoramentoModal } from "./RelatorioDoMonitoramentoModal";
 import { PreviaRascunhoModal } from "@/modules/fichas/components/PreviaRascunhoModal";
@@ -136,6 +141,8 @@ export function PainelBordo() {
   const [pausaParaConfirmar, setPausaParaConfirmar] = useState<TipoPausa | null>(null);
   const [showModalParada, setShowModalParada] = useState(false);
   const [processoParadoDe, setProcessoParadoDe] = useState<FichaAtrasada | null>(null);
+  // Justificativa de monitoramento não realizado (fichas do PAC 11): ficha e horário já escolhidos quando vem do card em atraso.
+  const [justificando, setJustificando] = useState<{ fichaId?: string; horario?: Date } | null>(null);
   const [categoriaKpiModal, setCategoriaKpiModal] = useState<CategoriaKpi | null>(null);
   const [previaMonitoramentoId, setPreviaMonitoramentoId] = useState<string | null>(null);
   const [previaRascunho, setPreviaRascunho] = useState<Rascunho | null>(null);
@@ -266,7 +273,7 @@ export function PainelBordo() {
     .sort((a, b) => new Date(b.horaMonitoramento).getTime() - new Date(a.horaMonitoramento).getTime());
   const codigosEncerrados = new Set(kpis?.fichasEncerradasHoje ?? []);
   const fichasEncerradas = fichasAplicaveis.filter((f) => f.encerravel && codigosEncerrados.has(f.codigo));
-  const fichasAtrasadas = turnoHoje ? calcularFichasAtrasadas(fichasAplicaveis, [...(kpis?.monitoramentosDoSetorHoje ?? []), ...rascunhosComoMonitoramentos(rascunhosLocais, userSetores)], agora, codigosEncerrados, kpis?.processosParadosHoje) : [];
+  const fichasAtrasadas = turnoHoje ? calcularFichasAtrasadas(fichasAplicaveis, [...(kpis?.monitoramentosDoSetorHoje ?? []), ...rascunhosComoMonitoramentos(rascunhosLocais, userSetores)], agora, codigosEncerrados, paradasParaAtraso(kpis)) : [];
   // Monitoramento de pragas: obrigatório pelo menos uma vez por dia. Enquanto houver ficha de pragas do setor sem monitoramento
   // hoje (feito por este inspetor, por quem cobriu o setor ou em rascunho), o turno não pode ser finalizado.
   const pragasFaltando = turnoHoje
@@ -275,6 +282,7 @@ export function PainelBordo() {
   // Para finalizar o turno só vale o monitoramento ASSINADO (é o que o banco enxerga): rascunho ainda não libera.
   const pragasSemAssinar = turnoHoje ? pragasPendentes(fichasAplicaveis, kpis?.pragasRealizadas ?? [], [], new Date(turnoHoje.inicio), agora) : [];
   const processosParados = paradasVigentes(fichasAplicaveis, kpis?.processosParadosHoje ?? [], agora);
+  const fichasJustificaveis = fichasAplicaveis.filter(fichaJustificavel);
   const desviosComRnc = (kpis?.desviosAtivos ?? []).filter((d) => d.rnc !== null);
   const bloqueadoPorPausa = pausaAtiva != null;
 
@@ -470,6 +478,23 @@ export function PainelBordo() {
                   <PauseCircle className="h-4 w-4" /> Processo parado (justificar)
                 </Button>
               )}
+              {fichaJustificavel(a.ficha) && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={bloqueadoPorPausa}
+                  data-testid={`justificar-horario-${a.ficha.id}`}
+                  onClick={() => {
+                    const intervalo = a.ficha.tempo_entre_apontamentos_min ?? 0;
+                    // O horário em atraso mais recente: é ele que a justificativa dispensa.
+                    const horario = a.devidoEm && intervalo > 0 ? referenciaDoProcessoParado(new Date(a.devidoEm), intervalo, new Date()) : undefined;
+                    setJustificando({ fichaId: a.ficha.id, horario });
+                  }}
+                >
+                  <ClipboardX className="h-4 w-4" /> Justificar horário não realizado
+                </Button>
+              )}
               {a.ficha.encerravel && (
                 <Button
                   type="button"
@@ -519,6 +544,14 @@ export function PainelBordo() {
       )}
 
       <MonitoramentosEmAndamento />
+
+      <JustificativasDoTurno
+        fichas={fichasJustificaveis}
+        justificativas={kpis?.justificativasHoje ?? []}
+        nomesUsuarios={nomesUsuarios}
+        bloqueado={bloqueadoPorPausa}
+        onJustificar={() => setJustificando({})}
+      />
 
       {kpis && kpis.adendosPendentes.length > 0 && (
         <div className="space-y-3 rounded-xl border border-warning bg-warning/10 p-4">
@@ -803,6 +836,17 @@ export function PainelBordo() {
           userSetores={userSetores}
           onFechar={() => setProcessoParadoDe(null)}
           onRegistrado={() => setMensagem({ tipo: "success", texto: "Processo parado registrado. O monitoramento só será cobrado no próximo período." })}
+        />
+      )}
+
+      {justificando && (
+        <ModalJustificarNaoRealizado
+          fichas={fichasJustificaveis}
+          userSetores={userSetores}
+          fichaInicialId={justificando.fichaId}
+          horarioInicial={justificando.horario}
+          onFechar={() => setJustificando(null)}
+          onRegistrado={() => setMensagem({ tipo: "success", texto: "Justificativa registrada. Ela aparece no relatório da ficha." })}
         />
       )}
 

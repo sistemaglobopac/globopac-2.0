@@ -15,6 +15,7 @@ import { horaEfetiva } from "@/modules/fichas/utils/horaMonitoramento";
 import {
   PAUSAS_CONFIG,
   calcularFichasAtrasadas,
+  paradasParaAtraso,
   fichasAplicaveisAoInspetor,
   numeroDoLembretePragas,
   pragasPendentes,
@@ -117,7 +118,7 @@ export function GlobalInspectorAlerts() {
     const aplicaveis = fichasAplicaveisAoInspetor(kpis.fichasAtivas, userSetores);
     // Rascunho = monitoramento já realizado (só não assinado): não é atraso.
     const feitos = [...kpis.monitoramentosDoSetorHoje, ...rascunhosComoMonitoramentos(rascunhos, userSetores)];
-    return calcularFichasAtrasadas(aplicaveis, feitos, agora, new Set(kpis.fichasEncerradasHoje), kpis.processosParadosHoje).filter(
+    return calcularFichasAtrasadas(aplicaveis, feitos, agora, new Set(kpis.fichasEncerradasHoje), paradasParaAtraso(kpis)).filter(
       (f) => !dismissed.has(`ficha_${f.ficha.id}`)
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps

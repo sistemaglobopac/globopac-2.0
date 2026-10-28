@@ -7,13 +7,14 @@
 import { useEffect, useState } from "react";
 import { camposNaoConformes, type CampoNaoConforme } from "../../utils/desviosEspeciais";
 import { temAdendoRegistrado } from "../../utils/adendosPendentes";
-import { CheckCircle2, AlertTriangle, Search, Shield } from "lucide-react";
+import { CheckCircle2, AlertTriangle, ClipboardX, Search, Shield } from "lucide-react";
 import { turnoDoDia } from "@/modules/bordo/api";
 import type { AssinaturaRelatorio, DadosRelatorio, MonitoramentoRelatorio, TemplateRelatorio } from "../../api";
 import type { AutocorrecaoImediata } from "@/modules/autocorrecao/api";
 import type { Rnc } from "@/modules/rnc/api";
 import { ensureLocalTime } from "../../utils/tempo";
 import { instanteDoRegistro } from "../../utils/horaMonitoramento";
+import { justificativasDoRelatorio } from "../../utils/justificativaHorario";
 import { computarHashMonitoramento, resumoHash } from "../../utils/hashDocumento";
 import { DadosColetados } from "../DadosColetadosFicha";
 import { SeloAssinatura } from "@/shared/relatorio/SeloAssinatura";
@@ -376,6 +377,12 @@ export function RelatorioMonitoramento({ ids, dados, turnoDe = (r) => turnoDoDia
   if (!primary) return null;
 
   const template = dados.templatesPorId.get(primary.ficha_template_id);
+  // Monitoramentos que não foram realizados em um horário, com a justificativa do inspetor (mesma ficha, dia e turno do relatório).
+  const justificativas = justificativasDoRelatorio(dados.justificativas ?? [], {
+    codigos: [...new Set(records.map((r) => dados.templatesPorId.get(r.ficha_template_id)?.codigo).filter((c): c is string => Boolean(c)))],
+    setores: [...new Set(records.map((r) => r.setor).filter(Boolean))],
+    instantesDosRegistros: records.map((r) => new Date(instanteDoRegistro(r))),
+  });
   const diaDocumento = ensureLocalTime(instanteDoRegistro(primary)).datePt;
   // Identidade do documento (protocolo, selo, ID de auditoria): o registro VERIFICADO mais antigo do consolidado, não o mais
   // antigo de todos. Um monitoramento retroativo lançado depois da verificação entra antes dos demais e não pode trocar o
@@ -554,6 +561,37 @@ export function RelatorioMonitoramento({ ids, dados, turnoDe = (r) => turnoDoDia
             ))}
           </div>
         </div>
+
+        {justificativas.length > 0 && (
+          <div className="mb-8 print:mb-2" data-testid="justificativas-nao-realizadas">
+            <h3 className="mb-3 flex items-center gap-2 border-b-2 border-primary/20 pb-2 text-xs font-bold uppercase tracking-wider text-primary print:mb-1 print:pb-1 print:text-[10px]">
+              <ClipboardX className="h-4 w-4 print:h-3 print:w-3" /> Monitoramentos não realizados — justificativas
+            </h3>
+            <table className="w-full border-collapse text-left text-xs print:text-[10px]">
+              <thead>
+                <tr className="bg-muted text-[10px] uppercase">
+                  <th className="border p-1.5">Horário</th>
+                  <th className="border p-1.5">Motivo</th>
+                  <th className="border p-1.5">Detalhes</th>
+                  <th className="border p-1.5">Registrado por</th>
+                </tr>
+              </thead>
+              <tbody>
+                {justificativas.map((j) => (
+                  <tr key={`${j.ficha_codigo}|${j.setor ?? ""}|${j.horario_devido}`} className="align-top">
+                    <td className="border p-1.5 font-medium">{ensureLocalTime(j.horario_devido).time}</td>
+                    <td className="border p-1.5 font-semibold">{j.motivo}</td>
+                    <td className="border p-1.5">{j.detalhes || "—"}</td>
+                    <td className="border p-1.5">
+                      {dados.nomesPorId.get(j.registrado_por) ?? "Inspetor"}
+                      <span className="block text-[10px] text-muted-foreground">{ensureLocalTime(j.registrado_em).datePt} {ensureLocalTime(j.registrado_em).time}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         <RodapeAtestado
           objeto="monitoramento"

@@ -17,6 +17,7 @@ import { ensureLocalTime } from "./utils/tempo";
 import { aplicarNoCaminho, erroDoValorNovoDoAdendo } from "./utils/adendoCampos";
 import { motivosBloqueioAdendoDoa } from "./utils/doaCorrecao";
 import { CHAVE_AGUARDANDO_DRIPPING } from "./fields/calculosAbsorcao";
+import type { JustificativaHorario } from "./utils/justificativaHorario";
 
 export interface TemplateAtivo {
   id: string;
@@ -881,6 +882,9 @@ export interface DadosRelatorio {
   autocorrecoes: AutocorrecaoImediata[];
   templatesPorId: Map<string, TemplateRelatorio>;
   nomesPorId: Map<string, string>;
+  /** Justificativas de monitoramento não realizado das fichas do relatório, num intervalo em torno dos registros; o relatório filtra
+   * o dia e o turno (justificativasDoRelatorio). Ausente quando a tabela ainda não existe no banco. */
+  justificativas?: JustificativaHorario[];
 }
 
 const CAMPOS_MONITORAMENTO_RELATORIO =
@@ -955,13 +959,42 @@ export function useDadosRelatorio(ids: string[]) {
         templatesExtras = (porIds ?? []) as unknown as TemplateRelatorio[];
       }
 
+      const monitoramentosComInstante = await herdarInstanteDoOriginal(monitoramentos ?? []);
+      const todosTemplates = [...(templates ?? []), ...templatesExtras];
+      const nomesPorId = new Map(((perfis ?? []) as { id: string; nome_completo: string }[]).map((p) => [p.id, p.nome_completo]));
+
+      // Justificativas de monitoramento não realizado (fichas do PAC 11): do código da ficha, num intervalo de 12 h em volta dos
+      // registros (o relatório escolhe o dia e o turno). Sem a tabela (migração ainda não aplicada) o erro é ignorado.
+      let justificativas: JustificativaHorario[] | undefined;
+      const instantes = monitoramentosComInstante.map((m) => new Date(instanteDoRegistro(m)).getTime()).filter(Number.isFinite);
+      const codigos = [...new Set(todosTemplates.map((t) => t.codigo))];
+      if (instantes.length > 0 && codigos.length > 0) {
+        const { data: lista, error: erroJustificativas } = await supabase
+          .from("monitoramentos_nao_realizados")
+          .select("ficha_codigo, setor, horario_devido, motivo, detalhes, registrado_por, registrado_em")
+          .in("ficha_codigo", codigos)
+          .gte("horario_devido", new Date(Math.min(...instantes) - 12 * 3_600_000).toISOString())
+          .lte("horario_devido", new Date(Math.max(...instantes) + 12 * 3_600_000).toISOString())
+          .order("horario_devido", { ascending: true })
+          .overrideTypes<JustificativaHorario[], { merge: false }>();
+        if (!erroJustificativas) {
+          justificativas = lista ?? [];
+          const faltam = [...new Set(justificativas.map((j) => j.registrado_por))].filter((id) => !nomesPorId.has(id));
+          if (faltam.length > 0) {
+            const { data: nomes } = await supabase.rpc("nomes_usuarios", { p_ids: faltam });
+            for (const n of (nomes ?? []) as { id: string; nome_completo: string }[]) nomesPorId.set(n.id, n.nome_completo);
+          }
+        }
+      }
+
       return {
-        monitoramentos: await herdarInstanteDoOriginal(monitoramentos ?? []),
+        monitoramentos: monitoramentosComInstante,
         assinaturas: assinaturas ?? [],
         rncs: rncs ?? [],
         autocorrecoes: autocorrecoes ?? [],
-        templatesPorId: new Map([...(templates ?? []), ...templatesExtras].map((t) => [t.id, t])),
-        nomesPorId: new Map(((perfis ?? []) as { id: string; nome_completo: string }[]).map((p) => [p.id, p.nome_completo])),
+        templatesPorId: new Map(todosTemplates.map((t) => [t.id, t])),
+        nomesPorId,
+        justificativas,
       };
     },
   });

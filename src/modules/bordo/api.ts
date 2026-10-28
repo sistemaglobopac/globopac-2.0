@@ -7,6 +7,7 @@ import { ajustesDeCargaDoa, ajustesQueSeAplicam, motivosBloqueioAdendoDoa, recal
 import { horaEfetiva } from "@/modules/fichas/utils/horaMonitoramento";
 import { diffCorrecoes, MOTIVO_CORRECAO_MIN_CARACTERES, podeCorrigirMonitoramento, type ResultadoPodeCorrigir } from "@/modules/fichas/utils/correcaoInspetor";
 import { turnoParaHeranca } from "@/modules/fichas/utils/turnoUtils";
+import { comoReferenciaDeAtraso, type JustificativaHorario } from "@/modules/fichas/utils/justificativaHorario";
 import { supabase } from "@/lib/supabase";
 import type { StatusRnc } from "@/modules/rnc/api";
 import type { RegistroVazao } from "./avesNaVazao";
@@ -188,6 +189,8 @@ export interface FichaAtivaResumo {
   /** Ficha que depende de haver abate (tem o campo de espera das aves): pode ser "encerrada" no fim
    * do abate para não gerar atraso. Derivado de schema_campos ao carregar os KPIs. */
   encerravel?: boolean;
+  /** PAC(s) da ficha (pode ser uma lista separada por vírgula): as do PAC 11 aceitam a justificativa de monitoramento não realizado. */
+  pac_correspondente?: string | null;
   /** Ficha marcada no Construtor como "só com o processo em andamento": em atraso, aceita a justificativa "processo parado". */
   exige_processo_em_andamento?: boolean;
   /** Ficha de monitoramento de pragas (tem o campo de ocorrência de pragas): obrigatória pelo menos uma vez por dia — o turno
@@ -479,6 +482,9 @@ export interface KpisTurno {
   fichasEncerradasHoje: string[];
   /** Justificativas de "processo parado" registradas hoje (de qualquer inspetor). */
   processosParadosHoje: ProcessoParado[];
+  /** Justificativas de monitoramento não realizado (PAC 11) com horário nas últimas 24 h, nos setores do inspetor (de qualquer inspetor).
+   * Opcional: o cache offline de versões antigas não traz o campo. */
+  justificativasHoje?: JustificativaHorario[];
   /** Monitoramentos de pragas (qualquer versão da ficha, qualquer inspetor) feitos nos setores do inspetor nas últimas 36 h. */
   pragasRealizadas: PragaRealizada[];
   desviosAtivos: DesvioAtivo[];
@@ -509,6 +515,7 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
         { data: fichasAtivasBrutas, error: erroFichas },
         { data: encerradas },
         { data: processosParados },
+        { data: justificativasBrutas },
       ] = await Promise.all([
         supabase
           .from("monitoramentos")
@@ -544,7 +551,7 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
           >(),
         supabase
           .from("fichas_templates")
-          .select("id, codigo, nome, tipo_apontamento, tempo_entre_apontamentos_min, exige_processo_em_andamento, locais_aplicacao, schema_campos")
+          .select("id, codigo, nome, tipo_apontamento, tempo_entre_apontamentos_min, exige_processo_em_andamento, locais_aplicacao, pac_correspondente, schema_campos")
           .eq("ativo", true)
           .overrideTypes<(FichaAtivaResumo & { schema_campos: { tipo?: string }[] | null })[], { merge: false }>(),
         // Erro aqui (ex.: migração ainda não aplicada) só significa "nenhuma ficha encerrada".
@@ -559,6 +566,14 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
           .select("ficha_codigo, referencia_em, motivo, registrado_em")
           .gte("registrado_em", desdeHoje)
           .overrideTypes<ProcessoParado[], { merge: false }>(),
+        // Justificativas de monitoramento não realizado: o turno atravessa a meia-noite, então vale a janela das últimas 24 h.
+        // Erro (migração ainda não aplicada) = nenhuma justificativa.
+        supabase
+          .from("monitoramentos_nao_realizados")
+          .select("ficha_codigo, setor, horario_devido, motivo, detalhes, registrado_por, registrado_em")
+          .gte("horario_devido", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+          .order("horario_devido", { ascending: true })
+          .overrideTypes<JustificativaHorario[], { merge: false }>(),
       ]);
       const fichasAtivas: FichaAtivaResumo[] = (fichasAtivasBrutas ?? []).map(({ schema_campos, ...ficha }) => ({
         ...ficha,
@@ -698,7 +713,7 @@ export function useKpisTurno(userId: string | undefined, userSetores: string[]) 
           return versaoAtivaPorTemplate.has(m.ficha_template_id) ? { ...efetivo, ficha_template_id: versaoAtivaPorTemplate.get(m.ficha_template_id)! } : efetivo;
         });
 
-      return { monitoramentosHoje: normalizar(monitoramentosHoje), monitoramentosDoSetorHoje: normalizar(monitoramentosDoSetor), fichasAtivas, fichasEncerradasHoje: (encerradas ?? []).map((e) => e.codigo), processosParadosHoje: processosParados ?? [], pragasRealizadas, desviosAtivos, adendosPendentes, nomesFicha };
+      return { monitoramentosHoje: normalizar(monitoramentosHoje), monitoramentosDoSetorHoje: normalizar(monitoramentosDoSetor), fichasAtivas, fichasEncerradasHoje: (encerradas ?? []).map((e) => e.codigo), processosParadosHoje: processosParados ?? [], justificativasHoje: (justificativasBrutas ?? []).filter((j) => !j.setor || userSetores.includes(j.setor)), pragasRealizadas, desviosAtivos, adendosPendentes, nomesFicha };
     },
   });
 }
@@ -861,6 +876,35 @@ export function useRegistrarProcessoParado() {
       if (error) throw error;
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["painel-bordo", "kpis"] }),
+  });
+}
+
+/** Referências que o cálculo de atraso entende: o "processo parado" registrado e as justificativas de monitoramento não realizado.
+ * Só o atraso usa as justificativas — o aviso de "processo parado vigente" continua olhando só `processosParadosHoje`. */
+export function paradasParaAtraso(kpis: Pick<KpisTurno, "processosParadosHoje" | "justificativasHoje"> | undefined): ProcessoParado[] {
+  if (!kpis) return [];
+  return [...kpis.processosParadosHoje, ...comoReferenciaDeAtraso(kpis.justificativasHoje ?? [])];
+}
+
+/** O inspetor justifica por que o monitoramento de um horário (inclusive de horas que já passaram) não foi realizado. Registro de
+ * auditoria — só insere; registrar de novo o mesmo horário substitui a justificativa nos relatórios, sem apagar a anterior. */
+export function useRegistrarMonitoramentoNaoRealizado() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { fichaCodigo: string; setor: string | null; horario: Date; motivo: string; detalhes: string | null }) => {
+      const { error } = await supabase.from("monitoramentos_nao_realizados").insert({
+        ficha_codigo: input.fichaCodigo,
+        setor: input.setor,
+        horario_devido: input.horario.toISOString(),
+        motivo: input.motivo,
+        detalhes: input.detalhes,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["painel-bordo", "kpis"] });
+      void queryClient.invalidateQueries({ queryKey: ["monitoramentos", "relatorio"] });
+    },
   });
 }
 
