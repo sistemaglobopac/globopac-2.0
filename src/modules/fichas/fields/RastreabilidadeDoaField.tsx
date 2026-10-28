@@ -18,6 +18,9 @@ interface RastreabilidadeDoaFieldProps {
   cargasUsadasEmRascunho?: CargasEmRascunhoPorTipo;
 }
 
+/** As aves mortas só ficam travadas quando a apuração anterior já as registrou (0 conta como registrado). */
+const mortasTravadas = (anterior: { avesMortas?: string } | undefined) => anterior !== undefined && lerContagem(anterior.avesMortas) !== null;
+
 /** Rastreabilidade e Controle de DOA: lista as cargas do dia na ordem em que começaram a ser
  * penduradas, com GTA, veículo, início do abate e aves previstas HERDADOS da programação e da
  * recepção de aves. O inspetor informa só as aves que de fato vieram e as mortas; o % de DOA sai
@@ -73,7 +76,8 @@ export function RastreabilidadeDoaField({ value, onChange, disabled, cargasUsada
     // Enquanto a consulta não volta (ou offline), mantém as linhas já salvas em vez de zerar.
     const salvas = [...(dataAbate === inicial.current.dataAbate ? inicial.current.cargas : []), ...anteriores.values()];
     const efetivas: Record<string, EntradaDoa> = { ...entradas };
-    for (const c of anteriores.values()) efetivas[c.cargaId] = { avesRecebidas: c.avesRecebidas, avesMortas: c.avesMortas };
+    // Mortas ainda em branco no registro anterior continuam editáveis: valem as que o inspetor digitar agora.
+    for (const c of anteriores.values()) efetivas[c.cargaId] = { avesRecebidas: c.avesRecebidas, avesMortas: mortasTravadas(c) ? c.avesMortas : (entradas[c.cargaId]?.avesMortas ?? "") };
     // Com a consulta respondida, carga apagada da programação não volta pelas linhas salvas; sem resposta (offline) elas ficam.
     const montado = montarValorDoa(dataAbate, montarCargas(rpc ? herdadas : [], efetivas, rpc ? [] : salvas));
     return semApuracoesAnteriores ? { ...montado, aguardandoApuracoesAnteriores: true } : montado;
@@ -162,7 +166,7 @@ export function RastreabilidadeDoaField({ value, onChange, disabled, cargasUsada
               </div>
               <div className="space-y-1">
                 <Label htmlFor={`doa-mortas-${c.gta}`}>Aves mortas (DOA)</Label>
-                <Input id={`doa-mortas-${c.gta}`} inputMode="numeric" disabled={anteriores.has(c.cargaId)} placeholder="0" value={c.avesMortas} onChange={(e) => digitar(c.cargaId, { avesMortas: apenasDigitos(e.target.value) })} />
+                <Input id={`doa-mortas-${c.gta}`} inputMode="numeric" disabled={mortasTravadas(anteriores.get(c.cargaId))}placeholder="0" value={c.avesMortas} onChange={(e) => digitar(c.cargaId, { avesMortas: apenasDigitos(e.target.value) })} />
               </div>
               <div className="space-y-1">
                 <Label>% de DOA</Label>
