@@ -9,7 +9,6 @@ import { Textarea } from "@/shared/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useAppDialog } from "@/modules/gestao/dialogSystem";
 import { CabecalhoBpf, PaginaBpf } from "./PaginaBpf";
-import { RelatorioPorData } from "./RelatorioPorData";
 import { useEmitirRelatorio, useOrdensParaVerificar, useRegistrarVerificacao, useRelatorios } from "./api";
 import {
   formatarData,
@@ -23,7 +22,7 @@ import {
   rotuloProgramacao,
   situacaoPrazo,
 } from "./regras";
-import { CODIGO_FICHA_BPF, NOME_RELATORIO_BPF, PAC_BPF, type Ordem, type ResultadoBpf } from "./tipos";
+import type { Ordem, ResultadoBpf } from "./tipos";
 
 const ESTILO_SELECIONADO: Record<ResultadoBpf, string> = {
   C: "border-transparent bg-success text-success-foreground hover:bg-success hover:text-success-foreground",
@@ -169,7 +168,7 @@ function CartaoOs({ ordem, hoje, bloqueado, retida, aoReter, aoLiberar }: Cartao
   );
 }
 
-function AbaVerificacao({ aoVerRelatorio }: { aoVerRelatorio: () => void }) {
+function Conteudo() {
   const hoje = hojeManaus();
   const dialog = useAppDialog();
   const { data: ordens, isLoading, isError } = useOrdensParaVerificar();
@@ -242,10 +241,7 @@ function AbaVerificacao({ aoVerRelatorio }: { aoVerRelatorio: () => void }) {
       {relatorioDeHoje && (
         <div className="rounded-lg border border-hairline bg-primary/5 p-4 text-sm">
           O relatório de hoje foi emitido por <strong>{relatorioDeHoje.emitido_por_nome}</strong> em {formatarDataHora(relatorioDeHoje.emitido_em)} (
-          {relatorioDeHoje.status === "liberado" ? "liberado ao SIF" : relatorioDeHoje.status === "verificado" ? "verificado, aguardando liberação ao SIF" : "aguardando o Verificador"}). As verificações do dia estão travadas.{" "}
-          <button type="button" onClick={aoVerRelatorio} className="font-semibold underline">
-            Ver relatório
-          </button>
+          {relatorioDeHoje.status === "liberado" ? "liberado ao SIF" : relatorioDeHoje.status === "verificado" ? "verificado, aguardando liberação ao SIF" : "aguardando o Verificador"}). As verificações do dia estão travadas.
         </div>
       )}
 
@@ -321,51 +317,6 @@ function Resumo({ rotulo, valor, destaque }: { rotulo: string; valor: string | n
       <p className="text-xs text-muted-foreground">{rotulo}</p>
       <p className={cn("text-2xl font-bold tabular-nums", destaque && "text-destructive")}>{valor}</p>
     </div>
-  );
-}
-
-type Aba = "verificacao" | "relatorio";
-
-const ABAS: { id: Aba; rotulo: string }[] = [
-  { id: "verificacao", rotulo: "Verificação do dia" },
-  { id: "relatorio", rotulo: "Relatório" },
-];
-
-/** Verificação diária e relatório numa tela só: a aba Relatório não mostra nada pronto, o usuário escolhe a data e gera. */
-function Conteudo() {
-  const [aba, setAba] = useState<Aba>("verificacao");
-  return (
-    <>
-      <div role="tablist" aria-label="Verificação diária e relatório" className="flex gap-2 border-b border-hairline print:hidden">
-        {ABAS.map((a) => (
-          <button
-            key={a.id}
-            type="button"
-            role="tab"
-            id={`aba-bpf-${a.id}`}
-            aria-selected={aba === a.id}
-            aria-controls="painel-bpf"
-            onClick={() => setAba(a.id)}
-            className={cn(
-              "-mb-px border-b-2 px-4 py-2 text-sm font-semibold",
-              aba === a.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {a.rotulo}
-          </button>
-        ))}
-      </div>
-      <div id="painel-bpf" role="tabpanel" aria-labelledby={`aba-bpf-${aba}`} className="space-y-6">
-        {aba === "verificacao" ? (
-          <AbaVerificacao aoVerRelatorio={() => setAba("relatorio")} />
-        ) : (
-          <>
-            <CabecalhoBpf titulo={NOME_RELATORIO_BPF} descricao={`${CODIGO_FICHA_BPF} · ${PAC_BPF} — escolha a data e gere o relatório.`} />
-            <RelatorioPorData />
-          </>
-        )}
-      </div>
-    </>
   );
 }
 

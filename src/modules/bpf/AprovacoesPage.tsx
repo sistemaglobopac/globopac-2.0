@@ -8,11 +8,13 @@ import { Label } from "@/shared/ui/label";
 import { Select } from "@/shared/ui/select";
 import { Textarea } from "@/shared/ui/textarea";
 import { useAppDialog } from "@/modules/gestao/dialogSystem";
+import { cn } from "@/lib/utils";
 import { useSessionStore } from "@/store/session";
 import { CabecalhoBpf, PaginaBpf } from "./PaginaBpf";
 import { DadosSolicitacao } from "./componentesBpf";
 import { useAprovarSolicitacao, useEditarSolicitacao, useReprovarSolicitacao, useSolicitacoes } from "./api";
-import { CATEGORIAS_BPF, type Solicitacao } from "./tipos";
+import { RelatorioPorData } from "./RelatorioPorData";
+import { CATEGORIAS_BPF, CODIGO_FICHA_BPF, NOME_RELATORIO_BPF, PAC_BPF, type Solicitacao } from "./tipos";
 
 function CartaoAprovacao({ ss }: { ss: Solicitacao }) {
   const dialog = useAppDialog();
@@ -166,7 +168,7 @@ function CartaoAprovacao({ ss }: { ss: Solicitacao }) {
   );
 }
 
-function Conteudo() {
+function AbaSolicitacoes() {
   const { data: aguardando, isLoading } = useSolicitacoes({ status: ["AGUARDANDO_APROVACAO"] });
   const { data: decididas } = useSolicitacoes({ status: ["APROVADA", "REPROVADA", "PROGRAMADA"], limite: 20 });
 
@@ -205,9 +207,55 @@ function Conteudo() {
   );
 }
 
+type Aba = "solicitacoes" | "relatorio";
+
+const ABAS: { id: Aba; rotulo: string }[] = [
+  { id: "solicitacoes", rotulo: "Solicitações" },
+  { id: "relatorio", rotulo: "Relatório" },
+];
+
+/** Aprovação das solicitações e relatório diário de OS na mesma tela do administrador. A aba Relatório não mostra nada pronto: o
+ * administrador escolhe a data e gera. Quem gera o relatório é ele, não o inspetor (que só verifica as OS e encerra o dia). */
+function Conteudo() {
+  const [aba, setAba] = useState<Aba>("solicitacoes");
+  return (
+    <>
+      <div role="tablist" aria-label="Aprovação de solicitações e relatório" className="flex gap-2 border-b border-hairline print:hidden">
+        {ABAS.map((a) => (
+          <button
+            key={a.id}
+            type="button"
+            role="tab"
+            id={`aba-bpf-${a.id}`}
+            aria-selected={aba === a.id}
+            aria-controls="painel-bpf"
+            onClick={() => setAba(a.id)}
+            className={cn(
+              "-mb-px border-b-2 px-4 py-2 text-sm font-semibold",
+              aba === a.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {a.rotulo}
+          </button>
+        ))}
+      </div>
+      <div id="painel-bpf" role="tabpanel" aria-labelledby={`aba-bpf-${aba}`} className="space-y-6">
+        {aba === "solicitacoes" ? (
+          <AbaSolicitacoes />
+        ) : (
+          <>
+            <CabecalhoBpf titulo={NOME_RELATORIO_BPF} descricao={`${CODIGO_FICHA_BPF} · ${PAC_BPF} — escolha a data e gere o relatório.`} />
+            <RelatorioPorData />
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
 export function AprovacoesPage() {
   return (
-    <PaginaBpf>
+    <PaginaBpf larga>
       <Conteudo />
     </PaginaBpf>
   );
