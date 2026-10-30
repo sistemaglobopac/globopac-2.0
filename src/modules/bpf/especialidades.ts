@@ -2,15 +2,14 @@
  * das listas). Não confundir com a `categoria` da SS, que é o tipo da não conformidade escolhido pelo inspetor.
  * O banco guarda só o texto (até 40 caracteres): para incluir uma especialidade basta acrescentá-la aqui. */
 export const ESPECIALIDADES_BPF = [
-  "Elétrica",
+  "Manutenção Diária",
+  "Manutenção Noturna",
+  "Elétrica Diária",
+  "Elétrica Noturna",
+  "Lubrificação",
   "Obra civil",
   "Pintura",
-  "Mecânica",
-  "Hidráulica",
-  "Refrigeração",
-  "Serralheria / solda",
-  "Carpintaria",
-  "Outros",
+  "Terceiros",
 ] as const;
 
 export const SEM_ESPECIALIDADE = "Sem classificação";
