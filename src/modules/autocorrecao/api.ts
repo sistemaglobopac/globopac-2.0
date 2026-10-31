@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
 /** Autocorreção imediata (medida de autocontrole): alternativa à RNC para um monitoramento com não
- * conformidade. A ação imediata do inspetor restabelece a conformidade do monitoramento. É um registro
+ * conformidade. A ação imediata (registrada pelo inspetor, ou pelo verificador/administrador na tela de verificação)
+ * restabelece a conformidade do monitoramento. É um registro
  * à parte (o monitoramento assinado não muda), de uma por monitoramento e sem edição. */
 export interface AutocorrecaoImediata {
   id: string;
@@ -33,7 +34,7 @@ export function useRegistrarAutocorrecao() {
       if (error) {
         if (error.code === "23505") throw new Error("Este monitoramento já tem uma autocorreção registrada.");
         if (error.code === "42501") {
-          throw new Error("Não foi possível registrar: só vale para monitoramento com não conformidade, do seu setor, ainda não verificado e sem RNC.");
+          throw new Error("Não foi possível registrar: só vale para monitoramento com não conformidade, ainda não verificado e sem RNC (o inspetor só registra no seu setor).");
         }
         throw error;
       }

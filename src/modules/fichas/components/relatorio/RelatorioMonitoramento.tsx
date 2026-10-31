@@ -59,13 +59,13 @@ function BlocoAutocorrecao({ autocorrecao, nome, camposNc }: { autocorrecao: Aut
             Nenhum campo apontado automaticamente no preenchimento — ver a descrição da ação abaixo.
           </p>
         )}
-        <p className="text-muted-foreground">Ação imediata executada pelo inspetor:</p>
+        <p className="text-muted-foreground">Ação imediata executada:</p>
         <p className="whitespace-pre-wrap font-semibold text-ink">{autocorrecao.descricao}</p>
         <p className="text-muted-foreground">
           Registrada por <strong className="text-ink">{nome}</strong> em{" "}
           <span className="font-mono">{new Date(autocorrecao.executada_em).toLocaleString("pt-BR", { timeZone: "America/Manaus" })}</span>.
         </p>
-        <p className="font-bold text-success">A ação imediata do inspetor restabeleceu a conformidade deste monitoramento.</p>
+        <p className="font-bold text-success">A ação imediata restabeleceu a conformidade deste monitoramento.</p>
       </div>
     </div>
   );

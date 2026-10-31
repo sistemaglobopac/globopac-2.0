@@ -6,7 +6,7 @@
 // mesma lógica de rótulo/tipo, e um valor de widget composto caía direto em `String(valor)` →
 // "[object Object]".
 import { Fragment } from "react";
-import { FileWarning, PenLine, ShieldAlert } from "lucide-react";
+import { FileWarning, PenLine, ShieldAlert, ShieldCheck } from "lucide-react";
 import type { CampoTemplate } from "@/shared/schema-campos";
 import { Button } from "@/shared/ui/button";
 import { valorNaoConforme } from "../utils/desviosEspeciais";
@@ -108,12 +108,14 @@ export interface AcoesNaoConformidade {
   onAdendo?: (chaveCampo: string) => void;
   /** Abrir a RNC do monitoramento; ausente quando já existe RNC ou autocorreção. */
   onAbrirRnc?: (chaveCampo: string) => void;
+  /** Registrar a autocorreção imediata (alternativa à RNC); ausente quando já existe RNC/autocorreção ou o registro já foi verificado. */
+  onAutocorrigir?: (chaveCampo: string) => void;
   /** Já tem RNC, autocorreção ou adendo: a não conformidade está tratada (âmbar, não vermelho). */
   tratada?: boolean;
 }
 
 function BarraNaoConformidade({ chave, rotulo, acoes }: { chave: string; rotulo: string; acoes: AcoesNaoConformidade }) {
-  if (!acoes.onAdendo && !acoes.onAbrirRnc) return null;
+  if (!acoes.onAdendo && !acoes.onAbrirRnc && !acoes.onAutocorrigir) return null;
   return (
     <div
       className={`col-span-full flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 print:hidden ${
@@ -128,6 +130,11 @@ function BarraNaoConformidade({ chave, rotulo, acoes }: { chave: string; rotulo:
         {acoes.onAdendo && (
           <Button type="button" size="sm" variant="outline" data-testid={`nc-adendo-${chave}`} onClick={() => acoes.onAdendo?.(chave)}>
             <PenLine className="h-3.5 w-3.5" /> Incluir adendo
+          </Button>
+        )}
+        {acoes.onAutocorrigir && (
+          <Button type="button" size="sm" variant="outline" data-testid={`nc-autocorrecao-${chave}`} onClick={() => acoes.onAutocorrigir?.(chave)}>
+            <ShieldCheck className="h-3.5 w-3.5" /> Autocorreção imediata
           </Button>
         )}
         {acoes.onAbrirRnc && (

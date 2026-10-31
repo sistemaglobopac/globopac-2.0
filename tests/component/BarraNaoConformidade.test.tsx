@@ -22,6 +22,14 @@ describe("relatório: barra de ações sobre o campo não conforme", () => {
     expect(onAbrirRnc).toHaveBeenCalledWith("miudos");
   });
 
+  it("mostra Autocorreção imediata e dispara com a chave do campo; sozinha já basta para a barra aparecer", () => {
+    const onAutocorrigir = vi.fn();
+    render(<DadosColetados dadosDinamicos={naoConforme} campos={campos} acoesNaoConformidade={{ onAutocorrigir }} />);
+    fireEvent.click(screen.getByTestId("nc-autocorrecao-miudos"));
+    expect(onAutocorrigir).toHaveBeenCalledWith("miudos");
+    expect(screen.queryByTestId("nc-rnc-miudos")).toBeNull();
+  });
+
   it("só mostra o botão de ação disponível (sem adendo, só RNC)", () => {
     render(<DadosColetados dadosDinamicos={naoConforme} campos={campos} acoesNaoConformidade={{ onAbrirRnc: () => undefined }} />);
     expect(screen.queryByTestId("nc-adendo-miudos")).toBeNull();

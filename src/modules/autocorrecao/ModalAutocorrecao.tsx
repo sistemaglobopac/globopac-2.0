@@ -22,6 +22,8 @@ export function ModalAutocorrecao({ monitoramentoId, fichaNome, onFechar, onRegi
   const [descricao, setDescricao] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const valida = descricaoAutocorrecaoValida(descricao);
+  // Verificador/administrador registrando (na tela de verificação) no lugar do inspetor: o texto e o aviso de autoria mudam.
+  const noLugarDoInspetor = perfil?.nivelAcesso === "VERIFICADOR" || perfil?.nivelAcesso === "ADMIN_MASTER";
 
   async function confirmar() {
     if (!perfil || !valida) return;
@@ -50,9 +52,14 @@ export function ModalAutocorrecao({ monitoramentoId, fichaNome, onFechar, onRegi
         <div className="space-y-4 p-4">
           {fichaNome && <p className="text-sm font-medium">{fichaNome}</p>}
           <p className="text-sm text-muted-foreground">
-            Alternativa à RNC. Descreva a <strong>ação imediata</strong> que você executou como medida de autocontrole: ela restabelece a conformidade deste
-            monitoramento. O registro não pode ser editado depois.
+            Alternativa à RNC. Descreva a <strong>ação imediata</strong> que {noLugarDoInspetor ? "foi executada" : "você executou"} como medida de autocontrole: ela
+            restabelece a conformidade deste monitoramento. O registro não pode ser editado depois.
           </p>
+          {noLugarDoInspetor && perfil && (
+            <p className="rounded-md border border-warning/60 bg-warning/10 p-2 text-xs text-warning-foreground" data-testid="autocorrecao-em-nome-proprio">
+              O relatório mostrará <strong>{perfil.nomeCompleto}</strong> como quem registrou esta autocorreção.
+            </p>
+          )}
           <div className="space-y-1">
             <Label htmlFor="autocorrecao-descricao">Ação imediata executada</Label>
             <Textarea

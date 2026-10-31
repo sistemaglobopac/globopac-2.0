@@ -1,22 +1,26 @@
 -- Testes pgTAP — autocorrecao imediata (20261002000001_autocorrecao_imediata.sql): so o inspetor do
 -- setor registra, so em monitoramento COM nao conformidade e ainda NAO verificado, uma por
 -- monitoramento, append-only, e o verificador consegue ler.
+-- 20261031120000: o verificador (qualquer setor) e o administrador tambem registram, no proprio nome,
+-- com as mesmas regras (nao conformidade, nao verificado).
 
 create extension if not exists pgtap with schema extensions;
 
 begin;
-select plan(9);
+select plan(14);
 
 insert into auth.users (id, aud, role, email, instance_id, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 values
   ('e6000000-0000-0000-0000-000000000001', 'authenticated', 'authenticated', 'insp.auto@test.local', '00000000-0000-0000-0000-000000000000', '{}', '{}', now(), now()),
   ('e6000000-0000-0000-0000-000000000002', 'authenticated', 'authenticated', 'verif.auto@test.local', '00000000-0000-0000-0000-000000000000', '{}', '{}', now(), now()),
-  ('e6000000-0000-0000-0000-000000000003', 'authenticated', 'authenticated', 'outro.insp.auto@test.local', '00000000-0000-0000-0000-000000000000', '{}', '{}', now(), now());
+  ('e6000000-0000-0000-0000-000000000003', 'authenticated', 'authenticated', 'outro.insp.auto@test.local', '00000000-0000-0000-0000-000000000000', '{}', '{}', now(), now()),
+  ('e6000000-0000-0000-0000-000000000004', 'authenticated', 'authenticated', 'admin.auto@test.local', '00000000-0000-0000-0000-000000000000', '{}', '{}', now(), now());
 
 insert into perfis_usuarios (id, nome_completo, nome_usuario, matricula, nivel_acesso, setores_permitidos) values
   ('e6000000-0000-0000-0000-000000000001', 'Insp Auto', 'insp.auto.teste', 'T0060', 'INSPETOR_QUALIDADE', array['LINHA_DIF']),
   ('e6000000-0000-0000-0000-000000000002', 'Verif Auto', 'verif.auto.teste', 'T0061', 'VERIFICADOR', array['Todos']),
-  ('e6000000-0000-0000-0000-000000000003', 'Outro Insp Auto', 'outro.auto.teste', 'T0062', 'INSPETOR_QUALIDADE', array['OUTRO_SETOR']);
+  ('e6000000-0000-0000-0000-000000000003', 'Outro Insp Auto', 'outro.auto.teste', 'T0062', 'INSPETOR_QUALIDADE', array['OUTRO_SETOR']),
+  ('e6000000-0000-0000-0000-000000000004', 'Admin Auto', 'admin.auto.teste', 'T0063', 'ADMIN_MASTER', array['Todos']);
 
 insert into fichas_templates (id, codigo, versao, nome, pac_correspondente, schema_campos)
 values ('f6000000-0000-0000-0000-000000000001', 'TEMP-AUTO-TESTE', 1, 'Template Auto', 'PAC-000', '[]'::jsonb);
@@ -25,7 +29,10 @@ insert into monitoramentos (id, ficha_template_id, versao_template, user_id, set
   ('16000000-0000-0000-0000-000000000001', 'f6000000-0000-0000-0000-000000000001', 1, 'e6000000-0000-0000-0000-000000000001', 'LINHA_DIF', '{"campo":{"conformidade":false}}'::jsonb, null),
   ('16000000-0000-0000-0000-000000000002', 'f6000000-0000-0000-0000-000000000001', 1, 'e6000000-0000-0000-0000-000000000001', 'LINHA_DIF', '{"campo":{"conformidade":true}}'::jsonb, null),
   ('16000000-0000-0000-0000-000000000003', 'f6000000-0000-0000-0000-000000000001', 1, 'e6000000-0000-0000-0000-000000000001', 'LINHA_DIF', '{"campo":{"conformidade":false}}'::jsonb, 'e6000000-0000-0000-0000-000000000002'),
-  ('16000000-0000-0000-0000-000000000004', 'f6000000-0000-0000-0000-000000000001', 1, 'e6000000-0000-0000-0000-000000000001', 'LINHA_DIF', '{"campo":{"status":"nao-conforme"}}'::jsonb, null);
+  ('16000000-0000-0000-0000-000000000004', 'f6000000-0000-0000-0000-000000000001', 1, 'e6000000-0000-0000-0000-000000000001', 'LINHA_DIF', '{"campo":{"status":"nao-conforme"}}'::jsonb, null),
+  ('16000000-0000-0000-0000-000000000005', 'f6000000-0000-0000-0000-000000000001', 1, 'e6000000-0000-0000-0000-000000000001', 'LINHA_DIF', '{"campo":{"conformidade":false}}'::jsonb, null),
+  ('16000000-0000-0000-0000-000000000006', 'f6000000-0000-0000-0000-000000000001', 1, 'e6000000-0000-0000-0000-000000000003', 'OUTRO_SETOR', '{"campo":{"conformidade":false}}'::jsonb, null),
+  ('16000000-0000-0000-0000-000000000007', 'f6000000-0000-0000-0000-000000000001', 1, 'e6000000-0000-0000-0000-000000000003', 'OUTRO_SETOR', '{"campo":{"conformidade":false}}'::jsonb, null);
 
 -- ---- inspetor do setor
 select set_config('request.jwt.claims', json_build_object('sub', 'e6000000-0000-0000-0000-000000000001', 'role', 'authenticated', 'perfil', 'INSPETOR_QUALIDADE', 'setores_permitidos', array['LINHA_DIF'])::text, true);
@@ -66,6 +73,31 @@ select throws_ok(
 -- ---- verificador le
 select set_config('request.jwt.claims', json_build_object('sub', 'e6000000-0000-0000-0000-000000000002', 'role', 'authenticated', 'perfil', 'VERIFICADOR', 'setores_permitidos', array['Todos'])::text, true);
 select is((select count(*)::int from autocorrecoes_imediatas where monitoramento_id = '16000000-0000-0000-0000-000000000001'), 1, 'verificador enxerga a autocorrecao');
+
+-- ---- verificador registra (qualquer setor), no proprio nome
+select lives_ok(
+  $$insert into autocorrecoes_imediatas (monitoramento_id, user_id, descricao) values ('16000000-0000-0000-0000-000000000005', 'e6000000-0000-0000-0000-000000000002', 'Verificador registra a acao imediata do turno encerrado')$$,
+  'verificador registra a autocorrecao de um monitoramento nao verificado'
+);
+select lives_ok(
+  $$insert into autocorrecoes_imediatas (monitoramento_id, user_id, descricao) values ('16000000-0000-0000-0000-000000000006', 'e6000000-0000-0000-0000-000000000002', 'Verificador registra em monitoramento de outro setor')$$,
+  'verificador registra em monitoramento de qualquer setor'
+);
+select throws_ok(
+  $$insert into autocorrecoes_imediatas (monitoramento_id, user_id, descricao) values ('16000000-0000-0000-0000-000000000003', 'e6000000-0000-0000-0000-000000000002', 'Verificador nao registra em monitoramento ja verificado')$$,
+  '42501', null, 'verificador nao registra em monitoramento ja verificado'
+);
+select throws_ok(
+  $$insert into autocorrecoes_imediatas (monitoramento_id, user_id, descricao) values ('16000000-0000-0000-0000-000000000007', 'e6000000-0000-0000-0000-000000000001', 'Verificador tentando registrar em nome do inspetor')$$,
+  '42501', null, 'verificador nao registra em nome de outro usuario'
+);
+
+-- ---- administrador registra
+select set_config('request.jwt.claims', json_build_object('sub', 'e6000000-0000-0000-0000-000000000004', 'role', 'authenticated', 'perfil', 'ADMIN_MASTER', 'setores_permitidos', array['Todos'])::text, true);
+select lives_ok(
+  $$insert into autocorrecoes_imediatas (monitoramento_id, user_id, descricao) values ('16000000-0000-0000-0000-000000000007', 'e6000000-0000-0000-0000-000000000004', 'Administrador registra a acao imediata do turno encerrado')$$,
+  'administrador registra a autocorrecao de um monitoramento nao verificado'
+);
 reset role;
 
 -- ---- append-only

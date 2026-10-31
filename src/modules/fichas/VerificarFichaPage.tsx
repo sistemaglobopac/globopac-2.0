@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AlertTriangle, ArrowLeft, CheckCircle2, FileWarning, Loader2, Lock, PenLine, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useSessionStore } from "@/store/session";
@@ -15,6 +15,8 @@ import { temNaoConformidade } from "./utils/desviosEspeciais";
 import { temAdendoRegistrado } from "./utils/adendosPendentes";
 import { urlAbrirRnc, useRncsDosMonitoramentos } from "@/modules/rnc/api";
 import { useAutocorrigidos } from "@/modules/autocorrecao/api";
+import { ModalAutocorrecao } from "@/modules/autocorrecao/ModalAutocorrecao";
+import { podeAutocorrigirNaVerificacao } from "./utils/autocorrecaoNaVerificacao";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { ModalAssinaturaSenha } from "@/shared/ModalAssinaturaSenha";
@@ -50,6 +52,8 @@ export function VerificarFichaPage() {
   const [acao, setAcao] = useState<Acao>(null);
   // Adendo pedido direto sobre um campo não conforme do relatório: abre o formulário já com registro e campo escolhidos.
   const [adendoAlvo, setAdendoAlvo] = useState<{ registroId: string; campo: string } | null>(null);
+  // Registro cuja autocorreção imediata está sendo registrada (modal aberto), no lugar do inspetor que não a registrou.
+  const [autocorrigindoId, setAutocorrigindoId] = useState<string | null>(null);
   const painelAcaoRef = useRef<HTMLDivElement>(null);
   const [mensagemErro, setMensagemErro] = useState<string | null>(null);
   const [mensagemSucesso, setMensagemSucesso] = useState<string | null>(null);
@@ -85,6 +89,11 @@ export function VerificarFichaPage() {
   // encerrado (a decisão já foi tomada).
   const bloqueado = pendentes.some((m) => blockedIds.has(m.id));
 
+  function autocorrecaoRegistrada() {
+    setMensagemErro(null);
+    setMensagemSucesso("Autocorreção imediata registrada: ela consta no relatório, em seu nome, como alternativa à RNC.");
+  }
+
   function voltarComMensagem(tipo: "success" | "error", texto: string) {
     navigate("/verificacao", { state: { mensagem: { tipo, texto } } });
   }
@@ -110,6 +119,7 @@ export function VerificarFichaPage() {
               setAcao("adendo");
               setTimeout(() => painelAcaoRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
             },
+        onAutocorrigir: podeAutocorrigirNaVerificacao(perfil.nivelAcesso, registro, jaTemRncOuAutocorrecao) ? () => setAutocorrigindoId(registro.id) : undefined,
         onAbrirRnc: jaTemRncOuAutocorrecao ? undefined : () => navigate(urlAbrirRnc(registro.id)),
         tratada: jaTemRncOuAutocorrecao || temAdendoRegistrado(registro),
       })
@@ -151,6 +161,15 @@ export function VerificarFichaPage() {
         <>
           <RelatorioMonitoramento ids={ids} dados={dados} turnoDe={turnoDe} acoesNaoConformidade={acoesNaoConformidade} />
 
+          {autocorrigindoId && (
+            <ModalAutocorrecao
+              monitoramentoId={autocorrigindoId}
+              fichaNome={dados.templatesPorId.get(dados.monitoramentos.find((m) => m.id === autocorrigindoId)?.ficha_template_id ?? "")?.nome}
+              onFechar={() => setAutocorrigindoId(null)}
+              onRegistrada={autocorrecaoRegistrada}
+            />
+          )}
+
           {ncSemRnc.length > 0 && (
             <div className="mx-auto max-w-4xl space-y-3 rounded-xl border-2 border-destructive/50 bg-destructive/5 p-4" data-testid="nc-sem-rnc">
               <div>
@@ -158,15 +177,24 @@ export function VerificarFichaPage() {
                   <ShieldAlert className="h-5 w-5" /> Não conformidade sem RNC
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Abra a RNC para que o setor trate e sane a não conformidade. O monitoramento passa a TRATADO quando a RNC for fechada.
+                  Abra a RNC para que o setor trate e sane a não conformidade (o monitoramento passa a TRATADO quando a RNC for fechada) ou, se a
+                  ação imediata já foi executada, registre a autocorreção imediata.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
                 {ncSemRnc.map((m) => (
-                  <Button key={m.id} type="button" variant="destructive" data-testid={`abrir-rnc-${m.id}`} onClick={() => navigate(urlAbrirRnc(m.id))}>
-                    <FileWarning className="h-4 w-4" />
-                    Abrir RNC{ncSemRnc.length > 1 ? ` — ${ensureLocalTime(instanteDoRegistro(m)).time}` : ""}
-                  </Button>
+                  <Fragment key={m.id}>
+                    {podeAutocorrigirNaVerificacao(perfil.nivelAcesso, m, false) && (
+                      <Button type="button" variant="outline" data-testid={`autocorrigir-${m.id}`} onClick={() => setAutocorrigindoId(m.id)}>
+                        <ShieldCheck className="h-4 w-4" />
+                        Autocorreção imediata{ncSemRnc.length > 1 ? ` — ${ensureLocalTime(instanteDoRegistro(m)).time}` : ""}
+                      </Button>
+                    )}
+                    <Button type="button" variant="destructive" data-testid={`abrir-rnc-${m.id}`} onClick={() => navigate(urlAbrirRnc(m.id))}>
+                      <FileWarning className="h-4 w-4" />
+                      Abrir RNC{ncSemRnc.length > 1 ? ` — ${ensureLocalTime(instanteDoRegistro(m)).time}` : ""}
+                    </Button>
+                  </Fragment>
                 ))}
               </div>
             </div>
