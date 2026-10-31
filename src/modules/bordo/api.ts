@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { temNaoConformidade } from "@/modules/fichas/utils/desviosEspeciais";
 import { aplicarNoCaminho } from "@/modules/fichas/utils/adendoCampos";
+import { refazerConformidadeDosCamposCorrigidos } from "@/modules/fichas/utils/conformidadeDoAdendo";
 import { aditivosVigentes, idsAdendosConcluidos } from "@/modules/fichas/utils/adendosPendentes";
 import { propagarLeituraNosSeguintes } from "@/modules/fichas/utils/propagacaoCorrecao";
 import { ajustesDeCargaDoa, ajustesQueSeAplicam, motivosBloqueioAdendoDoa, recalcularDoaNoRegistro } from "@/modules/fichas/utils/doaCorrecao";
@@ -958,6 +959,16 @@ export function useAssinarAdendo() {
       dadosCorrigidos = recalcularDoaNoRegistro(dadosCorrigidos);
       const motivosDoa = motivosBloqueioAdendoDoa(dadosCorrigidos, input.corrections);
       if (motivosDoa.length > 0) throw new Error(motivosDoa.join(" "));
+
+      // O veredito (conformidade/detalhesRNC) gravado no campo era o do valor antigo: refaz com o corrigido. Sem o template (ex.: sem
+      // rede) a assinatura segue, como antes, com o veredito gravado.
+      const { data: template } = await supabase
+        .from("fichas_templates")
+        .select("schema_campos")
+        .eq("id", original.ficha_template_id)
+        .maybeSingle()
+        .overrideTypes<{ schema_campos: { chave: string; tipo?: string }[] | null }, { merge: false }>();
+      dadosCorrigidos = refazerConformidadeDosCamposCorrigidos(dadosCorrigidos, input.corrections, template?.schema_campos ?? []);
 
       const { error: erroInsert } = await supabase.from("monitoramentos").insert({
         ficha_template_id: original.ficha_template_id,
