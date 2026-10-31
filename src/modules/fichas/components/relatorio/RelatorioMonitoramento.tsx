@@ -277,7 +277,7 @@ function RegistroUnico({ record, ordem, template, dados, hashesAoVivo, acoesNaoC
         </span>
       </div>
 
-      <DadosColetados dadosDinamicos={record.dados_dinamicos} campos={camposSemHora} acoesNaoConformidade={acoesNaoConformidade?.(record, Boolean(rnc || autocorrecao))} onCorrigirCampo={onCorrigirCampo ? (chave) => onCorrigirCampo(record, chave) : undefined} registro={{ criado_em: record.criado_em, finalizado_em: record.finalizado_em, assinado_em: inspetorAssinatura?.criado_em }} />
+      <DadosColetados dadosDinamicos={record.dados_dinamicos} campos={camposSemHora} acoesNaoConformidade={acoesNaoConformidade?.(record, Boolean(rnc || autocorrecao))} onCorrigirCampo={onCorrigirCampo ? (chave) => onCorrigirCampo(record, chave) : undefined} registro={{ criado_em: record.criado_em, finalizado_em: record.finalizado_em, assinado_em: (inspetorAssinatura ?? (record.aditivo_de ? assinaturaDe(dados.assinaturas, record.aditivo_de, "INSPETOR") : undefined))?.criado_em }} />
 
       {rnc && (
         <BlocoRnc

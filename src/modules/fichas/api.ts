@@ -926,6 +926,19 @@ export function useDadosRelatorio(ids: string[]) {
       if (erroAssinaturas) throw erroAssinaturas;
       if (erroRncs) throw erroRncs;
 
+      // A versão corrigida por adendo (aditivo) não tem assinatura própria do inspetor: a "hora final" do teste é a do original.
+      const idsDosOriginais = [...new Set((monitoramentos ?? []).flatMap((m) => (m.aditivo_de && !ids.includes(m.aditivo_de) ? [m.aditivo_de] : [])))];
+      let assinaturasDosOriginais: AssinaturaRelatorio[] = [];
+      if (idsDosOriginais.length > 0) {
+        const { data } = await supabase
+          .from("assinaturas_eletronicas")
+          .select(CAMPOS_ASSINATURA_RELATORIO)
+          .in("monitoramento_id", idsDosOriginais)
+          .eq("tipo", "INSPETOR")
+          .overrideTypes<AssinaturaRelatorio[], { merge: false }>();
+        assinaturasDosOriginais = data ?? [];
+      }
+
       const templateIds = [...new Set((monitoramentos ?? []).map((m) => m.ficha_template_id))];
       const userIds = [
         ...new Set(
@@ -989,7 +1002,7 @@ export function useDadosRelatorio(ids: string[]) {
 
       return {
         monitoramentos: monitoramentosComInstante,
-        assinaturas: assinaturas ?? [],
+        assinaturas: [...(assinaturas ?? []), ...assinaturasDosOriginais],
         rncs: rncs ?? [],
         autocorrecoes: autocorrecoes ?? [],
         templatesPorId: new Map(todosTemplates.map((t) => [t.id, t])),
