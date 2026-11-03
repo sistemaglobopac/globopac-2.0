@@ -199,7 +199,7 @@ export function DadosColetados({
               />
             ) : null;
           case "dripping_test":
-            return valor ? <DrippingTestRelatorio key={campo.chave} valor={valor as DrippingTestValor} titulo={rotulo} assinadoEm={registro?.assinado_em} /> : null;
+            return valor ? <DrippingTestRelatorio key={campo.chave} valor={valor as DrippingTestValor} titulo={rotulo} assinadoEm={registro?.assinado_em ?? registro?.finalizado_em} /> : null;
           case "parada_equipamento":
             return valor ? <ParadaEquipamentoRelatorio key={campo.chave} valor={valor as ParadaEquipamentoValor} titulo={rotulo} /> : null;
           case "ocorrencia_pragas":

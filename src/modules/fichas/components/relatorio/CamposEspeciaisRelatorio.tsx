@@ -448,7 +448,7 @@ export function DrippingTestRelatorio({
 }: {
   valor: DrippingTestValor;
   titulo?: string;
-  /** Hora (servidor) da assinatura do inspetor — a "hora final" do teste. */
+  /** Hora (servidor) da assinatura do inspetor — a "hora final" do teste; sem assinatura, a da finalização do registro. */
   assinadoEm?: string | null;
 }) {
   const conforme = valor.status === "conforme";

@@ -19,7 +19,7 @@ export type ResultadoAssinatura =
   | { ok: false; status: number; mensagem: string };
 
 /** Marcas gravadas em dados_dinamicos por quem completa o registro de outro inspetor: `{ por, nome, em }`. */
-const MARCAS_DE_CONCLUSAO = ["absorcao_finalizada", "peso_completado"] as const;
+const MARCAS_DE_CONCLUSAO = ["absorcao_finalizada", "peso_completado", "dripping_completado"] as const;
 
 /** O registro FINALIZADO foi concluído por `userId`, e ele é do mesmo setor do registro (ou tem acesso a todos)? A marca só
  * é aceita porque o banco só deixa alguém do setor (ou o criador/ADMIN_MASTER) finalizar um registro em andamento. */
