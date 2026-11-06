@@ -39,6 +39,15 @@ export function inicioDoDiaManaus(referencia: Date): Date {
   return new Date(`${dataLocal}T04:00:00.000Z`);
 }
 
+/** Início do turno em andamento (1º: 04h–17h; 2º: 17h–04h, que atravessa a meia-noite). Os KPIs do administrador contam a
+ * partir daqui, e não do início do dia civil, para o 2º turno não perder as horas anteriores à virada do dia. */
+export function inicioDoTurnoManaus(referencia: Date): Date {
+  const hora = horaEmManaus(referencia);
+  if (hora >= 4 && hora < 17) return new Date(`${diaManaus(referencia)}T08:00:00.000Z`);
+  const diaDoInicio = hora >= 17 ? referencia : new Date(referencia.getTime() - 24 * 60 * 60 * 1000);
+  return new Date(`${diaManaus(diaDoInicio)}T21:00:00.000Z`);
+}
+
 /** Data (AAAA-MM-DD) em America/Manaus — a mesma de fichas_encerradas_dia.dia. */
 export function diaManaus(referencia: Date): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Manaus", year: "numeric", month: "2-digit", day: "2-digit" }).format(referencia);

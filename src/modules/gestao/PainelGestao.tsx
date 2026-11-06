@@ -278,8 +278,8 @@ function AbaHome({ irPara }: { irPara: (aba: AbaGestao) => void }) {
           icon={FileText}
           variante="lime"
           rotulo="Monitoramentos em Andamento"
-          valor={monitoramentosHoje?.atrasados.length ?? 0}
-          subtitulo="Em atraso neste turno"
+          valor={monitoramentosHoje?.total ?? 0}
+          subtitulo={`No turno · ${monitoramentosHoje?.atrasados.length ?? 0} em atraso`}
           indice={3}
           onClick={() => setModalAberto("monitoramentos")}
         />

@@ -1,7 +1,7 @@
 import { erroDeFuncao, MENSAGEM_SESSAO_EXPIRADA, statusDeFuncao } from "@/lib/erroFuncao";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { inicioDoDiaManaus } from "@/modules/bordo/api";
+import { inicioDoDiaManaus, inicioDoTurnoManaus } from "@/modules/bordo/api";
 import type { NivelAcesso } from "@/lib/database.types";
 import { type Rnc } from "@/modules/rnc/api";
 import type { CampoTemplate } from "@/shared/schema-campos";
@@ -459,23 +459,29 @@ export interface MonitoramentoAtrasado {
   ultimoMonitoramentoId: string;
 }
 
+export interface MonitoramentoDoTurno extends MonitoramentoHojeResumo {
+  fichaCodigo: string | null;
+  fichaNome: string | null;
+}
+
 export interface MonitoramentosHojeDetalhado {
   total: number;
-  itens: MonitoramentoHojeResumo[];
-  porSetor: { setor: string; quantidade: number; itens: MonitoramentoHojeResumo[] }[];
+  itens: MonitoramentoDoTurno[];
+  porSetor: { setor: string; quantidade: number; itens: MonitoramentoDoTurno[] }[];
   atrasados: MonitoramentoAtrasado[];
 }
 
-/** KPI "Monitoramentos em Andamento": só os monitoramentos em atraso que já iniciaram no turno —
- * fichas recorrentes com intervalo configurado, com ao menos um apontamento hoje no setor, cujo
- * último apontamento passou do intervalo esperado. Fichas sem nenhum apontamento ainda (não
- * iniciaram) e fichas "Diário" não entram. */
+/** KPI "Monitoramentos em Andamento": todos os monitoramentos do turno em andamento (1º 04h–17h, 2º 17h–04h), qualquer
+ * que seja a hora em que o administrador entrou — o 2º turno não perde os das 17h–24h na virada do dia. Os em atraso
+ * seguem destacados: fichas recorrentes com intervalo configurado, com ao menos um apontamento no turno no setor, cujo
+ * último apontamento passou do intervalo esperado. Fichas sem nenhum apontamento ainda (não iniciaram) e fichas
+ * "Diário" não entram nos atrasados. */
 export function useMonitoramentosHojeDetalhado() {
   return useQuery({
     queryKey: ["monitoramentos", "hoje-detalhado"],
     refetchInterval: 20_000,
     queryFn: async (): Promise<MonitoramentosHojeDetalhado> => {
-      const desde = inicioDoDiaManaus(new Date()).toISOString();
+      const desde = inicioDoTurnoManaus(new Date()).toISOString();
       const [{ data: hoje, error: erroHoje }, { data: fichas, error: erroFichas }, { data: paradas }] = await Promise.all([
         supabase
           .from("monitoramentos")
@@ -499,8 +505,13 @@ export function useMonitoramentosHojeDetalhado() {
       if (erroHoje) throw erroHoje;
       if (erroFichas) throw erroFichas;
 
-      const itens = hoje ?? [];
-      const porSetorMapa = new Map<string, MonitoramentoHojeResumo[]>();
+      const fichaPorId = new Map((fichas ?? []).map((f) => [f.id, f]));
+      const itens: MonitoramentoDoTurno[] = (hoje ?? []).map((m) => ({
+        ...m,
+        fichaCodigo: fichaPorId.get(m.ficha_template_id)?.codigo ?? null,
+        fichaNome: fichaPorId.get(m.ficha_template_id)?.nome ?? null,
+      }));
+      const porSetorMapa = new Map<string, MonitoramentoDoTurno[]>();
       for (const m of itens) {
         const lista = porSetorMapa.get(m.setor) ?? [];
         lista.push(m);
