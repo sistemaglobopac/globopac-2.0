@@ -15,6 +15,7 @@ import {
   type RegistroPragaDia,
 } from "./fields/pragas";
 import type { OcorrenciaPragasValor } from "./fields/tiposCompostos";
+import { instanteDoRegistro } from "./utils/horaMonitoramento";
 import { ensureLocalTime } from "./utils/tempo";
 import { imprimirElemento } from "./utils/printHelper";
 
@@ -44,10 +45,12 @@ interface LinhaBruta {
   id: string;
   setor: string;
   criado_em: string;
+  hora_monitoramento: string | null;
   dados_dinamicos: Record<string, unknown>;
 }
 
-/** Monitoramentos do mês (fuso de Manaus, UTC−4) de todas as versões do template escolhido. */
+/** Monitoramentos do mês (fuso de Manaus, UTC−4) de todas as versões do template escolhido. O dia vale pela hora em que
+ * o monitoramento foi realizado (`hora_monitoramento`), não pela de gravação: o que foi lançado depois cai no dia certo. */
 function useRegistrosPragasMes(
   templateIds: string[],
   ano: number,
@@ -64,10 +67,12 @@ function useRegistrosPragasMes(
     queryFn: async () => {
       const { data, error } = await supabase
         .from("monitoramentos_vigentes")
-        .select("id, setor, criado_em, dados_dinamicos")
+        .select("id, setor, criado_em, hora_monitoramento, dados_dinamicos")
         .in("ficha_template_id", templateIds)
-        .gte("criado_em", inicio)
-        .lt("criado_em", proximo)
+        .or(
+          `and(hora_monitoramento.gte.${inicio},hora_monitoramento.lt.${proximo}),` +
+            `and(hora_monitoramento.is.null,criado_em.gte.${inicio},criado_em.lt.${proximo})`,
+        )
         .order("criado_em", { ascending: true })
         .overrideTypes<LinhaBruta[], { merge: false }>();
       if (error) throw error;
@@ -282,7 +287,7 @@ export function RelatorioPragasMensalPage() {
       if (setor && l.setor !== setor) continue;
       if (!mapa.has(l.setor)) mapa.set(l.setor, []);
       mapa.get(l.setor)!.push({
-        dia: ensureLocalTime(l.criado_em).isoLocal,
+        dia: ensureLocalTime(instanteDoRegistro(l)).isoLocal,
         setor: l.setor,
         // Cada versão do template guarda o valor na sua própria chave de campo.
         valor: (Object.values(l.dados_dinamicos).find(
