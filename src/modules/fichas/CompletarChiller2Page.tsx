@@ -4,6 +4,7 @@ import { AlertTriangle, ArrowLeft, CheckCircle2, Clock, Loader2, Waves } from "l
 import { useSessionStore } from "@/store/session";
 import { ModalAssinaturaSenha } from "@/shared/ModalAssinaturaSenha";
 import { ModalAutocorrecao } from "@/modules/autocorrecao/ModalAutocorrecao";
+import { EscolhaTratativaNc } from "@/modules/autocorrecao/EscolhaTratativaNc";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -269,18 +270,11 @@ export function CompletarChiller2Page() {
                 <p className="flex items-center gap-2 font-bold text-destructive">
                   <AlertTriangle className="h-5 w-5" /> Monitoramento finalizado NÃO CONFORME
                 </p>
-                <p className="text-sm">Emita agora a RNC ou registre a autocorreção imediata (medida de autocontrole), que restabelece a conformidade.</p>
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="outline" className="flex-1" onClick={() => navigate("/fichas/nova")}>
-                    Depois
-                  </Button>
-                  <Button type="button" variant="outline" className="flex-1" onClick={() => setAutocorrigindo(true)}>
-                    Autocorreção imediata
-                  </Button>
-                  <Button type="button" variant="destructive" className="flex-1" onClick={() => navigate(`/nova-rnc?vinculo=${registro.id}`)}>
-                    Emitir RNC agora
-                  </Button>
-                </div>
+                <EscolhaTratativaNc
+                  onAutocorrigir={() => setAutocorrigindo(true)}
+                  onRnc={() => navigate(`/nova-rnc?vinculo=${registro.id}`)}
+                  onDepois={() => navigate("/fichas/nova")}
+                />
               </>
             ) : (
               <>

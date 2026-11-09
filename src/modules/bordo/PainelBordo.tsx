@@ -1157,14 +1157,19 @@ function CardDesvio({
         <span className="inline-block rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold uppercase">Desvio</span>
         <p className="text-xs opacity-80">{formatarHoraManaus(desvio.criadoEm)}</p>
         <p className="line-clamp-2 font-medium">{fichaNome}</p>
-        <div className="flex flex-wrap gap-2 pt-1">
-          <button type="button" onClick={onSemRnc} className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-white/20 px-3 py-2 text-sm font-semibold hover:bg-white/30">
-            <AlertTriangle className="h-4 w-4" />
-            Emitir RNC
-          </button>
-          <button type="button" onClick={onAutocorrigir} className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-white px-3 py-2 text-sm font-semibold text-destructive hover:bg-white/90">
-            <ShieldCheck className="h-4 w-4" />
+        <div className="space-y-1.5 pt-1">
+          <button
+            type="button"
+            onClick={onAutocorrigir}
+            className="flex w-full items-center justify-center gap-2 rounded-md bg-white px-3 py-3 text-base font-black text-destructive shadow-md ring-2 ring-white/60 hover:bg-white/90"
+          >
+            <ShieldCheck className="h-5 w-5" />
             Autocorreção imediata
+            <span className="rounded-full bg-success px-1.5 py-0.5 text-[9px] font-black uppercase text-success-foreground">Recomendado</span>
+          </button>
+          <button type="button" onClick={onSemRnc} className="flex w-full items-center justify-center gap-1 px-2 py-1 text-xs font-medium underline opacity-80 hover:opacity-100">
+            <AlertTriangle className="h-3 w-3" />
+            Só se a correção imediata não resolver: emitir RNC
           </button>
         </div>
       </div>

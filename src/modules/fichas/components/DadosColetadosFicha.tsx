@@ -133,12 +133,25 @@ function BarraNaoConformidade({ chave, rotulo, acoes }: { chave: string; rotulo:
           </Button>
         )}
         {acoes.onAutocorrigir && (
-          <Button type="button" size="sm" variant="outline" data-testid={`nc-autocorrecao-${chave}`} onClick={() => acoes.onAutocorrigir?.(chave)}>
-            <ShieldCheck className="h-3.5 w-3.5" /> Autocorreção imediata
+          <Button
+            type="button"
+            size="sm"
+            className="bg-success font-bold text-success-foreground shadow hover:bg-success/90"
+            data-testid={`nc-autocorrecao-${chave}`}
+            onClick={() => acoes.onAutocorrigir?.(chave)}
+          >
+            <ShieldCheck className="h-4 w-4" /> Autocorreção imediata
           </Button>
         )}
         {acoes.onAbrirRnc && (
-          <Button type="button" size="sm" variant="destructive" data-testid={`nc-rnc-${chave}`} onClick={() => acoes.onAbrirRnc?.(chave)}>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="border-destructive/40 text-xs font-medium text-destructive hover:bg-destructive/10"
+            data-testid={`nc-rnc-${chave}`}
+            onClick={() => acoes.onAbrirRnc?.(chave)}
+          >
             <FileWarning className="h-3.5 w-3.5" /> Abrir RNC
           </Button>
         )}

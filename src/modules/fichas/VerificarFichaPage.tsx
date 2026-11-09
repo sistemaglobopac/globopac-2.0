@@ -177,20 +177,32 @@ export function VerificarFichaPage() {
                   <ShieldAlert className="h-5 w-5" /> Não conformidade sem RNC
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Abra a RNC para que o setor trate e sane a não conformidade (o monitoramento passa a TRATADO quando a RNC for fechada) ou, se a
-                  ação imediata já foi executada, registre a autocorreção imediata.
+                  Se a ação imediata já foi executada, registre a autocorreção imediata (preferível, evita uma RNC). Só abra a RNC quando o setor
+                  precisar tratar e sanar a não conformidade (o monitoramento passa a TRATADO quando a RNC for fechada).
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
                 {ncSemRnc.map((m) => (
                   <Fragment key={m.id}>
                     {podeAutocorrigirNaVerificacao(perfil.nivelAcesso, m, false) && (
-                      <Button type="button" variant="outline" data-testid={`autocorrigir-${m.id}`} onClick={() => setAutocorrigindoId(m.id)}>
-                        <ShieldCheck className="h-4 w-4" />
+                      <Button
+                        type="button"
+                        size="lg"
+                        className="bg-success font-bold text-success-foreground shadow-md hover:bg-success/90"
+                        data-testid={`autocorrigir-${m.id}`}
+                        onClick={() => setAutocorrigindoId(m.id)}
+                      >
+                        <ShieldCheck className="h-5 w-5" />
                         Autocorreção imediata{ncSemRnc.length > 1 ? ` — ${ensureLocalTime(instanteDoRegistro(m)).time}` : ""}
                       </Button>
                     )}
-                    <Button type="button" variant="destructive" data-testid={`abrir-rnc-${m.id}`} onClick={() => navigate(urlAbrirRnc(m.id))}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                      data-testid={`abrir-rnc-${m.id}`}
+                      onClick={() => navigate(urlAbrirRnc(m.id))}
+                    >
                       <FileWarning className="h-4 w-4" />
                       Abrir RNC{ncSemRnc.length > 1 ? ` — ${ensureLocalTime(instanteDoRegistro(m)).time}` : ""}
                     </Button>

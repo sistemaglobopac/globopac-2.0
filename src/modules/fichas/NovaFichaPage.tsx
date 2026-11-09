@@ -25,6 +25,7 @@ import { lotesSemPeso } from "./fields/preenchimentoSpr";
 import { motivosDeBloqueioSpr } from "./utils/bloqueiosSpr";
 import { desviosEspeciais, temNaoConformidade } from "./utils/desviosEspeciais";
 import { ModalAutocorrecao } from "@/modules/autocorrecao/ModalAutocorrecao";
+import { EscolhaTratativaNc } from "@/modules/autocorrecao/EscolhaTratativaNc";
 import { CHAVE_AGUARDANDO_DRIPPING, motivosPrimeiraEtapaDripping, validarFaseInicial } from "./fields/calculosAbsorcao";
 import type { AbsorcaoAguaValor, DrippingTestValor } from "./fields/tiposCompostos";
 import { MonitoramentosEmAndamento } from "./components/MonitoramentosEmAndamento";
@@ -1117,30 +1118,19 @@ function FichaForm({ templateId, codigo, versaoTemplate, campos, nome, intervalo
                 <AlertTriangle className="h-4 w-4 shrink-0" />
                 Você tem um monitoramento finalizado com não conformidade.
               </p>
-              <p>Emita agora um relatório de não conformidade (RNC) ou registre a autocorreção imediata (medida de autocontrole), que restabelece a conformidade.</p>
+              <p>Registre a autocorreção imediata se a ação já foi executada; a RNC só é necessária quando a correção imediata não resolver.</p>
               {ncAposAssinar.offline && (
                 <p className="text-xs">
-                  Sem conexão: o monitoramento será enviado quando a rede voltar. Emita a RNC ou registre a autocorreção pelo Painel de Bordo depois de sincronizar.
+                  Sem conexão: o monitoramento será enviado quando a rede voltar. Registre a autocorreção (ou emita a RNC) pelo Painel de Bordo depois de sincronizar.
                 </p>
               )}
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" className="flex-1" onClick={onVoltar}>
-                Depois
-              </Button>
-              <Button type="button" variant="outline" className="flex-1" disabled={ncAposAssinar.offline} onClick={() => setAutocorrigindoNc(true)}>
-                Autocorreção imediata
-              </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                className="flex-1"
-                disabled={ncAposAssinar.offline}
-                onClick={() => navigate(`/nova-rnc?vinculo=${ncAposAssinar.id}`)}
-              >
-                Emitir RNC agora
-              </Button>
-            </div>
+            <EscolhaTratativaNc
+              desabilitado={ncAposAssinar.offline}
+              onAutocorrigir={() => setAutocorrigindoNc(true)}
+              onRnc={() => navigate(`/nova-rnc?vinculo=${ncAposAssinar.id}`)}
+              onDepois={onVoltar}
+            />
           </div>
         </ModalAssinatura>
       )}

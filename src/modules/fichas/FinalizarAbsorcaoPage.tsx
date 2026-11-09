@@ -3,6 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { AlertTriangle, ArrowLeft, Clock, Loader2, ShieldCheck, X } from "lucide-react";
 import { useSessionStore } from "@/store/session";
 import { reautenticar } from "@/modules/auth/reautenticar";
+import { ModalAutocorrecao } from "@/modules/autocorrecao/ModalAutocorrecao";
+import { EscolhaTratativaNc } from "@/modules/autocorrecao/EscolhaTratativaNc";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -77,6 +79,7 @@ export function FinalizarAbsorcaoPage() {
   const [autenticando, setAutenticando] = useState(false);
   const [gravado, setGravado] = useState(false); // já FINALIZADO no banco; falta (re)tentar a assinatura
   const [concluido, setConcluido] = useState<{ naoConforme: boolean } | null>(null);
+  const [autocorrigindo, setAutocorrigindo] = useState(false);
   const [agora, setAgora] = useState(() => new Date());
   useEffect(() => {
     const t = setInterval(() => setAgora(new Date()), 30_000);
@@ -265,23 +268,33 @@ export function FinalizarAbsorcaoPage() {
                   <AlertTriangle className="h-4 w-4 shrink-0" />
                   Você tem um monitoramento finalizado com não conformidade.
                 </p>
-                <p>Emita agora um relatório de não conformidade (RNC).</p>
+                <p>Registre a autocorreção imediata se a ação já foi executada; a RNC só é necessária quando a correção imediata não resolver.</p>
               </div>
             ) : (
               <p className="text-sm">Pesagem final gravada e monitoramento assinado com sucesso.</p>
             )}
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" className="flex-1" onClick={() => navigate("/painel")}>
-                {concluido.naoConforme ? "Depois" : "Voltar ao Painel de Bordo"}
+            {concluido.naoConforme ? (
+              <EscolhaTratativaNc
+                onAutocorrigir={() => setAutocorrigindo(true)}
+                onRnc={() => navigate(`/nova-rnc?vinculo=${registro.id}`)}
+                onDepois={() => navigate("/painel")}
+              />
+            ) : (
+              <Button type="button" variant="outline" className="w-full" onClick={() => navigate("/painel")}>
+                Voltar ao Painel de Bordo
               </Button>
-              {concluido.naoConforme && (
-                <Button type="button" variant="destructive" className="flex-1" onClick={() => navigate(`/nova-rnc?vinculo=${registro.id}`)}>
-                  Emitir RNC agora
-                </Button>
-              )}
-            </div>
+            )}
           </div>
         </Modal>
+      )}
+
+      {autocorrigindo && (
+        <ModalAutocorrecao
+          monitoramentoId={registro.id}
+          fichaNome={template?.nome}
+          onFechar={() => setAutocorrigindo(false)}
+          onRegistrada={() => navigate("/painel")}
+        />
       )}
     </div>
   );
