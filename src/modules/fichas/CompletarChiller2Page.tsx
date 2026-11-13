@@ -25,6 +25,7 @@ import {
   TANQUES_ABSORCAO,
   tanqueParado,
   temperaturaAbsorcaoAcimaDoLimite,
+  temperaturaAbsorcaoImplausivel,
 } from "./fields/controleAbsorcao";
 import { LIMITE_AGUA_C } from "./fields/temperaturaResfriamento";
 import type { ControleAbsorcaoValor } from "./fields/tiposCompostos";
@@ -110,6 +111,7 @@ export function CompletarChiller2Page() {
   const completo = !!valor && faltas.length === 0;
   const naoConforme = !!valor && !valor.conformidade;
   const ncChiller2 = !parado && temperaturaAbsorcaoAcimaDoLimite("chiller2", lerTemperatura(temperatura));
+  const chiller2Impossivel = !parado && temperaturaAbsorcaoImplausivel(temperatura);
 
   async function assinarFinal() {
     if (!registro || !campo || !valor || !perfil) return;
@@ -210,10 +212,15 @@ export function CompletarChiller2Page() {
                   inputMode="decimal"
                   placeholder="4,0"
                   disabled={finalizar.isPending}
-                  className={ncChiller2 ? "border-destructive text-destructive" : ""}
+                  className={ncChiller2 || chiller2Impossivel ? "border-destructive text-destructive" : ""}
                   value={temperatura}
                   onChange={(e) => setTemperatura(apenasTemperatura(e.target.value))}
                 />
+                {chiller2Impossivel && (
+                  <p role="alert" className="text-xs font-semibold text-destructive" data-testid="temperatura-impossivel-chiller2">
+                    Temperatura impossível para a água: confira o número digitado (não pode ser a matrícula nem a senha).
+                  </p>
+                )}
               </div>
               <div className="space-y-1">
                 <span className="text-sm font-medium">Borbulhamento</span>
@@ -249,7 +256,7 @@ export function CompletarChiller2Page() {
           <Button type="button" disabled={!completo || finalizar.isPending} onClick={() => setPedirSenha(true)} data-testid="finalizar-chiller2">
             <Waves className="h-4 w-4" /> Finalizar e assinar
           </Button>
-          {!completo && <p className="text-xs text-muted-foreground">Informe a temperatura e o borbulhamento do chiller 02 (ou marque "Processo parado") para finalizar.</p>}
+          {!completo && !chiller2Impossivel && <p className="text-xs text-muted-foreground">Informe a temperatura e o borbulhamento do chiller 02 (ou marque "Processo parado") para finalizar.</p>}
         </CardContent>
       </Card>
 

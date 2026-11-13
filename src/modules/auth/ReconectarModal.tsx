@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Loader2, Wifi } from "lucide-react";
+import { useFocoPresoNoModal } from "@/shared/useFocoPresoNoModal";
 import { useSessionStore } from "@/store/session";
 import { useOnline } from "@/lib/useOnline";
 import { Button } from "@/shared/ui/button";
@@ -17,8 +18,12 @@ export function ReconectarModal() {
   const [usarLogin, setUsarLogin] = useState(false);
   const [processando, setProcessando] = useState(false);
   const [adiado, setAdiado] = useState(false);
+  const dialogoRef = useRef<HTMLDivElement>(null);
+  const senhaRef = useRef<HTMLInputElement>(null);
+  const aberto = !!acesso && online && !adiado;
+  useFocoPresoNoModal(dialogoRef, senhaRef, aberto);
 
-  if (!acesso || !online || adiado) return null;
+  if (!aberto) return null;
 
   async function confirmar() {
     if (!acesso || !senha || processando) return;
@@ -38,7 +43,7 @@ export function ReconectarModal() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" data-testid="modal-reconectar">
-      <div role="dialog" aria-modal="true" aria-label="Conexão restaurada" className="w-full max-w-md rounded-xl border bg-background shadow-2xl">
+      <div ref={dialogoRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Conexão restaurada" className="w-full max-w-md rounded-xl border bg-background shadow-2xl outline-none">
         <div className="flex items-center gap-2 rounded-t-xl bg-primary px-4 py-3 font-semibold text-primary-foreground">
           <Wifi className="h-5 w-5" /> Conexão restaurada
         </div>
@@ -50,6 +55,7 @@ export function ReconectarModal() {
             <Label htmlFor="senha-reconectar">Sua senha</Label>
             <Input
               id="senha-reconectar"
+              ref={senhaRef}
               type="password"
               value={senha}
               autoFocus

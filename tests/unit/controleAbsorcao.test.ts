@@ -8,6 +8,7 @@ import {
   motivosBloqueioControleAbsorcao,
   rotuloBorbulhamento,
   TANQUES_ABSORCAO,
+  temperaturaAbsorcaoImplausivel,
 } from "@/modules/fichas/fields/controleAbsorcao";
 
 function preenchido() {
@@ -48,6 +49,26 @@ describe("controle de absorção", () => {
     const v = preenchido();
     v.tempoPermanenciaMin = "999";
     expect(avaliarControleAbsorcao(v).conformidade).toBe(true);
+  });
+
+  it("bloqueia temperatura impossível (matrícula/senha digitada no campo, ex.: 1539 ºC), mas deixa passar uma não conformidade real", () => {
+    const v = preenchido();
+    v.temperaturas.chiller2 = "1539";
+    expect(temperaturaAbsorcaoImplausivel("1539")).toBe(true);
+    expect(motivosBloqueioControleAbsorcao(v)).toHaveLength(1);
+    expect(motivosBloqueioControleAbsorcao(v, 2)[0]).toMatch(/Chiller 02.*1539/);
+    // etapa 1 não olha o chiller 02
+    expect(motivosBloqueioControleAbsorcao(v, 1)).toEqual([]);
+    // 25 ºC é desvio de verdade (reprova), não erro de digitação
+    v.temperaturas.chiller2 = "25";
+    expect(temperaturaAbsorcaoImplausivel("25")).toBe(false);
+    expect(motivosBloqueioControleAbsorcao(v)).toEqual([]);
+    expect(avaliarControleAbsorcao(v).conformidade).toBe(false);
+    // vazio ou texto não é "impossível": é falta de informar
+    expect(temperaturaAbsorcaoImplausivel("")).toBe(false);
+    expect(temperaturaAbsorcaoImplausivel("-")).toBe(false);
+    expect(temperaturaAbsorcaoImplausivel("-0,5")).toBe(false);
+    expect(temperaturaAbsorcaoImplausivel("-80")).toBe(true);
   });
 
   it("bloqueia a assinatura sem tempo, temperatura ou borbulhamento", () => {

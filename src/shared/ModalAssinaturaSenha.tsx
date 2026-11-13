@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Loader2, ShieldCheck, X } from "lucide-react";
+import { useFocoPresoNoModal } from "@/shared/useFocoPresoNoModal";
 import { conferirSenha } from "@/modules/auth/reautenticar";
 import { useSemVerificadorOffline } from "@/modules/auth/useSemVerificador";
 import { Button } from "@/shared/ui/button";
@@ -41,6 +42,10 @@ export function ModalAssinaturaSenha({
   const [processando, setProcessando] = useState(false);
   // Sem internet e sem o verificador da senha neste aparelho: não há senha para conferir (ver conferirSenha).
   const semSenha = useSemVerificadorOffline();
+  // O teclado fica preso neste modal: a senha nunca cai no campo da ficha que estava em foco por baixo.
+  const dialogoRef = useRef<HTMLDivElement>(null);
+  const senhaRef = useRef<HTMLInputElement>(null);
+  useFocoPresoNoModal(dialogoRef, senhaRef);
 
   async function confirmar() {
     if ((!senha && !semSenha) || processando) return;
@@ -65,7 +70,7 @@ export function ModalAssinaturaSenha({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" data-testid={testId}>
-      <div role="dialog" aria-modal="true" aria-label={titulo} className="max-h-[calc(100dvh-2rem)] overflow-y-auto w-full max-w-md rounded-xl border bg-background shadow-2xl">
+      <div ref={dialogoRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={titulo} className="max-h-[calc(100dvh-2rem)] overflow-y-auto w-full max-w-md rounded-xl border bg-background shadow-2xl outline-none">
         <div className="flex items-center justify-between rounded-t-xl bg-primary px-4 py-3 text-primary-foreground">
           <span className="flex items-center gap-2 font-semibold">
             <ShieldCheck className="h-5 w-5" />
@@ -104,6 +109,7 @@ export function ModalAssinaturaSenha({
                     <Label htmlFor="senha-assinatura-modal">Sua senha (a mesma do login)</Label>
                     <Input
                       id="senha-assinatura-modal"
+                      ref={senhaRef}
                       type="password"
                       value={senha}
                       autoFocus

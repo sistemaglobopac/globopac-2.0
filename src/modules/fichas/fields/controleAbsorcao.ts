@@ -80,6 +80,18 @@ export function montarValorControleAbsorcao(v: ControleAbsorcaoValor): ControleA
   return { ...v, conformidade, detalhesRNC: motivos.length ? `Controle de absorção — temperatura acima do limite — ${motivos.join("; ")}` : null };
 }
 
+/** Faixa em que uma temperatura de água de pré-chiller/chiller pode realmente ocorrer (ºC), mesmo numa não conformidade.
+ * Fora dela o valor é quase certamente digitação errada — ex.: a matrícula ou a senha que foi parar no campo quando a janela de
+ * assinatura trocou de lugar (chiller 2 gravado como 1539 ºC). O registro não segue até o inspetor conferir o número. */
+export const TEMPERATURA_AGUA_MIN_PLAUSIVEL_C = -10;
+export const TEMPERATURA_AGUA_MAX_PLAUSIVEL_C = 50;
+
+/** A temperatura digitada é um número fora da faixa plausível? (Vazio ou texto inválido não conta: isso é "falta informar".) */
+export function temperaturaAbsorcaoImplausivel(texto: string | undefined | null): boolean {
+  const t = lerTemperatura(texto);
+  return t !== null && (t < TEMPERATURA_AGUA_MIN_PLAUSIVEL_C || t > TEMPERATURA_AGUA_MAX_PLAUSIVEL_C);
+}
+
 /** O chiller 2 ainda não foi informado (temperatura e borbulhamento)? */
 export function chiller2Pendente(v: ControleAbsorcaoValor | undefined | null): boolean {
   if (tanqueParado(v, "chiller2")) return false;
@@ -98,6 +110,10 @@ export function motivosBloqueioControleAbsorcao(v: ControleAbsorcaoValor | undef
   for (const t of tanques) {
     if (tanqueParado(v, t.chave)) continue;
     if (lerTemperatura(v.temperaturas?.[t.chave]) === null) m.push(`${p}: informe a temperatura da água do ${t.rotulo}.`);
+    else if (temperaturaAbsorcaoImplausivel(v.temperaturas?.[t.chave]))
+      m.push(
+        `${p}: a temperatura da água do ${t.rotulo} (${v.temperaturas?.[t.chave]} ºC) é impossível — confira o número digitado (deve ficar entre ${TEMPERATURA_AGUA_MIN_PLAUSIVEL_C} e ${TEMPERATURA_AGUA_MAX_PLAUSIVEL_C} ºC).`
+      );
   }
   for (const t of tanques) {
     if (tanqueParado(v, t.chave)) continue;

@@ -16,6 +16,7 @@ import {
   TANQUES_ETAPA1,
   tanqueParado,
   temperaturaAbsorcaoAcimaDoLimite,
+  temperaturaAbsorcaoImplausivel,
 } from "./controleAbsorcao";
 import type { ChaveTanqueAbsorcao, ControleAbsorcaoValor } from "./tiposCompostos";
 
@@ -82,6 +83,7 @@ export function ControleAbsorcaoField({ value, onChange, disabled, somenteEtapa1
         {tanques.map((t) => {
           const temp = v.temperaturas?.[t.chave] ?? "";
           const parado = tanqueParado(v, t.chave);
+          const implausivel = !parado && temperaturaAbsorcaoImplausivel(temp);
           const nc = !parado && temperaturaAbsorcaoAcimaDoLimite(t.chave, lerTemperatura(temp));
           const limite = LIMITE_AGUA_C[t.chave];
           return (
@@ -106,9 +108,14 @@ export function ControleAbsorcaoField({ value, onChange, disabled, somenteEtapa1
                     inputMode="decimal"
                     placeholder="4,0"
                     value={temp}
-                    className={nc ? "border-destructive text-destructive" : ""}
+                    className={nc || implausivel ? "border-destructive text-destructive" : ""}
                     onChange={(e) => alterarTemperatura(t.chave, e.target.value)}
                   />
+                  {implausivel && (
+                    <p role="alert" className="text-xs font-semibold text-destructive" data-testid={`temperatura-impossivel-${t.chave}`}>
+                      Temperatura impossível para a água: confira o número digitado (não pode ser a matrícula nem a senha).
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <span className="text-sm font-medium">Borbulhamento</span>

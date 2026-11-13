@@ -792,6 +792,8 @@ export function usePreviaMonitoramento(monitoramentoId: string | null) {
   return useQuery({
     queryKey: ["painel-bordo", "previa", monitoramentoId],
     enabled: !!monitoramentoId,
+    staleTime: 0,
+    refetchOnMount: "always",
     queryFn: async (): Promise<PreviaMonitoramento | null> => {
       const colunas = "id, ficha_template_id, user_id, setor, dados_dinamicos, criado_em, hora_monitoramento, finalizado_em, conformidade, situacao_conformidade, verificado_por";
       type Linha = Omit<PreviaMonitoramento, "ficha" | "corrigidoPorAdendo"> & { ficha_template_id: string };
@@ -832,6 +834,10 @@ export function useIdVigenteDoMonitoramento(monitoramentoId: string | null) {
   return useQuery({
     queryKey: ["painel-bordo", "id-vigente", monitoramentoId],
     enabled: !!monitoramentoId,
+    // Quem é a versão vigente muda quando o adendo é assinado (em qualquer aparelho): nunca reaproveita o cache ao abrir o relatório,
+    // senão ele mostrava o original (ainda não conforme) logo depois da correção.
+    staleTime: 0,
+    refetchOnMount: "always",
     queryFn: async (): Promise<string> => {
       const { data, error } = await supabase
         .from("monitoramentos")
@@ -1000,7 +1006,8 @@ export function useAssinarAdendo() {
       }
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["painel-bordo", "kpis"] });
+      // Todo o painel (inclui a versão vigente e a prévia do monitoramento), não só os KPIs: a versão corrigida é outro registro.
+      void queryClient.invalidateQueries({ queryKey: ["painel-bordo"] });
       void queryClient.invalidateQueries({ queryKey: ["monitoramentos"] });
     },
   });
