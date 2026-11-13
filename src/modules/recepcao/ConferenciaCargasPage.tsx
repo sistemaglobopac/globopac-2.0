@@ -8,6 +8,7 @@ import { ensureLocalTime } from "@/modules/fichas/utils/tempo";
 import { formatarDataHora } from "@/modules/fichas/fields/recepcaoAves";
 import { formatarPctDoa } from "@/modules/fichas/fields/rastreabilidadeDoa";
 import { useCargasJaMonitoradas, useCargasRastreabilidade, useDoaCargasRegistradas } from "./api";
+import { CargasCanceladas } from "./CargasCanceladas";
 import { montarConferencia, resumirConferencia } from "./conferenciaCargas";
 
 function Selo({ feito, rotulo }: { feito: boolean; rotulo: string }) {
@@ -89,6 +90,8 @@ export function ConferenciaCargasPage() {
       {!isLoading && !isError && linhas.length === 0 && (
         <p className="rounded-lg border bg-muted/40 p-6 text-center text-sm text-muted-foreground">Nenhuma carga programada para esta data.</p>
       )}
+
+      <CargasCanceladas dataAbate={dia} />
 
       {visiveis.length > 0 && (
         <div className="overflow-x-auto rounded-xl border bg-card">

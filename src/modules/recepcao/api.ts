@@ -66,7 +66,7 @@ export function normalizarPlaca(placa: string): string {
   return placa.toUpperCase().replace(/[^A-Z0-9-]/g, "");
 }
 
-/** Cargas programadas para um dia (YYYY-MM-DD), na ordem de cadastro. */
+/** Cargas programadas e ATIVAS para um dia (YYYY-MM-DD), na ordem de cadastro. As canceladas ficam de fora (useCargasCanceladasDoDia). */
 export function useCargasDoDia(dataAbate: string | undefined) {
   return useQuery({
     queryKey: ["cargas-aves", dataAbate],
@@ -77,12 +77,74 @@ export function useCargasDoDia(dataAbate: string | undefined) {
         .from("cargas_aves")
         .select(COLUNAS_CARGA)
         .eq("data_abate", dataAbate!)
+        .is("cancelada_em", null)
         .order("criado_em")
         .overrideTypes<CargaAves[], { merge: false }>();
       if (error) throw error;
       return data;
     },
   });
+}
+
+/** Carga marcada como cancelada, com quem cancelou, quando e o motivo. */
+export interface CargaCancelada extends CargaAves {
+  cancelada_em: string;
+  cancelada_por: string;
+  cancelada_por_nome: string;
+  motivo_cancelamento: string;
+}
+
+/** Cargas canceladas de um dia (YYYY-MM-DD): saem das listas de monitoramento, mas ficam registradas para conferência. */
+export function useCargasCanceladasDoDia(dataAbate: string | undefined) {
+  return useQuery({
+    queryKey: ["cargas-aves", "canceladas", dataAbate],
+    enabled: !!dataAbate,
+    queryFn: async (): Promise<CargaCancelada[]> => {
+      const { data, error } = await supabase
+        .from("cargas_aves")
+        .select(`${COLUNAS_CARGA}, cancelada_em, cancelada_por, motivo_cancelamento`)
+        .eq("data_abate", dataAbate!)
+        .not("cancelada_em", "is", null)
+        .order("cancelada_em")
+        .overrideTypes<Omit<CargaCancelada, "cancelada_por_nome">[], { merge: false }>();
+      if (error) throw error;
+      const ids = [...new Set((data ?? []).map((c) => c.cancelada_por))];
+      // Função do banco: o inspetor não lê perfis_usuarios dos colegas (RLS).
+      const { data: nomes } = ids.length > 0 ? await supabase.rpc("nomes_usuarios", { p_ids: ids }) : { data: [] };
+      const nomePorId = new Map(((nomes ?? []) as { id: string; nome_completo: string }[]).map((n) => [n.id, n.nome_completo]));
+      return (data ?? []).map((c) => ({ ...c, cancelada_por_nome: nomePorId.get(c.cancelada_por) ?? "Usuário do sistema" }));
+    },
+  });
+}
+
+/** Marca a carga como cancelada (motivo obrigatório). Quem pode: Administrador, Verificador e Inspetor de Qualidade. */
+export function useCancelarCarga() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { cargaId: string; motivo: string }) => {
+      const { error } = await supabase.rpc("cancelar_carga_aves", { p_carga_id: input.cargaId, p_motivo: input.motivo });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => invalidarCargas(qc),
+  });
+}
+
+/** Desfaz o cancelamento (carga cancelada por engano). */
+export function useReativarCarga() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (cargaId: string) => {
+      const { error } = await supabase.rpc("reativar_carga_aves", { p_carga_id: cargaId });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => invalidarCargas(qc),
+  });
+}
+
+function invalidarCargas(qc: ReturnType<typeof useQueryClient>) {
+  void qc.invalidateQueries({ queryKey: ["cargas-aves"] });
+  void qc.invalidateQueries({ queryKey: ["cargas-rastreabilidade"] });
+  void qc.invalidateQueries({ queryKey: ["cargas-ja-monitoradas"] });
 }
 
 export interface CargaRastreabilidade {

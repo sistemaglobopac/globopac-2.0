@@ -5,6 +5,7 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Select } from "@/shared/ui/select";
 import { normalizarPlaca, useCargasDoDia, useCargasJaMonitoradas, useCriarVeiculo, useVeiculos, type CargaAves } from "@/modules/recepcao/api";
+import { CancelarCargaAves } from "@/modules/recepcao/CancelarCargaAves";
 import { ensureLocalTime } from "../utils/tempo";
 import {
   avaliarRecepcao,
@@ -144,6 +145,7 @@ export function RecepcaoAvesField({ value, onChange, disabled, cargasUsadasEmRas
             {(cargasDoDia ?? []).length === 0 && (
               <p className="text-xs text-muted-foreground">Nenhuma carga programada para esta data. Peça ao Administrador/Verificador para cadastrar a GTA.</p>
             )}
+            {!disabled && <CancelarCargaAves cargas={cargas} aoCancelar={(id) => id === v.cargaId && escolherCarga("")} />}
           </div>
         </div>
         {v.cargaId && (

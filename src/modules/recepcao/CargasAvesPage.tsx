@@ -4,6 +4,7 @@ import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { ensureLocalTime } from "@/modules/fichas/utils/tempo";
+import { CargasCanceladas } from "./CargasCanceladas";
 import {
   normalizarPlaca,
   useCargasDoDia,
@@ -201,6 +202,7 @@ export function CargasAvesPage() {
             )}
           </table>
         </div>
+        <CargasCanceladas dataAbate={dataAbate} />
       </section>
 
       <section className="space-y-4 rounded-xl border p-4" data-testid="secao-veiculos">

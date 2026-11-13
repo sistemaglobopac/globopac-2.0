@@ -5,6 +5,7 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Select } from "@/shared/ui/select";
 import { useCargasDoDia, useCargasRastreabilidade, type CargaAves } from "@/modules/recepcao/api";
+import { CancelarCargaAves } from "@/modules/recepcao/CancelarCargaAves";
 import { ensureLocalTime } from "../utils/tempo";
 import { acaoCorretivaPendente, avaliarEspera, boxesOfegantes, BOXES_ESPERA, boxVazio, COMPORTAMENTOS_AVES, esperaVazia, montarValorEspera, motivosBloqueioEspera, proximoBoxLivre } from "./esperaAves";
 import type { BoxEsperaAves, EsperaAvesValor } from "./tiposCompostos";
@@ -96,6 +97,15 @@ export function EsperaAvesField({ value, onChange, disabled }: EsperaAvesFieldPr
         </div>
         {(cargasDoDia ?? []).length === 0 && (
           <p className="text-xs text-muted-foreground">Nenhuma carga programada para esta data. Peça ao Administrador/Verificador para cadastrar a GTA.</p>
+        )}
+        {!disabled && (
+          <CancelarCargaAves
+            cargas={(cargasDoDia ?? []).filter((c) => !jaPenduradas.has(c.id) && !escolhidas.has(c.id))}
+            aoCancelar={(id) => {
+              const indice = v.boxes.findIndex((b) => b.cargaId === id);
+              if (indice >= 0) escolherCarga(indice, "");
+            }}
+          />
         )}
 
         <div className="space-y-3">
