@@ -9,6 +9,8 @@ import { motivosBloqueioCaixasVazias } from "../fields/caixasVazias";
 import { motivosBloqueioRecebimentoEmbalagens, varianteDoTipo } from "../fields/recebimentoEmbalagens";
 import { motivosBloqueioPendura } from "../fields/penduraAves";
 import { motivosBloqueioEletronarcose } from "../fields/eletronarcoseAves";
+import { motivosBloqueioEscaldagem } from "../fields/escaldagemDepenagem";
+import { motivosBloqueioHematomas } from "../fields/hematomas";
 import { motivosBloqueioPesoCaixa } from "../fields/pesoCaixa";
 import { motivosBloqueioRecepcao } from "../fields/recepcaoAves";
 import { motivosBloqueioDoa } from "../fields/rastreabilidadeDoa";
@@ -19,7 +21,7 @@ import { motivosBloqueioQualidadeMiudos } from "../fields/qualidadeMiudos";
 import { motivosBloqueioControleAbsorcao } from "../fields/controleAbsorcao";
 import { motivosBloqueioChecklist } from "../fields/checklistConformidade";
 import { motivosPreenchimentoCarcacas, motivosPreenchimentoChuveiro, motivosPreenchimentoMiudos, motivosPreenchimentoPartes } from "../fields/preenchimentoSpr";
-import type { CaixasVaziasValor, ChillerCarcacasValor, ChillerPartesValor, EletronarcoseAvesValor, LavagemFinalValor, MiniChillersValor, EsperaAvesValor, OcorrenciaPragasValor, PenduraAvesValor, PesoCaixaValor, RastreabilidadeDoaValor, RecepcaoAvesValor, TemperaturaResfriamentoValor, PotabilidadeAguaValor, PotabilidadePontosValor, QualidadeMiudosValor, ControleAbsorcaoValor, ChecklistConformidadeValor, RecebimentoEmbalagensValor } from "../fields/tiposCompostos";
+import type { CaixasVaziasValor, ChillerCarcacasValor, ChillerPartesValor, EletronarcoseAvesValor, EscaldagemDepenagemValor, HematomasCarcacasValor, LavagemFinalValor, MiniChillersValor, EsperaAvesValor, OcorrenciaPragasValor, PenduraAvesValor, PesoCaixaValor, RastreabilidadeDoaValor, RecepcaoAvesValor, TemperaturaResfriamentoValor, PotabilidadeAguaValor, PotabilidadePontosValor, QualidadeMiudosValor, ControleAbsorcaoValor, ChecklistConformidadeValor, RecebimentoEmbalagensValor } from "../fields/tiposCompostos";
 
 /** Campos simples: ASSINAR EXIGE 100% PREENCHIDO, tenham ou não `obrigatorio`. Número vazio/NaN, texto em branco e seleção sem
  * escolha bloqueiam. Caixa de marcar (booleano/simples) não entra: desmarcada é uma resposta ("não"), não um vazio. Foto e
@@ -86,6 +88,14 @@ export function motivosDeBloqueioSpr(
     }
     if (campo.tipo === "espera_aves") {
       motivos.push(...motivosBloqueioEspera(dados[campo.chave] as EsperaAvesValor | undefined));
+      continue;
+    }
+    if (campo.tipo === "escaldagem_depenagem") {
+      motivos.push(...motivosBloqueioEscaldagem(dados[campo.chave] as EscaldagemDepenagemValor | undefined));
+      continue;
+    }
+    if (campo.tipo === "hematomas_carcacas") {
+      motivos.push(...motivosBloqueioHematomas(dados[campo.chave] as HematomasCarcacasValor | undefined));
       continue;
     }
     if (campo.tipo === "peso_caixa") {

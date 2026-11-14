@@ -25,6 +25,8 @@ import {
   PenduraAvesRelatorio,
   EletronarcoseAvesRelatorio,
   PesoCaixaRelatorio,
+  EscaldagemDepenagemRelatorio,
+  HematomasRelatorio,
   RastreabilidadeDoaRelatorio,
   TemperaturaResfriamentoRelatorio,
   PotabilidadeAguaRelatorio,
@@ -49,6 +51,8 @@ import type {
   PenduraAvesValor,
   EletronarcoseAvesValor,
   PesoCaixaValor,
+  EscaldagemDepenagemValor,
+  HematomasCarcacasValor,
   RastreabilidadeDoaValor,
   TemperaturaResfriamentoValor,
   PotabilidadeAguaValor,
@@ -227,6 +231,10 @@ export function DadosColetados({
             return valor ? <PenduraAvesRelatorio key={campo.chave} valor={valor as PenduraAvesValor} titulo={rotulo} /> : null;
           case "peso_caixa":
             return valor ? <PesoCaixaRelatorio key={campo.chave} valor={valor as PesoCaixaValor} titulo={rotulo} /> : null;
+          case "escaldagem_depenagem":
+            return valor ? <EscaldagemDepenagemRelatorio key={campo.chave} valor={valor as EscaldagemDepenagemValor} titulo={rotulo} /> : null;
+          case "hematomas_carcacas":
+            return valor ? <HematomasRelatorio key={campo.chave} valor={valor as HematomasCarcacasValor} titulo={rotulo} /> : null;
           case "rastreabilidade_doa":
             return valor ? <RastreabilidadeDoaRelatorio key={campo.chave} valor={valor as RastreabilidadeDoaValor} titulo={rotulo} /> : null;
           case "temperatura_resfriamento":

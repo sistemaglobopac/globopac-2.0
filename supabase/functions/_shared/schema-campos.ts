@@ -63,6 +63,8 @@ export type CampoTemplate =
   | { chave: string; tipo: "recebimento_secundarias"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
   | { chave: string; tipo: "peso_caixa"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
   | { chave: string; tipo: "rastreabilidade_doa"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
+  | { chave: string; tipo: "hematomas_carcacas"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
+  | { chave: string; tipo: "escaldagem_depenagem"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
   | { chave: string; tipo: "temperatura_resfriamento"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
   | { chave: string; tipo: "potabilidade_agua"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
   | { chave: string; tipo: "potabilidade_pontos"; obrigatorio: boolean; label?: string; dependeDe?: DependeDe }
@@ -304,6 +306,20 @@ export const campoTemplateSchema: z.ZodType<CampoTemplate> = z.discriminatedUnio
   }),
   z.object({
     chave: z.string().min(1),
+    tipo: z.literal("hematomas_carcacas"),
+    obrigatorio: z.boolean(),
+    label: z.string().optional(),
+    dependeDe: dependeDeSchema,
+  }),
+  z.object({
+    chave: z.string().min(1),
+    tipo: z.literal("escaldagem_depenagem"),
+    obrigatorio: z.boolean(),
+    label: z.string().optional(),
+    dependeDe: dependeDeSchema,
+  }),
+  z.object({
+    chave: z.string().min(1),
     tipo: z.literal("temperatura_resfriamento"),
     obrigatorio: z.boolean(),
     label: z.string().optional(),
@@ -450,6 +466,8 @@ export function zodFromSchemaCampos(campos: CampoTemplate[]): z.ZodEffects<z.Zod
       case "recebimento_sacos":
       case "recebimento_secundarias":
       case "peso_caixa":
+      case "hematomas_carcacas":
+      case "escaldagem_depenagem":
       case "temperatura_resfriamento":
       case "potabilidade_agua":
       case "potabilidade_pontos":
@@ -565,6 +583,8 @@ export function valoresIniciaisDe(campos: CampoTemplate[]): Record<string, unkno
       campo.tipo === "recebimento_sacos" ||
       campo.tipo === "recebimento_secundarias" ||
       campo.tipo === "peso_caixa" ||
+      campo.tipo === "hematomas_carcacas" ||
+      campo.tipo === "escaldagem_depenagem" ||
       campo.tipo === "rastreabilidade_doa" ||
       campo.tipo === "temperatura_resfriamento" ||
       campo.tipo === "potabilidade_agua" ||

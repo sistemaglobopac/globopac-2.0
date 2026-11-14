@@ -4,6 +4,7 @@
 // novo valor no ponto certo do registro. Funções puras, testadas em tests/unit/adendoCampos.test.ts.
 
 import { CHECKLISTS, itensDaSala, SALAS_CHECKLIST, type TipoChecklist } from "../fields/checklistConformidade";
+import { DEFEITOS_ESCALDAGEM } from "../fields/escaldagemDepenagem";
 import { PARTES_MIUDOS } from "../fields/qualidadeMiudos";
 
 export interface AlvoAdendo {
@@ -20,6 +21,16 @@ const ROTULOS: Record<string, string> = {
   avesPorCaixa: "Aves por caixa",
   avesRecebidas: "Aves que vieram na carga",
   avesMortas: "Aves mortas",
+  carcacasAvaliadas: "Carcaças avaliadas",
+  avesAvaliadas: "Aves avaliadas",
+  velocidadeNoreaAvesHora: "Velocidade da nórea — PSO 15 (aves/h)",
+  tempoEscaldagemMin: "Tempo de escaldagem (min)",
+  temperaturaDepiladorPatasC: "Temperatura do depilador de patas (°C)",
+  temperaturaTanqueEscaldagemC: "Temperatura do tanque de escaldagem (°C)",
+  contusoesAsas: "Contusões nas asas",
+  contusoesPeito: "Contusões no peito",
+  contusoesCoxa: "Contusões na coxa",
+  fraturas: "Fraturas",
   penduraInicioEm: "Início da pendura",
   temperaturaC: "Temperatura (°C)",
   comportamento: "Comportamento das aves",
@@ -74,7 +85,7 @@ const ROTULOS: Record<string, string> = {
 };
 
 /** Objetos aninhados cujos dados escalares também podem ser corrigidos (leituras de hidrômetro por tanque, temperaturas da água). */
-const OBJETOS_ALVO = new Set(["tanques", "chuveiro", "temperaturas", "agua", "ambiente", "produtos", "sistemas", "salas", "partes"]);
+const OBJETOS_ALVO = new Set(["tanques", "chuveiro", "temperaturas", "agua", "ambiente", "produtos", "sistemas", "salas", "partes", "defeitos"]);
 /** Profundidade máxima dentro desses objetos (partes › parte › defeitos › defeito). */
 const PROFUNDIDADE_MAXIMA = 3;
 /** Chaves que só agrupam (não entram no rótulo): "Chiller 1 › Hidr. atual", não "Tanques › Chiller 1 › …". */
@@ -86,6 +97,10 @@ function rotuloDaTrilha(tipo: string | undefined, trilha: string[]): string {
     const sala = SALAS_CHECKLIST.find((s) => s.chave === trilha[1]);
     const item = itensDaSala(tipo as TipoChecklist, trilha[1] as never).find((i) => i.chave === trilha[2]);
     if (sala && item) return `${sala.curto} › ${item.rotulo}`;
+  }
+  if (tipo === "escaldagem_depenagem" && trilha[0] === "defeitos") {
+    const defeito = DEFEITOS_ESCALDAGEM.find((d) => d.chave === trilha[1]);
+    if (defeito) return defeito.rotulo;
   }
   if (tipo === "qualidade_miudos" && trilha[0] === "partes") {
     const parte = PARTES_MIUDOS.find((p) => p.chave === trilha[1]);
@@ -110,7 +125,7 @@ function coletarAninhados(campo: { chave: string; tipo?: string }, nome: string,
 }
 
 /** Dados calculados ou de conformidade: corrigi-los à mão deixaria o registro incoerente. */
-export const DERIVADOS = /^(conformidade|detalhesRNC|status|houveOfegantes|acaoCorretiva|acaoCorretivaEm|doaPct|saldoDiferenca|notaSaldo|ordemPendura|dataAbate|cargaId|veiculoId|adendos|total.*|.*Pct)$/;
+export const DERIVADOS = /^(conformidade|detalhesRNC|status|houveOfegantes|acaoCorretiva|acaoCorretivaEm|doaPct|saldoDiferenca|notaSaldo|ordemPendura|dataAbate|cargaId|veiculoId|adendos|setorRnc|total.*|.*Pct)$/;
 
 /** Dados que o adendo pode acrescentar mesmo ainda ausentes no item (herdados depois do registro). */
 const EXTRAS_POR_ITEM: Record<string, string[]> = {

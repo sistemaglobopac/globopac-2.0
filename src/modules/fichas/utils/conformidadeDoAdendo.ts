@@ -13,6 +13,8 @@ import { montarValorControleAbsorcao } from "../fields/controleAbsorcao";
 import { montarValorEletronarcose } from "../fields/eletronarcoseAves";
 import { montarValorEspera } from "../fields/esperaAves";
 import { montarValorPendura } from "../fields/penduraAves";
+import { montarValorEscaldagem } from "../fields/escaldagemDepenagem";
+import { montarValorHematomas } from "../fields/hematomas";
 import { montarValorPesoCaixa } from "../fields/pesoCaixa";
 import { montarValorPotabilidade } from "../fields/potabilidadeAgua";
 import { montarValorPotabilidadePontos } from "../fields/potabilidadePontos";
@@ -59,6 +61,8 @@ const MONTADORES: Record<string, Montador> = {
   potabilidade_pontos: m(montarValorPotabilidadePontos),
   qualidade_miudos: m(montarValorQualidadeMiudos),
   peso_caixa: m(montarValorPesoCaixa),
+  hematomas_carcacas: m(montarValorHematomas),
+  escaldagem_depenagem: m(montarValorEscaldagem),
   recepcao_aves: m(montarValorRecepcao),
   espera_aves: m(montarValorEspera),
   pendura_aves: m(montarValorPendura),

@@ -22,6 +22,8 @@ import { varianteDoTipo } from "./fields/recebimentoEmbalagens";
 import { PesoCaixaField } from "./fields/PesoCaixaField";
 import type { CargasEmRascunhoPorTipo } from "./utils/rascunhosAnterior";
 import { RastreabilidadeDoaField } from "./fields/RastreabilidadeDoaField";
+import { HematomasField } from "./fields/HematomasField";
+import { EscaldagemDepenagemField } from "./fields/EscaldagemDepenagemField";
 import { TemperaturaResfriamentoField } from "./fields/TemperaturaResfriamentoField";
 import { PotabilidadeAguaField } from "./fields/PotabilidadeAguaField";
 import { PotabilidadePontosField } from "./fields/PotabilidadePontosField";
@@ -41,6 +43,8 @@ import type {
   OcorrenciaPragasValor,
   PenduraAvesValor,
   EletronarcoseAvesValor,
+  EscaldagemDepenagemValor,
+  HematomasCarcacasValor,
   PesoCaixaValor,
   RastreabilidadeDoaValor,
   TemperaturaResfriamentoValor,
@@ -275,6 +279,22 @@ export function DynamicField({ campo, register, errors, control, prevAppointment
           name={campo.chave}
           control={control}
           render={({ field }) => <PesoCaixaField value={field.value as PesoCaixaValor | undefined} onChange={field.onChange} cargasUsadasEmRascunho={cargasUsadasEmRascunho} />}
+        />
+      )}
+
+      {campo.tipo === "escaldagem_depenagem" && (
+        <Controller
+          name={campo.chave}
+          control={control}
+          render={({ field }) => <EscaldagemDepenagemField value={field.value as EscaldagemDepenagemValor | undefined} onChange={field.onChange} />}
+        />
+      )}
+
+      {campo.tipo === "hematomas_carcacas" && (
+        <Controller
+          name={campo.chave}
+          control={control}
+          render={({ field }) => <HematomasField value={field.value as HematomasCarcacasValor | undefined} onChange={field.onChange} />}
         />
       )}
 

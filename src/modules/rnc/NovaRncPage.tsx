@@ -7,6 +7,7 @@ import { resolverSetoresEfetivos, useSetoresCadastrados } from "@/modules/admin/
 import { supabase } from "@/lib/supabase";
 import { desviosEspeciais } from "@/modules/fichas/utils/desviosEspeciais";
 import type { CampoTemplate } from "@/shared/schema-campos";
+import { setorCadastradoDe, setorDestinoDaRnc } from "@/shared/setor-rnc";
 import { enviarAnexosRnc, useAbrirRnc, type SeveridadeRnc } from "./api";
 import { SeletorAnexos } from "./AnexosRnc";
 import { Button } from "@/shared/ui/button";
@@ -44,7 +45,9 @@ function useFichaDoMonitoramento(monitoramentoId: string | null) {
       // O que estava não conforme no monitoramento (vazão abaixo da meta, absorção/dripping…): viaja
       // com a RNC para quem a recebe já saber do que se trata.
       const naoConformidades = desviosEspeciais(ficha.schema_campos ?? [], monitoramento.dados_dinamicos ?? {});
-      return { setor: monitoramento.setor, fichaNome: ficha.nome, naoConformidades };
+      // Alguns campos (hematomas nas carcaças) mandam a RNC para outro setor que não o de quem monitora.
+      const setorDestino = setorDestinoDaRnc(monitoramento.dados_dinamicos);
+      return { setor: monitoramento.setor, setorDestino, fichaNome: ficha.nome, naoConformidades };
     },
   });
 }
@@ -76,9 +79,12 @@ export function NovaRncPage() {
   const [fotos, setFotos] = useState<File[]>([]);
   const [mensagem, setMensagem] = useState<{ tipo: "success" | "error"; texto: string } | null>(null);
 
+  // Setor que o próprio desvio exige (ex.: hematomas → Fomento Avícola), na grafia em que está cadastrado.
+  const setorExigido = vinculo?.setorDestino ? setorCadastradoDe(vinculo.setorDestino, masterSetores) : null;
+
   useEffect(() => {
     if (!vinculo) return;
-    setSetor(vinculo.setor);
+    setSetor(setorExigido ?? vinculo.setor);
     // Pré-preenche a descrição com a não conformidade do monitoramento (o inspetor pode complementar).
     setDescricao((atual) => {
       if (atual) return atual;
@@ -86,10 +92,12 @@ export function NovaRncPage() {
       if (vinculo.naoConformidades.length > 0) linhas.push("Não conformidade do monitoramento:", ...vinculo.naoConformidades.map((n) => `- ${n}`));
       return linhas.join("\n");
     });
-  }, [vinculo]);
+  }, [vinculo, setorExigido]);
 
   // O inspetor indica o setor ONDE a não conformidade ocorre — qualquer setor cadastrado, não só os dele.
-  const setoresParaEscolher = (masterSetores ?? []).length > 0 ? (masterSetores as string[]) : setoresDoUsuario;
+  const setoresCadastrados = (masterSetores ?? []).length > 0 ? (masterSetores as string[]) : setoresDoUsuario;
+  // O setor exigido pelo desvio sempre aparece na lista, mesmo que ainda não esteja cadastrado (senão o campo mostraria outro setor).
+  const setoresParaEscolher = setorExigido && !setoresCadastrados.includes(setorExigido) ? [...setoresCadastrados, setorExigido] : setoresCadastrados;
 
   useEffect(() => {
     if (vinculo) return;
@@ -168,6 +176,11 @@ export function NovaRncPage() {
                   </option>
                 ))}
               </Select>
+              {setorExigido && (
+                <p className="text-xs text-muted-foreground" data-testid="setor-rnc-exigido">
+                  Este desvio é tratado pelo setor <strong>{setorExigido}</strong>, definido pelo próprio monitoramento.
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">

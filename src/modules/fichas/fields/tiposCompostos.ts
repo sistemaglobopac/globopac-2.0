@@ -259,6 +259,39 @@ export interface PesoCaixaValor {
   detalhesRNC: string | null;
 }
 
+/** Uma carga no monitoramento de hematomas nas carcaças. As contagens são como digitadas; `totalLesoes` e
+ * `hematomasPct` são calculados e gravados para o relatório não depender de recalcular. */
+export interface CargaHematomas {
+  cargaId: string;
+  gta: string;
+  integrado: string;
+  aviario: string;
+  nucleo: string;
+  qtdAves: number;
+  /** Carcaças avaliadas nesta carga. */
+  carcacasAvaliadas: string;
+  contusoesAsas: string;
+  contusoesPeito: string;
+  contusoesCoxa: string;
+  fraturas: string;
+  /** Soma das quatro contagens (null enquanto faltar algum dado). */
+  totalLesoes: number | null;
+  /** Total de lesões ÷ carcaças avaliadas × 100 (null enquanto faltar algum dado). */
+  hematomasPct: number | null;
+}
+
+/** Hematomas nas carcaças (Especial SIF): conforme até 4% por carga; acima disso, não conforme e a RNC
+ * vai para o setor em `setorRnc` (Fomento Avícola). */
+export interface HematomasCarcacasValor {
+  cargas: CargaHematomas[];
+  /** Limite máximo tolerado (%), gravado para o relatório mostrar a regra que valeu na hora. */
+  limitePct: number;
+  /** Setor que recebe a RNC deste desvio (a tela de abertura da RNC e a Edge Function leem daqui). */
+  setorRnc: string;
+  conformidade: boolean;
+  detalhesRNC: string | null;
+}
+
 /** Caixas de transporte vazias antes do tanque de imersão (Especial SIF). */
 export interface CaixasVaziasValor {
   /** true = todas as caixas estão vazias. `null` = não respondido. */
@@ -487,6 +520,27 @@ export type ChaveParteMiudo = "cabeca" | "pes" | "moela" | "figado" | "coracao";
  * digitadas (o percentual é calculado). Fichas antigas não têm `existe`: com amostra, a parte existia. */
 export interface QualidadeMiudosValor {
   partes: Record<ChaveParteMiudo, { existe?: "sim" | "nao" | ""; amostra: string; defeitos: Record<string, string> }>;
+  observacao: string;
+  conformidade: boolean;
+  detalhesRNC: string | null;
+}
+
+/** Escaldagem/Depenagem — Controle (Especial SIF): parâmetros do processo (só registrados, sem limite) e, sobre as aves
+ * avaliadas, a quantidade com cada defeito (o percentual é calculado e comparado com o máximo do defeito). Tudo como
+ * digitado (texto, aceita vírgula nos decimais). */
+export interface EscaldagemDepenagemValor {
+  /** Velocidade da nórea (PSO 15), em aves por hora. */
+  velocidadeNoreaAvesHora: string;
+  /** Tempo de escaldagem, em minutos. */
+  tempoEscaldagemMin: string;
+  /** Temperatura do depilador de patas (°C). */
+  temperaturaDepiladorPatasC: string;
+  /** Temperatura do tanque de escaldagem (°C). */
+  temperaturaTanqueEscaldagemC: string;
+  /** Quantidade de aves avaliadas (a base dos percentuais). */
+  avesAvaliadas: string;
+  /** Quantidade de aves com cada defeito, por chave (ver DEFEITOS_ESCALDAGEM). */
+  defeitos: Record<string, string>;
   observacao: string;
   conformidade: boolean;
   detalhesRNC: string | null;

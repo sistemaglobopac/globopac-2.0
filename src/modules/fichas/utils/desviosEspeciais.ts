@@ -27,7 +27,7 @@ function limiteConfigurado(campo: CampoTemplate): number | undefined {
 }
 
 // Widgets que gravam `conformidade` + `detalhesRNC` no próprio valor (vazão de água e recepção de aves).
-export const TIPOS_VAZAO = ["chiller_carcacas", "chiller_partes", "mini_chillers", "lavagem_final", "recepcao_aves", "espera_aves", "pendura_aves", "eletronarcose_aves", "caixas_vazias", "recebimento_embalagens", "recebimento_sacos", "recebimento_secundarias", "peso_caixa", "temperatura_resfriamento", "potabilidade_agua", "potabilidade_pontos", "qualidade_miudos", "controle_absorcao", "aguas_residuais", "ventilacao", "higiene_habitos", "pso", "higiene_operacional", "higiene_colaboradores"];
+export const TIPOS_VAZAO = ["chiller_carcacas", "chiller_partes", "mini_chillers", "lavagem_final", "recepcao_aves", "espera_aves", "pendura_aves", "eletronarcose_aves", "caixas_vazias", "recebimento_embalagens", "recebimento_sacos", "recebimento_secundarias", "peso_caixa", "hematomas_carcacas", "escaldagem_depenagem", "temperatura_resfriamento", "potabilidade_agua", "potabilidade_pontos", "qualidade_miudos", "controle_absorcao", "aguas_residuais", "ventilacao", "higiene_habitos", "pso", "higiene_operacional", "higiene_colaboradores"];
 
 /** Desvios que tornam a ficha NÃO CONFORME já no preenchimento: absorção/dripping fora do limite,
  * vazão de água abaixo da meta (o widget grava `conformidade: false` + `detalhesRNC`). Ocorrência
@@ -44,6 +44,10 @@ export function desviosEspeciais(campos: CampoTemplate[], dados: Record<string, 
             ? `O campo "${campo.label ?? campo.chave}" está não conforme: ${bruto.detalhesRNC ?? "desvio na recepção das aves"}.`
             : campo.tipo === "peso_caixa"
             ? `O campo "${campo.label ?? campo.chave}" está não conforme: ${bruto.detalhesRNC ?? "peso vivo por caixa acima de 25 kg"}.`
+            : campo.tipo === "escaldagem_depenagem"
+            ? `O campo "${campo.label ?? campo.chave}" está não conforme: ${bruto.detalhesRNC ?? "defeito acima do máximo tolerado"}.`
+            : campo.tipo === "hematomas_carcacas"
+            ? `O campo "${campo.label ?? campo.chave}" está não conforme: ${bruto.detalhesRNC ?? "hematomas acima do limite de 4%"}.`
             : campo.tipo === "caixas_vazias"
             ? `O campo "${campo.label ?? campo.chave}" está não conforme: ${bruto.detalhesRNC ?? "caixas de transporte não vazias antes do tanque de imersão"}.`
             : campo.tipo === "recebimento_embalagens" || campo.tipo === "recebimento_sacos" || campo.tipo === "recebimento_secundarias"

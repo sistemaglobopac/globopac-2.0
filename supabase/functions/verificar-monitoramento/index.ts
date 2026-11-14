@@ -9,6 +9,7 @@ import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { corsHeadersAutenticado } from "../_shared/cors.ts";
 import { assinarMonitoramento } from "../_shared/assinar.ts";
+import { setorCadastradoDe, setorDestinoDaRnc } from "../_shared/setor-rnc.ts";
 
 const requestSchema = z.discriminatedUnion("decisao", [
   z.object({ decisao: z.literal("aprovar"), monitoramento_id: z.string().uuid() }),
@@ -73,7 +74,7 @@ Deno.serve(async (req) => {
       })
       .eq("id", dados.monitoramento_id)
       .is("verificado_por", null)
-      .select("id, setor, conformidade, verificado_por")
+      .select("id, setor, conformidade, verificado_por, dados_dinamicos")
       .single();
 
     if (updateError || !atualizado) {
@@ -99,6 +100,18 @@ Deno.serve(async (req) => {
       const horas = horasPorSeveridade[dados.severidade] ?? SLA_PADRAO_HORAS[dados.severidade];
       const prazoSla = new Date(Date.now() + horas * 60 * 60 * 1000).toISOString();
 
+      // Campo não conforme que define o setor da RNC (hematomas → Fomento Avícola): vale o setor dele, na grafia cadastrada.
+      const setorDestino = setorDestinoDaRnc(atualizado.dados_dinamicos as Record<string, unknown> | null);
+      let setorDaRnc: string = atualizado.setor;
+      if (setorDestino) {
+        const { data: cadastrados } = await callerClient
+          .from("app_config")
+          .select("valor")
+          .eq("chave", "setores_cadastrados")
+          .maybeSingle();
+        setorDaRnc = setorCadastradoDe(setorDestino, Array.isArray(cadastrados?.valor) ? (cadastrados.valor as string[]) : null);
+      }
+
       const { data: rncCriada, error: rncError } = await callerClient
         .from("rnc")
         .insert({
@@ -106,7 +119,7 @@ Deno.serve(async (req) => {
           descricao:
             dados.descricao ??
             `RNC aberta automaticamente pela reprovação do monitoramento ${dados.monitoramento_id}.`,
-          setor: atualizado.setor,
+          setor: setorDaRnc,
           severidade: dados.severidade,
           aberto_por: user.id,
           prazo_sla: prazoSla,

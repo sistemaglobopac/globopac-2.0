@@ -22,6 +22,8 @@ import type {
   ParadaEquipamentoValor,
   PenduraAvesValor,
   PesoCaixaValor,
+  EscaldagemDepenagemValor,
+  HematomasCarcacasValor,
   RastreabilidadeDoaValor,
   TemperaturaResfriamentoValor,
   PotabilidadeAguaValor,
@@ -33,6 +35,14 @@ import type {
   TanqueHidrometro,
 } from "@/modules/fichas/fields/tiposCompostos";
 import { formatMaskedValue } from "@/modules/fichas/fields/hidrometro";
+import {
+  DEFEITOS_ESCALDAGEM,
+  defeitoAcimaDoMaximo as escaldagemDefeitoAcimaDoMaximo,
+  formatarPct as escaldagemFormatarPct,
+  PARAMETROS_ESCALDAGEM,
+  percentualDefeito as escaldagemPercentual,
+} from "@/modules/fichas/fields/escaldagemDepenagem";
+import { acimaDoLimite as hematomasAcimaDoLimite, formatarPctHematomas, LIMITE_HEMATOMAS_PCT, percentualHematomas, totalDeLesoes } from "@/modules/fichas/fields/hematomas";
 import { pesoVivoMedioDaCarcaca, RENDIMENTO_CARCACA_PERCENTUAL } from "@/modules/fichas/fields/calculosSpr";
 import { tanqueSemProducao } from "@/modules/fichas/fields/tanqueSemProducao";
 import { pragasPresentes, rotuloDaPraga } from "@/modules/fichas/fields/pragas";
@@ -656,6 +666,107 @@ export function PesoCaixaRelatorio({ valor, titulo = "Peso Vivo por Caixa de Tra
                 <td className="pr-2">{c.avesPorCaixa || "—"}</td>
                 <td className="pr-2">{c.pesoMedioKg || "—"}</td>
                 <td className={total !== null && total > 25 ? "font-black text-destructive" : "font-black"}>{total === null ? "—" : total.toLocaleString("pt-BR", { maximumFractionDigits: 3 })}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {valor.conformidade === false && valor.detalhesRNC && <p className="text-[10px] font-semibold text-destructive print:text-[8px]">{valor.detalhesRNC}</p>}
+    </div>
+  );
+}
+
+export function EscaldagemDepenagemRelatorio({ valor, titulo = "Escaldagem/Depenagem — Controle" }: { valor: EscaldagemDepenagemValor; titulo?: string }) {
+  const avaliadas = lerContagem(valor.avesAvaliadas);
+  return (
+    <div className="col-span-full space-y-2 rounded-lg border border-hairline bg-gray-50 p-3 print:p-2" data-testid="relatorio-escaldagem-depenagem">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] font-black uppercase tracking-wider text-primary print:text-[9px]">{titulo}</span>
+        <SeloConformidade conforme={valor.conformidade !== false} />
+      </div>
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] sm:grid-cols-4 print:text-[8px]">
+        {PARAMETROS_ESCALDAGEM.map((p) => (
+          <div key={p.chave}>
+            <dt className="text-muted-foreground">{p.rotulo}</dt>
+            <dd className="font-black">{valor[p.chave] || "—"}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="text-[10px] print:text-[8px]">
+        Aves avaliadas: <strong>{avaliadas ?? "—"}</strong>
+      </p>
+      <table className="max-sm:block max-sm:overflow-x-auto w-full text-[10px] print:text-[8px]">
+        <thead>
+          <tr className="text-left text-muted-foreground">
+            <th className="pr-2 font-normal">Defeito</th>
+            <th className="pr-2 font-normal">Aves</th>
+            <th className="pr-2 font-normal">%</th>
+            <th className="font-normal">Máx.</th>
+          </tr>
+        </thead>
+        <tbody>
+          {DEFEITOS_ESCALDAGEM.map((d) => {
+            // O % sai sempre das contagens exibidas (um adendo troca o digitado, não o derivado).
+            const n = lerContagem(valor.defeitos?.[d.chave]);
+            const nc = escaldagemDefeitoAcimaDoMaximo(n, avaliadas, d.maximoPct);
+            return (
+              <tr key={d.chave}>
+                <td className="pr-2">{d.rotulo}</td>
+                <td className="pr-2">{n ?? "—"}</td>
+                <td className={nc ? "pr-2 font-black text-destructive" : "pr-2 font-black"}>{escaldagemFormatarPct(escaldagemPercentual(n, avaliadas))}</td>
+                <td>{d.maximoPct.toLocaleString("pt-BR")}%</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {valor.observacao?.trim() && <p className="text-[10px] italic text-ink print:text-[8px]">Observações: {valor.observacao}</p>}
+      {valor.conformidade === false && valor.detalhesRNC && <p className="text-[10px] font-semibold text-destructive print:text-[8px]">{valor.detalhesRNC}</p>}
+    </div>
+  );
+}
+
+export function HematomasRelatorio({ valor, titulo = "Hematomas nas Carcaças" }: { valor: HematomasCarcacasValor; titulo?: string }) {
+  const limite = typeof valor.limitePct === "number" ? valor.limitePct : LIMITE_HEMATOMAS_PCT;
+  return (
+    <div className="col-span-full space-y-2 rounded-lg border border-hairline bg-gray-50 p-3 print:p-2" data-testid="relatorio-hematomas">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] font-black uppercase tracking-wider text-primary print:text-[9px]">
+          {titulo} <span className="font-semibold normal-case text-muted-foreground">(limite {limite}%)</span>
+        </span>
+        <SeloConformidade conforme={valor.conformidade !== false} />
+      </div>
+      <table className="max-sm:block max-sm:overflow-x-auto w-full text-[10px] print:text-[8px]">
+        <thead>
+          <tr className="text-left text-muted-foreground">
+            <th className="pr-2">GTA</th>
+            <th className="pr-2">Integrado</th>
+            <th className="pr-2">Avaliadas</th>
+            <th className="pr-2">Asas</th>
+            <th className="pr-2">Peito</th>
+            <th className="pr-2">Coxa</th>
+            <th className="pr-2">Fraturas</th>
+            <th className="pr-2">Total</th>
+            <th>Hematomas</th>
+          </tr>
+        </thead>
+        <tbody>
+          {(valor.cargas ?? []).map((c, i) => {
+            // O total e o % saem sempre das contagens exibidas (um adendo troca o digitado, não o derivado gravado).
+            const total = totalDeLesoes(c);
+            const pct = percentualHematomas(c);
+            const acima = hematomasAcimaDoLimite(c, limite);
+            return (
+              <tr key={i}>
+                <td className="pr-2">{c.gta || "—"}</td>
+                <td className="pr-2">{c.integrado || "—"}</td>
+                <td className="pr-2">{c.carcacasAvaliadas || "—"}</td>
+                <td className="pr-2">{c.contusoesAsas || "—"}</td>
+                <td className="pr-2">{c.contusoesPeito || "—"}</td>
+                <td className="pr-2">{c.contusoesCoxa || "—"}</td>
+                <td className="pr-2">{c.fraturas || "—"}</td>
+                <td className="pr-2">{total === null ? "—" : total.toLocaleString("pt-BR")}</td>
+                <td className={acima ? "font-black text-destructive" : "font-black"}>{formatarPctHematomas(pct)}</td>
               </tr>
             );
           })}
