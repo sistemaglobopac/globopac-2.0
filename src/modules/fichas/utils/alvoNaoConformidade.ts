@@ -11,7 +11,7 @@ import { TANQUES_ABSORCAO, tanqueParado, temperaturaAbsorcaoAcimaDoLimite } from
 import { FAIXA_CORRENTE_MA, FAIXA_FREQUENCIA_HZ, FAIXA_VOLTAGEM_V, foraDaFaixa, lerNumero, LIMITE_CONTENCAO_MAX_S, LIMITE_POSTURA_ESTACAO_MAX_S, LIMITE_SAIDA_SANGRIA_MAX_S, LIMITE_SANGRIA_MIN_S, SINAIS_INSENSIBILIZACAO } from "../fields/eletronarcoseAves";
 import { acaoCorretivaPendente } from "../fields/esperaAves";
 import { defeitosAcimaDoMaximo as defeitosAcimaDoMaximoEscaldagem } from "../fields/escaldagemDepenagem";
-import { acimaDoLimite as hematomasAcimaDoLimite, LESOES_HEMATOMAS, lerContagem as lerContagemHematomas } from "../fields/hematomas";
+import { lerContagem as lerContagemHematomas, lesoesAcimaDoLimite as lesoesAcimaDoLimiteHematomas } from "../fields/hematomas";
 import { acimaDoLimite as pesoPorCaixaAcimaDoLimite } from "../fields/pesoCaixa";
 import { cloroForaDoLimite, lerMedida, phForaDoLimite } from "../fields/potabilidadeAgua";
 import { cloroPontoForaDoLimite, phPontoForaDoLimite } from "../fields/potabilidadePontos";
@@ -178,13 +178,16 @@ const RESOLVEDORES: Record<string, Resolvedor> = {
     const d = defeitosAcimaDoMaximoEscaldagem(v)[0];
     return d ? `defeitos.${d.chave}` : undefined;
   }),
-  // Hematomas: a primeira carga acima do limite; o dado a corrigir é a contagem que mais pesa (ou as carcaças avaliadas, se foi só isso)
+  // Hematomas: a primeira carga com algum tipo de lesão acima do limite; o dado a corrigir é a contagem desse tipo
+  // (o de maior contagem, se mais de um passou do limite)
   hematomas_carcacas: r((v: HematomasCarcacasValor) => {
-    const i = (v.cargas ?? []).findIndex((c) => hematomasAcimaDoLimite(c, v.limitePct));
-    if (i < 0) return undefined;
-    const carga = v.cargas[i]!;
-    const maior = LESOES_HEMATOMAS.map((l) => ({ chave: l.chave, n: lerContagemHematomas(carga[l.chave]) ?? 0 })).sort((a, b) => b.n - a.n)[0];
-    return `cargas.${i}.${maior && maior.n > 0 ? maior.chave : "carcacasAvaliadas"}`;
+    for (const [i, carga] of (v.cargas ?? []).entries()) {
+      const tipos = lesoesAcimaDoLimiteHematomas(carga, v.limitePct);
+      if (tipos.length === 0) continue;
+      const maior = [...tipos].sort((a, b) => (lerContagemHematomas(carga[b.chave]) ?? 0) - (lerContagemHematomas(carga[a.chave]) ?? 0))[0]!;
+      return `cargas.${i}.${maior.chave}`;
+    }
+    return undefined;
   }),
   recepcao_aves: r((v: RecepcaoAvesValor) => {
     if (v.condicaoVeiculo === "NAO_CONFORME") return "condicaoVeiculo";

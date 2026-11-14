@@ -7,8 +7,11 @@ import {
   hematomasVazio,
   LIMITE_HEMATOMAS_PCT,
   lerContagem,
+  lesaoAcimaDoLimite,
+  lesoesAcimaDoLimite,
   montarValorHematomas,
   motivosBloqueioHematomas,
+  percentualDaLesao,
   percentualHematomas,
   totalDeLesoes,
 } from "@/modules/fichas/fields/hematomas";
@@ -36,22 +39,54 @@ const valor = (...cargas: CargaHematomas[]): HematomasCarcacasValor => ({ ...hem
 const campos = [{ chave: "h", tipo: "hematomas_carcacas", obrigatorio: true, label: "Hematomas" }] as CampoTemplate[];
 
 describe("hematomas nas carcaças — cálculo do percentual", () => {
-  it("soma contusões nas asas, no peito, na coxa e fraturas e divide pelas carcaças avaliadas", () => {
+  it("calcula o percentual de cada tipo de lesão sobre as carcaças avaliadas", () => {
     const c = carga({ carcacasAvaliadas: "200", contusoesAsas: "2", contusoesPeito: "1", contusoesCoxa: "3", fraturas: "2" });
+    expect(percentualDaLesao(c, "contusoesAsas")).toBe(1);
+    expect(percentualDaLesao(c, "contusoesPeito")).toBe(0.5);
+    expect(percentualDaLesao(c, "contusoesCoxa")).toBe(1.5);
+    expect(percentualDaLesao(c, "fraturas")).toBe(1);
+    // o total (soma ÷ avaliadas) segue disponível, só como informação
     expect(totalDeLesoes(c)).toBe(8);
     expect(percentualHematomas(c)).toBe(4);
   });
 
-  it("o limite é 4%: exatamente 4% é conforme e acima disso não", () => {
+  it("o limite de 4% vale para CADA tipo: exatamente 4% é conforme e acima disso não", () => {
     expect(LIMITE_HEMATOMAS_PCT).toBe(4);
-    expect(acimaDoLimite(carga({ carcacasAvaliadas: "100", contusoesAsas: "4", contusoesPeito: "0", contusoesCoxa: "0", fraturas: "0" }))).toBe(false);
-    expect(acimaDoLimite(carga({ carcacasAvaliadas: "100", contusoesAsas: "4", contusoesPeito: "1", contusoesCoxa: "0", fraturas: "0" }))).toBe(true);
+    const zeradas = { contusoesAsas: "0", contusoesPeito: "0", contusoesCoxa: "0", fraturas: "0" };
+    expect(acimaDoLimite(carga({ ...zeradas, contusoesAsas: "4" }))).toBe(false);
+    expect(acimaDoLimite(carga({ ...zeradas, contusoesAsas: "5" }))).toBe(true);
+    expect(acimaDoLimite(carga({ ...zeradas, contusoesPeito: "5" }))).toBe(true);
+    expect(acimaDoLimite(carga({ ...zeradas, contusoesCoxa: "5" }))).toBe(true);
     // sem erro de ponto flutuante nas bordas (7 ÷ 175 = 4%)
-    expect(acimaDoLimite(carga({ carcacasAvaliadas: "175", contusoesAsas: "7", contusoesPeito: "0", contusoesCoxa: "0", fraturas: "0" }))).toBe(false);
+    expect(acimaDoLimite(carga({ ...zeradas, carcacasAvaliadas: "175", contusoesAsas: "7" }))).toBe(false);
+    expect(acimaDoLimite(carga({ ...zeradas, carcacasAvaliadas: "175", contusoesAsas: "8" }))).toBe(true);
   });
 
-  it("fraturas também entram no total", () => {
-    expect(acimaDoLimite(carga({ carcacasAvaliadas: "50", contusoesAsas: "0", contusoesPeito: "0", contusoesCoxa: "0", fraturas: "3" }))).toBe(true);
+  it("a soma dos tipos NÃO é o critério: vários tipos no limite somam mais de 4% e a carga continua conforme", () => {
+    const c = carga({ carcacasAvaliadas: "100", contusoesAsas: "4", contusoesPeito: "4", contusoesCoxa: "4", fraturas: "4" });
+    expect(percentualHematomas(c)).toBe(16);
+    expect(acimaDoLimite(c)).toBe(false);
+    expect(lesoesAcimaDoLimite(c)).toEqual([]);
+    expect(montarValorHematomas(valor(c)).conformidade).toBe(true);
+  });
+
+  it("fraturas também têm o limite de 4%", () => {
+    const zeradas = { contusoesAsas: "0", contusoesPeito: "0", contusoesCoxa: "0" };
+    expect(acimaDoLimite(carga({ ...zeradas, carcacasAvaliadas: "50", fraturas: "3" }))).toBe(true);
+    expect(acimaDoLimite(carga({ ...zeradas, carcacasAvaliadas: "50", fraturas: "2" }))).toBe(false);
+  });
+
+  it("identifica exatamente quais tipos passaram do limite", () => {
+    const c = carga({ carcacasAvaliadas: "100", contusoesAsas: "6", contusoesPeito: "1", contusoesCoxa: "9", fraturas: "4" });
+    expect(lesoesAcimaDoLimite(c).map((l) => l.chave)).toEqual(["contusoesAsas", "contusoesCoxa"]);
+    expect(lesaoAcimaDoLimite(c, "fraturas")).toBe(false);
+  });
+
+  it("cada tipo é avaliado sozinho: um tipo acima do limite reprova mesmo com os outros em branco", () => {
+    const c = carga({ carcacasAvaliadas: "100", contusoesAsas: "9", contusoesPeito: "", contusoesCoxa: "", fraturas: "" });
+    expect(lesaoAcimaDoLimite(c, "contusoesAsas")).toBe(true);
+    expect(acimaDoLimite(c)).toBe(true);
+    expect(totalDeLesoes(c)).toBeNull();
   });
 
   it("zero lesões é 0% e conforme; contagem em branco não vira zero", () => {
@@ -86,15 +121,23 @@ describe("hematomas nas carcaças — cálculo do percentual", () => {
 
 describe("hematomas nas carcaças — veredito e RNC", () => {
   it("monta o valor com total, %, limite, veredito e o setor da RNC (Fomento Avícola)", () => {
-    const v = montarValorHematomas(valor(carga({ carcacasAvaliadas: "100", contusoesAsas: "3", contusoesPeito: "2", contusoesCoxa: "1", fraturas: "0" })));
-    expect(v.cargas[0]!.totalLesoes).toBe(6);
-    expect(v.cargas[0]!.hematomasPct).toBe(6);
+    const v = montarValorHematomas(valor(carga({ carcacasAvaliadas: "100", contusoesAsas: "6", contusoesPeito: "2", contusoesCoxa: "1", fraturas: "0" })));
+    expect(v.cargas[0]!.totalLesoes).toBe(9);
+    expect(v.cargas[0]!.hematomasPct).toBe(9);
     expect(v.limitePct).toBe(4);
     expect(v.setorRnc).toBe("FOMENTO AVÍCOLA");
     expect(v.conformidade).toBe(false);
     expect(v.detalhesRNC).toContain("GTA 123");
-    expect(v.detalhesRNC).toContain("6%");
+    expect(v.detalhesRNC).toContain("contusões nas asas 6%");
+    expect(v.detalhesRNC).not.toContain("peito");
     expect(v.detalhesRNC).toContain("FOMENTO AVÍCOLA");
+  });
+
+  it("a RNC lista cada tipo de lesão acima do limite, com o seu percentual", () => {
+    const v = montarValorHematomas(valor(carga({ carcacasAvaliadas: "200", contusoesAsas: "10", contusoesPeito: "1", contusoesCoxa: "0", fraturas: "9" })));
+    expect(v.detalhesRNC).toContain("contusões nas asas 5%");
+    expect(v.detalhesRNC).toContain("fraturas 4,5%");
+    expect(v.detalhesRNC).not.toContain("coxa");
   });
 
   it("carga dentro do limite fica conforme, sem texto de RNC", () => {

@@ -103,7 +103,7 @@ const TIPOS_CAMPO: { value: TipoCampo; label: string }[] = [
   { value: "recebimento_sacos", label: "Recebimento de Embalagens Primárias — Sacos: fornecedor, higiene do veículo, rótulo, lote e medição de 30 amostras (Especial SIF)" },
   { value: "recebimento_secundarias", label: "Recebimento de Embalagens Secundárias (caixas): fornecedor, higiene do veículo, teste de resina, lote e medição de 32 amostras (Especial SIF)" },
   { value: "peso_caixa", label: "Peso Vivo por Caixa de Transporte (Especial SIF)" },
-  { value: "hematomas_carcacas", label: "Hematomas nas Carcaças por carga — limite 4%, RNC para o Fomento Avícola (Especial SIF)" },
+  { value: "hematomas_carcacas", label: "Hematomas nas Carcaças por carga — limite 4% para cada tipo de lesão, RNC para o Fomento Avícola (Especial SIF)" },
   { value: "escaldagem_depenagem", label: "Escaldagem/Depenagem — Controle: parâmetros do processo e defeitos em % (penas, película, pele, pés) (Especial SIF)" },
   { value: "rastreabilidade_doa", label: "Rastreabilidade e Controle de DOA (Especial SIF)" },
   { value: "temperatura_resfriamento", label: "Temperaturas do Pré-resfriamento: água e produtos (Especial SIF)" },

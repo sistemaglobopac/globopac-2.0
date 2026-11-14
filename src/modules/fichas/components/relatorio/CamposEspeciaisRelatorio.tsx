@@ -42,7 +42,7 @@ import {
   PARAMETROS_ESCALDAGEM,
   percentualDefeito as escaldagemPercentual,
 } from "@/modules/fichas/fields/escaldagemDepenagem";
-import { acimaDoLimite as hematomasAcimaDoLimite, formatarPctHematomas, LIMITE_HEMATOMAS_PCT, percentualHematomas, totalDeLesoes } from "@/modules/fichas/fields/hematomas";
+import { formatarPctHematomas, LESOES_HEMATOMAS, LIMITE_HEMATOMAS_PCT, lesaoAcimaDoLimite as hematomasLesaoAcimaDoLimite, percentualDaLesao, percentualHematomas, totalDeLesoes } from "@/modules/fichas/fields/hematomas";
 import { pesoVivoMedioDaCarcaca, RENDIMENTO_CARCACA_PERCENTUAL } from "@/modules/fichas/fields/calculosSpr";
 import { tanqueSemProducao } from "@/modules/fichas/fields/tanqueSemProducao";
 import { pragasPresentes, rotuloDaPraga } from "@/modules/fichas/fields/pragas";
@@ -732,7 +732,7 @@ export function HematomasRelatorio({ valor, titulo = "Hematomas nas Carcaças" }
     <div className="col-span-full space-y-2 rounded-lg border border-hairline bg-gray-50 p-3 print:p-2" data-testid="relatorio-hematomas">
       <div className="flex items-center justify-between gap-2">
         <span className="text-[10px] font-black uppercase tracking-wider text-primary print:text-[9px]">
-          {titulo} <span className="font-semibold normal-case text-muted-foreground">(limite {limite}%)</span>
+          {titulo} <span className="font-semibold normal-case text-muted-foreground">(limite {limite}% para cada tipo de lesão)</span>
         </span>
         <SeloConformidade conforme={valor.conformidade !== false} />
       </div>
@@ -742,31 +742,33 @@ export function HematomasRelatorio({ valor, titulo = "Hematomas nas Carcaças" }
             <th className="pr-2">GTA</th>
             <th className="pr-2">Integrado</th>
             <th className="pr-2">Avaliadas</th>
-            <th className="pr-2">Asas</th>
-            <th className="pr-2">Peito</th>
-            <th className="pr-2">Coxa</th>
-            <th className="pr-2">Fraturas</th>
-            <th className="pr-2">Total</th>
-            <th>Hematomas</th>
+            {LESOES_HEMATOMAS.map((l) => (
+              <th key={l.chave} className="pr-2">
+                {l.rotulo}
+              </th>
+            ))}
+            <th>Total (informativo)</th>
           </tr>
         </thead>
         <tbody>
           {(valor.cargas ?? []).map((c, i) => {
-            // O total e o % saem sempre das contagens exibidas (um adendo troca o digitado, não o derivado gravado).
+            // Totais e % saem sempre das contagens exibidas (um adendo troca o digitado, não o derivado gravado).
             const total = totalDeLesoes(c);
             const pct = percentualHematomas(c);
-            const acima = hematomasAcimaDoLimite(c, limite);
             return (
               <tr key={i}>
                 <td className="pr-2">{c.gta || "—"}</td>
                 <td className="pr-2">{c.integrado || "—"}</td>
                 <td className="pr-2">{c.carcacasAvaliadas || "—"}</td>
-                <td className="pr-2">{c.contusoesAsas || "—"}</td>
-                <td className="pr-2">{c.contusoesPeito || "—"}</td>
-                <td className="pr-2">{c.contusoesCoxa || "—"}</td>
-                <td className="pr-2">{c.fraturas || "—"}</td>
-                <td className="pr-2">{total === null ? "—" : total.toLocaleString("pt-BR")}</td>
-                <td className={acima ? "font-black text-destructive" : "font-black"}>{formatarPctHematomas(pct)}</td>
+                {LESOES_HEMATOMAS.map((l) => {
+                  const acima = hematomasLesaoAcimaDoLimite(c, l.chave, limite);
+                  return (
+                    <td key={l.chave} className={acima ? "pr-2 font-black text-destructive" : "pr-2"}>
+                      {c[l.chave] || "—"} <span className="font-black">({formatarPctHematomas(percentualDaLesao(c, l.chave))})</span>
+                    </td>
+                  );
+                })}
+                <td>{total === null ? "—" : `${total.toLocaleString("pt-BR")} (${formatarPctHematomas(pct)})`}</td>
               </tr>
             );
           })}

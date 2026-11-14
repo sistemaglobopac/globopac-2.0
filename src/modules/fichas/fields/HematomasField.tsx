@@ -15,11 +15,12 @@ import {
   LESOES_HEMATOMAS,
   LIMITE_HEMATOMAS_PCT,
   lerAvaliadas,
-  lerContagem,
+  lesaoAcimaDoLimite,
+  lesoesAcimaDoLimite,
   montarValorHematomas,
   motivosBloqueioHematomas,
+  percentualDaLesao,
   percentualHematomas,
-  percentualSobreAvaliadas,
   SETOR_RNC_HEMATOMAS,
   totalDeLesoes,
 } from "./hematomas";
@@ -82,13 +83,13 @@ export function HematomasField({ value, onChange, disabled }: HematomasFieldProp
       </div>
 
       <fieldset className="space-y-3" disabled={disabled}>
-        <legend className="text-xs font-black uppercase tracking-wider text-muted-foreground">Hematomas nas carcaças (limite {LIMITE_HEMATOMAS_PCT}%)</legend>
+        <legend className="text-xs font-black uppercase tracking-wider text-muted-foreground">Hematomas nas carcaças (limite {LIMITE_HEMATOMAS_PCT}% para cada tipo de lesão)</legend>
         <div className="space-y-1 sm:w-48">
           <Label htmlFor="hematomas-data">Data da programação</Label>
           <Input id="hematomas-data" type="date" value={dataProgramacao} onChange={(e) => setDataProgramacao(e.target.value)} />
         </div>
         <p className="text-xs text-muted-foreground">
-          Informe 0 quando não houver lesão daquele tipo. O percentual é o total de lesões (contusões nas asas, no peito, na coxa e fraturas) dividido pelas carcaças avaliadas.
+          Informe 0 quando não houver lesão daquele tipo. O percentual de cada tipo (contusões nas asas, no peito, na coxa e fraturas) é calculado sobre as carcaças avaliadas e comparado com o limite separadamente: basta um tipo passar de {LIMITE_HEMATOMAS_PCT}% para a carga ser não conforme.
         </p>
         {(cargasDoDia ?? []).length === 0 && <p className="text-xs text-muted-foreground">Nenhuma carga programada para esta data. Peça ao Administrador/Verificador para cadastrar a GTA.</p>}
 
@@ -100,6 +101,8 @@ export function HematomasField({ value, onChange, disabled }: HematomasFieldProp
           const total = totalDeLesoes(c);
           const pct = percentualHematomas(c);
           const acima = acimaDoLimite(c);
+          // Todos os dados informados: aí já dá para dizer CONFORME (NÃO CONFORME aparece assim que um tipo passa do limite).
+          const cargaCompleta = avaliadas !== null && total !== null;
           return (
             <div key={i} className={`space-y-3 rounded-md border p-3 ${acima ? "border-destructive bg-destructive/5" : ""}`} data-testid={`carga-hematomas-${i}`}>
               <div className="space-y-1">
@@ -128,8 +131,8 @@ export function HematomasField({ value, onChange, disabled }: HematomasFieldProp
 
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {LESOES_HEMATOMAS.map((l) => {
-                  const n = lerContagem(c[l.chave]);
-                  const parcial = percentualSobreAvaliadas(n, avaliadas);
+                  const parcial = percentualDaLesao(c, l.chave);
+                  const lesaoNc = lesaoAcimaDoLimite(c, l.chave);
                   return (
                     <div key={l.chave} className="space-y-1">
                       <Label htmlFor={`hematomas-${l.chave}-${i}`}>{l.rotulo}</Label>
@@ -137,11 +140,15 @@ export function HematomasField({ value, onChange, disabled }: HematomasFieldProp
                         id={`hematomas-${l.chave}-${i}`}
                         inputMode="numeric"
                         autoComplete="off"
+                        className={lesaoNc ? "border-destructive text-destructive" : ""}
                         value={c[l.chave]}
                         onChange={(e) => atualizarCarga(i, { [l.chave]: e.target.value.replace(/\D/g, "") })}
                       />
-                      <p className="text-[11px] text-muted-foreground" data-testid={`hematomas-pct-${l.chave}-${i}`}>
-                        {formatarPctHematomas(parcial)} das carcaças
+                      <p
+                        className={`text-[11px] ${lesaoNc ? "font-black text-destructive" : parcial === null ? "text-muted-foreground" : "font-semibold text-success"}`}
+                        data-testid={`hematomas-pct-${l.chave}-${i}`}
+                      >
+                        {formatarPctHematomas(parcial)} das carcaças{lesaoNc ? ` · acima de ${LIMITE_HEMATOMAS_PCT}%` : ""}
                       </p>
                     </div>
                   );
@@ -150,17 +157,22 @@ export function HematomasField({ value, onChange, disabled }: HematomasFieldProp
 
               <div
                 className={`flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm font-black ${
-                  pct === null ? "text-muted-foreground" : acima ? "border-destructive text-destructive" : "border-success text-success"
+                  acima ? "border-destructive text-destructive" : cargaCompleta ? "border-success text-success" : "text-muted-foreground"
                 }`}
                 data-testid={`hematomas-calculado-${i}`}
               >
                 <span>
                   Total de lesões: {total === null ? "—" : total.toLocaleString("pt-BR")}
-                  {avaliadas !== null && total !== null ? ` em ${avaliadas.toLocaleString("pt-BR")} carcaças` : ""}
+                  {avaliadas !== null && total !== null ? ` em ${avaliadas.toLocaleString("pt-BR")} carcaças (${formatarPctHematomas(pct)} no total, informativo)` : ""}
                 </span>
                 <span>
-                  Hematomas: {formatarPctHematomas(pct)}
-                  {pct === null ? "" : acima ? ` · NÃO CONFORME (limite ${LIMITE_HEMATOMAS_PCT}%)` : " · CONFORME"}
+                  {acima
+                    ? `NÃO CONFORME: ${lesoesAcimaDoLimite(c)
+                        .map((l) => l.rotulo.toLowerCase())
+                        .join(", ")} (limite ${LIMITE_HEMATOMAS_PCT}% por tipo)`
+                    : cargaCompleta
+                      ? `CONFORME (nenhum tipo acima de ${LIMITE_HEMATOMAS_PCT}%)`
+                      : ""}
                 </span>
               </div>
 

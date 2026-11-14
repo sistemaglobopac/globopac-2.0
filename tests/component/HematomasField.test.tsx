@@ -34,23 +34,34 @@ describe("HematomasField", () => {
 
   it("dentro do limite: mostra o percentual calculado, CONFORME, e não aponta setor de RNC", async () => {
     const ultimo = await preencher("100", "1", "1", "1", "0");
-    expect(screen.getByTestId("hematomas-calculado-0").textContent).toContain("Hematomas: 3%");
-    expect(screen.getByTestId("hematomas-calculado-0").textContent).toContain("CONFORME");
+    expect(screen.getByTestId("hematomas-pct-contusoesAsas-0").textContent).toContain("1%");
+    const resumo = screen.getByTestId("hematomas-calculado-0").textContent ?? "";
+    expect(resumo).toContain("Total de lesões: 3");
+    expect(resumo).toContain("CONFORME");
     expect(screen.getByTestId("hematomas").textContent).not.toContain("FOMENTO AVÍCOLA");
     const v = ultimo();
     expect(v.conformidade).toBe(true);
-    expect(v.cargas[0]!.hematomasPct).toBe(3);
+    expect(v.cargas[0]!.totalLesoes).toBe(3);
   });
 
-  it("acima de 4%: NÃO CONFORME e avisa que a RNC vai para o Fomento Avícola", async () => {
-    const ultimo = await preencher("100", "3", "2", "0", "1");
-    expect(screen.getByTestId("hematomas-calculado-0").textContent).toContain("Hematomas: 6%");
-    expect(screen.getByTestId("hematomas-calculado-0").textContent).toContain("NÃO CONFORME");
+  it("a soma não decide: 4 tipos em 4% somam 16% e a carga segue CONFORME", async () => {
+    const ultimo = await preencher("100", "4", "4", "4", "4");
+    expect(screen.getByTestId("hematomas-calculado-0").textContent).toContain("CONFORME");
+    expect(screen.getByTestId("hematomas-calculado-0").textContent).not.toContain("NÃO CONFORME");
+    expect(ultimo().conformidade).toBe(true);
+  });
+
+  it("um tipo acima de 4%: NÃO CONFORME, destaca o tipo e avisa que a RNC vai para o Fomento Avícola", async () => {
+    const ultimo = await preencher("100", "5", "0", "0", "0");
+    expect(screen.getByTestId("hematomas-pct-contusoesAsas-0").textContent).toContain("5%");
+    expect(screen.getByTestId("hematomas-pct-contusoesAsas-0").textContent).toContain("acima de 4%");
+    expect(screen.getByTestId("hematomas-pct-contusoesPeito-0").textContent).not.toContain("acima de");
+    expect(screen.getByTestId("hematomas-calculado-0").textContent).toContain("NÃO CONFORME: contusões nas asas");
     expect(screen.getByTestId("hematomas").textContent).toContain("FOMENTO AVÍCOLA");
     const v = ultimo();
     expect(v.conformidade).toBe(false);
     expect(v.setorRnc).toBe("FOMENTO AVÍCOLA");
-    expect(v.cargas[0]!.totalLesoes).toBe(6);
+    expect(v.detalhesRNC).toContain("contusões nas asas 5%");
   });
 
   it("mostra o percentual de cada tipo de lesão sobre as carcaças avaliadas", async () => {

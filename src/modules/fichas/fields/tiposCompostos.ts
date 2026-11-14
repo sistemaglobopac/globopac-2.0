@@ -276,11 +276,11 @@ export interface CargaHematomas {
   fraturas: string;
   /** Soma das quatro contagens (null enquanto faltar algum dado). */
   totalLesoes: number | null;
-  /** Total de lesões ÷ carcaças avaliadas × 100 (null enquanto faltar algum dado). */
+  /** Total de lesões ÷ carcaças avaliadas × 100 (null enquanto faltar algum dado). Só informativo: o limite vale por tipo. */
   hematomasPct: number | null;
 }
 
-/** Hematomas nas carcaças (Especial SIF): conforme até 4% por carga; acima disso, não conforme e a RNC
+/** Hematomas nas carcaças (Especial SIF): conforme até 4% em CADA tipo de lesão (asas, peito, coxa, fraturas) por carga; acima disso, não conforme e a RNC
  * vai para o setor em `setorRnc` (Fomento Avícola). */
 export interface HematomasCarcacasValor {
   cargas: CargaHematomas[];

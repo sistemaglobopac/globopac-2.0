@@ -1,7 +1,9 @@
 // Hematomas nas carcaças — funções PURAS. O inspetor escolhe a carga, informa quantas carcaças avaliou e quantas
-// contusões (asas, peito, coxa) e fraturas encontrou; o percentual é calculado aqui:
-//   % = (contusões nas asas + no peito + na coxa + fraturas) ÷ carcaças avaliadas × 100
-// Conforme até 4% (inclusive); acima disso a carga é NÃO CONFORME e a RNC vai para o FOMENTO AVÍCOLA.
+// contusões (asas, peito, coxa) e fraturas encontrou; o percentual é calculado aqui, POR TIPO DE LESÃO:
+//   % do tipo = contagem do tipo ÷ carcaças avaliadas × 100
+// A tolerância de 4% vale para CADA tipo separadamente (não para a soma): conforme até 4% (inclusive) em todos os
+// tipos; basta um tipo acima disso para a carga ser NÃO CONFORME, e a RNC vai para o FOMENTO AVÍCOLA. O total de
+// lesões e o seu % são só informativos (não entram no veredito).
 // Testadas em tests/unit/hematomas.test.ts.
 import { SETOR_FOMENTO_AVICOLA } from "@/shared/setor-rnc";
 import type { CargaHematomas, HematomasCarcacasValor } from "./tiposCompostos";
@@ -73,17 +75,32 @@ export function percentualSobreAvaliadas(contagem: number | null, avaliadas: num
   return (contagem / avaliadas) * 100;
 }
 
-/** Percentual de hematomas da carga (total de lesões ÷ avaliadas × 100); null enquanto faltar algum dado. */
+/** Percentual total de lesões da carga (soma ÷ avaliadas × 100). Só informativo: o limite vale por tipo de lesão. */
 export function percentualHematomas(c: Contagens): number | null {
   return percentualSobreAvaliadas(totalDeLesoes(c), lerAvaliadas(c));
 }
 
-/** A carga passou do limite? Comparação em inteiros (total × 100 > limite × avaliadas): exatamente 4% é conforme e a
- * conta não sofre com arredondamento de ponto flutuante. */
-export function acimaDoLimite(c: Contagens, limitePct: number = LIMITE_HEMATOMAS_PCT): boolean {
-  const total = totalDeLesoes(c);
+/** Percentual de UM tipo de lesão sobre as carcaças avaliadas; null enquanto faltar a contagem ou a base. */
+export function percentualDaLesao(c: Contagens, chave: ChaveLesao): number | null {
+  return percentualSobreAvaliadas(lerContagem(c[chave]), lerAvaliadas(c));
+}
+
+/** Este tipo de lesão passou do limite? Comparação em inteiros (contagem × 100 > limite × avaliadas): exatamente 4% é
+ * conforme e a conta não sofre com arredondamento de ponto flutuante. Independe das outras contagens. */
+export function lesaoAcimaDoLimite(c: Contagens, chave: ChaveLesao, limitePct: number = LIMITE_HEMATOMAS_PCT): boolean {
+  const n = lerContagem(c[chave]);
   const avaliadas = lerAvaliadas(c);
-  return total !== null && avaliadas !== null && total * 100 > limitePct * avaliadas;
+  return n !== null && avaliadas !== null && n * 100 > limitePct * avaliadas;
+}
+
+/** Os tipos de lesão da carga que passaram do limite (na ordem da tela). */
+export function lesoesAcimaDoLimite(c: Contagens, limitePct: number = LIMITE_HEMATOMAS_PCT): (typeof LESOES_HEMATOMAS)[number][] {
+  return LESOES_HEMATOMAS.filter((l) => lesaoAcimaDoLimite(c, l.chave, limitePct));
+}
+
+/** A carga é não conforme? Sim quando QUALQUER tipo de lesão passa do limite (a tolerância é por tipo, não pela soma). */
+export function acimaDoLimite(c: Contagens, limitePct: number = LIMITE_HEMATOMAS_PCT): boolean {
+  return lesoesAcimaDoLimite(c, limitePct).length > 0;
 }
 
 /** "3,25%" — duas casas, vírgula decimal; "—" sem valor. */
@@ -93,17 +110,22 @@ export function formatarPctHematomas(pct: number | null): string {
 
 const nomeDaCarga = (c: Pick<CargaHematomas, "gta">, i: number) => (c.gta ? `GTA ${c.gta}` : `Linha ${i + 1}`);
 
-/** Cargas acima do limite, em texto (para o selo, a RNC e o relatório). */
+/** Cargas com algum tipo de lesão acima do limite, em texto (para o selo, a RNC e o relatório): uma entrada por carga,
+ * listando cada tipo estourado com o seu percentual. */
 export function avaliarHematomas(v: HematomasCarcacasValor): { conformidade: boolean; motivos: string[] } {
   const limite = v.limitePct ?? LIMITE_HEMATOMAS_PCT;
   const motivos = (v.cargas ?? [])
-    .map((c, i) => ({ c, i }))
-    .filter(({ c }) => acimaDoLimite(c, limite))
-    .map(({ c, i }) => `${nomeDaCarga(c, i)}: ${formatarPctHematomas(percentualHematomas(c))} de hematomas (${totalDeLesoes(c)} lesões em ${lerAvaliadas(c)} carcaças avaliadas; limite ${limite}%)`);
+    .map((c, i) => ({ c, i, tipos: lesoesAcimaDoLimite(c, limite) }))
+    .filter(({ tipos }) => tipos.length > 0)
+    .map(
+      ({ c, i, tipos }) =>
+        `${nomeDaCarga(c, i)}: ${tipos.map((l) => `${l.rotulo.toLowerCase()} ${formatarPctHematomas(percentualDaLesao(c, l.chave))}`).join(", ")} (máx. ${limite}% por tipo; ${lerAvaliadas(c)} carcaças avaliadas)`
+    );
   return { conformidade: motivos.length === 0, motivos };
 }
 
-/** Grava no valor o que o relatório e a RNC precisam: o total e o % de cada carga, o veredito, o limite e o setor da RNC. */
+/** Grava no valor o que o relatório e a RNC precisam: o total e o % total de cada carga (informativos), o veredito por tipo
+ * de lesão, o limite e o setor da RNC. */
 export function montarValorHematomas(v: HematomasCarcacasValor): HematomasCarcacasValor {
   const limitePct = LIMITE_HEMATOMAS_PCT;
   const cargas = (v.cargas ?? []).map((c) => ({ ...c, totalLesoes: totalDeLesoes(c), hematomasPct: percentualHematomas(c) }));
@@ -114,7 +136,7 @@ export function montarValorHematomas(v: HematomasCarcacasValor): HematomasCarcac
     limitePct,
     setorRnc: SETOR_RNC_HEMATOMAS,
     conformidade,
-    detalhesRNC: motivos.length ? `Hematomas acima de ${limitePct}% — ${motivos.join("; ")}. RNC para o setor ${SETOR_RNC_HEMATOMAS}` : null,
+    detalhesRNC: motivos.length ? `Hematomas acima de ${limitePct}% em algum tipo de lesão — ${motivos.join("; ")}. RNC para o setor ${SETOR_RNC_HEMATOMAS}` : null,
   };
 }
 
